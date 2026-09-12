@@ -51,8 +51,10 @@ Bézier node editing deferred to v2, section-move by drag is navigate-only in v1
 stays where drawn in v1, `altChunk` is preserved rather than flattened, and image compression defaults
 to a PPI ladder that never downsamples below print resolution.
 
-The only item still genuinely open is **which PDF/A profile the Romanian and Russian archiving regimes
-accept** — a compliance question, not an engineering one.
+**PDF/A-2b is confirmed** as the archival profile (owner, 2026-09-12), configurable so a host can select
+another. The profile choice is settled; whether the Romanian and Russian archiving regimes *accept* it for
+a given filing remains a compliance verification the owner should confirm with whoever handles that, but
+it no longer blocks any implementation work. **No product decisions remain open.**
 
 ---
 
