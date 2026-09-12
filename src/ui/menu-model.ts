@@ -263,15 +263,15 @@ export const RIBBON_TABS: readonly UiTab[] = [
             labelKey: 'ui.control.textColor',
             command: command('format.setColor'),
             keytip: 'FC',
-            action: 'openDialog',
-            actionArgs: { dialog: command('format.setColor') },
+            action: 'openColourPicker',
+            actionArgs: { command: command('format.setColor') },
           }),
           button({
             labelKey: 'ui.control.highlight',
             command: command('format.setHighlight'),
             keytip: 'H',
-            action: 'openDialog',
-            actionArgs: { dialog: command('format.setHighlight') },
+            action: 'openColourPicker',
+            actionArgs: { command: command('format.setHighlight') },
           }),
           button({
             labelKey: 'ui.control.clearFormatting',
@@ -820,8 +820,8 @@ const fontSubmenu = (prefix: string): UiNode =>
     toggle({ labelKey: 'ui.control.superscript', id: `${prefix}:sup`, command: command('format.superscript') }),
     toggle({ labelKey: 'ui.control.subscript', id: `${prefix}:sub`, command: command('format.subscript') }),
     separator(`${prefix}:font-sep2`),
-    button({ labelKey: 'ui.control.textColor', id: `${prefix}:color`, command: command('format.setColor'), action: 'openDialog', actionArgs: { dialog: command('format.setColor') } }),
-    button({ labelKey: 'ui.control.highlight', id: `${prefix}:highlight`, command: command('format.setHighlight'), action: 'openDialog', actionArgs: { dialog: command('format.setHighlight') } }),
+    button({ labelKey: 'ui.control.textColor', id: `${prefix}:color`, command: command('format.setColor'), action: 'openColourPicker', actionArgs: { command: command('format.setColor') } }),
+    button({ labelKey: 'ui.control.highlight', id: `${prefix}:highlight`, command: command('format.setHighlight'), action: 'openColourPicker', actionArgs: { command: command('format.setHighlight') } }),
   ]);
 
 const paragraphSubmenu = (prefix: string): UiNode =>
@@ -1045,8 +1045,8 @@ export const FLOATING_CONTROLS: readonly UiNode[] = [
   toggle({ labelKey: 'ui.control.underline', id: 'float:underline', command: command('format.underline') }),
   toggle({ labelKey: 'ui.control.strike', id: 'float:strike', command: command('format.strike') }),
   separator('float:sep2'),
-  button({ labelKey: 'ui.control.textColor', id: 'float:color', command: command('format.setColor'), action: 'openDialog', actionArgs: { dialog: command('format.setColor') } }),
-  button({ labelKey: 'ui.control.highlight', id: 'float:highlight', command: command('format.setHighlight'), action: 'openDialog', actionArgs: { dialog: command('format.setHighlight') } }),
+  button({ labelKey: 'ui.control.textColor', id: 'float:color', command: command('format.setColor'), action: 'openColourPicker', actionArgs: { command: command('format.setColor') } }),
+  button({ labelKey: 'ui.control.highlight', id: 'float:highlight', command: command('format.setHighlight'), action: 'openColourPicker', actionArgs: { command: command('format.setHighlight') } }),
   separator('float:sep3'),
   toggle({ labelKey: 'ui.control.alignLeft', id: 'float:al', command: command('format.alignLeft') }),
   toggle({ labelKey: 'ui.control.alignCenter', id: 'float:ac', command: command('format.alignCenter') }),

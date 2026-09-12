@@ -16,6 +16,10 @@ import type { UiNode, UiTab } from './menu-model.js';
 import { createEditorQueries, NO_QUERIES } from './queries.js';
 import type { EditorQueries } from './queries.js';
 import { createRuler, RULER_UNITS } from './ruler.js';
+import { createVerticalRuler } from './ruler-vertical.js';
+import type { VerticalRulerHandle } from './ruler-vertical.js';
+import { SET_HIGHLIGHT_COMMAND, createColourPicker } from './colour-picker.js';
+import type { ColourPickerHandle } from './colour-picker.js';
 import type { RulerHandle, RulerIndents } from './ruler.js';
 import { createChromeStore, initialChromeState } from './store.js';
 import type { ChromeStore } from './store.js';
@@ -55,6 +59,7 @@ const ACTIONS: readonly ChromeActionName[] = [
   'hideFloatingControls',
   'openContextMenu',
   'openDialog',
+  'openColourPicker',
   'closeDialog',
   'setIndent',
   'setMargin',
@@ -269,6 +274,38 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       case 'zoomSet':
         setZoom(Number(args?.zoom ?? 1));
         return;
+      case 'openColourPicker': {
+        const command = typeof args?.command === 'string' ? args.command : '';
+        if (command === '') return;
+        const session = handle.session;
+        const model = handle.document;
+        const readColour = (): string | undefined => {
+          if (session === undefined || model === undefined) return undefined;
+          const marks = marksAt(model, session, handle.selection.focus);
+          if (marks === undefined) return undefined;
+          return command === SET_HIGHLIGHT_COMMAND ? marks.highlight : marks.color;
+        };
+        let picker = colourPickers.get(command);
+        if (picker === undefined) {
+          picker = createColourPicker({
+            context,
+            command,
+            value: readColour,
+            mount: portal ?? root,
+          });
+          colourPickers.set(command, picker);
+          styleStore.add(picker);
+        } else {
+          picker.refresh();
+        }
+        const anchor = args?.anchor;
+        const rect =
+          anchor !== null && typeof anchor === 'object' && 'left' in anchor
+            ? (anchor as { left: number; top: number; width: number; height: number })
+            : undefined;
+        picker.open(rect ?? { left: 0, top: 0, width: 0, height: 0 });
+        return;
+      }
       case 'zoomFit':
         setZoom(fitZoom(args?.mode === 'wholePage' ? 'wholePage' : 'pageWidth'));
         return;
@@ -422,6 +459,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
   let menuBar: MenuBarHandle | undefined;
   let ruler: RulerHandle | undefined;
+  let verticalRuler: VerticalRulerHandle | undefined;
+  const colourPickers = new Map<string, ColourPickerHandle>();
   let statusBar: StatusBarHandle | undefined;
   let floating: FloatingToolbarHandle | undefined;
   let contextMenus: ContextMenuController | undefined;
@@ -479,6 +518,20 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       });
       root.appendChild(mountInto('ruler', ruler.element));
       styleStore.add(ruler);
+
+      verticalRuler = createVerticalRuler({
+        context,
+        metrics: () => {
+          const page = queries.pageFragment(queries.page() - 1);
+          if (page === undefined) return undefined;
+          return {
+            page,
+            zoom: queries.zoom(),
+            offsetPx: queries.offsetYPx(),
+          };
+        },
+      });
+      styleStore.add(verticalRuler);
     }
 
     if (enabled('statusBar')) {
@@ -534,6 +587,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
     const rootNode = handle.root;
     if (rootNode.parentNode === container) {
+      if (verticalRuler !== undefined) canvas.appendChild(verticalRuler.element);
       canvas.appendChild(rootNode);
       root.appendChild(canvas);
     }
@@ -614,6 +668,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   function syncSurfaces(): void {
     sync();
     ruler?.refresh();
+    verticalRuler?.refresh();
     statusBar?.refresh();
   }
 
@@ -627,6 +682,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
   const viewportChanged = (): void => {
     ruler?.refresh();
+    verticalRuler?.refresh();
   };
   const ownerWindow = handle.root.ownerDocument.defaultView;
   const ownerDocument = handle.root.ownerDocument;

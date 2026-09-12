@@ -21,6 +21,7 @@ export interface EditorQueries {
   readonly indents: () => RulerIndents | undefined;
   readonly pageFragment: (index: number) => PageFragment | undefined;
   readonly offsetPx: () => number;
+  readonly offsetYPx: () => number;
   dispose(): void;
 }
 
@@ -70,6 +71,13 @@ export const createEditorQueries = (
     return sheet.getBoundingClientRect().left - handle.element.getBoundingClientRect().left;
   };
 
+  const pageOriginYPx = (): number => {
+    const sheet = handle.element.querySelector<HTMLElement>(`[${ATTR.page}]`);
+    if (sheet === null) return 0;
+    const host = handle.element.querySelector<HTMLElement>('.docier-canvas') ?? handle.element;
+    return sheet.getBoundingClientRect().top - host.getBoundingClientRect().top;
+  };
+
   const self: Omit<EditorQueries, 'setSurface'> = {
     words: () => countWords(handle),
     page: () => {
@@ -95,6 +103,7 @@ export const createEditorQueries = (
     indents: () => options?.indents?.(self.page()) ?? DEFAULT_INDENTS,
     pageFragment: (index) => handle.layout?.pages[index],
     offsetPx: () => pageOriginPx(),
+    offsetYPx: () => pageOriginYPx(),
     dispose: () => {
       if (disposed) return;
       disposed = true;
@@ -124,5 +133,6 @@ export const NO_QUERIES: EditorQueries = {
   indents: () => DEFAULT_INDENTS,
   pageFragment: () => undefined,
   offsetPx: () => 0,
+  offsetYPx: () => 0,
   dispose: () => {},
 };

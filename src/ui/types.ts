@@ -82,6 +82,7 @@ export type ChromeActionName =
   | 'hideFloatingControls'
   | 'openContextMenu'
   | 'openDialog'
+  | 'openColourPicker'
   | 'closeDialog'
   | 'setIndent'
   | 'setMargin'

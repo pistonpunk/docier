@@ -97,3 +97,7 @@ export { NO_QUERIES, countWords, createEditorQueries } from './queries.js';
 
 export type { ChromeHandle, ChromeOptions } from './chrome.js';
 export { DEFAULT_CHROME_THEME, DENSITY_THEME, mountChrome } from './chrome.js';
+export { createVerticalRuler } from './ruler-vertical.js';
+export type { VerticalRulerHandle, VerticalRulerOptions, VerticalMarginSide } from './ruler-vertical.js';
+export { SET_COLOR_COMMAND, SET_HIGHLIGHT_COMMAND, NO_COLOUR, createColourPicker } from './colour-picker.js';
+export type { ColourKind, ColourPickerAnchor, ColourPickerHandle, ColourPickerOptions, ColourSection, ColourSwatch } from './colour-picker.js';

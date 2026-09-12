@@ -374,6 +374,14 @@ export const createControl = (
       if (resolved.reason !== undefined) context.run('flushMessage', { message: resolved.reason });
       return;
     }
+    if (spec.action === 'openColourPicker') {
+      const args = node.actionArgs ?? spec.args;
+      context.run('openColourPicker', {
+        ...(typeof args === 'object' && args !== null ? args : {}),
+        anchor: element.getBoundingClientRect(),
+      });
+      return;
+    }
     context.invoke(spec);
   });
 

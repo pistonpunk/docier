@@ -340,6 +340,7 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
   };
 
   let guide: HTMLElement | undefined;
+  let cancelDrag: (() => void) | undefined;
 
   const guideHost = (): HTMLElement | undefined => {
     const canvas = element.parentElement?.querySelector('.docier-canvas');
@@ -410,6 +411,14 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     doc.addEventListener('pointermove', onMove);
     doc.addEventListener('pointerup', onUp);
     doc.addEventListener('keydown', onKey);
+    cancelDrag = () => {
+      hideGuide();
+      badge.hidden = true;
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('keydown', onKey);
+      cancelDrag = undefined;
+    };
   };
 
   for (const side of ['left', 'right'] as const) {
@@ -445,6 +454,7 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     textArea,
     refresh,
     dispose: () => {
+      cancelDrag?.();
       store.dispose();
     },
   };

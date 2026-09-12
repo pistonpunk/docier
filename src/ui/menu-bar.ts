@@ -1,5 +1,5 @@
 import type { Disposable } from '../api/types.js';
-import { applyResolved, createControl, specOf } from './controls.js';
+import { applyResolved, applyValue, createControl, specOf } from './controls.js';
 import { createDisposableStore, markPart, markSlot, make, setText } from './dom.js';
 import { attachRoving, normaliseKeyTip } from './keyboard.js';
 import type { UiNode, UiTab } from './menu-model.js';
@@ -146,7 +146,12 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
       groupElement.setAttribute('data-docier-group', group.id);
       const controls = make('div', 'docier-group-controls');
       for (const node of group.nodes) {
-        const element = createControl(context, node, { role: 'button' });
+        const element = createControl(context, node, {
+          role: 'button',
+          onItem: (itemElement, itemNode) => {
+            bindNode(itemElement, itemNode, 'button');
+          },
+        });
         bindNode(element, node, roleForNode(node));
         if (node.kind === 'menu') {
           element.setAttribute('aria-expanded', 'false');
@@ -291,7 +296,8 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   backstagePanel.setAttribute('aria-label', context.i18n.text('ui.chrome.backstage'));
   const backstageItems = make('div', 'docier-backstage-items');
   for (const node of backstage) {
-    const element = createControl(context, node, { role: 'button' });
+    const element = createControl(context, node, { role: 'button', icon: false });
+    element.classList.add('docier-backstage-item');
     bindNode(element, node, 'button');
     backstageItems.appendChild(element);
   }
@@ -322,6 +328,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
     for (const entry of bound) {
       const resolved: ResolvedControl = context.describe(entry.spec);
       applyResolved(entry.element, resolved, entry.role);
+      applyValue(entry.element, resolved);
     }
     ribbon.setAttribute('data-docier-collapsed', context.state.collapse);
     const collapsedLabel = context.i18n.text(
