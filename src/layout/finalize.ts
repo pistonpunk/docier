@@ -16,6 +16,7 @@ import type {
   LayoutDiagnostic,
   LayoutResult,
   LineFragment,
+  LineRun,
   PageFragment,
   Rect,
   RowFragment,
@@ -164,7 +165,9 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
         const end = lineEndOf(line, markPos);
         const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
         const stops = caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak);
-        const runs = runsOfPlaced(line.placed);
+        const runs: LineRun[] = [];
+        for (const run of runsOfPlaced(line.prefix)) runs.push(run);
+        for (const run of runsOfPlaced(line.placed)) runs.push(run);
         const fragment: LineFragment = {
           id: lineId,
           box: { x, y, width: geometry.width, height: geometry.height },

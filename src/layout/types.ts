@@ -46,6 +46,7 @@ export type LayoutDiagnosticCode =
   | 'keepNextContradiction'
   | 'noteMarksNotLaidOut'
   | 'numberingTextNotLaidOut'
+  | 'numberingFormatNotLaidOut'
   | 'columnsNotLaidOut'
   | 'tablesNotLaidOut'
   | 'drawingsNotLaidOut'

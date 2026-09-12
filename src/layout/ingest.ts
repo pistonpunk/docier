@@ -5,6 +5,8 @@ import type {
   AlternateChoice,
   AlternateContentSelection,
   DocumentModel,
+  LevelJustification,
+  LevelSuffix,
   Paragraph,
   RunContent,
 } from '../model/index.js';
@@ -24,6 +26,7 @@ import {
 } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
 import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
+import { NumberingCounters, defaultLevelText, numberTextOf } from './numbering.js';
 import { objectPlacementOf } from './objects.js';
 import { borderSetOf, shadingOf } from './table-borders.js';
 import { Hasher } from './hash.js';
@@ -54,12 +57,20 @@ export interface IngestedRun {
   readonly docEnd: DocPos;
 }
 
+export interface IngestedNumbering {
+  readonly text: string;
+  readonly format: RunFormat;
+  readonly suffix: LevelSuffix;
+  readonly justification: LevelJustification;
+}
+
 export interface IngestedParagraph {
   readonly index: number;
   readonly format: ParagraphFormat;
   readonly paragraphGroup: string;
   readonly markFormat: RunFormat;
   readonly runs: readonly IngestedRun[];
+  readonly numbering: IngestedNumbering | undefined;
   readonly docStart: DocPos;
   readonly docEnd: DocPos;
   readonly endsSection: boolean;
@@ -75,7 +86,6 @@ export interface IngestedDocument {
   readonly paragraphs: readonly IngestedParagraph[];
   readonly bodySectionPropertiesElement: XmlElement | undefined;
   readonly defaultTabStop: Mp;
-  readonly hasNumbering: boolean;
   readonly hasThemeFonts: boolean;
   readonly hasFields: boolean;
   readonly hasNotes: boolean;
@@ -187,7 +197,6 @@ interface ParagraphIngest {
   readonly hasNotes: boolean;
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
-  readonly hasNumbering: boolean;
   readonly diagnostics: readonly LayoutDiagnostic[];
 }
 
@@ -252,12 +261,76 @@ export const paragraphDecorationOf = (
   };
 };
 
+interface ResolvedNumbering {
+  readonly numbering: IngestedNumbering | undefined;
+  readonly diagnostics: readonly LayoutDiagnostic[];
+}
+
+const resolveNumbering = (
+  model: DocumentModel,
+  paragraph: Paragraph,
+  start: DocPos,
+  options: IngestOptions,
+  counters: NumberingCounters,
+): ResolvedNumbering => {
+  const declared = model.resolveParagraphProperties(paragraph).numberingId;
+  if (declared === undefined || declared === 0) return { numbering: undefined, diagnostics: [] };
+  const context = model.numberingFor(paragraph.properties.element);
+  if (context === undefined) {
+    return {
+      numbering: undefined,
+      diagnostics: [
+        {
+          code: 'numberingTextNotLaidOut',
+          severity: 'warning',
+          message: `w:numId ${declared} does not resolve to a numbering level, so no number was laid out`,
+          docPos: start,
+        },
+      ],
+    };
+  }
+  const { numId, ilvl, level } = context;
+  const numbering = model.numbering;
+  const levelOf = (at: number) => numbering?.levelFor(numId, at);
+  const startOf = (at: number) => numbering?.startFor(numId, at) ?? 1;
+  const values = counters.advance(numId, ilvl, { levelOf, startOf });
+  const text = numberTextOf({
+    levelText: level.levelText ?? defaultLevelText(ilvl),
+    formatOf: (at) => levelOf(at)?.numFormat,
+    startOf,
+    values: values.values,
+  });
+  const diagnostics: LayoutDiagnostic[] = [];
+  if (text.unsupported.length > 0) {
+    diagnostics.push({
+      code: 'numberingFormatNotLaidOut',
+      severity: 'warning',
+      message: `number format "${text.unsupported.join('", "')}" is not produced by this slice; the counter was written in decimal`,
+      docPos: start,
+    });
+  }
+  const format = runFormatOf(
+    model.resolveRunProperties(paragraph, level.runPropertiesElement),
+    options.defaultFontFamily,
+  );
+  return {
+    numbering: {
+      text: text.text,
+      format,
+      suffix: level.suff,
+      justification: level.lvlJc ?? 'left',
+    },
+    diagnostics,
+  };
+};
+
 export const ingestParagraph = (
   model: DocumentModel,
   paragraph: Paragraph,
   index: number,
   start: DocPos,
   options: IngestOptions,
+  counters: NumberingCounters,
 ): ParagraphIngest => {
   const resolvedParagraph = model.resolveParagraphProperties(paragraph);
   const markResolved = model.resolveRunProperties(paragraph, paragraph.markProperties.element);
@@ -325,7 +398,8 @@ export const ingestParagraph = (
     runs.push({ format: runFormat, items, docStart: runStart, docEnd: docPos(cursor) });
   }
 
-  const numberingId = resolvedParagraph.numberingId;
+  const numbering = resolveNumbering(model, paragraph, start, options, counters);
+  for (const diagnostic of numbering.diagnostics) diagnostics.push(diagnostic);
   return {
     paragraph: {
       index,
@@ -333,6 +407,7 @@ export const ingestParagraph = (
       paragraphGroup: resolvedParagraph.describe('contextualSpacing') ?? 'none',
       markFormat,
       runs,
+      numbering: numbering.numbering,
       docStart: start,
       docEnd: docPos(cursor + MARK_POSITION),
       endsSection: paragraph.hasSectionBreak,
@@ -344,7 +419,6 @@ export const ingestParagraph = (
     hasNotes,
     hasDrawings,
     hasUnresolvedDrawings,
-    hasNumbering: numberingId !== undefined && numberingId !== 0,
     diagnostics,
   };
 };
@@ -361,13 +435,13 @@ export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDo
     options,
     diagnostics,
     paragraphs: [],
+    counters: new NumberingCounters(),
     flags: {
       themeFonts: false,
       fields: false,
       notes: false,
       drawings: false,
       unresolvedDrawings: false,
-      numbering: false,
     },
     cursor: 0,
   };
@@ -378,7 +452,6 @@ export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDo
     paragraphs: state.paragraphs,
     bodySectionPropertiesElement: model.body().sectionPropertiesElement(),
     defaultTabStop: options.defaultTabStop,
-    hasNumbering: state.flags.numbering,
     hasThemeFonts: state.flags.themeFonts,
     hasFields: state.flags.fields,
     hasNotes: state.flags.notes,

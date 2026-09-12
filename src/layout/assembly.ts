@@ -16,9 +16,15 @@ export interface LaidLine {
   readonly start: number;
   readonly end: number;
   readonly placed: readonly PlacedAtom[];
+  readonly prefix: readonly PlacedAtom[];
   readonly geometry: LineGeometry;
   readonly justified: boolean;
   readonly breakAfter: ForcedBreak;
+}
+
+export interface NumberingPlacement {
+  readonly prefix: readonly PlacedAtom[];
+  readonly textStart: Mp;
 }
 
 export interface AssembleRequest {
@@ -26,6 +32,7 @@ export interface AssembleRequest {
   readonly format: ParagraphFormat;
   readonly fallbackBox: LineBox;
   readonly context: MeasureContext;
+  readonly numbering: NumberingPlacement | undefined;
   readonly contentX: Mp;
   readonly contentWidth: Mp;
 }
@@ -51,11 +58,15 @@ const hyphenAtomOf = (atom: Atom): Atom | undefined => {
 const HYPHEN_TEXT = '-';
 
 export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[] => {
-  const { measured, format, contentX, contentWidth } = request;
+  const { measured, format, contentX, contentWidth, numbering } = request;
   const origin = mp(contentX + format.indentStart);
   const available = maxMp(mp(contentWidth - format.indentStart - format.indentEnd), mp(0));
-  const firstLineOrigin = mp(origin + format.firstLine);
-  const firstLineAvailable = maxMp(mp(available - format.firstLine), mp(0));
+  const firstLineOrigin =
+    numbering === undefined ? mp(origin + format.firstLine) : numbering.textStart;
+  const firstLineAvailable = maxMp(
+    mp(contentWidth - (firstLineOrigin - contentX) - format.indentEnd),
+    mp(0),
+  );
 
   const breaks: readonly BreakLine[] = greedyBreaker.breakParagraph({
     measured,
@@ -102,11 +113,16 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
       if (shift !== 0) placed = shiftPlaced(placed, shift);
     }
 
+    const prefix = index === 0 && numbering !== undefined ? numbering.prefix : [];
+    const withPrefix = prefix.length === 0 ? placed : [...prefix, ...placed];
+    const geometryOrigin = prefix[0]?.x ?? lineOrigin;
+
     lines.push({
       start: line.start,
       end: line.end,
       placed,
-      geometry: geometryOfPlaced(placed, request.fallbackBox, lineOrigin),
+      prefix,
+      geometry: geometryOfPlaced(withPrefix, request.fallbackBox, geometryOrigin),
       justified: stretches,
       breakAfter: line.forced,
     });

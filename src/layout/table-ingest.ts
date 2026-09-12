@@ -12,6 +12,7 @@ import type {
 } from '../model/index.js';
 import type { BorderSet, CellMergeRole, CellVerticalAlignment, DocPos, LayoutDiagnostic, Shading } from './types.js';
 import { docPos } from './types.js';
+import type { NumberingCounters } from './numbering.js';
 import type { IngestedBlock, IngestedParagraph, IngestOptions } from './ingest.js';
 import { MAX_DOC_POS, ingestParagraph } from './ingest.js';
 import type { TableBorderDeclarations } from './table-borders.js';
@@ -98,7 +99,6 @@ export interface IngestFlags {
   notes: boolean;
   drawings: boolean;
   unresolvedDrawings: boolean;
-  numbering: boolean;
 }
 
 export interface IngestState {
@@ -106,6 +106,7 @@ export interface IngestState {
   readonly options: IngestOptions;
   readonly diagnostics: LayoutDiagnostic[];
   readonly paragraphs: IngestedParagraph[];
+  readonly counters: NumberingCounters;
   readonly flags: IngestFlags;
   cursor: number;
 }
@@ -374,6 +375,7 @@ export const ingestBlockList = (
         state.paragraphs.length,
         docPos(state.cursor),
         state.options,
+        state.counters,
       );
       if (result.next > MAX_DOC_POS) {
         state.diagnostics.push({
@@ -392,7 +394,6 @@ export const ingestBlockList = (
       state.flags.notes = state.flags.notes || result.hasNotes;
       state.flags.drawings = state.flags.drawings || result.hasDrawings;
       state.flags.unresolvedDrawings = state.flags.unresolvedDrawings || result.hasUnresolvedDrawings;
-      state.flags.numbering = state.flags.numbering || result.hasNumbering;
       out.push({ kind: 'paragraph', paragraph: result.paragraph });
       continue;
     }

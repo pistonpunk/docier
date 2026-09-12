@@ -43,8 +43,16 @@ export { LAYOUT_RESULT_VERSION, DOC_POS_ORIGIN, docPos } from './types.js';
 export type { Atom, ParagraphAtoms, AtomizeOptions } from './atoms.js';
 export { atomize, isCollapsibleSpace, isNonBreakingSpace } from './atoms.js';
 
-export type { LaidLine, AssembleRequest } from './assembly.js';
+export type { LaidLine, AssembleRequest, NumberingPlacement } from './assembly.js';
 export { assembleParagraph } from './assembly.js';
+
+export type {
+  CounterValues,
+  NumberText,
+  NumberTextRequest,
+  NumberingLevelSource,
+} from './numbering.js';
+export { NumberingCounters, defaultLevelText, formatCounter, numberTextOf } from './numbering.js';
 
 export type { BreakLine, BreakRequest, Breaker } from './breaking.js';
 export { greedyBreaker } from './breaking.js';
@@ -90,7 +98,14 @@ export {
 export { deepFreeze } from './freeze.js';
 export { Hasher } from './hash.js';
 
-export type { IngestedDocument, IngestedItem, IngestedParagraph, IngestedRun, IngestOptions } from './ingest.js';
+export type {
+  IngestedDocument,
+  IngestedItem,
+  IngestedNumbering,
+  IngestedParagraph,
+  IngestedRun,
+  IngestOptions,
+} from './ingest.js';
 export { MAX_DOC_POS, ingest, ingestParagraph, paragraphDecorationOf } from './ingest.js';
 
 export type { LineRef, IndexInput } from './indices.js';
