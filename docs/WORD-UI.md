@@ -255,3 +255,32 @@ the wrapping grid in the ribbon with a single-row horizontal gallery with
 overflow, which is a change to the gallery control rather than to the ribbon's
 widths. That would put the Styles group at one row, leave Font's two rows as the
 tallest, and make 84px reachable.
+
+### What 84px actually requires, after trying it
+
+Attempted and reverted, with the result recorded because it settles the question.
+
+Making the ribbon's gallery a single scrolling row of wider tiles, in the
+document font, does work in principle: with a bounded flex basis and `min-width:
+0` on the growing group, the gallery stopped demanding all 704px of its columns,
+and eight of the nine tabs came down to exactly 84px with no overflow and no
+overlapping controls.
+
+Home did not. It settled at 107px with two overlapping controls, because the
+Styles group took 437px of a 1202px budget by growing into the slack, which left
+the Font group at 313px where it needs 410 for two rows, so Font went to three
+rows and the extra row pushed the panel past the token. Fixing it by giving Font
+its 410 means Styles gets about 350, and the five groups then want 1209px against
+1202 available.
+
+So 84px is not reachable by redistributing width across these five groups at a
+1214px ribbon. The change was reverted to the clean 112px state rather than
+shipped at 107px with two collisions, since a collision is worse than 5px of
+height.
+
+The conclusion is the same one the plan started from, now with a number behind
+it: the way to 84px is fewer rows of controls, which means the large button
+variant and a Trimmed set of what appears on the Home tab, not more width spent
+on a gallery. The gallery work above is worth keeping in mind for that pass: a
+single scrolling row is what Word uses and it is the right shape, it just cannot
+carry the whole 28px on its own.
