@@ -30,16 +30,17 @@ body {
 #app {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-  grid-template-areas:
-    'bar bar'
-    'stage diagnostics';
   height: 100vh;
   height: 100dvh;
 }
 
+.workspace {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+
 .appbar {
-  grid-area: bar;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -119,7 +120,7 @@ body {
 }
 
 .stage {
-  grid-area: stage;
+  flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
   padding: 12px;
@@ -145,7 +146,10 @@ body {
 }
 
 .diagnostics {
-  grid-area: diagnostics;
+  flex: 0 0 auto;
+  position: relative;
+  width: var(--panel-width, 360px);
+  max-width: 80%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -153,8 +157,67 @@ body {
   background: var(--panel);
 }
 
-.diagnostics[data-collapsed='true'] .diagnostics-list {
+.diagnostics[data-collapsed='true'] {
+  width: auto;
+  max-width: 80%;
+}
+
+.diagnostics[data-collapsed='true'] .diagnostics-list,
+.diagnostics[data-collapsed='true'] .diagnostics-head h2,
+.diagnostics[data-collapsed='true'] .diagnostics-clear {
   display: none;
+}
+
+.splitter {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -3px;
+  width: 7px;
+  cursor: col-resize;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  touch-action: none;
+  z-index: 2;
+}
+
+.splitter:hover,
+.splitter:focus-visible {
+  background: color-mix(in srgb, var(--lime-deep) 45%, transparent);
+  outline: none;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  inset-block: 45%;
+  inset-inline-start: 3px;
+  width: 1px;
+  height: 10%;
+  background: var(--line);
+}
+
+.diagnostics[data-collapsed='true'] .splitter {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .workspace {
+    flex-direction: column;
+  }
+
+  .diagnostics,
+  .diagnostics[data-collapsed='true'] {
+    width: auto;
+    max-width: none;
+    max-height: 45vh;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .splitter {
+    display: none;
+  }
 }
 
 .diagnostics-head {
@@ -244,18 +307,8 @@ body {
   font-size: 11px;
 }
 
-@media (max-width: 900px) {
-  #app {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) minmax(0, 40vh);
-    grid-template-areas:
-      'bar'
-      'stage'
-      'diagnostics';
-  }
-
-  .diagnostics {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
+.appbar .btn:focus-visible,
+.diagnostics .btn:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 1px;
 }

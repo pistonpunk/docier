@@ -17,6 +17,61 @@ export interface Panel {
 }
 
 const MAX_ENTRIES = 400;
+const MIN_PANEL_PX = 220;
+const MIN_STAGE_PX = 320;
+const DRAG_STEP_PX = 16;
+
+const installSplitter = (root: HTMLElement): void => {
+  const workspace = root.parentElement;
+  if (workspace === null) return;
+  const handle = document.createElement('div');
+  handle.className = 'splitter';
+  handle.tabIndex = 0;
+  handle.setAttribute('role', 'separator');
+  handle.setAttribute('aria-orientation', 'vertical');
+  handle.setAttribute('aria-label', 'Resize the diagnostics panel');
+  root.prepend(handle);
+
+  const maxWidth = (): number => Math.max(MIN_PANEL_PX, workspace.clientWidth - MIN_STAGE_PX);
+
+  const setWidth = (px: number): void => {
+    const limit = maxWidth();
+    const clamped = Math.max(MIN_PANEL_PX, Math.min(limit, Math.round(px)));
+    root.style.setProperty('--panel-width', `${String(clamped)}px`);
+    handle.setAttribute('aria-valuenow', String(clamped));
+    handle.setAttribute('aria-valuemin', String(MIN_PANEL_PX));
+    handle.setAttribute('aria-valuemax', String(Math.round(limit)));
+  };
+
+  let dragging = false;
+  handle.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  handle.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    setWidth(workspace.getBoundingClientRect().right - event.clientX);
+  });
+  const stop = (event: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = false;
+    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+  };
+  handle.addEventListener('pointerup', stop);
+  handle.addEventListener('pointercancel', stop);
+  handle.addEventListener('keydown', (event) => {
+    const current = root.getBoundingClientRect().width;
+    if (event.key === 'ArrowLeft') setWidth(current + DRAG_STEP_PX);
+    else if (event.key === 'ArrowRight') setWidth(current - DRAG_STEP_PX);
+    else if (event.key === 'Home') setWidth(MIN_PANEL_PX);
+    else if (event.key === 'End') setWidth(maxWidth());
+    else return;
+    event.preventDefault();
+  });
+
+  setWidth(root.getBoundingClientRect().width);
+};
 
 export const createPanel = (list: HTMLElement, count: HTMLElement, root: HTMLElement): Panel => {
   let total = 0;
@@ -68,6 +123,7 @@ export const createPanel = (list: HTMLElement, count: HTMLElement, root: HTMLEle
   };
 
   render();
+  installSplitter(root);
 
   return {
     add,
