@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Paragraph } from '../../src/model/blocks/paragraph.js';
 import type { Table } from '../../src/model/blocks/table.js';
+import { removeElement, removeWAttr, setWAttr } from '../../src/model/index.js';
 import { childElement } from './support.js';
 import {
   numberingRelationship,
@@ -126,6 +127,69 @@ describe('style cascade', () => {
     const resolved = model.resolveRunProperties(paragraph, firstRunProperties(paragraph));
     expect(resolved.italic).toBe(false);
     expect(resolved.describe('i')).toBe('paragraphMark');
+  });
+});
+
+describe('resolver cache invalidation', () => {
+  it('re-resolves a run after direct formatting changes in place', async () => {
+    const model = await openModel({
+      body: '<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>a</w:t></w:r></w:p>',
+      styles: BASE_STYLES,
+      documentRelationships: [stylesRelationship()],
+    });
+    const paragraph = model.paragraphs()[0];
+    if (paragraph === undefined) throw new Error('no paragraph');
+    const properties = firstRunProperties(paragraph);
+    if (properties === undefined) throw new Error('no run properties');
+    expect(model.resolveRunProperties(paragraph, properties).bold).toBe(true);
+
+    const bold = childElement(properties, 'b');
+    if (bold === undefined) throw new Error('no bold element');
+    setWAttr(bold, 'val', '0');
+    expect(model.resolveRunProperties(paragraph, properties).bold).toBe(false);
+
+    removeWAttr(bold, 'val');
+    expect(model.resolveRunProperties(paragraph, properties).bold).toBe(true);
+
+    removeElement(bold);
+    expect(model.resolveRunProperties(paragraph, properties).bold).toBeUndefined();
+  });
+
+  it('re-resolves a run when the paragraph mark properties change in place', async () => {
+    const model = await openModel({
+      body: '<w:p><w:pPr><w:rPr><w:b/></w:rPr></w:pPr><w:r><w:rPr><w:i/></w:rPr><w:t>a</w:t></w:r></w:p>',
+      styles: BASE_STYLES,
+      documentRelationships: [stylesRelationship()],
+    });
+    const paragraph = model.paragraphs()[0];
+    if (paragraph === undefined) throw new Error('no paragraph');
+    const properties = firstRunProperties(paragraph);
+    if (properties === undefined) throw new Error('no run properties');
+    expect(model.resolveRunProperties(paragraph, properties).bold).toBe(true);
+
+    const mark = paragraph.properties.element;
+    const markProperties = mark === undefined ? undefined : childElement(mark, 'rPr');
+    const bold = markProperties === undefined ? undefined : childElement(markProperties, 'b');
+    if (bold === undefined) throw new Error('no mark bold element');
+    setWAttr(bold, 'val', '0');
+    expect(model.resolveRunProperties(paragraph, properties).bold).toBeUndefined();
+  });
+
+  it('re-resolves a paragraph after its properties change in place', async () => {
+    const model = await openModel({
+      body: '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>a</w:t></w:r></w:p>',
+      styles: BASE_STYLES,
+      documentRelationships: [stylesRelationship()],
+    });
+    const paragraph = model.paragraphs()[0];
+    if (paragraph === undefined) throw new Error('no paragraph');
+    expect(model.resolveParagraphProperties(paragraph).justification).toBe('center');
+
+    const properties = paragraph.properties.element;
+    const justification = properties === undefined ? undefined : childElement(properties, 'jc');
+    if (justification === undefined) throw new Error('no jc element');
+    setWAttr(justification, 'val', 'right');
+    expect(model.resolveParagraphProperties(paragraph).justification).toBe('right');
   });
 });
 

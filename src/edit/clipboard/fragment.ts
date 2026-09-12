@@ -41,6 +41,13 @@ export const createWrapper = (): XmlElement => {
   return wrapper;
 };
 
+export const appendWElement = (parent: XmlElement, localName: string): XmlElement => {
+  const element = createWElement(parent, localName);
+  parent.children.push(element);
+  parent.selfClosing = false;
+  return element;
+};
+
 const collectPrefixes = (
   node: XmlNode,
   into: Map<string, string>,
@@ -387,21 +394,21 @@ export const fragmentFromPlain = (
   const tail: XmlNode[] = [];
   const lastIndex = lines.length - 1;
   for (let at = 0; at < lines.length; at += 1) {
-    const paragraph = createWElement(scratch, 'p');
+    const paragraph = appendWElement(scratch, 'p');
     const pieces = (lines[at] ?? '').split('\t');
     for (let piece = 0; piece < pieces.length; piece += 1) {
-      if (piece > 0) createWElement(paragraph, 'tab');
+      if (piece > 0) appendWElement(paragraph, 'tab');
       const value = pieces[piece] ?? '';
       if (value === '') continue;
-      const run = createWElement(paragraph, 'r');
-      setElementText(createWElement(run, 't'), value);
+      const run = appendWElement(paragraph, 'r');
+      setElementText(appendWElement(run, 't'), value);
     }
     if (at < lastIndex) {
       blocks.push(paragraph);
       continue;
     }
     for (const child of [...paragraph.children]) {
-      child.parent = undefined;
+      removeChild(paragraph, child);
       tail.push(child);
     }
   }

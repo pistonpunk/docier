@@ -7,9 +7,11 @@ import type { DocumentModel } from '../model/index.js';
 import { DocumentModel as DocumentModelClass, Paragraph, isWElement } from '../model/index.js';
 import { renderDocument } from '../render/index.js';
 import type { RenderOptions, RenderedDocument } from '../render/index.js';
-import type { EditSession, ParagraphSlot } from '../edit/session.js';
+import type { EditSession, EditSnapshot, ParagraphSlot } from '../edit/session.js';
 import { createEditSession } from '../edit/session.js';
 import { paragraphLength } from '../edit/mutation.js';
+import type { ParagraphIndents } from '../edit/inspect.js';
+import { indentsAt } from '../edit/inspect.js';
 import type { EditSelection, SelectionReason } from '../edit/selection.js';
 import { caretSelection, selectionEquals, selectionOf, snapshotOf } from '../edit/selection.js';
 import { caretGeometryOf } from '../edit/caret.js';
@@ -17,6 +19,8 @@ import { installEditCommands } from '../edit/commands.js';
 import type { HistoryOutcome } from '../edit/commands.js';
 import { attachInput } from '../edit/input.js';
 import type { InputHandle, InputHost } from '../edit/input.js';
+import { installAreaCommands } from '../edit/areas/index.js';
+import type { AreaHost } from '../edit/areas/index.js';
 import { installClipboardCommands } from '../edit/clipboard/commands.js';
 import type { ClipboardCommandHost } from '../edit/clipboard/commands.js';
 import { createClipboardBuffer } from '../edit/clipboard/transfer.js';
@@ -84,6 +88,7 @@ export interface EditorHandle {
   readonly revision: number;
   setSelection(anchor: DocPos, focus?: DocPos): void;
   caretGeometry(): CaretGeometry | undefined;
+  paragraphIndents(): ParagraphIndents | undefined;
   slotAt(pos: DocPos): ParagraphSlot | undefined;
   focus(): void;
   readonly transactions: TransactionController;
@@ -100,7 +105,7 @@ interface TransactionState {
   changed: boolean;
   ranges: readonly TextRange[];
   invalidation: LayoutInvalidation;
-  readonly historyBefore: readonly XmlNode[] | undefined;
+  readonly historyBefore: EditSnapshot | undefined;
   readonly selectionBefore: SelectionSnapshot;
   readonly commitHooks: (() => void)[];
   readonly rollbackHooks: (() => void)[];
@@ -112,6 +117,8 @@ const COALESCING_COMMANDS: readonly string[] = [
   'docier.command.edit.deleteForward',
   'docier.command.edit.deleteWordBackward',
   'docier.command.edit.deleteWordForward',
+  'docier.command.doc.setMargins',
+  'docier.command.format.setParagraphIndent',
 ];
 
 const READ_ONLY_BLOCKS: readonly PermissionKey[] = [
@@ -386,11 +393,14 @@ export const createEditor = (
     input?.refresh();
   };
 
-  const host: ClipboardCommandHost = {
+  const host: ClipboardCommandHost & AreaHost = {
     buffer: clipboardBuffer,
     htmlPolicy: DEFAULT_HTML_POLICY,
     get documentId(): string {
       return settings.document.docId;
+    },
+    get tokenizationEnabled(): boolean {
+      return settings.tokenization.enabled;
     },
     announceCopied: (
       flavours: readonly ClipboardFlavour[],
@@ -698,7 +708,7 @@ export const createEditor = (
           operation: info.commandId,
           patches: diffBody(
             activeSession.model,
-            active.historyBefore ?? [],
+            active.historyBefore?.body ?? [],
             bodyChildren(activeSession.model),
           ),
           invalidation: active.invalidation,
@@ -772,6 +782,7 @@ export const createEditor = (
   const disposables = [
     ...installEditCommands(registry, host),
     ...installClipboardCommands(registry, host),
+    ...installAreaCommands(registry, host),
   ];
 
   const openTransaction = (
@@ -1019,6 +1030,12 @@ export const createEditor = (
       const active = session;
       if (active === undefined) return undefined;
       return caretGeometryOf(active.index, selection.focus, selection.affinity);
+    },
+    paragraphIndents: () => {
+      const active = session;
+      const activeModel = model;
+      if (active === undefined || activeModel === undefined) return undefined;
+      return indentsAt(activeModel, active, selection.focus);
     },
     slotAt: (pos) => {
       const active = session;

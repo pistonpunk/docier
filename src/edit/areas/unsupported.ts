@@ -1,0 +1,294 @@
+import type { CommandArea, CommandDefinition } from '../../api/types.js';
+import { areaCommand } from './support.js';
+import type { AreaHost, AreaSpec } from './support.js';
+
+interface Refusal {
+  readonly id: string;
+  readonly label: string;
+  readonly category: CommandArea;
+  readonly reason: string;
+  readonly live?: (host: AreaHost) => string;
+}
+
+const NO_OBJECT_SELECTION =
+  'There is no object selection in this build, so drawing commands cannot act';
+const NO_TABLE_CARET =
+  'The caret cannot be placed inside a table in this build, so table commands cannot act';
+const NO_DRAWING =
+  'This build cannot author drawing content: the editing layer cannot create media parts or w:drawing runs';
+const NO_PART = (part: string): string =>
+  `This build cannot create a ${part} part from the editing layer, and the undo history covers only the document body`;
+const HOST_OWNED = (action: string): string =>
+  `The host application owns ${action} in this build; the editor exposes no ${action} backend`;
+
+const REFUSALS: readonly Refusal[] = [
+  { id: 'docier.command.doc.open', label: 'Open', category: 'doc', reason: HOST_OWNED('opening documents') },
+  { id: 'docier.command.doc.save', label: 'Save', category: 'doc', reason: HOST_OWNED('saving documents') },
+  { id: 'docier.command.doc.saveAs', label: 'Save as', category: 'doc', reason: HOST_OWNED('saving documents') },
+  { id: 'docier.command.doc.print', label: 'Print', category: 'doc', reason: HOST_OWNED('printing') },
+  {
+    id: 'docier.command.doc.setPageBackground',
+    label: 'Page colour',
+    category: 'doc',
+    reason: 'A page colour is a w:background element on the document root, which the undo history does not cover',
+  },
+  {
+    id: 'docier.command.doc.setWatermark',
+    label: 'Watermark',
+    category: 'doc',
+    reason: NO_PART('header'),
+  },
+  {
+    id: 'docier.command.doc.setLineNumbers',
+    label: 'Line numbers',
+    category: 'doc',
+    reason: 'Line numbering is deferred (LE-044) and is not modelled by this build',
+  },
+  {
+    id: 'docier.command.doc.toggleTrackChanges',
+    label: 'Track changes',
+    category: 'doc',
+    reason: 'This build does not record tracked changes; revision marks are preserved exactly as they were loaded',
+  },
+  {
+    id: 'docier.command.doc.acceptChange',
+    label: 'Accept change',
+    category: 'doc',
+    reason: 'This build preserves revision marks and never accepts them',
+  },
+  {
+    id: 'docier.command.doc.rejectChange',
+    label: 'Reject change',
+    category: 'doc',
+    reason: 'This build preserves revision marks and never rejects them',
+  },
+
+  { id: 'docier.command.export.docx', label: 'Export as Word', category: 'export', reason: HOST_OWNED('exports') },
+  { id: 'docier.command.export.pdf', label: 'Export as PDF', category: 'export', reason: HOST_OWNED('exports') },
+  { id: 'docier.command.export.html', label: 'Export as HTML', category: 'export', reason: HOST_OWNED('exports') },
+
+  {
+    id: 'docier.command.find.find',
+    label: 'Find',
+    category: 'find',
+    reason: 'This build has no search engine, so find and replace are not implemented',
+  },
+  {
+    id: 'docier.command.find.replace',
+    label: 'Replace',
+    category: 'find',
+    reason: 'This build has no search engine, so find and replace are not implemented',
+  },
+
+  { id: 'docier.command.insert.table', label: 'Table', category: 'insert', reason: NO_TABLE_CARET },
+  { id: 'docier.command.insert.textBox', label: 'Text box', category: 'insert', reason: NO_DRAWING },
+  { id: 'docier.command.insert.header', label: 'Header', category: 'insert', reason: NO_PART('header') },
+  { id: 'docier.command.insert.footer', label: 'Footer', category: 'insert', reason: NO_PART('footer') },
+  {
+    id: 'docier.command.insert.closeHeaderFooter',
+    label: 'Close header and footer',
+    category: 'insert',
+    reason: 'This build never opens a header or footer, so there is none to close',
+  },
+  { id: 'docier.command.insert.footnote', label: 'Footnote', category: 'insert', reason: NO_PART('footnotes') },
+  { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },
+  {
+    id: 'docier.command.insert.coverPage',
+    label: 'Cover page',
+    category: 'insert',
+    reason: 'Cover pages need a built-in gallery, which this build does not ship',
+  },
+  {
+    id: 'docier.command.insert.tableOfContents',
+    label: 'Table of contents',
+    category: 'insert',
+    reason: 'A table of contents needs field evaluation over headings, which this build does not implement',
+  },
+  {
+    id: 'docier.command.insert.updateTable',
+    label: 'Update table',
+    category: 'insert',
+    reason: 'This build inserts no fields to update',
+  },
+  {
+    id: 'docier.command.insert.crossReference',
+    label: 'Cross-reference',
+    category: 'insert',
+    reason: 'Cross references need bookmark-scoped field evaluation, which this build does not implement',
+  },
+  {
+    id: 'docier.command.insert.caption',
+    label: 'Caption',
+    category: 'insert',
+    reason: 'Captions need sequence fields, which this build does not implement',
+  },
+  {
+    id: 'docier.command.insert.index',
+    label: 'Index',
+    category: 'insert',
+    reason: 'An index needs field evaluation over marked entries, which this build does not implement',
+  },
+  {
+    id: 'docier.command.insert.bibliography',
+    label: 'Bibliography',
+    category: 'insert',
+    reason: 'Citations are preserved but never generated in this build',
+  },
+
+  {
+    id: 'docier.command.numbering.bullets',
+    label: 'Bullets',
+    category: 'numbering',
+    reason: 'List numbering writes a definition to numbering.xml, which the undo history does not cover',
+  },
+  {
+    id: 'docier.command.numbering.numbers',
+    label: 'Numbering',
+    category: 'numbering',
+    reason: 'List numbering writes a definition to numbering.xml, which the undo history does not cover',
+  },
+  {
+    id: 'docier.command.numbering.multilevel',
+    label: 'Multilevel list',
+    category: 'numbering',
+    reason: 'List numbering writes a definition to numbering.xml, which the undo history does not cover',
+  },
+
+  { id: 'docier.command.object.insertImage', label: 'Picture', category: 'object', reason: NO_DRAWING },
+  { id: 'docier.command.object.insertShape', label: 'Shape', category: 'object', reason: NO_DRAWING },
+  { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
+  { id: 'docier.command.object.changeImage', label: 'Change picture', category: 'object', reason: NO_DRAWING },
+  {
+    id: 'docier.command.object.compress',
+    label: 'Compress pictures',
+    category: 'object',
+    reason: 'Compression rewrites media parts, which the editing layer cannot reach',
+  },
+  { id: 'docier.command.object.align', label: 'Align objects', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.bringForward', label: 'Bring forward', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.sendBackward', label: 'Send backward', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.group', label: 'Group', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.setSize', label: 'Size', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.setWrap', label: 'Wrap text', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.delete', label: 'Delete object', category: 'object', reason: NO_OBJECT_SELECTION },
+
+  { id: 'docier.command.table.delete', label: 'Delete table', category: 'table', reason: NO_TABLE_CARET },
+  { id: 'docier.command.table.deleteRow', label: 'Delete row', category: 'table', reason: NO_TABLE_CARET },
+  { id: 'docier.command.table.deleteColumn', label: 'Delete column', category: 'table', reason: NO_TABLE_CARET },
+  { id: 'docier.command.table.insertRowsAbove', label: 'Insert rows above', category: 'table', reason: NO_TABLE_CARET },
+  { id: 'docier.command.table.insertRowsBelow', label: 'Insert rows below', category: 'table', reason: NO_TABLE_CARET },
+  {
+    id: 'docier.command.table.insertColumnsLeft',
+    label: 'Insert columns left',
+    category: 'table',
+    reason: NO_TABLE_CARET,
+  },
+  {
+    id: 'docier.command.table.insertColumnsRight',
+    label: 'Insert columns right',
+    category: 'table',
+    reason: NO_TABLE_CARET,
+  },
+  { id: 'docier.command.table.mergeCells', label: 'Merge cells', category: 'table', reason: NO_TABLE_CARET },
+  { id: 'docier.command.table.splitCells', label: 'Split cells', category: 'table', reason: NO_TABLE_CARET },
+  { id: 'docier.command.table.setProperties', label: 'Table properties', category: 'table', reason: NO_TABLE_CARET },
+
+  {
+    id: 'docier.command.theme.setColors',
+    label: 'Theme colours',
+    category: 'theme',
+    reason: 'The theme part is not modelled in this build, so theme colours cannot be written',
+  },
+  {
+    id: 'docier.command.theme.setFonts',
+    label: 'Theme fonts',
+    category: 'theme',
+    reason: 'The theme part is not modelled in this build, so theme fonts cannot be written',
+  },
+  {
+    id: 'docier.command.theme.setSpacing',
+    label: 'Theme spacing',
+    category: 'theme',
+    reason: 'The theme part is not modelled in this build, so theme spacing cannot be written',
+  },
+
+  {
+    id: 'docier.command.proof.spelling',
+    label: 'Spelling',
+    category: 'proof',
+    reason: 'This build ships no proofing provider',
+  },
+  {
+    id: 'docier.command.proof.thesaurus',
+    label: 'Thesaurus',
+    category: 'proof',
+    reason: 'This build ships no thesaurus provider',
+  },
+  {
+    id: 'docier.command.proof.wordCount',
+    label: 'Word count',
+    category: 'proof',
+    reason: 'Word count is reported by the status bar; this build has no word count dialog',
+  },
+
+  {
+    id: 'docier.command.view.setGridlines',
+    label: 'Gridlines',
+    category: 'view',
+    reason: 'The renderer draws no gridlines in this build',
+  },
+  {
+    id: 'docier.command.view.setNavigation',
+    label: 'Navigation pane',
+    category: 'view',
+    reason: 'This build has no navigation pane',
+  },
+
+  {
+    id: 'docier.command.comment.create',
+    label: 'New comment',
+    category: 'comment',
+    reason: NO_PART('comments'),
+  },
+  {
+    id: 'docier.command.comment.delete',
+    label: 'Delete comment',
+    category: 'comment',
+    reason: 'Comments are preserved exactly as they were loaded; this build does not edit them',
+  },
+];
+
+const tokenReason = (host: AreaHost): string =>
+  host.tokenizationEnabled
+    ? 'This build has no token subsystem'
+    : 'Tokenization is not enabled for this document';
+
+const tokenRefusals = (): readonly Refusal[] => [
+  { id: 'docier.command.token.insert', label: 'Insert token', category: 'token', reason: '', live: tokenReason },
+  { id: 'docier.command.token.edit', label: 'Edit token', category: 'token', reason: '', live: tokenReason },
+  { id: 'docier.command.token.setValue', label: 'Token value', category: 'token', reason: '', live: tokenReason },
+  { id: 'docier.command.token.update', label: 'Update token', category: 'token', reason: '', live: tokenReason },
+  { id: 'docier.command.token.unlink', label: 'Unlink token', category: 'token', reason: '', live: tokenReason },
+  { id: 'docier.command.token.toggleCodes', label: 'Field codes', category: 'token', reason: '', live: tokenReason },
+];
+
+const refusalCommand = (host: AreaHost, refusal: Refusal): CommandDefinition<never, void> => {
+  const spec: AreaSpec<Record<string, never>> = {
+    id: refusal.id,
+    label: refusal.label,
+    category: refusal.category,
+    enabledIn: () => false,
+    reason: (active) => refusal.live?.(active) ?? refusal.reason,
+  };
+  return areaCommand<Record<string, never>>(host, spec);
+};
+
+export const unsupportedCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
+  ...REFUSALS.map((refusal) => refusalCommand(host, refusal)),
+  ...tokenRefusals().map((refusal) => refusalCommand(host, refusal)),
+];
+
+export const unsupportedIds: readonly string[] = [
+  ...REFUSALS.map((refusal) => refusal.id),
+  ...tokenRefusals().map((refusal) => refusal.id),
+];

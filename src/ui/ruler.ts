@@ -332,7 +332,7 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
       });
     });
     store.listen<KeyboardEvent>(marker, 'keydown', (event) => {
-      const step = MP_PER_TWIP;
+      const step = event.shiftKey ? 10 : 1;
       const delta = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0;
       if (delta === 0) return;
       event.preventDefault();

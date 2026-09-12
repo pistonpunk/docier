@@ -54,14 +54,24 @@ describe('ribbon controls', () => {
 
   it('disables an unregistered command with a reason instead of silently doing nothing', async () => {
     const { chrome } = await chromeOf(longBody());
+    const bold = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
+      '[data-docier-id="docier.command.format.bold"]',
+    );
+    expect(bold).not.toBeNull();
+    expect(bold!.getAttribute('aria-disabled')).not.toBe('true');
+
     const insertTable = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
       '[data-docier-id="docier.command.insert.table"]',
     );
     expect(insertTable).not.toBeNull();
-    expect(insertTable!.getAttribute('aria-disabled')).not.toBe('true');
+    expect(insertTable!.getAttribute('aria-disabled')).toBe('true');
+    expect(insertTable!.getAttribute('aria-description')).toBe(
+      'The caret cannot be placed inside a table in this build, so table commands cannot act',
+    );
 
     const unregistered = chrome.context.describe({ command: 'docier.command.nope.missing' });
     expect(unregistered.enabled).toBe(false);
+    expect(unregistered.registered).toBe(false);
     expect(unregistered.reason).toBe('This command is not available in this build');
   });
 });

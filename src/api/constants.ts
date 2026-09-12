@@ -15,6 +15,7 @@ export const COMMAND_AREAS = [
   'theme',
   'numbering',
   'insert',
+  'comment',
   'table',
   'object',
   'view',

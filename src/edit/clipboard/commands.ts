@@ -283,6 +283,7 @@ const SPECS: readonly Spec[] = [
 
 const runCopy = (
   host: ClipboardCommandHost,
+  ctx: CommandContext<unknown>,
   args: ClipboardCommandArgs,
   remove: boolean,
 ): typeof NOOP | undefined => {
@@ -295,7 +296,9 @@ const runCopy = (
   const degraded = publishPayload(host, payload, args.data);
   host.announceCopied(payloadFlavours(payload), degraded);
   if (!remove) return undefined;
-  return host.session.deleteRange(range) ? undefined : NOOP;
+  if (!host.session.deleteRange(range)) return NOOP;
+  commit(host, ctx, caretSelection(range.start, 'downstream'));
+  return undefined;
 };
 
 const runMove = (
@@ -358,7 +361,7 @@ export const installClipboardCommands = (
       execute: (args, ctx) => {
         const payload = args ?? {};
         if (spec.action === 'copy' || spec.action === 'cut') {
-          return runCopy(host, payload, spec.action === 'cut');
+          return runCopy(host, ctx, payload, spec.action === 'cut');
         }
         if (spec.action === 'moveRange') return runMove(host, ctx, payload);
         const direct = sourceFromArgs(payload);

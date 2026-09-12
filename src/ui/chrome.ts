@@ -126,8 +126,11 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     handle.config.messages,
   );
 
+  const indentsOf =
+    options?.indents ?? ((): RulerIndents | undefined => handle.paragraphIndents());
+
   const queries: EditorQueries = mode === 'none' ? NO_QUERIES : createEditorQueries(handle, {
-    indents: options?.indents,
+    indents: indentsOf,
     language: options?.language,
   });
 
@@ -434,7 +437,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
             page,
             zoom: queries.zoom(),
             offsetPx: queries.offsetPx(),
-            indents: options?.indents?.(queries.page()),
+            indents: indentsOf(queries.page()),
           };
         },
       });

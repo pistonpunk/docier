@@ -3,6 +3,7 @@ import { layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
 import type { XmlElement, XmlNode } from '../ooxml/xml/index.js';
 import { cloneNode } from '../ooxml/xml/tree.js';
+import type { Relationship } from '../ooxml/relationships.js';
 import type { DocumentModel } from '../model/index.js';
 import { Paragraph } from '../model/index.js';
 import type { PositionIndex, ParagraphSpan } from './positions.js';
@@ -36,6 +37,11 @@ export interface ParagraphSlot {
   readonly length: number;
 }
 
+export interface EditSnapshot {
+  readonly body: readonly XmlNode[];
+  readonly relationships: readonly Relationship[];
+}
+
 export interface ResolvedPosition {
   readonly slot: ParagraphSlot;
   readonly offset: number;
@@ -65,10 +71,35 @@ export interface EditSession {
   clearRunFormatting(range: DocRange): boolean;
   applyParagraphFormat(range: DocRange, patch: ParagraphFormatPatch): boolean;
   clearParagraphFormatting(range: DocRange): boolean;
-  snapshot(): readonly XmlNode[];
-  restore(nodes: readonly XmlNode[]): void;
+  snapshot(): EditSnapshot;
+  restore(snapshot: EditSnapshot): void;
   readonly layoutOptions: LayoutOptions;
 }
+
+const relationshipsOf = (model: DocumentModel): readonly Relationship[] =>
+  model.package.getRelationships(model.package.mainDocumentPartName);
+
+const restoreRelationships = (
+  model: DocumentModel,
+  before: readonly Relationship[],
+): void => {
+  const graph = model.package.relationships;
+  const partName = model.package.mainDocumentPartName;
+  const wanted = new Set(before.map((relationship) => relationship.id));
+  for (const relationship of relationshipsOf(model)) {
+    if (!wanted.has(relationship.id)) graph.removeRelationship(partName, relationship.id);
+  }
+  const present = new Set(relationshipsOf(model).map((relationship) => relationship.id));
+  for (const relationship of before) {
+    if (present.has(relationship.id)) continue;
+    graph.addRelationship(partName, {
+      id: relationship.id,
+      type: relationship.type,
+      target: relationship.target,
+      targetMode: relationship.targetMode,
+    });
+  }
+};
 
 const bodyParagraphElements = (model: DocumentModel): readonly XmlElement[] => {
   const out: XmlElement[] = [];
@@ -307,15 +338,16 @@ export const createEditSession = (
       if (changed) markChanged();
       return changed;
     },
-    snapshot: (): readonly XmlNode[] => {
-      const body = model.body().element;
-      return body.children.map((child) => cloneNode(child));
-    },
-    restore: (nodes) => {
+    snapshot: (): EditSnapshot => ({
+      body: model.body().element.children.map((child) => cloneNode(child)),
+      relationships: [...relationshipsOf(model)],
+    }),
+    restore: (snapshot) => {
       const body = model.body().element;
       for (const child of body.children) child.parent = undefined;
-      body.children = nodes.map((node) => cloneNode(node));
+      body.children = snapshot.body.map((node) => cloneNode(node));
       for (const child of body.children) child.parent = body;
+      restoreRelationships(model, snapshot.relationships);
       model.context.forgetSubtree(body);
       markChanged();
     },

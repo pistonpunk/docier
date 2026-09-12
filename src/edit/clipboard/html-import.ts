@@ -1,9 +1,9 @@
 import type { XmlElement, XmlNode } from '../../ooxml/xml/index.js';
-import { createWElement, isWElement, setElementText, setWAttr } from '../../model/index.js';
+import { isWElement, setElementText, setWAttr } from '../../model/index.js';
 import { removeChild } from '../../ooxml/xml/tree.js';
 import type { ClipboardDegradation, ClipboardFragment, HtmlPolicy } from './types.js';
 import { DEFAULT_HTML_POLICY } from './types.js';
-import { createWrapper } from './fragment.js';
+import { appendWElement, createWrapper } from './fragment.js';
 
 const HYPERLINK_RELATIONSHIP =
   'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink';
@@ -320,30 +320,30 @@ const dropIfEmpty = (element: XmlElement): void => {
 };
 
 const applyRunProperties = (run: XmlElement, style: InlineStyle): void => {
-  const properties = createWElement(run, 'rPr');
-  if (style.bold) createWElement(properties, 'b');
-  if (style.italic) createWElement(properties, 'i');
-  if (style.underline) setWAttr(createWElement(properties, 'u'), 'val', 'single');
-  if (style.strike) createWElement(properties, 'strike');
+  const properties = appendWElement(run, 'rPr');
+  if (style.bold) appendWElement(properties, 'b');
+  if (style.italic) appendWElement(properties, 'i');
+  if (style.underline) setWAttr(appendWElement(properties, 'u'), 'val', 'single');
+  if (style.strike) appendWElement(properties, 'strike');
   if (style.verticalAlign === 'superscript' || style.verticalAlign === 'subscript') {
-    setWAttr(createWElement(properties, 'vertAlign'), 'val', style.verticalAlign);
+    setWAttr(appendWElement(properties, 'vertAlign'), 'val', style.verticalAlign);
   }
   if (style.color !== undefined) {
-    setWAttr(createWElement(properties, 'color'), 'val', style.color.slice(1));
+    setWAttr(appendWElement(properties, 'color'), 'val', style.color.slice(1));
   }
   if (style.highlight !== undefined) {
-    setWAttr(createWElement(properties, 'highlight'), 'val', style.highlight);
+    setWAttr(appendWElement(properties, 'highlight'), 'val', style.highlight);
   } else if (style.shade !== undefined) {
-    const shade = createWElement(properties, 'shd');
+    const shade = appendWElement(properties, 'shd');
     setWAttr(shade, 'val', 'clear');
     setWAttr(shade, 'color', 'auto');
     setWAttr(shade, 'fill', style.shade.slice(1).toUpperCase());
   }
   if (style.halfPoints !== undefined) {
-    setWAttr(createWElement(properties, 'sz'), 'val', String(style.halfPoints));
+    setWAttr(appendWElement(properties, 'sz'), 'val', String(style.halfPoints));
   }
   if (style.family !== undefined && style.family !== '') {
-    const fonts = createWElement(properties, 'rFonts');
+    const fonts = appendWElement(properties, 'rFonts');
     setWAttr(fonts, 'ascii', style.family);
     setWAttr(fonts, 'hAnsi', style.family);
   }
@@ -351,9 +351,9 @@ const applyRunProperties = (run: XmlElement, style: InlineStyle): void => {
 };
 
 const appendRun = (paragraph: XmlElement, style: InlineStyle, text: string): void => {
-  const run = createWElement(paragraph, 'r');
+  const run = appendWElement(paragraph, 'r');
   applyRunProperties(run, style);
-  setElementText(createWElement(run, 't'), text);
+  setElementText(appendWElement(run, 't'), text);
 };
 
 const urlAllowed = (value: string): boolean => {
@@ -437,7 +437,7 @@ const inlineInto = (
     return;
   }
   if (tag === 'br') {
-    createWElement(paragraph, 'br');
+    appendWElement(paragraph, 'br');
     return;
   }
   if (tag === 'img') {
@@ -462,7 +462,7 @@ const inlineInto = (
 };
 
 const wrapHyperlink = (context: Context, paragraph: XmlElement, href: string): XmlElement => {
-  const link = createWElement(paragraph, 'hyperlink');
+  const link = appendWElement(paragraph, 'hyperlink');
   setWAttr(link, 'id', relationshipFor(context.shared, href));
   link.selfClosing = false;
   return link;
@@ -471,7 +471,7 @@ const wrapHyperlink = (context: Context, paragraph: XmlElement, href: string): X
 const applyParagraphProperties = (context: Context, paragraph: XmlElement, element: Element): void => {
   const declarations = declarationsOf(element);
   const tag = element.localName.toLowerCase();
-  const properties = createWElement(paragraph, 'pPr');
+  const properties = appendWElement(paragraph, 'pPr');
   const justify = declarations.get('text-align')?.trim().toLowerCase();
   const mapped =
     justify === 'justify'
@@ -479,7 +479,7 @@ const applyParagraphProperties = (context: Context, paragraph: XmlElement, eleme
       : justify === 'center' || justify === 'right' || justify === 'left'
         ? justify
         : undefined;
-  if (mapped !== undefined) setWAttr(createWElement(properties, 'jc'), 'val', mapped);
+  if (mapped !== undefined) setWAttr(appendWElement(properties, 'jc'), 'val', mapped);
   const msoList = declarations.get('mso-list');
   let listLeft: number | undefined;
   if (msoList !== undefined) {
@@ -497,14 +497,14 @@ const applyParagraphProperties = (context: Context, paragraph: XmlElement, eleme
   );
   const indent = twipsOf(declarations.get('text-indent'));
   if (left > 0 || indent !== undefined) {
-    const indentation = createWElement(properties, 'ind');
+    const indentation = appendWElement(properties, 'ind');
     if (left > 0) setWAttr(indentation, 'left', String(left));
     if (indent !== undefined) setWAttr(indentation, 'firstLine', String(indent));
   }
   const before = twipsOf(declarations.get('margin-top'));
   const after = twipsOf(declarations.get('margin-bottom'));
   if (before !== undefined || after !== undefined) {
-    const spacing = createWElement(properties, 'spacing');
+    const spacing = appendWElement(properties, 'spacing');
     if (before !== undefined) setWAttr(spacing, 'before', String(Math.max(0, before)));
     if (after !== undefined) setWAttr(spacing, 'after', String(Math.max(0, after)));
   }
@@ -600,17 +600,17 @@ const tableOf = (
       columnWidths[at] = Math.max(1, Math.round((columnWidths[at] ?? even) * scale));
     }
   }
-  const table = createWElement(context.shared.scratch, 'tbl');
-  const properties = createWElement(table, 'tblPr');
-  const width = createWElement(properties, 'tblW');
+  const table = appendWElement(context.shared.scratch, 'tbl');
+  const properties = appendWElement(table, 'tblPr');
+  const width = appendWElement(properties, 'tblW');
   setWAttr(width, 'w', String(DEFAULT_TABLE_WIDTH));
   setWAttr(width, 'type', 'dxa');
-  const grid = createWElement(table, 'tblGrid');
-  for (const value of columnWidths) setWAttr(createWElement(grid, 'gridCol'), 'w', String(value));
+  const grid = appendWElement(table, 'tblGrid');
+  for (const value of columnWidths) setWAttr(appendWElement(grid, 'gridCol'), 'w', String(value));
   const carry = new Map<number, number>();
   let emitted = 0;
   for (const row of rows) {
-    const rowElement = createWElement(table, 'tr');
+    const rowElement = appendWElement(table, 'tr');
     const cells: Element[] = [];
     for (const child of row.childNodes) {
       if (child.nodeType !== 1) continue;
@@ -623,10 +623,10 @@ const tableOf = (
     while (column < columns) {
       const remaining = carry.get(column) ?? 0;
       if (remaining > 0) {
-        const continuation = createWElement(rowElement, 'tc');
-        const properties = createWElement(continuation, 'tcPr');
-        createWElement(properties, 'vMerge');
-        createWElement(continuation, 'p');
+        const continuation = appendWElement(rowElement, 'tc');
+        const properties = appendWElement(continuation, 'tcPr');
+        appendWElement(properties, 'vMerge');
+        appendWElement(continuation, 'p');
         carry.set(column, remaining - 1);
         column += 1;
         continue;
@@ -636,14 +636,14 @@ const tableOf = (
       if (source === undefined) break;
       const span = COLUMN_SPAN(source);
       const rowSpan = ROW_SPAN(source);
-      const cell = createWElement(rowElement, 'tc');
-      const cellProperties = createWElement(cell, 'tcPr');
-      if (span > 1) setWAttr(createWElement(cellProperties, 'gridSpan'), 'val', String(span));
-      if (rowSpan > 1) setWAttr(createWElement(cellProperties, 'vMerge'), 'val', 'restart');
+      const cell = appendWElement(rowElement, 'tc');
+      const cellProperties = appendWElement(cell, 'tcPr');
+      if (span > 1) setWAttr(appendWElement(cellProperties, 'gridSpan'), 'val', String(span));
+      if (rowSpan > 1) setWAttr(appendWElement(cellProperties, 'vMerge'), 'val', 'restart');
       if (cellProperties.children.length === 0) dropIfEmpty(cellProperties);
       const produced = childBlocks(context.shared, source, depth + 1, style);
       if (produced.length === 0) {
-        createWElement(cell, 'p');
+        appendWElement(cell, 'p');
       } else {
         for (const block of produced) {
           block.parent = cell;
@@ -723,7 +723,7 @@ const walkBlocks = (
     if (PARAGRAPH_ELEMENTS.has(tag)) {
       flush(context, cursor);
       if (depth === 0) context.sawBlock = true;
-      const paragraph = createWElement(context.shared.scratch, 'p');
+      const paragraph = appendWElement(context.shared.scratch, 'p');
       applyParagraphProperties(context, paragraph, element);
       const nested: Cursor = { current: paragraph };
       walkBlocks(context, nested, element, depth + 1, headingStyle(tag, styleFor(style, element)));
@@ -737,7 +737,7 @@ const walkBlocks = (
 
 const paragraphOf = (context: Context, cursor: Cursor): XmlElement => {
   if (cursor.current === undefined) {
-    cursor.current = createWElement(context.shared.scratch, 'p');
+    cursor.current = appendWElement(context.shared.scratch, 'p');
   }
   return cursor.current;
 };

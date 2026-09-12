@@ -34,8 +34,11 @@ const symbolText = (element: XmlElement): string => {
 };
 
 export interface PlainTextOptions {
+  readonly paragraphMark?: string | undefined;
   readonly onDegrade?: ((reason: string, detail: string) => void) | undefined;
 }
+
+const paragraphMarkOf = (options: PlainTextOptions): string => options.paragraphMark ?? '\n';
 
 const plainTextOfElement = (element: XmlElement, options: PlainTextOptions): string => {
   if (element.localName === 'AlternateContent') {
@@ -57,6 +60,9 @@ const plainTextOfElement = (element: XmlElement, options: PlainTextOptions): str
     if (element.localName === 'br' || element.localName === 'cr') return LINE_BREAK_CHARACTER;
     if (element.localName === 'noBreakHyphen') return PLAIN_HYPHEN;
     if (element.localName === 'softHyphen') return '';
+    if (element.localName === 'p') {
+      return `${plainTextOfNodes(element.children, options)}${paragraphMarkOf(options)}`;
+    }
     if (element.localName === 'footnoteReference' || element.localName === 'endnoteReference') {
       options.onDegrade?.('footnote', element.localName);
       return '';

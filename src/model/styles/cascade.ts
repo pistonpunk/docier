@@ -326,10 +326,31 @@ const contextKey = (
     numbering === undefined ? '' : `${numbering.numId}/${numbering.ilvl}`,
   ].join(' ');
 
+interface ResolutionBucket {
+  readonly content: string;
+  readonly entries: Map<string, ResolvedProperties>;
+}
+
+const elementContentKey = (element: XmlElement): string => {
+  let key = `<${element.localName}`;
+  for (const attribute of element.attributes) {
+    key += ` ${attribute.prefix}:${attribute.localName}=${attribute.value}`;
+  }
+  key += '>';
+  for (const child of element.children) {
+    if (child.kind === 'element') key += elementContentKey(child);
+    else if (child.kind === 'text' || child.kind === 'cdata') key += child.value;
+  }
+  return key;
+};
+
+const contentKey = (element: XmlElement | undefined): string =>
+  element === undefined ? '' : elementContentKey(element);
+
 export class StyleResolver {
   private readonly styles: StylesPart | undefined;
-  private readonly runCache = new Map<XmlElement, Map<string, ResolvedProperties>>();
-  private readonly paragraphCache = new Map<XmlElement, Map<string, ResolvedProperties>>();
+  private readonly runCache = new Map<XmlElement, ResolutionBucket>();
+  private readonly paragraphCache = new Map<XmlElement, ResolutionBucket>();
   private cachedRevision = -1;
 
   constructor(styles: StylesPart | undefined) {
@@ -352,6 +373,27 @@ export class StyleResolver {
     this.cachedRevision = this.revision;
   }
 
+  private cached(
+    cache: Map<XmlElement, ResolutionBucket>,
+    key: XmlElement,
+    content: string,
+    signature: string,
+    compute: () => ResolvedProperties,
+  ): ResolvedProperties {
+    const bucket = cache.get(key);
+    if (bucket !== undefined && bucket.content === content) {
+      const hit = bucket.entries.get(signature);
+      if (hit !== undefined) return hit;
+    }
+    const resolved = compute();
+    if (bucket === undefined || bucket.content !== content) {
+      cache.set(key, { content, entries: new Map([[signature, resolved]]) });
+    } else {
+      bucket.entries.set(signature, resolved);
+    }
+    return resolved;
+  }
+
   resolveRun(input: RunResolutionInput): ResolvedProperties {
     this.sync();
     const key = input.runProperties;
@@ -364,13 +406,8 @@ export class StyleResolver {
       input.numbering,
     );
     if (key === undefined) return this.computeRun(input);
-    const bucket = this.runCache.get(key);
-    const cached = bucket?.get(signature);
-    if (cached !== undefined) return cached;
-    const resolved = this.computeRun(input);
-    if (bucket === undefined) this.runCache.set(key, new Map([[signature, resolved]]));
-    else bucket.set(signature, resolved);
-    return resolved;
+    const content = `${contentKey(key)} ${contentKey(input.paragraphProperties)}`;
+    return this.cached(this.runCache, key, content, signature, () => this.computeRun(input));
   }
 
   resolveParagraph(input: ParagraphResolutionInput): ResolvedProperties {
@@ -382,13 +419,9 @@ export class StyleResolver {
       input.numbering,
     );
     if (key === undefined) return this.computeParagraph(input);
-    const bucket = this.paragraphCache.get(key);
-    const cached = bucket?.get(signature);
-    if (cached !== undefined) return cached;
-    const resolved = this.computeParagraph(input);
-    if (bucket === undefined) this.paragraphCache.set(key, new Map([[signature, resolved]]));
-    else bucket.set(signature, resolved);
-    return resolved;
+    return this.cached(this.paragraphCache, key, contentKey(key), signature, () =>
+      this.computeParagraph(input),
+    );
   }
 
   private applyParagraphStyleRunProperties(

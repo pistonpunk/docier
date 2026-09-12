@@ -24,6 +24,12 @@ export interface ParagraphMarks {
   readonly styleId: string | undefined;
 }
 
+export interface ParagraphIndents {
+  readonly firstLineTwips: number;
+  readonly leftTwips: number;
+  readonly rightTwips: number;
+}
+
 export type MarkState = 'on' | 'off' | 'mixed';
 
 export interface PropertySample {
@@ -155,4 +161,22 @@ export const paragraphMarksAt = (
       ? justification
       : undefined;
   return { alignment, styleId: paragraph.properties.styleId };
+};
+
+export const indentsAt = (
+  model: DocumentModel,
+  session: EditSession,
+  pos: DocPos,
+): ParagraphIndents | undefined => {
+  const target = session.resolve(session.index.clamp(pos));
+  if (target === undefined) return undefined;
+  const paragraph = Paragraph.of(model.context, target.slot.element);
+  const resolved = model.resolveParagraphProperties(paragraph);
+  const hanging = resolved.indentHanging;
+  const firstLine = resolved.indentFirstLine;
+  return {
+    leftTwips: resolved.indentStart ?? 0,
+    rightTwips: resolved.indentEnd ?? 0,
+    firstLineTwips: hanging === undefined ? (firstLine ?? 0) : -hanging,
+  };
 };

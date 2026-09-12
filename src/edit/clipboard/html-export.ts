@@ -25,14 +25,22 @@ const styleOf = (parts: readonly (string | undefined)[]): string => {
   return kept.length === 0 ? '' : ` style="${kept.join(';')}"`;
 };
 
+const valOf = (properties: XmlElement, name: string): string | undefined => {
+  const element = childElements(properties).find((child) => isWElement(child, name));
+  return element === undefined ? undefined : wAttr(element, 'val');
+};
+
 const runStyle = (properties: XmlElement | undefined): string => {
   if (properties === undefined) return styleOf([]);
-  const on = (name: string): boolean => isOn(wAttr(properties, name)) === true;
-  const underline = wAttr(properties, 'u');
-  const vertical = wAttr(properties, 'vertAlign');
-  const color = wAttr(properties, 'color');
-  const highlight = wAttr(properties, 'highlight');
-  const size = wAttr(properties, 'sz');
+  const on = (name: string): boolean => {
+    const toggle = childElements(properties).find((child) => isWElement(child, name));
+    return toggle !== undefined && isOn(wAttr(toggle, 'val')) === true;
+  };
+  const underline = valOf(properties, 'u');
+  const vertical = valOf(properties, 'vertAlign');
+  const color = valOf(properties, 'color');
+  const highlight = valOf(properties, 'highlight');
+  const size = valOf(properties, 'sz');
   const fonts = childElements(properties).find((child) => isWElement(child, 'rFonts'));
   const family = fonts === undefined ? undefined : wAttr(fonts, 'ascii');
   const decorations = [
@@ -55,7 +63,7 @@ const runStyle = (properties: XmlElement | undefined): string => {
 
 const paragraphStyle = (properties: XmlElement | undefined): string => {
   if (properties === undefined) return styleOf([]);
-  const justification = wAttr(properties, 'jc');
+  const justification = valOf(properties, 'jc');
   const spacing = childElements(properties).find((child) => isWElement(child, 'spacing'));
   const indentation = childElements(properties).find((child) => isWElement(child, 'ind'));
   const align =

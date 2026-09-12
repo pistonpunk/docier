@@ -29,6 +29,16 @@ export type { InputHandle, InputHost } from './input.js';
 export { attachInput } from './input.js';
 export type { MarkState, ParagraphMarks, RunMarks } from './inspect.js';
 export { marksAt, marksFrom, paragraphMarksAt } from './inspect.js';
+export type { AreaHost, AreaSpec } from './areas/support.js';
+export { areaCommands, installAreaCommands, unsupportedIds } from './areas/index.js';
+export {
+  insertCommands,
+  pageCommands,
+  paragraphCommands,
+  proofCommands,
+  styleCommands,
+  unsupportedCommands,
+} from './areas/index.js';
 export type { ParagraphFormatPatch, RunFormatPatch } from './mutation.js';
 export type {
   ClipboardCommandArgs,

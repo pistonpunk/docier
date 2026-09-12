@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import type { EditorHandle } from '../../src/api/editor.js';
+import { ParagraphProperties, SectionProperties } from '../../src/model/index.js';
 import { ATTR } from '../../src/render/dom.js';
 import { UNIT_SPECS, formatRulerValue } from '../../src/ui/ruler.js';
+import { MARGIN_TWIPS } from '../layout/support.js';
 import { bodyOf, chromeOf, disposeChromes, longBody, paragraphText } from './support.js';
 
 afterEach(() => {
@@ -19,6 +22,41 @@ const key = (target: HTMLElement, value: string, shiftKey = false): KeyboardEven
   const event = new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true, cancelable: true });
   target.dispatchEvent(event);
   return event;
+};
+
+interface Executed {
+  readonly commandId: string;
+  readonly args: Record<string, unknown>;
+}
+
+const recordCommands = (handle: EditorHandle): Executed[] => {
+  const seen: Executed[] = [];
+  handle.events.on('docier:command:execute', (event) => {
+    seen.push({ commandId: event.commandId, args: event.args as Record<string, unknown> });
+  });
+  return seen;
+};
+
+const valuenow = (marker: HTMLElement): number => Number(marker.getAttribute('aria-valuenow'));
+
+const indentationOf = (
+  handle: EditorHandle,
+  index = 0,
+): { readonly left: number | undefined; readonly firstLine: number | undefined; readonly right: number | undefined } => {
+  const slot = handle.session?.slots()[index];
+  if (slot === undefined) throw new Error('no slot');
+  const indentation = ParagraphProperties.inOwner(slot.element).indentation;
+  return {
+    left: indentation.left as number | undefined,
+    firstLine: indentation.firstLine as number | undefined,
+    right: indentation.right as number | undefined,
+  };
+};
+
+const leftMarginOf = (handle: EditorHandle): number | undefined => {
+  const model = handle.document;
+  if (model === undefined) throw new Error('no document');
+  return SectionProperties.inOwner(model.body().element).margins.left as number | undefined;
 };
 
 describe('one ruler for the document', () => {
@@ -79,42 +117,46 @@ describe('one ruler for the document', () => {
 describe('ruler interaction', () => {
   it('commits an indent change through the command surface when a key is pressed', async () => {
     const { handle, chrome } = await chromeOf(longBody());
-    const seen: { action: string; args: Record<string, unknown> }[] = [];
-    handle.element.addEventListener('docier:ui:action', (event) => {
-      const detail = (event as CustomEvent<{ action: string; args: Record<string, unknown> }>).detail;
-      seen.push({ action: detail.action, args: detail.args });
-    });
+    const seen = recordCommands(handle);
 
     const marker = markerFor(chrome, 'indent-left');
     const event = key(marker, 'ArrowRight');
     expect(event.defaultPrevented).toBe(true);
-    const indent = seen.find((entry) => entry.action === 'setIndent');
+    await handle.whenReady();
+    const indent = seen.find(
+      (entry) => entry.commandId === 'docier.command.format.setParagraphIndent',
+    );
     expect(indent).toBeDefined();
     expect(indent!.args.leftTwips).toBe(1);
+    expect(indentationOf(handle).left).toBe(1);
 
     seen.length = 0;
     key(marker, 'ArrowRight', true);
-    expect(seen[0]?.args.leftTwips).toBe(10);
+    await handle.whenReady();
+    expect(seen[0]?.args.leftTwips).toBe(11);
+    expect(indentationOf(handle).left).toBe(11);
   });
 
   it('commits margin changes through the command surface', async () => {
     const { handle, chrome } = await chromeOf(longBody());
-    const seen: Record<string, unknown>[] = [];
-    handle.element.addEventListener('docier:ui:action', (event) => {
-      seen.push((event as CustomEvent<{ args: Record<string, unknown> }>).detail.args);
-    });
+    const seen = recordCommands(handle);
     const marker = markerFor(chrome, 'margin-left');
     key(marker, 'ArrowRight');
-    expect(seen[0]?.side).toBe('left');
-    expect(typeof seen[0]?.twips).toBe('number');
+    await handle.whenReady();
+    expect(seen[0]?.commandId).toBe('docier.command.doc.setMargins');
+    expect(seen[0]?.args.side).toBe('left');
+    expect(seen[0]?.args.twips).toBe(MARGIN_TWIPS + 1);
+    expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS + 1);
+
+    key(marker, 'ArrowLeft', true);
+    await handle.whenReady();
+    expect(seen[1]?.args.twips).toBe(MARGIN_TWIPS - 9);
+    expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS - 9);
   });
 
   it('drags a marker without reading layout geometry', async () => {
     const { handle, chrome } = await chromeOf(longBody());
-    const seen: Record<string, unknown>[] = [];
-    handle.element.addEventListener('docier:ui:action', (event) => {
-      seen.push((event as CustomEvent<{ args: Record<string, unknown> }>).detail.args);
-    });
+    const seen = recordCommands(handle);
     const marker = markerFor(chrome, 'margin-left');
     const down = new MouseEvent('pointerdown', { clientX: 100, clientY: 5, bubbles: true, cancelable: true });
     marker.dispatchEvent(down);
@@ -122,11 +164,35 @@ describe('ruler interaction', () => {
 
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 120, clientY: 5, bubbles: true }));
     document.dispatchEvent(new MouseEvent('mouseup', { clientX: 120, clientY: 5, bubbles: true }));
+    await handle.whenReady();
     expect(seen.length).toBeGreaterThan(0);
+    expect(seen[0]?.commandId).toBe('docier.command.doc.setMargins');
+    expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS + 300);
 
     const before = seen.length;
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 140, clientY: 5, bubbles: true }));
+    await handle.whenReady();
     expect(seen.length).toBe(before);
+  });
+
+  it('reads the caret paragraph indents and offsets them rather than resetting them', async () => {
+    const { handle, chrome } = await chromeOf(
+      bodyOf(paragraphText('indented', '<w:ind w:left="720" w:firstLine="240"/>')),
+    );
+    await handle.whenReady();
+
+    const left = markerFor(chrome, 'indent-left');
+    const firstLine = markerFor(chrome, 'indent-first-line');
+    expect(valuenow(left)).toBe(MARGIN_TWIPS + 720);
+    expect(valuenow(firstLine)).toBe(MARGIN_TWIPS + 960);
+
+    const seen = recordCommands(handle);
+    key(left, 'ArrowRight');
+    await handle.whenReady();
+    expect(seen[0]?.args).toMatchObject({ leftTwips: 721, firstLineTwips: 240 });
+    expect(indentationOf(handle)).toMatchObject({ left: 721, firstLine: 240 });
+    expect(valuenow(left)).toBe(MARGIN_TWIPS + 721);
+    expect(valuenow(firstLine)).toBe(MARGIN_TWIPS + 961);
   });
 
   it('cycles units from the ruler corner', async () => {

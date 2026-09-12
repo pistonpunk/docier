@@ -14,6 +14,7 @@ import { removeAttribute } from '../../ooxml/xml/index.js';
 import { cloneNode, indexOfChild, insertChild, removeChild } from '../../ooxml/xml/tree.js';
 import { splitParagraphAt } from '../mutation.js';
 import type { EditSession } from '../session.js';
+import { appendWElement } from './fragment.js';
 import { logicalLengthOfNodes, logicalLengthOfParagraph } from './text.js';
 import type {
   ClipboardDegradation,
@@ -215,7 +216,7 @@ const applyPolicies = (
       if (properties !== undefined) {
         let id = childElements(properties).find((child) => isWElement(child, 'id'));
         if (id === undefined) {
-          id = createWElement(properties, 'id');
+          id = appendWElement(properties, 'id');
           properties.selfClosing = false;
         }
         setWAttr(id, 'val', String(nextSdtId));
