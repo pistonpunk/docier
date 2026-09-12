@@ -128,6 +128,7 @@ describe('painting runs from engine coordinates', () => {
     expect(node?.style.color).toBe('rgb(255, 0, 0)');
     expect(node?.style.textDecorationLine).toContain('underline');
     expect(node?.style.getPropertyValue('font-variant-caps')).toBe('');
+    expect(node?.style.textRendering).toBe('geometricPrecision');
     const bands = Array.from(target.querySelectorAll<HTMLElement>(`[${ATTR.highlight}]`));
     expect(bands.length).toBe(1);
     expect(bands[0]?.style.backgroundColor).toBe('rgb(255, 255, 0)');

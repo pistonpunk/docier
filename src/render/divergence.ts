@@ -30,6 +30,8 @@ import { objectBoxOf } from './inline-object.js';
 export const DEFAULT_TOLERANCE_PX = 0.5;
 export const DEFAULT_MAX_DIVERGENCES = 100;
 
+export type TextWidthSource = (element: HTMLElement) => number | undefined;
+
 const regionBlocks = (page: PageFragment): readonly BlockFragment[] => {
   const out: BlockFragment[] = [];
   if (page.header !== undefined) out.push(...page.header.blocks);
@@ -83,6 +85,7 @@ export type DivergenceSkipReason =
   | 'smallCapsAdvance'
   | 'controlCharacterAdvance'
   | 'noTextMeasurer'
+  | 'fontsPending'
   | 'unmeasurableText'
   | 'unreadableObjectBox'
   | 'pageLayerMissing'
@@ -103,6 +106,7 @@ const SKIP_SEVERITY: Record<DivergenceSkipReason, DivergenceSkipSeverity> = {
   smallCapsAdvance: 'info',
   controlCharacterAdvance: 'info',
   noTextMeasurer: 'warning',
+  fontsPending: 'warning',
   unmeasurableText: 'warning',
   unreadableObjectBox: 'warning',
   pageLayerMissing: 'warning',
@@ -148,6 +152,7 @@ export interface DivergenceCheckOptions {
   readonly tolerancePx?: number;
   readonly measureText?: TextAdvanceMeasurer;
   readonly rectOf?: RectSource;
+  readonly textWidthOf?: TextWidthSource;
   readonly maxDivergences?: number;
   readonly requireBrowserLayout?: boolean;
 }
@@ -169,6 +174,17 @@ export const hasLayoutEngine = (): boolean => {
 export const browserRectSource = (): RectSource => (element) => {
   const rect = element.getBoundingClientRect();
   return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+};
+
+export const browserTextWidthSource = (): TextWidthSource => {
+  const range = document.createRange();
+  return (element) => {
+    const text = element.firstChild;
+    if (text === null || text.nodeType !== Node.TEXT_NODE) return undefined;
+    range.selectNodeContents(text);
+    const rect = range.getBoundingClientRect();
+    return Number.isFinite(rect.width) ? rect.width : undefined;
+  };
 };
 
 const numeric = (value: string): number => {
@@ -196,12 +212,20 @@ export const canvasTextMeasurer = (): TextAdvanceMeasurer | undefined => {
   const canvas = document.createElement('canvas');
   const context = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
   if (context === null) return undefined;
+  const precise = context as CanvasRenderingContext2D & { textRendering?: string };
+  if ('textRendering' in precise) precise.textRendering = 'geometricPrecision';
   const measure = (text: string, font: RunFontSpec): number | undefined => {
     context.font = fontShorthand(font);
     const metrics = context.measureText(text);
     return Number.isFinite(metrics.width) ? metrics.width : undefined;
   };
   return { measure };
+};
+
+export const fontsArePending = (): boolean => {
+  if (typeof document === 'undefined') return false;
+  const set = (document as { fonts?: FontFaceSet }).fonts;
+  return set !== undefined && set.status !== 'loaded';
 };
 
 const HAS_CONTROL = /[\t\n\r\f\v]/;
@@ -297,6 +321,9 @@ export const detectDivergence = (
     options.rectOf ?? (browserAvailable ? browserRectSource() : styleRectSource(rectFactor));
   const measureText =
     options.measureText ?? (options.rectOf !== undefined ? undefined : canvasTextMeasurer());
+  const textWidthOf =
+    options.textWidthOf ?? (browserAvailable ? browserTextWidthSource() : undefined);
+  const fontsPending = options.measureText === undefined && fontsArePending();
 
   const divergences: LayoutDivergence[] = [];
   const skipCounts = new Map<DivergenceSkipReason, number>();
@@ -533,13 +560,15 @@ export const detectDivergence = (
       skip('controlCharacterAdvance');
       return;
     }
-    if (measureText === undefined) {
-      skip('noTextMeasurer');
+    if (fontsPending) {
+      skip('fontsPending');
       return;
     }
-    const measured = measureText.measure(run.text, spec);
+    const node = found[0];
+    const paintedText = node === undefined || textWidthOf === undefined ? undefined : textWidthOf(node);
+    const measured = paintedText ?? measureText?.measure(run.text, spec);
     if (measured === undefined) {
-      skip('unmeasurableText');
+      skip(measureText === undefined ? 'noTextMeasurer' : 'unmeasurableText');
       return;
     }
     advances += 1;
@@ -550,8 +579,11 @@ export const detectDivergence = (
           ...baseDraft(page.index, blockId, line.id, index),
           kind: 'runAdvance',
           message:
-            `the resolved font advances "${run.text}" to ${measured} px where the engine measured ` +
-            `${engineWidthPx} px`,
+            paintedText === undefined
+              ? `the resolved font advances "${run.text}" to ${measured} px where the engine measured ` +
+                `${engineWidthPx} px`
+              : `the painted text "${run.text}" is ${measured} px wide where the engine lays the run ` +
+                `out at ${engineWidthPx} px`,
           docPos: run.source.start,
           engineWidthMp: run.width,
           renderedWidthPx: measured,
@@ -896,6 +928,9 @@ export const detectDivergence = (
     gaps: RESULT_GAPS,
   };
 };
+
+export const awaitsFonts = (report: DivergenceReport): boolean =>
+  report.skipped.some((entry) => entry.reason === 'fontsPending');
 
 const unrunChecks = (report: DivergenceReport): string =>
   report.skipped

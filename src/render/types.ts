@@ -56,6 +56,7 @@ export interface RenderedDocument {
   readonly zoomMode: ZoomMode;
   readonly pages: readonly RenderedPage[];
   readonly issues?: readonly RenderIssue[];
+  readonly divergence?: DivergenceReport | undefined;
   setZoom(zoom: number): void;
   pageOf(index: number): RenderedPage | undefined;
   destroy(): void;

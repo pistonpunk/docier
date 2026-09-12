@@ -21,7 +21,7 @@ import type { PagePaintContext } from './pages.js';
 import { paintPageSheet } from './pages.js';
 import { createRendererRegistry } from './registry.js';
 import type { DivergenceReport } from './divergence.js';
-import { detectDivergence } from './divergence.js';
+import { awaitsFonts, detectDivergence } from './divergence.js';
 import { createImageRegistry } from './images.js';
 
 export const resolveRenderOptions = (options: RenderOptions = {}): ResolvedRenderOptions => ({
@@ -104,6 +104,9 @@ const paintDefault = (
   let zoom = options.zoom;
   let painted = false;
   let handle: RenderedDocument | undefined = undefined;
+  let awaitingFonts = false;
+  let fontsSettled = false;
+  let latestReport: DivergenceReport | undefined = undefined;
 
   const transformFactor = (): number => (options.zoomMode === 'transform' ? zoom : 1);
 
@@ -139,9 +142,23 @@ const paintDefault = (
     sizeSurface();
   };
 
+  const settleFonts = (report: DivergenceReport): void => {
+    if (awaitingFonts || fontsSettled || !awaitsFonts(report)) return;
+    const set = (document as { fonts?: FontFaceSet }).fonts;
+    if (set === undefined || typeof set.ready?.then !== 'function') return;
+    awaitingFonts = true;
+    void set.ready.then(() => {
+      awaitingFonts = false;
+      fontsSettled = true;
+      runDivergenceCheck();
+    });
+  };
+
   const runDivergenceCheck = (): DivergenceReport | undefined => {
     if (!options.detectDivergence || handle === undefined) return undefined;
     const report = detectDivergence(result, handle, options.divergence ?? {});
+    latestReport = report;
+    settleFonts(report);
     if (options.onDivergence !== undefined) options.onDivergence(report);
     return report;
   };
@@ -179,6 +196,9 @@ const paintDefault = (
       return renderedPages;
     },
     issues: images.issues,
+    get divergence(): DivergenceReport | undefined {
+      return latestReport;
+    },
     setZoom,
     pageOf: (index) => renderedPages.find((page) => page.index === index),
     destroy: () => {

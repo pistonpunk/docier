@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LayoutResult } from '../../src/layout/index.js';
 import { mp, toCssPx } from '../../src/units/index.js';
-import type { RectSource } from '../../src/render/index.js';
+import type { DivergenceReport, RectSource } from '../../src/render/index.js';
 import {
   ATTR,
   DEFAULT_TOLERANCE_PX,
   RESULT_GAPS,
   assertNoDivergence,
+  awaitsFonts,
   detectDivergence,
   edgeBandOf,
   formatDivergence,
@@ -56,6 +57,34 @@ const runCount = (result: LayoutResult): number =>
 
 const shiftLeft = (node: HTMLElement, deltaPx: number): void => {
   node.style.setProperty('left', `${String(Number.parseFloat(node.style.left) + deltaPx)}px`);
+};
+
+interface FakeCanvasContext {
+  font: string;
+  textRendering: string;
+  measureText(text: string): { width: number };
+}
+
+const stubCanvas = (width: number): { readonly context: FakeCanvasContext; readonly measured: string[] } => {
+  const measured: string[] = [];
+  const context: FakeCanvasContext = {
+    font: '',
+    textRendering: 'auto',
+    measureText: (text) => {
+      measured.push(text);
+      return { width };
+    },
+  };
+  const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+  spy.mockImplementation(() => context as unknown as CanvasRenderingContext2D);
+  return { context, measured };
+};
+
+const stubFontStatus = (status: 'loaded' | 'loading'): (() => void) => {
+  Object.defineProperty(document, 'fonts', { value: { status }, configurable: true, writable: true });
+  return () => {
+    delete (document as { fonts?: unknown }).fonts;
+  };
 };
 
 const paragraphs = (count: number, text: string): string =>
@@ -252,6 +281,139 @@ describe('layout divergence detection', () => {
     expect(() => assertNoDivergence(browserRects, { requireAuthoritative: true })).toThrow(
       /could not run every check \(noTextMeasurer/,
     );
+  });
+
+  it('refuses to measure a run against a face the browser is still loading', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('hello world')));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const canvas = stubCanvas(100);
+    const restore = stubFontStatus('loading');
+    try {
+      const report = detectDivergence(result, rendered);
+      expect(canvas.measured).toEqual([]);
+      expect(report.divergences).toEqual([]);
+      expect(report.checked.advances).toBe(0);
+      expect(report.ok).toBe(false);
+      expect(report.complete).toBe(false);
+      expect(report.authoritative).toBe(false);
+      expect(awaitsFonts(report)).toBe(true);
+      expect(report.skipped).toContainEqual({
+        reason: 'fontsPending',
+        count: runCount(result),
+        severity: 'warning',
+      });
+      expect(() => assertNoDivergence(report)).toThrow(/could not run every check: fontsPending/);
+      const hosted = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+      expect(hosted.checked.advances).toBe(runCount(result));
+      expect(awaitsFonts(hosted)).toBe(false);
+    } finally {
+      restore();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('measures the runs once the faces have settled and with the painted glyph precision', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('hello world')));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const canvas = stubCanvas(100);
+    const restore = stubFontStatus('loaded');
+    try {
+      const report = detectDivergence(result, rendered);
+      expect(canvas.context.textRendering).toBe('geometricPrecision');
+      expect(canvas.context.font).toContain('px');
+      expect(canvas.measured).toEqual(result.pages[0]?.blocks[0]?.lines[0]?.runs.map((run) => run.text));
+      expect(report.checked.advances).toBe(runCount(result));
+      expect(awaitsFonts(report)).toBe(false);
+      const advance = report.divergences.find((divergence) => divergence.kind === 'runAdvance');
+      expect(advance).toBeDefined();
+      expect(advance?.renderedWidthPx).toBe(100);
+      expect(advance?.deltaPx).toBeCloseTo(100 - (advance?.engineWidthPx ?? 0), 6);
+    } finally {
+      restore();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('reports again once the faces settle instead of keeping the pre-font numbers', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('hello world')));
+    const target = host();
+    const widths = new Map<string, number>();
+    for (const page of result.pages) {
+      for (const block of page.blocks) {
+        for (const line of block.lines) {
+          for (const run of line.runs) widths.set(run.text, toCssPx(run.width, 1));
+        }
+      }
+    }
+    const context: FakeCanvasContext = {
+      font: '',
+      textRendering: 'auto',
+      measureText: (text) => ({ width: widths.get(text) ?? 0 }),
+    };
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+    spy.mockImplementation(() => context as unknown as CanvasRenderingContext2D);
+    let settle: () => void = () => undefined;
+    const set = {
+      status: 'loading',
+      ready: new Promise<void>((resolve) => {
+        settle = () => {
+          set.status = 'loaded';
+          resolve();
+        };
+      }),
+    };
+    Object.defineProperty(document, 'fonts', { value: set, configurable: true, writable: true });
+    try {
+      const reports: DivergenceReport[] = [];
+      const rendered = renderDocument(result, target, {
+        detectDivergence: true,
+        onDivergence: (report) => reports.push(report),
+      });
+      expect(reports.length).toBe(1);
+      expect(awaitsFonts(reports[0] as DivergenceReport)).toBe(true);
+      expect(reports[0]?.checked.advances).toBe(0);
+      expect(reports[0]?.authoritative).toBe(false);
+      expect(rendered.divergence).toBe(reports[0]);
+      settle();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(reports.length).toBe(2);
+      expect(awaitsFonts(reports[1] as DivergenceReport)).toBe(false);
+      expect(reports[1]?.checked.advances).toBe(runCount(result));
+      expect(reports[1]?.divergences).toEqual([]);
+      expect(reports[1]?.complete).toBe(true);
+      expect(reports[1]?.ok).toBe(true);
+      expect(rendered.divergence).toBe(reports[1]);
+      await Promise.resolve();
+      expect(reports.length).toBe(2);
+    } finally {
+      delete (document as { fonts?: unknown }).fonts;
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('compares the engine slot against the text the browser painted', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('hello world')));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const painted = detectDivergence(result, rendered, {
+      textWidthOf: () => 100,
+      measureText: { measure: () => 999 },
+    });
+    const advance = painted.divergences.find((divergence) => divergence.kind === 'runAdvance');
+    expect(painted.checked.advances).toBe(runCount(result));
+    expect(advance?.renderedWidthPx).toBe(100);
+    expect(advance?.message).toContain('the painted text "hello world" is 100 px wide');
+    expect(advance?.message).toContain(`out at ${String(advance?.engineWidthPx)} px`);
+    const unreadable = detectDivergence(result, rendered, {
+      textWidthOf: () => undefined,
+      measureText: { measure: () => 999 },
+    });
+    const fallback = unreadable.divergences.find((divergence) => divergence.kind === 'runAdvance');
+    expect(fallback?.renderedWidthPx).toBe(999);
+    expect(fallback?.message).toContain('the resolved font advances "hello world" to 999 px');
   });
 
   it('accepts an A4 page the browser rounds onto its own pixel grid', async () => {

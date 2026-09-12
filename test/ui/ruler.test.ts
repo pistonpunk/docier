@@ -154,7 +154,7 @@ describe('ruler interaction', () => {
     expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS - 9);
   });
 
-  it('drags a marker without reading layout geometry', async () => {
+  it('drags a margin without reading layout geometry, and commits once', async () => {
     const { handle, chrome } = await chromeOf(longBody());
     const seen = recordCommands(handle);
     const marker = markerFor(chrome, 'margin-left');
@@ -162,17 +162,48 @@ describe('ruler interaction', () => {
     marker.dispatchEvent(down);
     expect(down.defaultPrevented).toBe(true);
 
-    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 120, clientY: 5, bubbles: true }));
-    document.dispatchEvent(new MouseEvent('mouseup', { clientX: 120, clientY: 5, bubbles: true }));
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 120, clientY: 5, bubbles: true }));
     await handle.whenReady();
-    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.length).toBe(0);
+    expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS);
+
+    document.dispatchEvent(new MouseEvent('pointerup', { clientX: 120, clientY: 5, bubbles: true }));
+    await handle.whenReady();
+    expect(seen.length).toBe(1);
     expect(seen[0]?.commandId).toBe('docier.command.doc.setMargins');
     expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS + 300);
+  });
 
-    const before = seen.length;
-    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 140, clientY: 5, bubbles: true }));
+  it('applies the whole gesture once instead of accumulating each move', async () => {
+    const { handle, chrome } = await chromeOf(longBody());
+    const seen = recordCommands(handle);
+    const marker = markerFor(chrome, 'margin-left');
+    marker.dispatchEvent(new MouseEvent('pointerdown', { clientX: 100, clientY: 5, bubbles: true, cancelable: true }));
+    for (const clientX of [110, 120, 130, 140, 150]) {
+      document.dispatchEvent(new MouseEvent('pointermove', { clientX, clientY: 5, bubbles: true }));
+      await handle.whenReady();
+    }
+    document.dispatchEvent(new MouseEvent('pointerup', { clientX: 150, clientY: 5, bubbles: true }));
     await handle.whenReady();
-    expect(seen.length).toBe(before);
+
+    expect(seen.length).toBe(1);
+    expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS + 750);
+  });
+
+  it('abandons a margin drag on Escape', async () => {
+    const { handle, chrome } = await chromeOf(longBody());
+    const seen = recordCommands(handle);
+    const marker = markerFor(chrome, 'margin-left');
+    marker.dispatchEvent(new MouseEvent('pointerdown', { clientX: 100, clientY: 5, bubbles: true, cancelable: true }));
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 160, clientY: 5, bubbles: true }));
+    await handle.whenReady();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await handle.whenReady();
+    document.dispatchEvent(new MouseEvent('pointerup', { clientX: 160, clientY: 5, bubbles: true }));
+    await handle.whenReady();
+
+    expect(seen.length).toBe(0);
+    expect(leftMarginOf(handle)).toBe(MARGIN_TWIPS);
   });
 
   it('reads the caret paragraph indents and offsets them rather than resetting them', async () => {
