@@ -117,6 +117,7 @@ try {
         pageGapPx: 24,
         detectDivergence: true,
         onDivergence: (report) => {
+          panel.removeWhere((code) => code.startsWith('divergence.'));
           if (report.divergences.length === 0 && report.complete) return;
           for (const divergence of report.divergences.slice(0, 12)) {
             panel.add({

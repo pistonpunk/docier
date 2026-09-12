@@ -12,6 +12,7 @@ export interface Panel {
   add(entry: Entry): void;
   addMany(entries: readonly Entry[]): void;
   clear(): void;
+  removeWhere(match: (code: string) => boolean): void;
   setCollapsed(collapsed: boolean): void;
   count(): number;
 }
@@ -92,6 +93,7 @@ export const createPanel = (list: HTMLElement, count: HTMLElement, root: HTMLEle
 
     const item = document.createElement('li');
     item.dataset.severity = entry.severity;
+    item.dataset.code = entry.code;
 
     const code = document.createElement('div');
     code.className = 'code';
@@ -122,6 +124,17 @@ export const createPanel = (list: HTMLElement, count: HTMLElement, root: HTMLEle
     render();
   };
 
+  const recount = (): void => {
+    total = 0;
+    errors = 0;
+    warnings = 0;
+    for (const item of list.children) {
+      total += 1;
+      if (item.getAttribute('data-severity') === 'error') errors += 1;
+      else if (item.getAttribute('data-severity') === 'warning') warnings += 1;
+    }
+  };
+
   render();
   installSplitter(root);
 
@@ -129,6 +142,14 @@ export const createPanel = (list: HTMLElement, count: HTMLElement, root: HTMLEle
     add,
     addMany: (entries) => {
       for (const entry of entries) add(entry);
+    },
+    removeWhere: (match) => {
+      for (const item of [...list.children]) {
+        const code = item.getAttribute('data-code') ?? '';
+        if (match(code)) item.remove();
+      }
+      recount();
+      render();
     },
     clear: () => {
       list.replaceChildren();
