@@ -1,7 +1,7 @@
 import type { DocPos, DocRange, PageFragment } from '../layout/index.js';
 import type { CaretGeometry, CommandRegistry, TextAffinity } from '../api/types.js';
 import { ATTR } from '../render/dom.js';
-import { mp, toCssPx } from '../units/index.js';
+import { MP_PER_TWIP, fromCssPx, mp, mpToTwip, toCssPx } from '../units/index.js';
 import type { Mp } from '../units/index.js';
 import type { CaretStopEntry, LineEntry, PositionIndex } from './positions.js';
 import { caretGeometryOf, clientToPage, hitTestPage, pageToViewport, stopsOfLine } from './caret.js';
@@ -39,6 +39,50 @@ interface DataTransferEventLike {
 
 const DRAG_THRESHOLD_PX = 4;
 const CARET_BLINK_MS = 530;
+const COLUMN_EDGE_PX = 5;
+const MIN_COLUMN_WIDTH_MP = mp(120 * MP_PER_TWIP);
+
+export interface ColumnEdge {
+  readonly table: number;
+  readonly column: number;
+  readonly x: Mp;
+  readonly width: Mp;
+  readonly widths: readonly number[];
+}
+
+export const columnEdgeInPage = (
+  page: PageFragment,
+  point: { readonly x: Mp; readonly y: Mp },
+  tolerance: Mp,
+): ColumnEdge | undefined => {
+  let best: ColumnEdge | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const table of page.tables) {
+    for (const row of table.rows) {
+      for (const cell of row.cells) {
+        if (point.y < cell.box.y || point.y > cell.box.y + cell.box.height) continue;
+        const right = mp(cell.box.x + cell.box.width);
+        const distance = Math.abs((point.x as number) - (right as number));
+        if (distance > (tolerance as number) || distance >= bestDistance) continue;
+        bestDistance = distance;
+        const widths: number[] = [];
+        for (const sibling of row.cells) {
+          const span = Math.max(1, sibling.columnSpan);
+          const share = Math.round(mpToTwip(sibling.box.width) / span);
+          for (let index = 0; index < span; index += 1) widths[sibling.column + index] = share;
+        }
+        best = {
+          table: row.table,
+          column: cell.column + cell.columnSpan - 1,
+          x: right,
+          width: cell.box.width,
+          widths,
+        };
+      }
+    }
+  }
+  return best;
+};
 
 const clipboardDataOf = (event: Event): ClipboardDataLike | undefined =>
   (event as unknown as ClipboardEventLike).clipboardData;
@@ -366,6 +410,7 @@ export const attachInput = (host: InputHost): InputHandle => {
   };
 
   let dragging = false;
+  let columnGuide: HTMLElement | undefined;
   let armed: { readonly from: DocRange; readonly x: number; readonly y: number } | undefined =
     undefined;
   let dragSource: DocRange | undefined = undefined;
@@ -373,6 +418,86 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const run = (command: string, args?: unknown): void => {
     void host.commands.execute(command, args);
+  };
+
+  const columnEdgeAt = (clientX: number, clientY: number): ColumnEdge | undefined => {
+    if (index() === undefined) return undefined;
+    const zoom = host.zoom === 0 ? 1 : host.zoom;
+    const tolerance = fromCssPx(COLUMN_EDGE_PX, zoom);
+    for (const sheet of sheets()) {
+      const box = pageBox(sheet);
+      if (clientX < box.left || clientX > box.left + box.width) continue;
+      if (clientY < box.top || clientY > box.top + box.height) continue;
+      const pageIndex = Number(sheet.getAttribute(ATTR.page) ?? '-1');
+      const page = pageFragmentOf(pageIndex);
+      if (page === undefined) return undefined;
+      const point = clientToPage(page, { left: box.left, top: box.top }, clientX, clientY, zoom);
+      return columnEdgeInPage(page, point, tolerance);
+    }
+    return undefined;
+  };
+
+  const guideFor = (): HTMLElement => {
+    if (columnGuide === undefined) {
+      columnGuide = owner.createElement('div');
+      columnGuide.className = 'docier-column-guide';
+      applyStyle(columnGuide, {
+        position: 'absolute',
+        top: '0',
+        bottom: '0',
+        width: '1px',
+        'z-index': '4',
+        'pointer-events': 'none',
+        'background-color': 'var(--docier-accent, #1f6feb)',
+      });
+      host.rendered.appendChild(columnGuide);
+    }
+    return columnGuide;
+  };
+
+  const startColumnDrag = (edge: ColumnEdge, event: PointerEvent): void => {
+    const zoom = host.zoom === 0 ? 1 : host.zoom;
+    const anchor = hitTest(event.clientX, event.clientY)?.pos;
+    const startX = event.clientX;
+    const base = edge.width;
+    const guide = guideFor();
+    const baseBox = host.rendered.getBoundingClientRect();
+    let pending = mpToTwip(base);
+    const widths = [...edge.widths];
+    guide.hidden = false;
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      const delta = fromCssPx(moveEvent.clientX - startX, zoom);
+      const width = mp(Math.max(MIN_COLUMN_WIDTH_MP as number, (base as number) + (delta as number)) as number);
+      pending = mpToTwip(width);
+      widths[edge.column] = pending;
+      guide.style.left = `${String(Math.round(moveEvent.clientX - baseBox.left))}px`;
+    };
+    const finish = (): void => {
+      guide.hidden = true;
+      owner.removeEventListener('pointermove', onMove);
+      owner.removeEventListener('pointerup', finish);
+      owner.removeEventListener('pointercancel', finish);
+      if (pending !== mpToTwip(base)) {
+        run(`${PREFIX}table.setColumnWidth`, {
+          column: edge.column,
+          widthTwips: pending,
+          widths,
+          ...(anchor === undefined ? {} : { anchor }),
+        });
+      }
+    };
+    guide.style.left = `${String(Math.round(event.clientX - baseBox.left))}px`;
+    owner.addEventListener('pointermove', onMove);
+    owner.addEventListener('pointerup', finish);
+    owner.addEventListener('pointercancel', finish);
+    event.preventDefault();
+  };
+
+  const onHover = (event: PointerEvent): void => {
+    if (dragging) return;
+    const edge = columnEdgeAt(event.clientX, event.clientY);
+    host.rendered.style.cursor = edge === undefined ? '' : 'col-resize';
   };
 
   const releasePointer = (): void => {
@@ -391,6 +516,11 @@ export const attachInput = (host: InputHost): InputHandle => {
   };
 
   const onPointerDown = (event: PointerEvent): void => {
+    const edge = event.button === 0 ? columnEdgeAt(event.clientX, event.clientY) : undefined;
+    if (edge !== undefined) {
+      startColumnDrag(edge, event);
+      return;
+    }
     const hit = hitTest(event.clientX, event.clientY);
     if (hit === undefined) return;
     event.preventDefault();
@@ -524,6 +654,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     run(`${PREFIX}clipboard.paste`, { data: clipboardDataOf(event) });
   };
 
+  host.rendered.addEventListener('pointermove', onHover);
   host.rendered.addEventListener('pointerdown', onPointerDown);
   composer.addEventListener('keydown', onKeyDown);
   composer.addEventListener('beforeinput', onBeforeInput);
@@ -552,6 +683,7 @@ export const attachInput = (host: InputHost): InputHandle => {
       composer.focus({ preventScroll: true });
     },
     dispose: () => {
+      host.rendered.removeEventListener('pointermove', onHover);
       host.rendered.removeEventListener('pointerdown', onPointerDown);
       composer.removeEventListener('keydown', onKeyDown);
       composer.removeEventListener('beforeinput', onBeforeInput);

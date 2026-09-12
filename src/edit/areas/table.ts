@@ -80,8 +80,8 @@ export interface TablePropertiesArgs {
   readonly layout?: 'autofit' | 'fixed';
 }
 
-const targetAt = (host: AreaHost): CellTarget | undefined => {
-  const resolved = host.session.resolve(host.selection.focus);
+const targetAt = (host: AreaHost, anchor?: DocPos): CellTarget | undefined => {
+  const resolved = host.session.resolve(anchor ?? host.selection.focus);
   if (resolved === undefined) return undefined;
   const ref = resolved.slot.cell;
   if (ref === undefined) return undefined;
@@ -475,6 +475,8 @@ const setPropertiesSpec: AreaSpec<TablePropertiesArgs> = {
 export interface ColumnWidthArgs {
   readonly column?: number;
   readonly widthTwips?: number;
+  readonly widths?: readonly number[];
+  readonly anchor?: DocPos;
 }
 
 const MIN_COLUMN_TWIPS = 120;
@@ -484,31 +486,61 @@ const setColumnWidthSpec: AreaSpec<ColumnWidthArgs> = {
   label: 'Column width',
   category: 'table',
   permissions: ['format'],
-  enabledIn: (host, args) =>
-    host.session.aligned &&
-    targetAt(host) !== undefined &&
-    widthSettable(targetAt(host), args),
+  enabledIn: (host, args) => {
+    if (!host.session.aligned) return false;
+    const target = targetAt(host, args?.anchor);
+    return target !== undefined && widthSettable(target, args);
+  },
   reason: (host, args) => {
     if (!host.session.aligned) return NOT_ALIGNED;
-    const target = targetAt(host);
+    const target = targetAt(host, args?.anchor);
     if (target === undefined) return PLACE_CARET;
     return widthSettable(target, args) ? NEEDS_PROPERTY : BAD_WIDTH;
   },
   run: (host, args) => {
-    const target = targetAt(host);
+    const target = targetAt(host, args.anchor);
     if (target === undefined || !widthSettable(target, args)) return false;
     const table = target.table;
-    const column = args.column ?? target.column;
+    const targetColumn = args.column ?? target.column;
     const requested = Math.max(MIN_COLUMN_TWIPS, Math.floor(args.widthTwips ?? 0));
+    const declared = args.widths;
+    const widthAt = (at: number): number => {
+      const value = declared?.[at];
+      return value === undefined || !Number.isFinite(value)
+        ? requested
+        : Math.max(MIN_COLUMN_TWIPS, Math.floor(value));
+    };
     const changed = changedBy([table.element], () => {
-      const grid = table.gridColumns()[column];
-      if (grid !== undefined) setWAttr(grid.element, 'w', String(requested));
+      if (declared !== undefined) {
+        const properties = table.properties;
+        properties.ensure();
+        properties.layout = 'fixed';
+      }
+      const grid = table.gridColumns();
+      for (let index = 0; index < grid.length; index += 1) {
+        const column = grid[index];
+        if (column === undefined) continue;
+        const isTarget = index === targetColumn;
+        if (!isTarget && declared === undefined) continue;
+        setWAttr(column.element, 'w', String(isTarget ? requested : widthAt(index)));
+      }
       for (const row of table.rows()) {
-        const cell = row.spanAt(column)?.cell;
-        if (cell === undefined) continue;
-        const properties = cell.properties;
-        properties.width.type = 'dxa';
-        properties.width.twips = twip(requested);
+        for (const span of row.cellSpans()) {
+          const spanWidth = Math.max(1, span.span);
+          const properties = span.cell.properties;
+          if (declared === undefined) {
+            if (span.start !== targetColumn || spanWidth !== 1) continue;
+            properties.width.type = 'dxa';
+            properties.width.twips = twip(requested);
+            continue;
+          }
+          let total = 0;
+          for (let step = 0; step < spanWidth; step += 1) {
+            total += span.start + step === targetColumn ? requested : widthAt(span.start + step);
+          }
+          properties.width.type = 'dxa';
+          properties.width.twips = twip(total);
+        }
       }
     });
     if (!changed) return false;
