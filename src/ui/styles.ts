@@ -32,7 +32,12 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-chrome{display:grid;grid-template-areas:"menubar" "ribbon" "ruler" "canvas" "status";grid-template-rows:auto auto auto minmax(0,1fr) auto;position:relative;min-height:0;width:100%;height:100%;box-sizing:border-box;font-family:var(--docier-ui-font);font-size:var(--docier-ui-font-size);color:var(--docier-text);background:var(--docier-surface)}
 .docier-chrome *,.docier-chrome *::before,.docier-chrome *::after{box-sizing:border-box}
 .docier-chrome [hidden]{display:none}
-.docier-chrome-menubar{display:flex;grid-area:menubar;align-items:stretch;flex-wrap:nowrap;background:var(--docier-surface);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
+.docier-chrome-menubar{display:flex;grid-area:menubar;flex-direction:column;align-items:stretch;background:var(--docier-surface);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
+.docier-titlebar{display:flex;align-items:center;gap:8px;height:32px;padding-inline:8px;background:var(--docier-surface-raised);border-bottom:1px solid var(--docier-border)}
+.docier-titlebar-title{flex:1;text-align:center;font-size:12px;color:var(--docier-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.docier-quick-access{display:flex;align-items:center;gap:2px}
+.docier-quick-access .docier-control{min-width:22px;min-height:22px}
+.docier-tab-row{display:flex;align-items:stretch;flex-wrap:nowrap;min-width:0}
 .docier-tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:thin}
 .docier-tab{appearance:none;border:0;background:transparent;color:var(--docier-text);font:inherit;font-size:12px;height:var(--docier-tab-height);padding:0 calc(var(--docier-gap) * 2.5);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
 .docier-tab:hover{background:var(--docier-state-hover)}

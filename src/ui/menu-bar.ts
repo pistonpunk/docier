@@ -56,25 +56,37 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   markSlot(bar, 'menuBar');
   bar.setAttribute('role', 'none');
 
+  const titleBar = make('div', 'docier-titlebar');
+  markPart(titleBar, 'titlebar');
+  const titleText = make('span', 'docier-titlebar-title');
+  setText(titleText, context.i18n.text('ui.chrome.title'));
+  markPart(titleText, 'titlebar-title');
+  bar.appendChild(titleBar);
+
+  const tabRow = make('div', 'docier-tab-row');
+  markPart(tabRow, 'tab-row');
+  bar.appendChild(tabRow);
+
   const backstageButton = make('button', 'docier-tab docier-backstage-button');
   backstageButton.setAttribute('type', 'button');
   backstageButton.setAttribute('data-docier-part', 'backstage');
   backstageButton.setAttribute('aria-haspopup', 'dialog');
   backstageButton.setAttribute('aria-expanded', 'false');
   setText(backstageButton, context.i18n.text('ui.tab.file'));
-  bar.appendChild(backstageButton);
+  tabRow.appendChild(backstageButton);
 
   const tablist = make('div', 'docier-tabs');
   tablist.setAttribute('role', 'tablist');
   tablist.setAttribute('aria-label', context.i18n.text('ui.chrome.menuBar'));
   markPart(tablist, 'tabs');
-  bar.appendChild(tablist);
+  tabRow.appendChild(tablist);
 
   const quick = make('div', 'docier-quick-access');
   quick.setAttribute('role', 'toolbar');
   quick.setAttribute('aria-label', context.i18n.text('ui.chrome.menuBar'));
   markPart(quick, 'quick-access');
-  bar.appendChild(quick);
+  titleBar.appendChild(quick);
+  titleBar.appendChild(titleText);
 
   const ribbon = make('div', 'docier-ribbon');
   ribbon.setAttribute('data-docier-collapsed', 'expanded');

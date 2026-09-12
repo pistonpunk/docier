@@ -8,6 +8,7 @@ export type MessageCatalogue = Readonly<Record<string, string>>;
 export type MessageParams = Readonly<Record<string, string | number>>;
 
 export const EN_MESSAGES: MessageCatalogue = {
+  'ui.chrome.title': 'Document',
   'ui.chrome.menuBar': 'Menu bar',
   'ui.chrome.ribbon': 'Ribbon',
   'ui.chrome.canvas': 'Document canvas',
