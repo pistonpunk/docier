@@ -126,7 +126,7 @@ const SHAPES: FieldTable = {
   storage: { enabled: 'boolean' },
   export: { fontMissing: 'string' },
   theme: { vars: 'object' },
-  ui: { chrome: 'string', mountDetached: 'string' },
+  ui: { chrome: 'string', mountDetached: 'string', ariaLabel: 'string' },
   keyboard: { bindings: 'object', shortcutsEnabled: 'boolean' },
   telemetry: { enabled: 'boolean' },
   plugins: { allowDocumentFeatures: 'boolean' },

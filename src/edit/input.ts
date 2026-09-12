@@ -38,6 +38,7 @@ interface DataTransferEventLike {
 }
 
 const DRAG_THRESHOLD_PX = 4;
+const CARET_BLINK_MS = 530;
 
 const clipboardDataOf = (event: Event): ClipboardDataLike | undefined =>
   (event as unknown as ClipboardEventLike).clipboardData;
@@ -160,6 +161,17 @@ export const attachInput = (host: InputHost): InputHandle => {
     'background-color': '#000',
     display: 'none',
   });
+  if (typeof caret.animate === 'function') {
+    caret.animate(
+      [
+        { opacity: 1, offset: 0 },
+        { opacity: 1, offset: 0.5 },
+        { opacity: 0, offset: 0.5 },
+        { opacity: 0, offset: 1 },
+      ],
+      { duration: CARET_BLINK_MS * 2, iterations: Number.POSITIVE_INFINITY },
+    );
+  }
   overlay.appendChild(selectionLayer);
   overlay.appendChild(caret);
   host.rendered.appendChild(overlay);

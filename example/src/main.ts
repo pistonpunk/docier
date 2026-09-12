@@ -117,7 +117,7 @@ try {
         pageGapPx: 24,
         detectDivergence: true,
         onDivergence: (report) => {
-          if (report.divergences.length === 0) return;
+          if (report.divergences.length === 0 && report.complete) return;
           for (const divergence of report.divergences.slice(0, 12)) {
             panel.add({
               code: `divergence.${divergence.kind}`,
