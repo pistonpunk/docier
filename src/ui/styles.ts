@@ -126,6 +126,12 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-canvas{position:relative;grid-area:canvas;display:flex;min-height:0;overflow:hidden;background:var(--docier-pasteboard)}
 .docier-canvas > .docier-editor{flex:1 1 auto;min-height:0}
 .docier-canvas > .docier-editor .docier-surface{margin-inline:auto}
+.docier-editor{scrollbar-width:thin;scrollbar-color:var(--docier-border) transparent}
+.docier-chrome ::-webkit-scrollbar{width:12px;height:12px}
+.docier-chrome ::-webkit-scrollbar-track{background:transparent}
+.docier-chrome ::-webkit-scrollbar-thumb{background-color:var(--docier-border);border:3px solid transparent;background-clip:content-box;border-radius:6px}
+.docier-chrome ::-webkit-scrollbar-thumb:hover{background-color:var(--docier-text-disabled)}
+.docier-chrome ::-webkit-scrollbar-corner{background:transparent}
 .docier-slot{display:contents}
 .docier-live{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .docier-visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
