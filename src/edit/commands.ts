@@ -32,6 +32,7 @@ import {
   insertText,
   joinParagraph,
   moveCaret,
+  moveCaretLines,
   moveCaretTo,
   moveCaretVertical,
   selectAllAction,
@@ -235,6 +236,28 @@ const moving = (
 interface ExtendArgs {
   readonly extend?: boolean;
 }
+
+interface PageArgs {
+  readonly lines?: number;
+  readonly extend?: boolean;
+}
+
+const paging = (
+  host: EditCommandHost,
+  action: string,
+  label: LocalizedString,
+  run: (host: EditCommandHost, args: PageArgs) => ActionResult,
+): CommandDefinition<PageArgs, void> =>
+  define<PageArgs>(host, {
+    action,
+    label,
+    area: 'selection',
+    layer: 'chrome',
+    undoable: false,
+    run,
+    enabledIn: loadedOnly,
+    reason: () => NO_DOCUMENT,
+  });
 
 interface TextArgs {
   readonly text?: string;
@@ -521,6 +544,12 @@ export const installEditCommands = (
     ),
     moving(host, 'moveStoryEnd', 'Move to the end of the document', [CTRL('End')], (h, extend) =>
       moveCaretTo(h, 'story-end', extend),
+    ),
+    paging(host, 'movePageDown', 'Move down one screen', (h, args) =>
+      moveCaretLines(h, 'down', args.lines ?? 1, args.extend ?? false),
+    ),
+    paging(host, 'movePageUp', 'Move up one screen', (h, args) =>
+      moveCaretLines(h, 'up', args.lines ?? 1, args.extend ?? false),
     ),
     define<CaretArgs>(host, {
       action: 'setCaret',

@@ -3,7 +3,7 @@ import type { TextAffinity } from '../api/types.js';
 import { docPos } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
 import { mp } from '../units/index.js';
-import { downFrom, upFrom } from './caret.js';
+import { downFrom, linesFrom, upFrom } from './caret.js';
 import type { PositionIndex, StorySpan } from './positions.js';
 import { blockText } from './positions.js';
 import { nextWordStart, previousWordStart } from './words.js';
@@ -198,6 +198,42 @@ export const moveDown = (
     const line = index.lineAt(selection.focus, selection.affinity);
     const target = line?.end ?? storyEnd(index, selection.focus);
     return { selection: apply(index, selection, target, 'upstream', extend), goalX: goalX ?? mp(0) };
+  }
+  return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
+};
+
+export const moveLinesDown = (
+  index: PositionIndex,
+  selection: EditSelection,
+  lines: number,
+  options: MoveOptions = {},
+  goalX?: Mp,
+): VerticalMoveResult => {
+  const extend = options.extend ?? false;
+  const collapsed = prepare(selection, 'down', extend);
+  if (collapsed !== undefined) return { selection: collapsed, goalX: goalX ?? mp(0) };
+  const moved = linesFrom(index, selection.focus, selection.affinity, goalX, Math.max(1, lines));
+  if (moved === undefined) {
+    const target = storyEnd(index, selection.focus);
+    return { selection: apply(index, selection, target, 'upstream', extend), goalX: mp(0) };
+  }
+  return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
+};
+
+export const moveLinesUp = (
+  index: PositionIndex,
+  selection: EditSelection,
+  lines: number,
+  options: MoveOptions = {},
+  goalX?: Mp,
+): VerticalMoveResult => {
+  const extend = options.extend ?? false;
+  const collapsed = prepare(selection, 'up', extend);
+  if (collapsed !== undefined) return { selection: collapsed, goalX: goalX ?? mp(0) };
+  const moved = linesFrom(index, selection.focus, selection.affinity, goalX, -Math.max(1, lines));
+  if (moved === undefined) {
+    const target = storyStart(index, selection.focus);
+    return { selection: apply(index, selection, target, 'downstream', extend), goalX: mp(0) };
   }
   return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
 };

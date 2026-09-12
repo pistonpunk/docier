@@ -22,6 +22,7 @@ export interface InputHost {
 
 export interface InputHandle {
   refresh(): void;
+  reveal(): void;
   focus(): void;
   dispose(): void;
 }
@@ -240,6 +241,29 @@ export const attachInput = (host: InputHost): InputHandle => {
     return caretGeometryOf(positions, host.selection.focus, host.selection.affinity);
   };
 
+  const scrollerOf = (): HTMLElement | undefined => {
+    let node: HTMLElement | null = host.rendered.parentElement;
+    while (node !== null) {
+      const overflow = host.root.ownerDocument.defaultView?.getComputedStyle(node).overflowY ?? '';
+      if (overflow === 'auto' || overflow === 'scroll') return node;
+      node = node.parentElement;
+    }
+    return undefined;
+  };
+
+  const scrollCaretIntoView = (): void => {
+    const scroller = scrollerOf();
+    if (scroller === undefined || caret.style.display === 'none') return;
+    const caretBox = caret.getBoundingClientRect();
+    if (caretBox.height === 0) return;
+    const view = scroller.getBoundingClientRect();
+    const margin = Math.max(8, caretBox.height);
+    const above = view.top + margin - caretBox.top;
+    const below = caretBox.bottom + margin - view.bottom;
+    if (above <= 0 && below <= 0) return;
+    scroller.scrollTop += above > 0 ? -above : below;
+  };
+
   const paintCaret = (): void => {
     const geometry = caretOf();
     if (geometry === undefined) {
@@ -431,11 +455,28 @@ export const attachInput = (host: InputHost): InputHandle => {
     run(`${PREFIX}clipboard.paste`, hit === undefined ? { data } : { data, at: hit.pos });
   };
 
+  const pageStep = (): number => {
+    const scroller = scrollerOf();
+    const height = scroller === undefined ? 0 : scroller.getBoundingClientRect().height;
+    const stop = caretOf();
+    const lineHeight = stop === undefined || stop.height <= 0 ? 0 : toCssPx(stop.height, host.zoom);
+    if (height <= 0 || lineHeight <= 0) return 1;
+    return Math.max(1, Math.floor(height / lineHeight) - 1);
+  };
+
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.isComposing) return;
     if (event.key === 'Escape' && (dragSource !== undefined || armed !== undefined)) {
       event.preventDefault();
       releasePointer();
+      return;
+    }
+    if ((event.key === 'PageDown' || event.key === 'PageUp') && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      run(`${PREFIX}selection.${event.key === 'PageDown' ? 'movePageDown' : 'movePageUp'}`, {
+        lines: pageStep(),
+        extend: event.shiftKey,
+      });
       return;
     }
     const mac = isMacPlatform();
@@ -489,6 +530,11 @@ export const attachInput = (host: InputHost): InputHandle => {
     refresh: () => {
       paintCaret();
       paintSelection();
+    },
+    reveal: () => {
+      paintCaret();
+      paintSelection();
+      scrollCaretIntoView();
     },
     focus: () => {
       composer.focus({ preventScroll: true });

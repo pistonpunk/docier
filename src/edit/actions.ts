@@ -13,6 +13,8 @@ import {
   moveDown,
   moveLineEnd,
   moveLineStart,
+  moveLinesDown,
+  moveLinesUp,
   moveParagraphEnd,
   moveParagraphStart,
   moveStoryEnd,
@@ -331,6 +333,22 @@ export const moveCaretVertical = (
     direction === 'up'
       ? moveUp(index, selection, { extend }, host.goalX)
       : moveDown(index, selection, { extend }, host.goalX);
+  if (selectionEquals(moved.selection, selection)) return NO_CHANGE;
+  return selectionAction(moved.selection, extend ? 'extend' : 'set', moved.goalX);
+};
+
+export const moveCaretLines = (
+  host: EditActionHost,
+  direction: 'up' | 'down',
+  lines: number,
+  extend: boolean,
+): ActionResult => {
+  const selection = host.selection;
+  const index = host.session.index;
+  const moved =
+    direction === 'up'
+      ? moveLinesUp(index, selection, lines, { extend }, host.goalX)
+      : moveLinesDown(index, selection, lines, { extend }, host.goalX);
   if (selectionEquals(moved.selection, selection)) return NO_CHANGE;
   return selectionAction(moved.selection, extend ? 'extend' : 'set', moved.goalX);
 };

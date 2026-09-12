@@ -172,7 +172,7 @@ const verticalFrom = (
   pos: DocPos,
   affinity: TextAffinity,
   goalX: Mp | undefined,
-  delta: 1 | -1,
+  delta: number,
 ): VerticalMove | undefined => {
   const line = index.lineAt(index.clamp(pos), affinity);
   if (line === undefined) return undefined;
@@ -195,6 +195,14 @@ export const downFrom = (
   affinity: TextAffinity,
   goalX?: Mp,
 ): VerticalMove | undefined => verticalFrom(index, pos, affinity, goalX, 1);
+
+export const linesFrom = (
+  index: PositionIndex,
+  pos: DocPos,
+  affinity: TextAffinity,
+  goalX: Mp | undefined,
+  delta: number,
+): VerticalMove | undefined => verticalFrom(index, pos, affinity, goalX, delta);
 
 export const upFrom = (
   index: PositionIndex,

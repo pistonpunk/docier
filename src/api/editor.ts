@@ -390,7 +390,7 @@ export const createEditor = (
       ariaLabel: options.render?.ariaLabel ?? settings.ui.ariaLabel ?? settings.document.docId,
     });
     previous?.destroy();
-    input?.refresh();
+    input?.reveal();
   };
 
   const host: ClipboardCommandHost & AreaHost = {
@@ -743,7 +743,7 @@ export const createEditor = (
           pages: activeSession.layout.pages.length,
         });
       } else if (selectionMoved) {
-        input?.refresh();
+        input?.reveal();
       }
       for (const hook of active.commitHooks) hook();
       return { affectedRanges: active.ranges, invalidation: active.invalidation };
@@ -1042,7 +1042,7 @@ export const createEditor = (
         current: snapshotOf(next),
         reason: 'set',
       });
-      input?.refresh();
+      input?.reveal();
     },
     caretGeometry: () => {
       const active = session;
