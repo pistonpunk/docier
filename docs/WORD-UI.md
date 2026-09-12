@@ -226,3 +226,32 @@ intrinsic width is over 100px. The Styles gallery's four rows want the same
 treatment: eight tiles in a 146px column is two columns by four, and Word shows
 them as one row of preview tiles, which needs the gallery to be the group that
 grows (it already is) and the tiles to be wider than they are tall.
+
+### The Styles gallery is why the ribbon is 112px, and the fix is a different gallery
+
+Chased to the end. The Font group is already two rows, which an earlier reading
+got wrong by counting the combos' inner inputs as a third row. The height comes
+from the Styles gallery, and widening its group does not help, because the
+gallery does not grow:
+
+    .docier-group-controls > .docier-menu-gallery{flex:0 1 auto;min-width:0}
+
+With `flex: 0 1 auto` the gallery keeps its content width, so giving its group a
+264px minimum left the gallery at 132px and it went on rendering two columns.
+That change also cost the Font group a row's worth of width and pushed it to
+three rows, so it was reverted: net worse.
+
+The gallery's columns come from `repeat(auto-fit, minmax(64px, 1fr))`, so the
+number of columns follows the gallery's width. Four columns needs 262px, three
+needs 196, two needs 132. Eight tiles therefore render as four rows at 132px or
+three rows at 196px, and the ribbon cannot reach Word's 84px while a group is
+three or four rows tall.
+
+Word does not solve this with a wider group. Its ribbon Styles gallery is a
+single horizontal row of preview tiles, about one tile tall, with a scroll arrow
+at its end, and the tiles are wider than they are tall so a style's name and its
+shape both read. Ours is a wrapping grid of text tiles. So the fix is to replace
+the wrapping grid in the ribbon with a single-row horizontal gallery with
+overflow, which is a change to the gallery control rather than to the ribbon's
+widths. That would put the Styles group at one row, leave Font's two rows as the
+tallest, and make 84px reachable.
