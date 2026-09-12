@@ -201,7 +201,20 @@ built; `createEditor` is the mount API this phase delivered.
 - [ ] Fill, preview, unresolved-value reporting, unlink
 
 ### Phase 6 — Output and release
-- [ ] `src/pdf/` — PDF export, separate entry point
+- [x] `src/pdf/` — PDF export as its own entry point (`docier/pdf`, D8). `renderPdf(result, options)`
+      serialises the millipoint `LayoutResult` the screen paints (D17): no second layout, no
+      re-measure, no consultation of the model for positioning. One conversion point,
+      `src/pdf/geometry.ts`, flips the engine's top-down points into the PDF's bottom-up user space.
+      Fonts are embedded as Identity-H CIDFontType2 TrueType subsets whose glyph advances come from
+      the measurer's cluster advances (the widths the engine laid out with), falling back to the
+      embedded hmtx only when the measurer cannot supply the family — with `metricSourceMismatch`
+      against the face id, and `metricMismatch` per atom when the layout's advance cannot be
+      reproduced. A face the host has not supplied is reported, never silently swapped. PNG and JPEG
+      images embed and dedupe per document. Deterministic by default: no wall clock, `/ID` and
+      `xmpMM:DocumentID` from the document hash, pinned DEFLATE. PDF/A-2b, A-2u and A-3b with a
+      built sRGB output intent; A-1b is refused citing ADR-0006. Not done: encryption, signing, and
+      the DOM painter still paints no images at all (`RESULT_GAPS`), so image placement is verified
+      against the layout, not against the screen.
 - [ ] Print path and print preview
 - [ ] Accessibility pass, i18n pass (en/ro/ru + RTL groundwork)
 - [ ] Performance pass on a 200-page document
