@@ -94,7 +94,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-menu-gallery-item{font-family:var(--docier-doc-font);min-height:calc(var(--docier-control-height) * 1.5)}
 .docier-ruler{position:relative;grid-area:ruler;height:var(--docier-ruler-size);background:var(--docier-surface-sunken);border-bottom:1px solid var(--docier-border);overflow:hidden;user-select:none}
 .docier-ruler[hidden]{display:none}
-.docier-ruler-corner{position:absolute;inset-inline-start:0;inset-block:0;width:calc(var(--docier-control-height) * 1.2);display:flex;align-items:center;justify-content:center;border-inline-end:1px solid var(--docier-border);background:var(--docier-surface-raised);z-index:2}
+.docier-ruler-corner{position:absolute;inset-inline-start:0;inset-block:0;width:var(--docier-ruler-size);display:flex;align-items:center;justify-content:center;border-inline-end:1px solid var(--docier-border);background:var(--docier-surface-raised);z-index:2}
 .docier-ruler-unit{appearance:none;border:0;background:transparent;color:var(--docier-text-muted);font:inherit;cursor:pointer;padding:0 2px;height:100%}
 .docier-ruler-strip{position:absolute;inset-block:0;inset-inline-start:0;will-change:transform}
 .docier-ruler-text-area{position:absolute;inset-block:0;background:var(--docier-page)}
