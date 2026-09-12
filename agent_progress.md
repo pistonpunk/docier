@@ -41,6 +41,8 @@ pleasant to integrate for a developer.
 | D14 | **No fonts and no dictionary data are bundled.** Both are host-supplied through config. | Removes the font-licensing and the ro/ru dictionary-licensing problems entirely rather than negotiating them. Also keeps the package small. |
 | D15 | **Unicode is preserved on save, not normalised** (D7 confirmed as the resolution of ADR-0001). | Legal fidelity. |
 | D16 | **PDF/A-2b** as the archival profile, configurable. | The pragmatic archival choice, and it permits transparency that PDF/A-1b does not. The RO/RU compliance question remains open for the owner to confirm. |
+| D17 | **One engine, two painters.** The PDF exporter renders the *same* `LayoutResult` the screen renders — it is a second painter, never a DOCX→PDF conversion through LibreOffice or any external converter. | This is the Google Docs property and the whole point of D2. Routing print through a converter reintroduces a second layout engine, and the screen/print drift returns one step downstream. Two painters of one layout is what makes "exact" true rather than aspirational. Resolves ADR-0002. |
+| D18 | **"Exact" means screen equals print, and both are faithful to the DOCX semantics — NOT pixel-identical to Microsoft Word.** | Nothing in a browser is pixel-identical to Word, including LibreOffice, ONLYOFFICE and Word Online. And it is not required here: templates are authored in docier, so Word is never in the loop and there is nothing to be exact *with* except ourselves. Setting the bar at Word-parity would mean chasing an impossible target for years. |
 
 ### Resolved product calls
 
