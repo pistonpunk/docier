@@ -1,0 +1,45 @@
+{
+  "name": "docier",
+  "version": "0.0.0",
+  "private": false,
+  "type": "module",
+  "description": "A Word-compatible DOCX editor for the browser. Framework-agnostic, command and event driven, with an optional tokenization module for document templates.",
+  "keywords": [
+    "docx",
+    "ooxml",
+    "word",
+    "editor",
+    "document",
+    "template",
+    "pdf",
+    "typescript"
+  ],
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tokens": {
+      "types": "./dist/tokens/index.d.ts",
+      "import": "./dist/tokens/index.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
