@@ -229,6 +229,21 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     handle.setZoom(clamped);
   };
 
+  const FIT_SLACK_PX = 24;
+
+  const fitZoom = (mode: 'pageWidth' | 'wholePage'): number => {
+    const page = queries.pageFragment(queries.page() - 1);
+    const canvas = root.querySelector<HTMLElement>('.docier-canvas');
+    if (page === undefined || canvas === null) return store.get().zoom;
+    const box = canvas.getBoundingClientRect();
+    const width = toCssPx(mp(Math.round(page.page.width)), 1);
+    const height = toCssPx(mp(Math.round(page.page.height)), 1);
+    if (width <= 0 || height <= 0) return store.get().zoom;
+    const byWidth = (box.width - FIT_SLACK_PX) / width;
+    if (mode === 'pageWidth') return byWidth;
+    return Math.min(byWidth, (box.height - FIT_SLACK_PX) / height);
+  };
+
   const setMessage = (message: string | undefined): void => {
     store.set({ message: message ?? '' });
     if (message !== undefined && message !== '') announce(message);
@@ -255,7 +270,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         setZoom(Number(args?.zoom ?? 1));
         return;
       case 'zoomFit':
-        setZoom(args?.mode === 'wholePage' ? 0.75 : 1);
+        setZoom(fitZoom(args?.mode === 'wholePage' ? 'wholePage' : 'pageWidth'));
         return;
       case 'ribbonCollapse':
         store.set({ collapse: 'collapsed' });
