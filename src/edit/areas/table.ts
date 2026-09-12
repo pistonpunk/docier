@@ -36,6 +36,7 @@ const ONE_TABLE: LocalizedString = 'The selection starts and ends in different t
 const RECTANGLE: LocalizedString =
   'This build merges cells along one row or one column; a block of rows and columns is not merged';
 const BAD_WIDTH: LocalizedString = 'A column needs a width of at least 6 points';
+const BAD_HEIGHT: LocalizedString = 'A row needs a height of at least 6 points';
 const NOT_MERGED: LocalizedString =
   'The cell under the caret is not merged, so there is nothing to split';
 const LAST_ROW: LocalizedString = 'This table has a single row; delete the table instead';
@@ -480,6 +481,7 @@ export interface ColumnWidthArgs {
 }
 
 const MIN_COLUMN_TWIPS = 120;
+const MIN_ROW_TWIPS = 120;
 
 const setColumnWidthSpec: AreaSpec<ColumnWidthArgs> = {
   id: 'docier.command.table.setColumnWidth',
@@ -559,6 +561,55 @@ const widthSettable = (target: CellTarget | undefined, args: ColumnWidthArgs | u
   return column >= 0 && column < target.table.columnCount;
 };
 
+export interface RowHeightArgs {
+  readonly row?: number;
+  readonly heightTwips?: number;
+  readonly anchor?: DocPos;
+}
+
+const setRowHeightSpec: AreaSpec<RowHeightArgs> = {
+  id: 'docier.command.table.setRowHeight',
+  label: 'Row height',
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host, args) => {
+    if (!host.session.aligned) return false;
+    const target = targetAt(host, args?.anchor);
+    return target !== undefined && rowSettable(target, args);
+  },
+  reason: (host, args) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    const target = targetAt(host, args?.anchor);
+    if (target === undefined) return PLACE_CARET;
+    return rowSettable(target, args) ? NEEDS_PROPERTY : BAD_HEIGHT;
+  },
+  run: (host, args) => {
+    const target = targetAt(host, args.anchor);
+    if (target === undefined || !rowSettable(target, args)) return false;
+    const index = args.row ?? target.row;
+    const row = target.table.rows()[index];
+    if (row === undefined) return false;
+    const height = Math.max(MIN_ROW_TWIPS, Math.floor(args.heightTwips ?? 0));
+    const changed = changedBy([target.table.element], () => {
+      row.properties.height = twip(height);
+      row.properties.heightRule = 'atLeast';
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(target.table.element);
+    return true;
+  },
+};
+
+const rowSettable = (target: CellTarget | undefined, args: RowHeightArgs | undefined): boolean => {
+  if (target === undefined || args === undefined) return false;
+  const height = args.heightTwips;
+  if (height === undefined || !Number.isFinite(height) || Math.floor(height) < MIN_ROW_TWIPS) {
+    return false;
+  }
+  const index = args.row ?? target.row;
+  return index >= 0 && index < target.table.rows().length;
+};
+
 export const tableCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<InsertTableArgs>(host, insertTableSpec),
   areaCommand<RowArgs>(
@@ -588,5 +639,6 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<CountArgs>(host, splitSpec),
   areaCommand<TablePropertiesArgs>(host, setPropertiesSpec),
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
+  areaCommand<RowHeightArgs>(host, setRowHeightSpec),
   areaCommand<CountArgs>(host, deleteSpec),
 ];

@@ -41,6 +41,7 @@ const DRAG_THRESHOLD_PX = 4;
 const CARET_BLINK_MS = 530;
 const COLUMN_EDGE_PX = 5;
 const MIN_COLUMN_WIDTH_MP = mp(120 * MP_PER_TWIP);
+const MIN_ROW_HEIGHT_MP = mp(120 * MP_PER_TWIP);
 
 export interface ColumnEdge {
   readonly table: number;
@@ -49,6 +50,39 @@ export interface ColumnEdge {
   readonly width: Mp;
   readonly widths: readonly number[];
 }
+
+type TableEdge =
+  | ({ readonly kind: 'column' } & ColumnEdge)
+  | ({ readonly kind: 'row' } & RowEdge);
+
+export interface RowEdge {
+  readonly table: number;
+  readonly row: number;
+  readonly y: Mp;
+  readonly height: Mp;
+}
+
+export const rowEdgeInPage = (
+  page: PageFragment,
+  point: { readonly x: Mp; readonly y: Mp },
+  tolerance: Mp,
+): RowEdge | undefined => {
+  let best: RowEdge | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const table of page.tables) {
+    for (const row of table.rows) {
+      for (const cell of row.cells) {
+        if (point.x < cell.box.x || point.x > cell.box.x + cell.box.width) continue;
+        const bottom = mp(cell.box.y + cell.box.height);
+        const distance = Math.abs((point.y as number) - (bottom as number));
+        if (distance > (tolerance as number) || distance >= bestDistance) continue;
+        bestDistance = distance;
+        best = { table: row.table, row: row.row, y: bottom, height: cell.box.height };
+      }
+    }
+  }
+  return best;
+};
 
 export const columnEdgeInPage = (
   page: PageFragment,
@@ -420,7 +454,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     void host.commands.execute(command, args);
   };
 
-  const columnEdgeAt = (clientX: number, clientY: number): ColumnEdge | undefined => {
+  const tableEdgeAt = (clientX: number, clientY: number): TableEdge | undefined => {
     if (index() === undefined) return undefined;
     const zoom = host.zoom === 0 ? 1 : host.zoom;
     const tolerance = fromCssPx(COLUMN_EDGE_PX, zoom);
@@ -432,27 +466,78 @@ export const attachInput = (host: InputHost): InputHandle => {
       const page = pageFragmentOf(pageIndex);
       if (page === undefined) return undefined;
       const point = clientToPage(page, { left: box.left, top: box.top }, clientX, clientY, zoom);
-      return columnEdgeInPage(page, point, tolerance);
+      const column = columnEdgeInPage(page, point, tolerance);
+      const row = rowEdgeInPage(page, point, tolerance);
+      if (column !== undefined && row !== undefined) {
+        const columnDistance = Math.abs((point.x as number) - (column.x as number));
+        const rowDistance = Math.abs((point.y as number) - (row.y as number));
+        return rowDistance < columnDistance ? { kind: 'row', ...row } : { kind: 'column', ...column };
+      }
+      if (row !== undefined) return { kind: 'row', ...row };
+      if (column !== undefined) return { kind: 'column', ...column };
+      return undefined;
     }
     return undefined;
   };
 
-  const guideFor = (): HTMLElement => {
+  const guideFor = (kind: 'column' | 'row'): HTMLElement => {
     if (columnGuide === undefined) {
       columnGuide = owner.createElement('div');
       columnGuide.className = 'docier-column-guide';
-      applyStyle(columnGuide, {
-        position: 'absolute',
-        top: '0',
-        bottom: '0',
-        width: '1px',
-        'z-index': '4',
-        'pointer-events': 'none',
-        'background-color': 'var(--docier-accent, #1f6feb)',
-      });
       host.rendered.appendChild(columnGuide);
     }
+    const shared = 'position:absolute;z-index:4;pointer-events:none;background-color:var(--docier-accent,#1f6feb);';
+    columnGuide.style.cssText =
+      kind === 'column'
+        ? `${shared}top:0;bottom:0;width:1px;`
+        : `${shared}left:0;right:0;height:1px;`;
     return columnGuide;
+  };
+
+  const startRowDrag = (edge: RowEdge, event: PointerEvent): void => {
+    const zoom = host.zoom === 0 ? 1 : host.zoom;
+    const anchor = hitTest(event.clientX, event.clientY)?.pos;
+    const startY = event.clientY;
+    const base = edge.height;
+    const guide = guideFor('row');
+    const baseBox = host.rendered.getBoundingClientRect();
+    let pending = mpToTwip(base);
+    guide.hidden = false;
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      const delta = fromCssPx(moveEvent.clientY - startY, zoom);
+      const height = mp(
+        Math.max(MIN_ROW_HEIGHT_MP as number, (base as number) + (delta as number)) as number,
+      );
+      pending = mpToTwip(height);
+      guide.style.top = `${String(Math.round(moveEvent.clientY - baseBox.top))}px`;
+    };
+    const finish = (): void => {
+      guide.hidden = true;
+      owner.removeEventListener('pointermove', onMove);
+      owner.removeEventListener('pointerup', finish);
+      owner.removeEventListener('pointercancel', finish);
+      if (pending !== mpToTwip(base)) {
+        run(`${PREFIX}table.setRowHeight`, {
+          row: edge.row,
+          heightTwips: pending,
+          ...(anchor === undefined ? {} : { anchor }),
+        });
+      }
+    };
+    guide.style.top = `${String(Math.round(event.clientY - baseBox.top))}px`;
+    owner.addEventListener('pointermove', onMove);
+    owner.addEventListener('pointerup', finish);
+    owner.addEventListener('pointercancel', finish);
+    event.preventDefault();
+  };
+
+  const startEdgeDrag = (edge: TableEdge, event: PointerEvent): void => {
+    if (edge.kind === 'row') {
+      startRowDrag(edge, event);
+      return;
+    }
+    startColumnDrag(edge, event);
   };
 
   const startColumnDrag = (edge: ColumnEdge, event: PointerEvent): void => {
@@ -460,7 +545,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     const anchor = hitTest(event.clientX, event.clientY)?.pos;
     const startX = event.clientX;
     const base = edge.width;
-    const guide = guideFor();
+    const guide = guideFor('column');
     const baseBox = host.rendered.getBoundingClientRect();
     let pending = mpToTwip(base);
     const widths = [...edge.widths];
@@ -496,8 +581,9 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const onHover = (event: PointerEvent): void => {
     if (dragging) return;
-    const edge = columnEdgeAt(event.clientX, event.clientY);
-    host.rendered.style.cursor = edge === undefined ? '' : 'col-resize';
+    const edge = tableEdgeAt(event.clientX, event.clientY);
+    host.rendered.style.cursor =
+      edge === undefined ? '' : edge.kind === 'column' ? 'col-resize' : 'row-resize';
   };
 
   const releasePointer = (): void => {
@@ -516,9 +602,9 @@ export const attachInput = (host: InputHost): InputHandle => {
   };
 
   const onPointerDown = (event: PointerEvent): void => {
-    const edge = event.button === 0 ? columnEdgeAt(event.clientX, event.clientY) : undefined;
+    const edge = event.button === 0 ? tableEdgeAt(event.clientX, event.clientY) : undefined;
     if (edge !== undefined) {
-      startColumnDrag(edge, event);
+      startEdgeDrag(edge, event);
       return;
     }
     const hit = hitTest(event.clientX, event.clientY);

@@ -1,5 +1,6 @@
 import type { EditorHandle } from '../api/editor.js';
 import type { ChromeMode, CommandDescriptor, Disposable, Unsubscribe } from '../api/types.js';
+import { marksAt } from '../edit/index.js';
 import { toCssPx, mp } from '../units/index.js';
 import { createContextMenus } from './context-menu.js';
 import type { ContextMenuController } from './context-menu.js';
@@ -182,12 +183,28 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     }
   };
 
+  const readValue = (valueKey: string | undefined): string | undefined => {
+    const session = handle.session;
+    const model = handle.document;
+    if (session === undefined || model === undefined) return undefined;
+    const marks = marksAt(model, session, handle.selection.focus);
+    if (marks === undefined) return undefined;
+    if (valueKey === 'family') return marks.fontFamily ?? '';
+    if (valueKey === 'sizePoints') {
+      return marks.sizeHalfPoints === undefined
+        ? ''
+        : String(marks.sizeHalfPoints / 2);
+    }
+    return undefined;
+  };
+
   const describe = createResolver({
     commands: handle.commands,
     i18n,
     descriptors: descriptorIndex,
     actions: ACTIONS,
     isActive: stateActive,
+    readValue,
   });
 
   const emit = (type: string, detail: unknown): boolean =>
@@ -398,13 +415,17 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   if (mode !== 'none') {
     if (options?.injectStyles !== false) injectStyles(doc);
     const hostTokens = { ...handle.config.theme.vars, ...options?.theme };
-    if (Object.keys(hostTokens).length > 0) applyTheme(root, hostTokens);
 
     portal = options?.portal ?? make('div', 'docier-portal');
     if (options?.portal === undefined) {
       portal.setAttribute('data-docier-portal', '');
       doc.body.appendChild(portal);
     }
+    if (Object.keys(hostTokens).length > 0) {
+      applyTheme(root, hostTokens);
+      applyTheme(portal, hostTokens);
+    }
+    mirrorPortal();
 
     const canvas = make('div', 'docier-canvas');
     markPart(canvas, 'canvas');
@@ -506,27 +527,36 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
   if (mode !== 'none') {
     subscriptions.push(
+      handle.events.on('docier:ready', () => {
+        descriptorsDirty = true;
+        syncSurfaces();
+      }),
       handle.events.on('docier:selection:change', () => {
         descriptorsDirty = true;
         sync();
+        refreshControls();
       }),
       handle.events.on('docier:doc:change', () => {
         descriptorsDirty = true;
+        refreshControls();
         sync();
       }),
       handle.events.on('docier:history:change', () => {
         descriptorsDirty = true;
+        refreshControls();
         sync();
       }),
       handle.events.on('docier:render:layoutend', () => {
         descriptorsDirty = true;
-        sync();
+        syncSurfaces();
       }),
       handle.events.on('docier:command:execute', () => {
         descriptorsDirty = true;
+        refreshControls();
       }),
       handle.events.on('docier:command:blocked', () => {
         descriptorsDirty = true;
+        refreshControls();
       }),
       handle.events.on('docier:configchange', () => {
         sync();
@@ -542,9 +572,15 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     styleStore.add({
       dispose: store.subscribe((state) => {
         root.setAttribute('data-docier-density', state.density);
+        mirrorPortal();
         emit('docier:ui:state', state);
       }),
     });
+  }
+
+  function refreshControls(): void {
+    menuBar?.refresh();
+    floating?.refresh();
   }
 
   function sync(): void {
@@ -559,6 +595,28 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       selectionEmpty: queries.selectionEmpty(),
     });
   }
+
+  function syncSurfaces(): void {
+    sync();
+    ruler?.refresh();
+    statusBar?.refresh();
+  }
+
+  function mirrorPortal(): void {
+    if (portal === undefined) return;
+    portal.setAttribute('data-docier-density', store.get().density);
+    const theme = root.getAttribute('data-docier-theme');
+    if (theme === null) portal.removeAttribute('data-docier-theme');
+    else portal.setAttribute('data-docier-theme', theme);
+  }
+
+  const viewportChanged = (): void => {
+    ruler?.refresh();
+  };
+  const ownerWindow = handle.root.ownerDocument.defaultView;
+  const ownerDocument = handle.root.ownerDocument;
+  ownerWindow?.addEventListener('resize', viewportChanged);
+  ownerDocument.addEventListener('scroll', viewportChanged, true);
 
   if (mode !== 'none') sync();
 
@@ -582,6 +640,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     },
     sync,
     dispose: () => {
+      ownerWindow?.removeEventListener('resize', viewportChanged);
+      ownerDocument.removeEventListener('scroll', viewportChanged, true);
       for (const unsubscribe of subscriptions.splice(0, subscriptions.length)) unsubscribe();
       styleStore.dispose();
       queries.dispose();
