@@ -16,7 +16,7 @@ tokenization on or off by config. It must feel like Word to a non-technical HR m
 pleasant to integrate for a developer.
 
 **Repo:** `git@github.com:pistonpunk/docier.git` · local `/home/daniel/work/docier` · branch `main`
-**Licence:** MIT · **Runtime deps:** zero, if attainable
+**Licence:** dual AGPL-3.0-only or commercial (D11) · **Runtime deps:** exactly one — `fflate`, taken for byte-deterministic compression (ADR-0003)
 
 ---
 
