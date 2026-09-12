@@ -255,7 +255,10 @@ describe('ribbon layout rules', () => {
 
   it('lets a group take its natural width and wrap instead of squeezing its controls', () => {
     expect(css).toContain('.docier-group-controls > *{flex:0 0 auto}');
-    expect(css).toContain('.docier-group{display:flex;flex:1 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content');
+    expect(css).toContain(
+      '.docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content',
+    );
+    expect(css).toContain('.docier-group[data-docier-grow="true"]{flex:1 1 auto}');
   });
 
   it('keeps a gallery label inside its own item', () => {

@@ -162,6 +162,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
         }
         controls.appendChild(element);
       }
+      if (group.id === 'styles') groupElement.setAttribute('data-docier-grow', 'true');
       groupElement.appendChild(controls);
       const label = make('div', 'docier-group-label');
       setText(label, context.i18n.text(group.labelKey));

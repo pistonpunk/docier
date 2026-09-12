@@ -47,14 +47,15 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:4px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
 @container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}
-.docier-group{display:flex;flex:1 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
+.docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
 .docier-group:last-child{border-inline-end:0}
-.docier-group-controls{display:flex;align-items:center;flex-wrap:wrap;gap:2px;flex:1 1 auto;min-width:0}
+.docier-group-controls{display:flex;align-items:center;flex-wrap:wrap;align-content:center;gap:2px;row-gap:2px;flex:1 1 auto;min-width:0}
 .docier-group-controls > *{flex:0 0 auto}
 .docier-group-controls > .docier-menu-gallery{flex:0 1 auto;min-width:0}
 .docier-group-label{display:flex;align-items:center;justify-content:center;gap:var(--docier-gap);color:var(--docier-text-muted);font-size:var(--docier-group-label-size);padding-block-start:2px;text-align:center}
 .docier-group-launcher{appearance:none;border:0;background:transparent;color:var(--docier-text-muted);cursor:pointer;line-height:1;padding:0 2px}
 .docier-group-launcher:hover{color:var(--docier-accent)}
+.docier-group[data-docier-grow="true"]{flex:1 1 auto}
 .docier-control{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:var(--docier-control-height);min-width:var(--docier-control-height);padding:0 calc(var(--docier-gap) + 2px);background:transparent;border:1px solid transparent;border-radius:var(--docier-radius);color:var(--docier-text);font:inherit;cursor:pointer;white-space:nowrap}
 .docier-control:hover:not([aria-disabled="true"]){background:var(--docier-state-hover)}
 .docier-control[aria-pressed="true"],.docier-control[aria-checked="true"]{background:var(--docier-state-selected);border-color:var(--docier-border);color:var(--docier-text)}
