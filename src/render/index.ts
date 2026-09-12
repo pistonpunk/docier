@@ -28,17 +28,45 @@ export {
 } from './types.js';
 
 export type { PaintScale } from './scale.js';
-export { DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM, clampZoom, formatPx, paintScale } from './scale.js';
+export {
+  DEFAULT_ZOOM,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  clampZoom,
+  formatNumber,
+  formatPx,
+  paintScale,
+} from './scale.js';
 
 export { ATTR } from './dom.js';
 
 export type { SlotError, SlotOptions, RegisteredDocumentRenderer, RegisteredPageOverlay, RegisteredRenderer } from './registry.js';
 export { DEFAULT_SLOT_PRIORITY, appendSlotContent, createRendererRegistry } from './registry.js';
 
-export { PaintContractError, PAINT_ONLY_PROPERTIES, applyStyle, assertPaintOnly, runFontSpec } from './style.js';
+export {
+  PaintContractError,
+  PAINT_ONLY_PROPERTIES,
+  applyStyle,
+  assertPaintOnly,
+  runFontSpec,
+  runFontSpecAt,
+} from './style.js';
 
 export type { BorderAxis, BorderSide } from './decoration.js';
 export { edgeBandOf, paintBorders, paintShading } from './decoration.js';
+
+export type { ImageBox, ObjectPaintInput } from './objects.js';
+export { imageBoxOf, objectBoxOf, paintObjects } from './objects.js';
+
+export type {
+  ImageRegistry,
+  ImageRegistryOptions,
+  RenderImageProvider,
+  RenderImageSource,
+  RenderIssue,
+  RenderIssueCode,
+} from './images.js';
+export { base64Of, createImageRegistry, dataUrlOf } from './images.js';
 
 export type { Segment } from './runs.js';
 export { paintLine, segmentsOf } from './runs.js';

@@ -181,6 +181,71 @@ selection *before* the change instead of after.
 spec's async `createDocier(options)` constructor — with plugins, tokens, theme, ui and renderers — is not
 built; `createEditor` is the mount API this phase delivered.
 
+**DOM painter parity with the PDF painter (D17).** The DOM painter now paints what the PDF painter paints,
+from the same `LayoutResult`, with no new runtime dependency and no layout decision in `src/render/`.
+
+Five gaps closed, each with a test that asserts the painted style rectangle against the engine's
+millipoints *and* the derived pixels (jsdom has no layout engine, so `getBoundingClientRect` returns zeros
+and the checks read the inline-style sums with `authoritative: false`, as the existing render tests do):
+
+1. **Images.** `src/render/images.ts` holds bytes by id, dedupes by `sha256Hex` exactly as
+   `src/pdf/images/registry.ts` does, and hands out `data:` URLs (jsdom has no `URL.createObjectURL`).
+   `src/render/objects.ts` mirrors the PDF's `imageBox()` crop arithmetic and centre-preserving rotation
+   and positions one container per object atom from `objectBoxOf` (engine `atom.x`,
+   `line.baselineY - run.ascent`, `wp:extent`). Nothing is clipped, so crop overflow stays screen-equal to
+   print. A source the host never supplied paints a visible placeholder at the engine box — dashed outline
+   and label in host-token CSS variables — and is reported twice over: once through `onIssue` and in
+   `rendered.issues` (`missingImage`, detail = relationship id), which is the failure mode the exercise was
+   about.
+2. **Per-run ascent, descent and shift.** The run box is now `baselineY - run.ascent` high by
+   `ascent + descent`, so a superscript is raised by exactly its engine shift instead of sharing one
+   paragraph-wide box. The run's highlight moved to its own band spanning `line.lineHeight`, which is what
+   the PDF `fillRect`s.
+3. **Per-atom resolved size.** `segmentsOf` splits a run wherever `atom.size` changes and
+   `runFontSpecAt` uses that size, so a small-caps run paints two boxes at 10000 and 8000 mp with no CSS
+   `font-variant` — the approximation is gone from the painter (the property stays in the allow-list).
+4. **Paragraph decoration.** Shading and each border edge paint from `edgeBandOf`, in the PDF's order
+   (shading, then borders, then lines).
+5. **Page origin.** The renderer now *uses* `page.origin` in document coordinates and adds only its own
+   uniform cosmetic gap on top: sheet *i* is placed at `(px(origin.x), px(origin.y) + gapPx * i)` and the
+   pages layer is sized from the union of the engine rectangles. Chosen over owning the stacking itself
+   because the engine already publishes page positions, and a painter that re-derives them from accumulated
+   heights silently encodes a layout rule; the gap is the one thing the engine has no opinion about, so it
+   stays a render option. For today's engine the two give identical pixels, which is why the detector
+   checks the *relative* placement against the origins and infers the constant gap.
+
+`RESULT_GAPS` is now `['fontFileHash']`, down from
+`['fontFileHash', 'perRunAscentAndDescent', 'perAtomFontSize', 'verticalShift', 'pageOriginInDocument',
+'imageSourceAndSize', 'paragraphDecorationRects']`. The six names that described the gaps above are gone
+because they are painted, and `fontFileHash` stays because the renderer still cannot verify that the family
+it resolves is the same font *file* the PDF embeds: CSS resolves families through the host, and no hash
+reaches the DOM painter. `test/render/contract.test.ts` was extended, not weakened: it now pins the detector's divergence
+kinds against a `Record<DivergenceKind, true>` so a new kind cannot be added silently, and asserts the gap
+list stays disjoint from them, non-empty, non-duplicated and identifier-shaped.
+
+The detector itself grew three checks and no longer skips a decoration it cannot find: an object the engine
+places but the DOM does not paint is `missingImage` (also when a placeholder carries no visible label), a
+moved object box or decoration is `objectBox` / `decoration`, a misplaced sheet is `pageOrigin`, and each
+painted segment's `font-size` is compared to the atom size it came from (`runFontSize`). A decoration the
+engine reports and the DOM has no node for is a divergence rather than a skip — the old code counted that
+as "could not check", which is exactly how a silently absent rectangle hides.
+
+**Two real screen-vs-print differences remain, both in `src/pdf/` and therefore out of this change's
+scope.** (a) `src/pdf/page.ts` `imageBox()` builds `[cos, sin; -sin, cos]` for a positive
+`rotationMilliDegrees`, which in PDF's y-up space rotates counter-clockwise; OOXML `rot` and CSS `rotate()`
+are clockwise for the same value, so a rotated image prints mirrored in direction from how it paints on
+screen. Verified against the exporter: `rot="5400000"` (90°) emits `0 20 -20 0 92 700 cm`, i.e. the
+image's x-axis pointing up. (b) a missing image prints nothing and records a `missingImage` loss, where the
+screen paints the visible placeholder above; making the screen silent to match would reintroduce the defect
+the placeholder exists to prevent, so the PDF should adopt the placeholder instead.
+
+Tests added: `test/render/images.test.ts` (12), plus image zoom cases in `test/render/zoom.test.ts`,
+superscript/small-caps/decoration/gap cases in `test/render/divergence.test.ts`, including a document that
+exercises every closed gap at once and a `detectDivergence` run over it that reports clean with
+`checked.objects`, `checked.decorations` and `checked.fonts` non-zero. Verification:
+`npx tsc --noEmit -p tsconfig.json`, `npx tsc --noEmit -p tsconfig.test.json` and `npx vitest run`
+(1046 passed, 2 skipped, 79 files) all green, up from 1028 passing before.
+
 ### Phase 4 — Word-like
 - [ ] Formatting and the styles engine
 - [x] Lists: `src/edit/list.ts` writes and reads bullet, decimal and multilevel definitions, and
@@ -212,9 +277,7 @@ built; `createEditor` is the mount API this phase delivered.
       reproduced. A face the host has not supplied is reported, never silently swapped. PNG and JPEG
       images embed and dedupe per document. Deterministic by default: no wall clock, `/ID` and
       `xmpMM:DocumentID` from the document hash, pinned DEFLATE. PDF/A-2b, A-2u and A-3b with a
-      built sRGB output intent; A-1b is refused citing ADR-0006. Not done: encryption, signing, and
-      the DOM painter still paints no images at all (`RESULT_GAPS`), so image placement is verified
-      against the layout, not against the screen.
+      built sRGB output intent; A-1b is refused citing ADR-0006. Not done: encryption and signing.
 - [ ] Print path and print preview
 - [ ] Accessibility pass, i18n pass (en/ro/ru + RTL groundwork)
 - [ ] Performance pass on a 200-page document

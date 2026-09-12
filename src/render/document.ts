@@ -1,6 +1,4 @@
 import type { LayoutResult } from '../layout/index.js';
-import type { Mp } from '../units/index.js';
-import { mp } from '../units/index.js';
 import type {
   DocumentRenderer,
   RenderedDocument,
@@ -24,6 +22,7 @@ import { paintPageSheet } from './pages.js';
 import { createRendererRegistry } from './registry.js';
 import type { DivergenceReport } from './divergence.js';
 import { detectDivergence } from './divergence.js';
+import { createImageRegistry } from './images.js';
 
 export const resolveRenderOptions = (options: RenderOptions = {}): ResolvedRenderOptions => ({
   zoom: clampZoom(options.zoom ?? DEFAULT_ZOOM),
@@ -40,16 +39,13 @@ export const resolveRenderOptions = (options: RenderOptions = {}): ResolvedRende
   detectDivergence: options.detectDivergence ?? false,
   divergence: options.divergence,
   onDivergence: options.onDivergence,
+  images: options.images,
+  imageProvider: options.imageProvider,
+  onIssue: options.onIssue,
 });
 
 const clear = (node: HTMLElement): void => {
   while (node.firstChild !== null) node.removeChild(node.firstChild);
-};
-
-const contentWidthOf = (result: LayoutResult): Mp => {
-  let width = 0;
-  for (const page of result.pages) width = Math.max(width, page.page.width);
-  return mp(width);
 };
 
 const clearRoot = (target: HTMLElement, className: string): void => {
@@ -66,6 +62,11 @@ const paintDefault = (
   const registry = options.renderers ?? createRendererRegistry();
   const renderOptions: ResolvedRenderOptions =
     options.renderers === undefined ? { ...options, renderers: registry } : options;
+  const images = createImageRegistry({
+    images: options.images,
+    imageProvider: options.imageProvider,
+    onIssue: options.onIssue,
+  });
   const root = box(options.className);
   stamp(root, {
     [ATTR.root]: '',
@@ -97,7 +98,6 @@ const paintDefault = (
   clearRoot(target, options.className);
   target.appendChild(root);
 
-  const contentWidth = contentWidthOf(result);
   let renderedPages: RenderedPage[] = [];
   let layerWidthPx = 0;
   let layerHeightPx = 0;
@@ -116,18 +116,22 @@ const paintDefault = (
 
   const paintPages = (scale: PaintScale): void => {
     clear(pagesLayer);
-    const context: PagePaintContext = { result, scale, options: renderOptions };
+    const context: PagePaintContext = { result, scale, options: renderOptions, images };
     const gapPx = options.zoomMode === 'transform' ? options.pageGapPx : options.pageGapPx * zoom;
     const pages: RenderedPage[] = [];
-    let top = 0;
-    for (const page of result.pages) {
-      const sheet = paintPageSheet(pagesLayer, page, top, context);
+    let layerWidth = 0;
+    let layerBottom = 0;
+    result.pages.forEach((page, index) => {
+      const left = scale.px(page.origin.x);
+      const top = scale.px(page.origin.y) + gapPx * index;
+      const sheet = paintPageSheet(pagesLayer, page, { left, top }, context);
       pages.push({ index: page.index, element: sheet });
-      top += scale.px(page.page.height) + gapPx;
-    }
+      layerWidth = Math.max(layerWidth, left + scale.px(page.page.width));
+      layerBottom = Math.max(layerBottom, top + scale.px(page.page.height));
+    });
     renderedPages = pages;
-    layerWidthPx = scale.px(contentWidth);
-    layerHeightPx = result.pages.length === 0 ? 0 : top - gapPx;
+    layerWidthPx = layerWidth;
+    layerHeightPx = layerBottom;
     applyStyle(pagesLayer, {
       width: formatPx(layerWidthPx),
       height: formatPx(layerHeightPx),
@@ -174,6 +178,7 @@ const paintDefault = (
     get pages(): readonly RenderedPage[] {
       return renderedPages;
     },
+    issues: images.issues,
     setZoom,
     pageOf: (index) => renderedPages.find((page) => page.index === index),
     destroy: () => {

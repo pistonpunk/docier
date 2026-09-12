@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { LayoutResult, LineFragment, RunPaint } from '../../src/layout/index.js';
 import { createDeterministicMeasurer, docPos } from '../../src/layout/index.js';
 import { mp } from '../../src/units/index.js';
-import { ATTR, paintLine, paintScale, renderDocument } from '../../src/render/index.js';
+import {
+  ATTR,
+  createImageRegistry,
+  paintLine,
+  paintScale,
+  renderDocument,
+} from '../../src/render/index.js';
 import {
   BORDERS,
   CONTENT_TOP_MP,
@@ -110,7 +116,9 @@ describe('painting runs from engine coordinates', () => {
     const result = await layoutOf(bodyOf(`<w:p>${formatted}</w:p>`));
     const target = host();
     renderDocument(result, target);
-    const run = result.pages[0]?.blocks[0]?.lines[0]?.runs[0];
+    const block = result.pages[0]?.blocks[0];
+    const line = block?.lines[0];
+    const run = line?.runs[0];
     const paint = result.paint[run?.paint ?? 0];
     const node = runBoxes(target)[0];
     expect(node?.style.fontFamily).toBe(paint?.family);
@@ -118,8 +126,16 @@ describe('painting runs from engine coordinates', () => {
     expect(node?.style.fontWeight).toBe('700');
     expect(node?.style.fontStyle).toBe('italic');
     expect(node?.style.color).toBe('rgb(255, 0, 0)');
-    expect(node?.style.backgroundColor).toBe('rgb(255, 255, 0)');
     expect(node?.style.textDecorationLine).toContain('underline');
+    expect(node?.style.getPropertyValue('font-variant-caps')).toBe('');
+    const bands = Array.from(target.querySelectorAll<HTMLElement>(`[${ATTR.highlight}]`));
+    expect(bands.length).toBe(1);
+    expect(bands[0]?.style.backgroundColor).toBe('rgb(255, 255, 0)');
+    expect(bands[0]?.style.top).toBe(
+      localPx((line?.baselineY ?? 0) - (line?.ascent ?? 0), block?.box.y ?? 0),
+    );
+    expect(bands[0]?.style.height).toBe(px(line?.lineHeight ?? 0));
+    expect(node?.textContent).toBe('styled');
   });
 });
 
@@ -298,6 +314,7 @@ describe('layout freedom of the painted document', () => {
       paints: [paint],
       frame: { dx: mp(0), dy: mp(0) },
       scale: paintScale(1),
+      images: createImageRegistry(),
     });
     expect(parent.querySelectorAll(`[${ATTR.run}]`).length).toBe(0);
     expect(parent.textContent).toBe('');

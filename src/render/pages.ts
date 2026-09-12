@@ -13,11 +13,13 @@ import { ATTR, box, frameOf, geometryAt, stamp } from './dom.js';
 import { paintBorders, paintShading } from './decoration.js';
 import { paintLine } from './runs.js';
 import { appendSlotContent } from './registry.js';
+import type { ImageRegistry } from './images.js';
 
 export interface PagePaintContext {
   readonly result: LayoutResult;
   readonly scale: PaintScale;
   readonly options: ResolvedRenderOptions;
+  readonly images: ImageRegistry;
 }
 
 const blocksById = (page: PageFragment): ReadonlyMap<number, BlockFragment> => {
@@ -36,8 +38,16 @@ export const paintBlock = (
   stamp(node, { [ATTR.block]: String(block.id) });
   applyStyle(node, positionStyle(geometryAt(block.box, frame, context.scale)));
   const inner = frameOf(block.box);
+  paintShading(node, block.shading, block.box, inner, context.scale);
+  paintBorders(node, block.borders, block.box, inner, context.scale);
   for (const line of block.lines) {
-    paintLine(node, { line, paints: context.result.paint, frame: inner, scale: context.scale });
+    paintLine(node, {
+      line,
+      paints: context.result.paint,
+      frame: inner,
+      scale: context.scale,
+      images: context.images,
+    });
   }
   parent.appendChild(node);
   return node;
@@ -156,7 +166,7 @@ export const paintOverlay = (
 export const paintPageSheet = (
   parent: HTMLElement,
   page: PageFragment,
-  top: number,
+  place: { readonly left: number; readonly top: number },
   context: PagePaintContext,
 ): HTMLElement => {
   const sheet = box('docier-page');
@@ -169,8 +179,8 @@ export const paintPageSheet = (
     sheet,
     positionStyle(
       {
-        left: 0,
-        top,
+        left: place.left,
+        top: place.top,
         width: context.scale.px(page.page.width),
         height: context.scale.px(page.page.height),
       },

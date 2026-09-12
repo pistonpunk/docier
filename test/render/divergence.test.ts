@@ -8,10 +8,32 @@ import {
   RESULT_GAPS,
   assertNoDivergence,
   detectDivergence,
+  edgeBandOf,
   formatDivergence,
   renderDocument,
 } from '../../src/render/index.js';
-import { bodyOf, host, layoutOf, paragraphText } from './support.js';
+import {
+  BORDERS,
+  CROPPED,
+  FIXED,
+  QUARTER_TURN,
+  bodyOf,
+  grid,
+  host,
+  imageParagraph,
+  imageSource,
+  layoutOf,
+  localPx,
+  para,
+  paragraphText,
+  px,
+  row,
+  styleLeft,
+  styleTop,
+  styleWidth,
+  table,
+  twoCells,
+} from './support.js';
 
 const runBoxes = (target: HTMLElement): readonly HTMLElement[] =>
   Array.from(target.querySelectorAll<HTMLElement>(`[${ATTR.run}]`));
@@ -53,8 +75,10 @@ const shiftLeft = (node: HTMLElement, deltaPx: number): void => {
   node.style.setProperty('left', `${String(Number.parseFloat(node.style.left) + deltaPx)}px`);
 };
 
-const manyParagraphs = (): string =>
-  Array.from({ length: 30 }, () => paragraphText('aaaa bbbb')).join('');
+const paragraphs = (count: number, text: string): string =>
+  Array.from({ length: count }, () => paragraphText(text)).join('');
+
+const manyParagraphs = (): string => paragraphs(30, 'aaaa bbbb');
 
 describe('layout divergence detection', () => {
   it('reports a clean render as matching the layout result', async () => {
@@ -212,6 +236,45 @@ describe('layout divergence detection', () => {
     expect(() => assertNoDivergence(report, { requireAuthoritative: true })).toThrow(/runBox/);
   });
 
+  it('reports clean over a document that exercises every closed gap', async () => {
+    const decorated =
+      '<w:pPr><w:pBdr><w:top w:val="single" w:sz="8" w:color="FF0000"/>' +
+      '<w:bottom w:val="single" w:sz="12"/></w:pBdr>' +
+      '<w:shd w:val="solid" w:fill="FFFF00"/></w:pPr>';
+    const superscript =
+      '<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>' +
+      '<w:t xml:space="preserve">2</w:t></w:r><w:r><w:t xml:space="preserve">base</w:t></w:r></w:p>';
+    const caps = '<w:p><w:r><w:rPr><w:smallCaps/></w:rPr><w:t xml:space="preserve">Ab</w:t></w:r></w:p>';
+    const document =
+      `<w:p>${decorated}<w:r><w:t xml:space="preserve">decorated</w:t></w:r></w:p>` +
+      superscript +
+      caps +
+      imageParagraph('rId7', { crop: CROPPED, transform: QUARTER_TURN }) +
+      table(`${FIXED(1000)}${BORDERS}`, grid([500, 500]), [row('', twoCells(para('aa')))]) +
+      paragraphs(90, 'aaaa bbbb');
+    const result = await layoutOf(bodyOf(document));
+    expect(result.pages.length).toBeGreaterThan(1);
+    const target = host();
+    const rendered = renderDocument(result, target, { images: [imageSource('rId7')] });
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(report.divergences).toEqual([]);
+    expect(report.ok).toBe(true);
+    expect(report.checked.pages).toBe(result.pages.length);
+    expect(report.checked.runs).toBeGreaterThan(0);
+    expect(report.checked.boxes).toBeGreaterThan(0);
+    expect(report.checked.fonts).toBeGreaterThan(0);
+    expect(report.checked.decorations).toBeGreaterThan(0);
+    expect(report.checked.objects).toBe(1);
+    expect(report.gaps).toEqual(RESULT_GAPS);
+    expect(report.authoritative).toBe(false);
+    expect(report.rectSource).toBe('style');
+    expect(() => assertNoDivergence(report)).not.toThrow();
+    const bare = renderDocument(result, host(), { images: [] });
+    const reported = detectDivergence(result, bare, { measureText: measurerOf(result) });
+    expect(reported.ok).toBe(true);
+    expect(bare.issues?.map((issue) => issue.code)).toEqual(['missingImage']);
+  });
+
   it('names the gaps the renderer still declares against the layout result', async () => {
     const superscript =
       '<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>' +
@@ -221,6 +284,9 @@ describe('layout divergence detection', () => {
     const line = block?.lines[0];
     expect(line?.runs.length).toBe(2);
     const raised = line?.runs.find((run) => run.text === '2');
+    const base = line?.runs.find((run) => run.text === 'base');
+    expect(raised?.shift).toBeGreaterThan(0);
+    expect(base?.shift).toBe(0);
     expect(Object.keys(raised ?? {}).sort()).toEqual([
       'ascent',
       'descent',
@@ -245,12 +311,163 @@ describe('layout divergence detection', () => {
       'width',
       'x',
     ]);
-    expect(RESULT_GAPS).toContain('verticalShift');
-    expect(RESULT_GAPS).toContain('perRunAscentAndDescent');
+    expect(RESULT_GAPS).toEqual(['fontFileHash']);
     const target = host();
     renderDocument(result, target);
-    const tops = new Set(runBoxes(target).map((node) => node.style.top));
-    expect(tops.size).toBe(1);
+    const boxes = runBoxes(target);
+    const tops = new Set(boxes.map((node) => node.style.top));
+    expect(tops.size).toBe(2);
+    const raisedTop = boxes[0]?.style.top ?? '';
+    const baseTop = boxes[1]?.style.top ?? '';
+    expect(Number.parseFloat(raisedTop)).toBeLessThan(Number.parseFloat(baseTop));
+    expect(raisedTop).toBe(
+      localPx((line?.baselineY ?? 0) - (raised?.ascent ?? 0), block?.box.y ?? 0),
+    );
+    expect(baseTop).toBe(
+      localPx((line?.baselineY ?? 0) - (base?.ascent ?? 0), block?.box.y ?? 0),
+    );
+    expect(boxes[0]?.style.height).toBe(px((raised?.ascent ?? 0) + (raised?.descent ?? 0)));
+    expect(boxes[1]?.style.height).toBe(px((base?.ascent ?? 0) + (base?.descent ?? 0)));
+  });
+
+  it('paints every run at its own engine ascent and descent', async () => {
+    const small =
+      '<w:p><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">tiny</w:t></w:r>' +
+      '<w:r><w:t xml:space="preserve">big</w:t></w:r></w:p>';
+    const result = await layoutOf(bodyOf(small));
+    const block = result.pages[0]?.blocks[0];
+    const line = block?.lines[0];
+    const target = host();
+    const rendered = renderDocument(result, target);
+    expect(line?.runs.length).toBe(2);
+    line?.runs.forEach((run, index) => {
+      const node = target.querySelector<HTMLElement>(
+        `[${ATTR.line}="${String(line.id)}"][${ATTR.run}="${String(index)}"]`,
+      );
+      expect(styleTop(node)).toBe(localPx(line.baselineY - run.ascent, block?.box.y ?? 0));
+      expect(node?.style.height).toBe(px(run.ascent + run.descent));
+      expect(node?.style.getPropertyValue('line-height')).toBe(px(run.ascent + run.descent));
+    });
+    expect(runBoxes(target)[0]?.style.top).not.toBe(runBoxes(target)[1]?.style.top);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(report.ok).toBe(true);
+    expect(report.checked.boxes).toBe(2);
+  });
+
+  it('paints each atom of a small-caps run at its own resolved size', async () => {
+    const caps =
+      '<w:p><w:r><w:rPr><w:smallCaps/></w:rPr>' +
+      '<w:t xml:space="preserve">Ab</w:t></w:r></w:p>';
+    const result = await layoutOf(bodyOf(caps));
+    const line = result.pages[0]?.blocks[0]?.lines[0];
+    const run = line?.runs[0];
+    const sizes = (line?.atoms ?? []).map((atom) => atom.size);
+    expect(sizes).toEqual([10000, 8000]);
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const boxes = runBoxes(target);
+    expect(boxes.length).toBe(2);
+    expect(boxes[0]?.textContent).toBe('A');
+    expect(boxes[1]?.textContent).toBe('b');
+    expect(boxes[0]?.style.fontSize).toBe(px(10000));
+    expect(boxes[1]?.style.fontSize).toBe(px(8000));
+    expect(boxes[0]?.style.getPropertyValue('font-variant-caps')).toBe('');
+    expect(boxes[1]?.style.getPropertyValue('font-variant-caps')).toBe('');
+    expect(styleLeft(boxes[1])).toBe(
+      localPx((line?.atoms[1]?.x ?? 0), result.pages[0]?.blocks[0]?.box.x ?? 0),
+    );
+    expect(styleWidth(boxes[1])).toBe(px(line?.atoms[1]?.width ?? 0));
+    expect(result.paint[run?.paint ?? 0]?.smallCaps).toBe(true);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(report.ok).toBe(true);
+    expect(report.checked.fonts).toBe(2);
+  });
+
+  it('paints a paragraph shading rectangle and its border bands at the engine rects', async () => {
+    const decorated =
+      '<w:pPr><w:pBdr><w:top w:val="single" w:sz="8" w:color="FF0000"/>' +
+      '<w:bottom w:val="single" w:sz="12"/></w:pBdr>' +
+      '<w:shd w:val="solid" w:fill="FFFF00"/></w:pPr>';
+    const result = await layoutOf(bodyOf(`<w:p>${decorated}<w:r><w:t xml:space="preserve">hi</w:t></w:r></w:p>`));
+    const block = result.pages[0]?.blocks[0];
+    const page = result.pages[0];
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const node = target.querySelector<HTMLElement>(`[${ATTR.block}="${String(block?.id)}"]`);
+    const box = block?.box ?? { x: mp(0), y: mp(0), width: mp(0), height: mp(0) };
+    const shading = node?.querySelector<HTMLElement>(`[${ATTR.shading}]`);
+    expect(styleLeft(shading)).toBe(localPx(box.x, box.x));
+    expect(styleTop(shading)).toBe(localPx(box.y, box.y));
+    expect(styleWidth(shading)).toBe(px(box.width));
+    expect(shading?.style.height).toBe(px(box.height));
+    expect(styleLeft(node)).toBe(localPx(box.x, page?.page.x ?? 0));
+    expect(styleTop(node)).toBe(localPx(box.y, page?.page.y ?? 0));
+    expect(shading?.style.backgroundColor).toBe('rgb(255, 255, 0)');
+    const top = node?.querySelector<HTMLElement>(`[${ATTR.border}="top"]`);
+    const topBand = edgeBandOf(box, 'top', mp(1000));
+    expect(styleLeft(top)).toBe(localPx(topBand.x, box.x));
+    expect(styleTop(top)).toBe(localPx(topBand.y, box.y));
+    expect(styleWidth(top)).toBe(px(topBand.width));
+    expect(top?.style.height).toBe(px(topBand.height));
+    expect(top?.style.backgroundColor).toBe('rgb(255, 0, 0)');
+    const bottom = node?.querySelector<HTMLElement>(`[${ATTR.border}="bottom"]`);
+    const bottomBand = edgeBandOf(box, 'bottom', mp(1500));
+    expect(styleTop(bottom)).toBe(localPx(bottomBand.y, box.y));
+    expect(bottom?.style.height).toBe(px(bottomBand.height));
+    expect(node?.querySelectorAll(`[${ATTR.border}]`).length).toBe(2);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(report.ok).toBe(true);
+    expect(report.checked.decorations).toBe(3);
+  });
+
+  it('reports a painted decoration the DOM moved or dropped', async () => {
+    const decorated =
+      '<w:pPr><w:pBdr><w:bottom w:val="single" w:sz="12"/></w:pBdr>' +
+      '<w:shd w:val="solid" w:fill="FFFF00"/></w:pPr>';
+    const result = await layoutOf(bodyOf(`<w:p>${decorated}<w:r><w:t xml:space="preserve">hi</w:t></w:r></w:p>`));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const block = target.querySelector<HTMLElement>(`[${ATTR.block}]`);
+    const shading = block?.querySelector<HTMLElement>(`[${ATTR.shading}]`);
+    expect(shading).not.toBeNull();
+    if (shading !== null && shading !== undefined) {
+      shading.style.setProperty('top', `${String(Number.parseFloat(shading.style.top) + 9)}px`);
+    }
+    const moved = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(moved.ok).toBe(false);
+    const divergence = moved.divergences.find((entry) => entry.kind === 'decoration');
+    expect(divergence?.message).toContain('shading');
+    expect(divergence?.deltaPx).toBeCloseTo(9, 4);
+    block?.querySelector<HTMLElement>(`[${ATTR.border}="bottom"]`)?.remove();
+    const dropped = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(dropped.divergences.map((entry) => entry.kind)).toContain('decoration');
+    expect(
+      dropped.divergences.some((entry) => entry.message.includes('no border node')),
+    ).toBe(true);
+    const supply = detectDivergence(result, rendered, { rectOf: () => ({ left: 0, top: 0, width: 0, height: 0 }) });
+    expect(supply.authoritative).toBe(true);
+  });
+
+  it('reports a page sheet the DOM placed away from the engine origin', async () => {
+    const result = await layoutOf(bodyOf(paragraphs(90, 'aaaa bbbb')));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    expect(result.pages.length).toBeGreaterThan(2);
+    const last = result.pages[result.pages.length - 1];
+    expect(last?.origin.y).toBe(
+      result.pages.slice(0, -1).reduce((total, page) => total + page.page.height, 0),
+    );
+    const sheets = pageSheets(target);
+    const sheet = sheets[sheets.length - 1] as HTMLElement;
+    const top = Number.parseFloat(sheet.style.top);
+    sheet.style.setProperty('top', `${String(top + 40)}px`);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
+    expect(report.ok).toBe(false);
+    const origin = report.divergences.find((entry) => entry.kind === 'pageOrigin');
+    expect(origin).toBeDefined();
+    expect(origin?.page).toBe(last?.index);
+    expect(origin?.deltaPx).toBeCloseTo(40, 4);
+    expect(origin?.message).toContain('engine origin');
   });
 
   it('carries the per-run vertical shift the painter raises a superscript with', async () => {

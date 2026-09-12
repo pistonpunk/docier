@@ -22,4 +22,6 @@ export const paintScale = (zoom: number): PaintScale => {
   return { zoom: value, px: (geometry) => toCssPx(geometry, value) };
 };
 
-export const formatPx = (value: number): string => `${Math.round(value * 10000) / 10000}px`;
+export const formatNumber = (value: number): string => String(Math.round(value * 10000) / 10000);
+
+export const formatPx = (value: number): string => `${formatNumber(value)}px`;

@@ -3,6 +3,7 @@ import type { Mp } from '../units/index.js';
 import type { PaintScale } from './scale.js';
 import type { RendererRegistry } from './registry.js';
 import type { DivergenceCheckOptions, DivergenceReport } from './divergence.js';
+import type { RenderImageProvider, RenderImageSource, RenderIssue } from './images.js';
 
 export interface Disposable {
   dispose(): void;
@@ -54,6 +55,7 @@ export interface RenderedDocument {
   readonly zoom: number;
   readonly zoomMode: ZoomMode;
   readonly pages: readonly RenderedPage[];
+  readonly issues?: readonly RenderIssue[];
   setZoom(zoom: number): void;
   pageOf(index: number): RenderedPage | undefined;
   destroy(): void;
@@ -107,6 +109,9 @@ export interface RenderOptions {
   readonly detectDivergence?: boolean;
   readonly divergence?: DivergenceCheckOptions;
   readonly onDivergence?: (report: DivergenceReport) => void;
+  readonly images?: readonly RenderImageSource[];
+  readonly imageProvider?: RenderImageProvider;
+  readonly onIssue?: (issue: RenderIssue) => void;
 }
 
 export interface ResolvedRenderOptions {
@@ -124,6 +129,9 @@ export interface ResolvedRenderOptions {
   readonly detectDivergence: boolean;
   readonly divergence: DivergenceCheckOptions | undefined;
   readonly onDivergence: ((report: DivergenceReport) => void) | undefined;
+  readonly images: readonly RenderImageSource[] | undefined;
+  readonly imageProvider: RenderImageProvider | undefined;
+  readonly onIssue: ((issue: RenderIssue) => void) | undefined;
 }
 
 export const DEFAULT_PAGE_GAP_PX = 24;

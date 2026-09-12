@@ -2,17 +2,19 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { DocumentRenderer, SlotError } from '../../src/render/index.js';
+import type { DivergenceKind, DocumentRenderer, SlotError } from '../../src/render/index.js';
 import * as render from '../../src/render/index.js';
 import {
   ATTR,
   PAINT_ONLY_PROPERTIES,
   PaintContractError,
+  RESULT_GAPS,
   applyStyle,
   assertPaintOnly,
   clampZoom,
   createRendererRegistry,
   formatPx,
+  imageBoxOf,
   paintScale,
   renderDocument,
 } from '../../src/render/index.js';
@@ -47,6 +49,32 @@ describe('the paint coordinate contract', () => {
       .filter((source) => /fromCssPx|96\s*\/\s*72|0\.0013333/.test(source.text))
       .map((source) => source.name);
     expect(raw).toEqual([]);
+  });
+
+  it('scales object and image geometry on that one scale and never in millipoints', () => {
+    const object = {
+      relationshipId: 'rId1',
+      width: mp(20000),
+      height: mp(10000),
+      crop: { x: mp(2000), y: mp(1000), width: mp(10000), height: mp(5000) },
+      rotationMilliDegrees: 90000,
+    };
+    const single = imageBoxOf(object, paintScale(1));
+    const doubled = imageBoxOf(object, paintScale(2));
+    expect(single.left).toBe(-toCssPx(mp(4000), 1));
+    expect(single.top).toBe(-toCssPx(mp(2000), 1));
+    expect(single.width).toBe(toCssPx(mp(40000), 1));
+    expect(single.height).toBe(toCssPx(mp(20000), 1));
+    for (const key of ['left', 'top', 'width', 'height'] as const) {
+      expect(doubled[key]).toBeCloseTo(single[key] * 2, 4);
+    }
+    const uncropped = { ...object, crop: undefined };
+    expect(imageBoxOf(uncropped, paintScale(3))).toEqual({
+      left: 0,
+      top: 0,
+      width: toCssPx(object.width, 3),
+      height: toCssPx(object.height, 3),
+    });
   });
 
   it('never imports the layout engine or the measurer at runtime', () => {
@@ -115,6 +143,44 @@ describe('the paint coordinate contract', () => {
         expect(PAINT_ONLY_PROPERTIES.has(property) || property.startsWith('--'), property).toBe(true);
       }
     }
+  });
+});
+
+describe('the declared gap contract', () => {
+  it('keeps the gap list disjoint from what the detector verifies', () => {
+    const verified: Record<DivergenceKind, true> = {
+      pageCount: true,
+      pageSize: true,
+      pageOrigin: true,
+      staleResult: true,
+      missingRun: true,
+      strayRun: true,
+      runBox: true,
+      runAdvance: true,
+      runFontSize: true,
+      decoration: true,
+      objectBox: true,
+      missingImage: true,
+    };
+    const kinds = Object.keys(verified).sort();
+    expect(kinds).toEqual([
+      'decoration',
+      'missingImage',
+      'missingRun',
+      'objectBox',
+      'pageCount',
+      'pageOrigin',
+      'pageSize',
+      'runAdvance',
+      'runBox',
+      'runFontSize',
+      'staleResult',
+      'strayRun',
+    ]);
+    for (const gap of RESULT_GAPS) expect(kinds).not.toContain(gap);
+    expect(RESULT_GAPS.length).toBeGreaterThan(0);
+    expect(new Set(RESULT_GAPS).size).toBe(RESULT_GAPS.length);
+    for (const gap of RESULT_GAPS) expect(gap).toMatch(/^[a-z][A-Za-z]*$/);
   });
 });
 

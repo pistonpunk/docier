@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { LayoutResult } from '../../src/layout/index.js';
-import { ATTR, MAX_ZOOM, MIN_ZOOM, renderDocument } from '../../src/render/index.js';
-import { bodyOf, host, layoutOf, localPx, paragraphText, px, styleLeft, styleWidth } from './support.js';
+import { ATTR, MAX_ZOOM, MIN_ZOOM, dataUrlOf, renderDocument } from '../../src/render/index.js';
+import {
+  CROPPED,
+  bodyOf,
+  derivedPx,
+  host,
+  imageParagraph,
+  imageSource,
+  layoutOf,
+  localPx,
+  negatedPx,
+  paragraphText,
+  px,
+  styleLeft,
+  styleWidth,
+} from './support.js';
 
 const digestOf = (result: LayoutResult): string =>
   result.pages
@@ -31,6 +45,12 @@ const pageSheets = (target: HTMLElement): readonly HTMLElement[] =>
 
 const scaleLayerOf = (target: HTMLElement): HTMLElement | null =>
   target.querySelector<HTMLElement>(`[${ATTR.scaleLayer}]`);
+
+const objectNode = (target: HTMLElement): HTMLElement | null =>
+  target.querySelector<HTMLElement>(`[${ATTR.object}]`);
+
+const imageOf = (target: HTMLElement): HTMLElement | null =>
+  target.querySelector<HTMLElement>(`[${ATTR.image}]`);
 
 const body = (): string => bodyOf(paragraphText('hello world'));
 
@@ -138,6 +158,44 @@ describe('zoom as paint', () => {
     expect(digestOf(result)).toBe(digest);
     expect(pageSheets(target).length).toBe(result.pages.length);
     expect(rendered.pages.map((page) => page.index)).toEqual(result.pages.map((p) => p.index));
+  });
+
+  it('repaints a cropped image at the new scale without touching the layout result', async () => {
+    const result = await layoutOf(bodyOf(imageParagraph('rId7', { crop: CROPPED })));
+    const digest = digestOf(result);
+    const block = result.pages[0]?.blocks[0];
+    const run = block?.lines[0]?.runs[0];
+    const object = run?.object;
+    const crop = object?.crop;
+    if (object === undefined || crop === undefined) throw new Error('the engine kept no crop rectangle');
+    const scaleX = object.width / crop.width;
+    const target = host();
+    const rendered = renderDocument(result, target, {
+      zoomMode: 'geometry',
+      images: [imageSource('rId7')],
+    });
+    expect(styleWidth(objectNode(target))).toBe(px(object.width));
+    expect(imageOf(target)?.style.width).toBe(derivedPx(object.width * scaleX));
+    expect(imageOf(target)?.style.left).toBe(negatedPx(crop.x * scaleX));
+    rendered.setZoom(2);
+    expect(digestOf(result)).toBe(digest);
+    expect(result.pages[0]?.blocks[0]?.lines[0]?.runs[0]?.object).toBe(object);
+    expect(styleWidth(objectNode(target))).toBe(px(object.width, 2));
+    expect(imageOf(target)?.style.width).toBe(derivedPx(object.width * scaleX, 2));
+    expect(imageOf(target)?.style.left).toBe(negatedPx(crop.x * scaleX, 2));
+    expect(imageOf(target)?.getAttribute('src')).toBe(dataUrlOf(imageSource('rId7')));
+  });
+
+  it('leaves the object box alone when the zoom is a transform', async () => {
+    const result = await layoutOf(bodyOf(imageParagraph('rId7')));
+    const target = host();
+    const rendered = renderDocument(result, target, { images: [imageSource('rId7')] });
+    const node = objectNode(target);
+    const css = node?.style.cssText;
+    rendered.setZoom(3);
+    expect(scaleLayerOf(target)?.style.transform).toBe('scale(3)');
+    expect(objectNode(target)).toBe(node);
+    expect(node?.style.cssText).toBe(css);
   });
 
   it('removes the painted root on destroy', async () => {

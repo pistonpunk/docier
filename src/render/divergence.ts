@@ -1,8 +1,18 @@
-import type { LayoutResult, LineFragment, LineRun, PageFragment, RunPaint } from '../layout/index.js';
+import type {
+  BorderSet,
+  LayoutResult,
+  LineFragment,
+  LineRun,
+  PageFragment,
+  Rect,
+  RunPaint,
+  Shading,
+} from '../layout/index.js';
 import { mp } from '../units/index.js';
 import type {
   MeasuredRect,
   RectSource,
+  RectStyle,
   RenderedDocument,
   RunFontSpec,
   TextAdvanceMeasurer,
@@ -10,31 +20,30 @@ import type {
 } from './types.js';
 import type { PaintScale } from './scale.js';
 import { paintScale } from './scale.js';
-import { ATTR } from './dom.js';
+import { ATTR, frameOf, geometryAt } from './dom.js';
 import { fontShorthand, runFontSpec } from './style.js';
-import { needsSegmentation } from './runs.js';
+import { BORDER_SIDES, edgeBandOf, shadingColorOf } from './decoration.js';
+import { needsSegmentation, segmentsOf } from './runs.js';
+import { objectBoxOf } from './objects.js';
 
 export const DEFAULT_TOLERANCE_PX = 0.5;
 export const DEFAULT_MAX_DIVERGENCES = 100;
 
-export const RESULT_GAPS: readonly string[] = [
-  'fontFileHash',
-  'perRunAscentAndDescent',
-  'perAtomFontSize',
-  'verticalShift',
-  'pageOriginInDocument',
-  'imageSourceAndSize',
-  'paragraphDecorationRects',
-];
+export const RESULT_GAPS: readonly string[] = ['fontFileHash'];
 
 export type DivergenceKind =
   | 'pageCount'
   | 'pageSize'
+  | 'pageOrigin'
   | 'staleResult'
   | 'missingRun'
   | 'strayRun'
   | 'runBox'
-  | 'runAdvance';
+  | 'runAdvance'
+  | 'runFontSize'
+  | 'decoration'
+  | 'objectBox'
+  | 'missingImage';
 
 export interface LayoutDivergence {
   readonly kind: DivergenceKind;
@@ -65,6 +74,9 @@ export interface DivergenceChecked {
   readonly runs: number;
   readonly boxes: number;
   readonly advances: number;
+  readonly fonts: number;
+  readonly decorations: number;
+  readonly objects: number;
 }
 
 export interface DivergenceReport {
@@ -114,7 +126,7 @@ const numeric = (value: string): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const styleRectSource = (zoom: number): RectSource => (element) => {
+export const styleRectSource = (factor: number): RectSource => (element) => {
   const width = numeric(element.style.width);
   const height = numeric(element.style.height);
   let left = 0;
@@ -126,7 +138,7 @@ export const styleRectSource = (zoom: number): RectSource => (element) => {
     if (node.hasAttribute(ATTR.page) || node.hasAttribute(ATTR.surface)) break;
     node = node.parentElement;
   }
-  return { left: left * zoom, top: top * zoom, width: width * zoom, height: height * zoom };
+  return { left: left * factor, top: top * factor, width: width * factor, height: height * factor };
 };
 
 export const canvasTextMeasurer = (): TextAdvanceMeasurer | undefined => {
@@ -163,34 +175,41 @@ const boundaryGap = (boundaries: readonly number[], value: number): number => {
   return best;
 };
 
-const boxMessage = (
-  segmented: boolean,
-  painted: readonly MeasuredRect[],
-  engineLeftPx: number,
-  engineTopPx: number,
-  engineWidthPx: number,
-): string => {
-  if (segmented) {
-    return (
-      `painted boxes (${painted
-        .map((rect) => `${rect.left}+${rect.width}`)
-        .join(', ')}) do not sit on the engine atom boundaries of a run the engine places at ` +
-      `left ${engineLeftPx} top ${engineTopPx} width ${engineWidthPx}`
-    );
-  }
-  const rect = painted[0];
-  return (
-    `painted box (left ${rect?.left ?? 0} top ${rect?.top ?? 0} width ${rect?.width ?? 0}) does not ` +
-    `match the engine (left ${engineLeftPx} top ${engineTopPx} width ${engineWidthPx})`
-  );
-};
-
 const localRect = (rect: MeasuredRect, sheet: MeasuredRect): MeasuredRect => ({
   left: rect.left - sheet.left,
   top: rect.top - sheet.top,
   width: rect.width,
   height: rect.height,
 });
+
+const unionOf = (rects: readonly MeasuredRect[]): MeasuredRect => {
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const rect of rects) {
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.left + rect.width);
+    bottom = Math.max(bottom, rect.top + rect.height);
+  }
+  return { left, top, width: right - left, height: bottom - top };
+};
+
+const rectDelta = (
+  expected: { readonly left: number; readonly top: number; readonly width: number; readonly height: number },
+  actual: MeasuredRect,
+): number =>
+  Math.max(
+    Math.abs(actual.left - expected.left),
+    Math.abs(actual.top - expected.top),
+    Math.abs(actual.width - expected.width),
+    Math.abs(actual.height - expected.height),
+  );
+
+const rectMessage = (label: string, expected: RectStyle, actual: MeasuredRect): string =>
+  `${label} is at ${actual.left}+${actual.top} ${actual.width}x${actual.height} px where the engine ` +
+  `places it at ${expected.left}+${expected.top} ${expected.width}x${expected.height} px`;
 
 export const formatDivergence = (divergence: LayoutDivergence): string =>
   `[${divergence.kind}] page ${divergence.page} line ${divergence.lineId} run ${divergence.runIndex}: ` +
@@ -221,8 +240,9 @@ export const detectDivergence = (
   const scale: PaintScale = paintScale(rendered.zoom);
   const browserAvailable = hasLayoutEngine();
   const authoritative = options.rectOf !== undefined || browserAvailable;
+  const rectFactor = rendered.zoomMode === 'transform' ? rendered.zoom : 1;
   const rectOf: RectSource =
-    options.rectOf ?? (browserAvailable ? browserRectSource() : styleRectSource(rendered.zoom));
+    options.rectOf ?? (browserAvailable ? browserRectSource() : styleRectSource(rectFactor));
   const measureText =
     options.measureText ?? (options.rectOf !== undefined ? undefined : canvasTextMeasurer());
 
@@ -232,6 +252,9 @@ export const detectDivergence = (
   let runs = 0;
   let lines = 0;
   let advances = 0;
+  let fonts = 0;
+  let decorations = 0;
+  let objects = 0;
 
   const skip = (reason: string): void => {
     skipCounts.set(reason, (skipCounts.get(reason) ?? 0) + 1);
@@ -248,6 +271,20 @@ export const detectDivergence = (
     });
   };
 
+  const baseDraft = (page: number, blockId: number, lineId: number, runIndex: number): DivergenceDraft => ({
+    kind: 'runBox',
+    message: '',
+    page,
+    blockId,
+    lineId,
+    runIndex,
+    docPos: undefined,
+    engineWidthMp: 0,
+    renderedWidthPx: 0,
+    resolvedFontFamily: '',
+    text: '',
+  });
+
   const root = rendered.root;
   const sheets = Array.from(root.querySelectorAll<HTMLElement>(`[${ATTR.page}]`));
   const version = Number.parseInt(root.getAttribute(ATTR.version) ?? '', 10);
@@ -255,17 +292,9 @@ export const detectDivergence = (
   if (version !== result.version || hash !== result.documentHash) {
     push(
       {
+        ...baseDraft(-1, -1, -1, -1),
         kind: 'staleResult',
         message: `the painted DOM was produced from result version ${String(version)} hash ${String(hash)}`,
-        page: -1,
-        blockId: -1,
-        lineId: -1,
-        runIndex: -1,
-        docPos: undefined,
-        engineWidthMp: 0,
-        renderedWidthPx: 0,
-        resolvedFontFamily: '',
-        text: '',
       },
       0,
     );
@@ -273,21 +302,36 @@ export const detectDivergence = (
   if (sheets.length !== result.pages.length) {
     push(
       {
+        ...baseDraft(-1, -1, -1, -1),
         kind: 'pageCount',
         message: `painted ${sheets.length} page sheets for ${result.pages.length} page fragments`,
-        page: -1,
-        blockId: -1,
-        lineId: -1,
-        runIndex: -1,
-        docPos: undefined,
-        engineWidthMp: 0,
         renderedWidthPx: sheets.length,
-        resolvedFontFamily: '',
-        text: '',
       },
       0,
     );
   }
+
+  const boxMessage = (
+    segmented: boolean,
+    painted: readonly MeasuredRect[],
+    engineLeftPx: number,
+    engineTopPx: number,
+    engineWidthPx: number,
+  ): string => {
+    if (segmented) {
+      return (
+        `painted boxes (${painted
+          .map((rect) => `${rect.left}+${rect.width}`)
+          .join(', ')}) do not sit on the engine atom boundaries of a run the engine places at ` +
+        `left ${engineLeftPx} top ${engineTopPx} width ${engineWidthPx}`
+      );
+    }
+    const rect = painted[0];
+    return (
+      `painted box (left ${rect?.left ?? 0} top ${rect?.top ?? 0} width ${rect?.width ?? 0}) does not ` +
+      `match the engine (left ${engineLeftPx} top ${engineTopPx} width ${engineWidthPx})`
+    );
+  };
 
   const checkRun = (
     page: PageFragment,
@@ -296,7 +340,7 @@ export const detectDivergence = (
     blockId: number,
     line: LineFragment,
     index: number,
-    run: LineFragment['runs'][number],
+    run: LineRun,
     paint: RunPaint | undefined,
   ): void => {
     runs += 1;
@@ -308,6 +352,10 @@ export const detectDivergence = (
       skip('hiddenRun');
       return;
     }
+    if (run.object !== undefined) {
+      skip('objectRun');
+      return;
+    }
     const spec = runFontSpec(paint, scale);
     const found = Array.from(
       sheet.querySelectorAll<HTMLElement>(
@@ -317,15 +365,11 @@ export const detectDivergence = (
     if (found.length === 0) {
       push(
         {
+          ...baseDraft(page.index, blockId, line.id, index),
           kind: 'missingRun',
           message: 'no painted box exists for this run',
-          page: page.index,
-          blockId,
-          lineId: line.id,
-          runIndex: index,
           docPos: run.source.start,
           engineWidthMp: run.width,
-          renderedWidthPx: 0,
           resolvedFontFamily: spec.family,
           text: run.text,
         },
@@ -354,7 +398,8 @@ export const detectDivergence = (
     );
     const engineWidthPx = scale.px(run.width);
     const engineLeftPx = scale.px(mp(run.x - page.page.x));
-    const engineTopPx = scale.px(mp(line.baselineY - line.ascent - page.page.y));
+    const engineTopPx = scale.px(mp(line.baselineY - run.ascent - page.page.y));
+    const engineHeightPx = scale.px(mp(run.ascent + run.descent));
     const segmented = found.length > 1;
     const boundaries = segmented ? atomBoundaries(line, run, scale) : [];
     const edgeDelta = segmented
@@ -370,16 +415,16 @@ export const detectDivergence = (
         : Math.abs(paintedWidth - engineWidthPx);
     const leftDelta = Math.abs(paintedLeft - engineLeftPx);
     const topDelta = Math.abs(paintedTop - engineTopPx);
-    const worst = Math.max(widthDelta, leftDelta, topDelta, edgeDelta);
+    const heightDelta = Math.min(
+      ...painted.map((rect) => Math.abs(rect.height - engineHeightPx)),
+    );
+    const worst = Math.max(widthDelta, leftDelta, topDelta, heightDelta, edgeDelta);
     if (worst > tolerancePx) {
       push(
         {
+          ...baseDraft(page.index, blockId, line.id, index),
           kind: 'runBox',
           message: boxMessage(segmented, painted, engineLeftPx, engineTopPx, engineWidthPx),
-          page: page.index,
-          blockId,
-          lineId: line.id,
-          runIndex: index,
           docPos: run.source.start,
           engineWidthMp: run.width,
           renderedWidthPx: paintedWidth,
@@ -389,6 +434,40 @@ export const detectDivergence = (
         worst,
       );
       return;
+    }
+    const segments = segmentsOf(line, run, paint);
+    if (found.length === segments.length) {
+      found.forEach((node, segmentIndex) => {
+        const segment = segments[segmentIndex];
+        if (segment === undefined) return;
+        const paintedSize = Number.parseFloat(node.style.fontSize);
+        if (!Number.isFinite(paintedSize)) {
+          skip('unreadableFontSize');
+          return;
+        }
+        fonts += 1;
+        const expectedSizePx = scale.px(segment.size);
+        const sizeDelta = Math.abs(paintedSize - expectedSizePx);
+        if (sizeDelta > tolerancePx) {
+          push(
+            {
+              ...baseDraft(page.index, blockId, line.id, index),
+              kind: 'runFontSize',
+              message:
+                `the painted box uses ${paintedSize} px where the engine resolves the atoms of ` +
+                `"${segment.text}" to ${expectedSizePx} px`,
+              docPos: run.source.start,
+              engineWidthMp: segment.size,
+              renderedWidthPx: paintedSize,
+              resolvedFontFamily: spec.family,
+              text: segment.text,
+            },
+            sizeDelta,
+          );
+        }
+      });
+    } else {
+      skip('segmentCountMismatch');
     }
     if (found.length > 1 || needsSegmentation(run, paint)) {
       skip('segmentedRunAdvance');
@@ -416,14 +495,11 @@ export const detectDivergence = (
     if (advanceDelta > tolerancePx) {
       push(
         {
+          ...baseDraft(page.index, blockId, line.id, index),
           kind: 'runAdvance',
           message:
             `the resolved font advances "${run.text}" to ${measured} px where the engine measured ` +
             `${engineWidthPx} px`,
-          page: page.index,
-          blockId,
-          lineId: line.id,
-          runIndex: index,
           docPos: run.source.start,
           engineWidthMp: run.width,
           renderedWidthPx: measured,
@@ -433,6 +509,223 @@ export const detectDivergence = (
         advanceDelta,
       );
     }
+  };
+
+  const checkObjects = (
+    page: PageFragment,
+    sheet: HTMLElement,
+    sheetRect: MeasuredRect,
+    blockId: number,
+    line: LineFragment,
+    index: number,
+    run: LineRun,
+  ): void => {
+    if (run.object === undefined) return;
+    const frame = frameOf(page.page);
+    for (const atom of line.atoms) {
+      const object = atom.object;
+      if (object === undefined) continue;
+      if (atom.source.start < run.source.start || atom.source.end > run.source.end) continue;
+      objects += 1;
+      const node = sheet.querySelector<HTMLElement>(`[${ATTR.object}="${String(atom.atomId)}"]`);
+      const draft: DivergenceDraft = {
+        ...baseDraft(page.index, blockId, line.id, index),
+        docPos: atom.source.start,
+        engineWidthMp: object.width,
+        text: object.relationshipId ?? '',
+      };
+      if (node === null) {
+        push(
+          {
+            ...draft,
+            kind: 'missingImage',
+            message:
+              `the engine places an object of ${object.width} mp and the DOM paints nothing for it; ` +
+              `${object.relationshipId === undefined ? 'an inline drawing without a relationship' : object.relationshipId} must be reported, not omitted`,
+          },
+          scale.px(object.width),
+        );
+        continue;
+      }
+      const rect = rectOf(node);
+      if (rect === undefined) {
+        skip('unreadableObjectBox');
+        continue;
+      }
+      const local = localRect(rect, sheetRect);
+      const expected = geometryAt(objectBoxOf(line, run, atom), frame, scale);
+      const delta = rectDelta(expected, local);
+      if (delta > tolerancePx) {
+        push({ ...draft, kind: 'objectBox', message: rectMessage('the painted object box', expected, local) }, delta);
+        continue;
+      }
+      if (!node.hasAttribute(ATTR.imageMissing)) continue;
+      const label = (node.textContent ?? '').trim();
+      const visible = label !== '' && (object.width <= 0 || (local.width > 0 && local.height > 0));
+      if (!visible) {
+        push(
+          {
+            ...draft,
+            kind: 'missingImage',
+            message: `the object at ${local.left}+${local.top} is reported as missing but carries no visible placeholder`,
+          },
+          0,
+        );
+      }
+    }
+  };
+
+  const checkDecoration = (
+    node: HTMLElement | null,
+    page: PageFragment,
+    sheetRect: MeasuredRect,
+    area: Rect,
+    shading: Shading | undefined,
+    borders: BorderSet | undefined,
+    identity: { readonly blockId: number; readonly lineId: number; readonly label: string },
+  ): void => {
+    const shaded = shadingColorOf(shading?.fill) !== undefined;
+    const edged =
+      borders === undefined
+        ? false
+        : BORDER_SIDES.some((side) => (borders[side]?.width ?? 0) > 0);
+    if (!shaded && !edged) return;
+    const frame = frameOf(page.page);
+    const draft = baseDraft(page.index, identity.blockId, identity.lineId, -1);
+    if (node === null) {
+      decorations += 1;
+      push(
+        {
+          ...draft,
+          kind: 'decoration',
+          message: `the engine paints ${identity.label} decoration and the DOM paints no node for it`,
+          engineWidthMp: area.width,
+        },
+        scale.px(area.width),
+      );
+      return;
+    }
+    if (shaded) {
+      decorations += 1;
+      const painted = node.querySelector<HTMLElement>(`[${ATTR.shading}]`);
+      const rect = painted === null ? undefined : rectOf(painted);
+      const expected = geometryAt(area, frame, scale);
+      if (rect === undefined) {
+        push(
+          {
+            ...draft,
+            kind: 'decoration',
+            message:
+              `the engine shades ${identity.label} over ${expected.left}+${expected.top} ` +
+              `${expected.width}x${expected.height} px and the DOM paints no shading node`,
+            engineWidthMp: area.width,
+          },
+          0,
+        );
+      } else {
+        const local = localRect(rect, sheetRect);
+        const delta = rectDelta(expected, local);
+        if (delta > tolerancePx) {
+          push({ ...draft, kind: 'decoration', message: rectMessage(`${identity.label} shading`, expected, local) }, delta);
+        }
+      }
+    }
+    if (borders === undefined) return;
+    for (const side of BORDER_SIDES) {
+      const edge = borders[side];
+      if (edge === undefined || edge.width <= 0) continue;
+      decorations += 1;
+      const rects: MeasuredRect[] = [];
+      for (const painted of Array.from(node.querySelectorAll<HTMLElement>(`[${ATTR.border}="${side}"]`))) {
+        const rect = rectOf(painted);
+        if (rect !== undefined) rects.push(localRect(rect, sheetRect));
+      }
+      const expected = geometryAt(edgeBandOf(area, side, edge.width), frame, scale);
+      if (rects.length === 0) {
+        push(
+          {
+            ...draft,
+            kind: 'decoration',
+            message:
+              `the engine paints the ${side} border of ${identity.label} at ${expected.left}+${expected.top} ` +
+              `${expected.width}x${expected.height} px and the DOM paints no border node`,
+            engineWidthMp: edge.width,
+          },
+          0,
+        );
+        continue;
+      }
+      const union = unionOf(rects);
+      const delta = rectDelta(expected, union);
+      if (delta > tolerancePx) {
+        push(
+          {
+            ...draft,
+            kind: 'decoration',
+            message: rectMessage(`${identity.label} ${side} border`, expected, union),
+          },
+          delta,
+        );
+      }
+    }
+  };
+
+  const checkPageOrigins = (): void => {
+    if (sheets.length === 0) return;
+    const layer = root.querySelector<HTMLElement>(`[${ATTR.pages}]`);
+    if (layer === null) {
+      skip('pageLayerMissing');
+      return;
+    }
+    const layerRect = rectOf(layer);
+    if (layerRect === undefined) {
+      skip('unreadablePageLayer');
+      return;
+    }
+    const placements: ({ readonly left: number; readonly top: number } | undefined)[] = [];
+    for (const sheet of sheets) {
+      const rect = rectOf(sheet);
+      placements.push(
+        rect === undefined ? undefined : { left: rect.left - layerRect.left, top: rect.top - layerRect.top },
+      );
+    }
+    if (placements.some((placement) => placement === undefined)) {
+      skip('unreadablePageOrigin');
+      return;
+    }
+    const placed = placements as readonly { readonly left: number; readonly top: number }[];
+    const first = result.pages[0];
+    if (first === undefined) return;
+    let gapPx = 0;
+    if (placed.length > 1) {
+      const second = result.pages[1];
+      if (second !== undefined) {
+        gapPx =
+          (placed[1]?.top ?? 0) -
+          (placed[0]?.top ?? 0) -
+          scale.px(mp(second.origin.y - first.origin.y));
+      }
+    }
+    result.pages.forEach((page, index) => {
+      const placement = placed[index];
+      if (placement === undefined) return;
+      const expectedLeft = scale.px(page.origin.x);
+      const expectedTop = scale.px(page.origin.y) + gapPx * index;
+      const delta = Math.max(Math.abs(placement.left - expectedLeft), Math.abs(placement.top - expectedTop));
+      if (delta > tolerancePx) {
+        push(
+          {
+            ...baseDraft(page.index, -1, -1, -1),
+            kind: 'pageOrigin',
+            message:
+              `page ${page.index} sits at ${placement.left}+${placement.top} px in the document where the ` +
+              `engine origin puts it at ${expectedLeft}+${expectedTop} px; the painted sheets carry a ` +
+              `uniform ${gapPx} px gap on top of the engine origins`,
+          },
+          delta,
+        );
+      }
+    });
   };
 
   for (const page of result.pages) {
@@ -448,30 +741,52 @@ export const detectDivergence = (
     if (widthDelta > 0 || heightDelta > 0) {
       push(
         {
+          ...baseDraft(page.index, -1, -1, -1),
           kind: 'pageSize',
           message: `page sheet is ${sheetRect.width}x${sheetRect.height} px, engine says ${scale.px(page.page.width)}x${scale.px(page.page.height)} px`,
-          page: page.index,
-          blockId: -1,
-          lineId: -1,
-          runIndex: -1,
-          docPos: undefined,
           engineWidthMp: page.page.width,
           renderedWidthPx: sheetRect.width,
-          resolvedFontFamily: '',
-          text: '',
         },
         Math.max(widthDelta, heightDelta),
       );
     }
     for (const block of page.blocks) {
+      const blockNode = sheet.querySelector<HTMLElement>(`[${ATTR.block}="${String(block.id)}"]`);
+      checkDecoration(blockNode, page, sheetRect, block.box, block.shading, block.borders, {
+        blockId: block.id,
+        lineId: -1,
+        label: `paragraph ${String(block.id)}`,
+      });
       for (const line of block.lines) {
         lines += 1;
         line.runs.forEach((run, index) => {
           checkRun(page, sheet, sheetRect, block.id, line, index, run, result.paint[run.paint]);
+          checkObjects(page, sheet, sheetRect, block.id, line, index, run);
         });
       }
     }
+    for (const table of page.tables) {
+      const tableNode = sheet.querySelector<HTMLElement>(`[${ATTR.table}="${String(table.table)}"]`);
+      checkDecoration(tableNode, page, sheetRect, table.box, table.shading, undefined, {
+        blockId: -1,
+        lineId: -1,
+        label: `table ${String(table.table)}`,
+      });
+      for (const row of table.rows) {
+        const rowNode = tableNode?.querySelector<HTMLElement>(`[${ATTR.row}="${String(row.row)}"]`) ?? null;
+        for (const cell of row.cells) {
+          const cellNode = rowNode?.querySelector<HTMLElement>(`[${ATTR.cell}="${String(cell.column)}"]`) ?? null;
+          checkDecoration(cellNode, page, sheetRect, cell.box, cell.shading, cell.borders, {
+            blockId: -1,
+            lineId: -1,
+            label: `cell ${String(cell.column)} of row ${String(row.row)}`,
+          });
+        }
+      }
+    }
   }
+
+  checkPageOrigins();
 
   const strayRuns = Array.from(root.querySelectorAll<HTMLElement>(`[${ATTR.run}]`)).filter((node) => {
     const lineId = node.getAttribute(ATTR.line);
@@ -480,14 +795,9 @@ export const detectDivergence = (
   for (const node of strayRuns) {
     push(
       {
+        ...baseDraft(-1, -1, -1, -1),
         kind: 'strayRun',
         message: 'a painted run box carries no line identity and cannot be attributed to the engine',
-        page: -1,
-        blockId: -1,
-        lineId: -1,
-        runIndex: -1,
-        docPos: undefined,
-        engineWidthMp: 0,
         renderedWidthPx: rectOf(node)?.width ?? 0,
         resolvedFontFamily: node.style.fontFamily,
         text: node.textContent ?? '',
@@ -505,7 +815,7 @@ export const detectDivergence = (
     tolerancePx,
     rectSource: authoritative ? 'browser' : 'style',
     authoritative,
-    checked: { pages: sheets.length, lines, runs, boxes, advances },
+    checked: { pages: sheets.length, lines, runs, boxes, advances, fonts, decorations, objects },
     skipped: Array.from(skipCounts, ([reason, count]) => ({ reason, count })),
     divergences,
     gaps: RESULT_GAPS,

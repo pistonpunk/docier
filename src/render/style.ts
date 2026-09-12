@@ -1,4 +1,5 @@
 import type { RunPaint } from '../layout/index.js';
+import type { Mp } from '../units/index.js';
 import type { RunFontSpec } from './types.js';
 import type { PaintScale } from './scale.js';
 import { formatPx } from './scale.js';
@@ -93,12 +94,15 @@ export const positionStyle = (
   ...extra,
 });
 
-export const runFontSpec = (paint: RunPaint, scale: PaintScale): RunFontSpec => ({
+export const runFontSpecAt = (paint: RunPaint, scale: PaintScale, size: Mp): RunFontSpec => ({
   family: paint.family,
-  sizePx: scale.px(paint.size),
+  sizePx: scale.px(size),
   weight: paint.bold ? 700 : 400,
   italic: paint.italic,
 });
+
+export const runFontSpec = (paint: RunPaint, scale: PaintScale): RunFontSpec =>
+  runFontSpecAt(paint, scale, paint.size);
 
 export const fontShorthand = (spec: RunFontSpec): string => {
   const style = spec.italic ? 'italic ' : '';
@@ -127,7 +131,6 @@ export const runStyle = (
     'font-variant-ligatures': 'none',
     'font-feature-settings': 'normal',
     'font-synthesis': 'none',
-    'font-variant-caps': paint.smallCaps && !paint.allCaps ? 'small-caps' : 'normal',
     color: textColorOf(paint.color),
     'background-color': highlight ?? 'transparent',
     'text-decoration': decorationOf(paint),
