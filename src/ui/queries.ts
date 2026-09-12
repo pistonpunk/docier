@@ -53,6 +53,9 @@ export const createEditorQueries = (
   let disposed = false;
 
   const unsubscribes: Unsubscribe[] = [
+    handle.events.on('docier:ready', () => {
+      save = 'saved';
+    }),
     handle.events.on('docier:history:change', (event) => {
       save = event.savePoint ? 'saved' : 'unsaved';
     }),
@@ -61,11 +64,10 @@ export const createEditorQueries = (
     }),
   ];
 
-  const scrollContainer = (): HTMLElement | undefined => {
-    const surface =
-      handle.element.querySelector<HTMLElement>(`[${ATTR.surface}]`) ??
-      handle.element.querySelector<HTMLElement>('.docier-editor-surface');
-    return surface ?? handle.element;
+  const pageOriginPx = (): number => {
+    const sheet = handle.element.querySelector<HTMLElement>(`[${ATTR.page}]`);
+    if (sheet === null) return 0;
+    return sheet.getBoundingClientRect().left - handle.element.getBoundingClientRect().left;
   };
 
   const self: Omit<EditorQueries, 'setSurface'> = {
@@ -92,7 +94,7 @@ export const createEditorQueries = (
     surface: () => surface,
     indents: () => options?.indents?.(self.page()) ?? DEFAULT_INDENTS,
     pageFragment: (index) => handle.layout?.pages[index],
-    offsetPx: () => -(scrollContainer() ?? handle.element).scrollLeft,
+    offsetPx: () => pageOriginPx(),
     dispose: () => {
       if (disposed) return;
       disposed = true;
