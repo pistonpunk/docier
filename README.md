@@ -1,79 +1,112 @@
 # docier
 
-A Word-compatible **DOCX editor for the browser**, written in TypeScript.
+A DOCX editor for the browser, written in TypeScript.
 
-DOCX is the native format, not an export target: docier parses a `.docx`, holds an OOXML-faithful
-document model, lays it out, edits it, and writes a valid `.docx` back. It is framework-agnostic — plain
-DOM chrome in the core, driven through commands and observed through events — and it ships an optional
-tokenization module for document templates.
+`docier` opens a `.docx`, lets a person edit it, and writes a valid `.docx` back. It is a library
+rather than an application: you mount it into an element, configure it with one object, drive it
+through commands and observe it through events. It is framework-agnostic, has one runtime dependency,
+and ships an optional module for document templates.
+
+[![CI](https://github.com/pistonpunk/docier/actions/workflows/ci.yml/badge.svg)](https://github.com/pistonpunk/docier/actions/workflows/ci.yml)
+
+## The problem it solves
+
+Most browser editing is HTML editing. You type into a `contenteditable`, the browser decides where the
+text goes, and a converter guesses at a `.docx` afterwards. That works until the document matters: the
+line breaks are not the ones that print, the page breaks are not the ones Word would choose, and each
+conversion loses something.
+
+`docier` treats the `.docx` as the document and computes the layout itself. Text is positioned from a
+computed layout rather than from what the browser happened to do, so the page you see and the page that
+prints are the same page. Documents from Word keep their markup, including the parts `docier` does not
+understand, so re-saving a contract does not quietly remove things.
+
+## Install
+
+```
+npm install docier
+```
+
+## Quick start
 
 ```ts
 import { createEditor } from 'docier'
 import { mountChrome } from 'docier/ui'
 
-const editor = createEditor('#app', { document: { source: bytes } })
+const bytes = await fetch('/contract.docx').then((r) => r.arrayBuffer())
+
+const editor = createEditor('#editor', {}, { document: bytes })
 mountChrome(editor)
 
+editor.events.on('docier:doc:change', () => scheduleSave(editor.document))
+```
+
+`createEditor(target, config, options)` where `target` is an element or a selector:
+
+- `config` is a deep-partial configuration object; every key has a default.
+- `options.document` accepts a `Uint8Array`, `ArrayBuffer`, `Blob`, or an already-parsed package or
+  model. `options.zoom` and `options.render` are also accepted here.
+
+The call is safe to repeat: mounting twice on the same element returns the first handle, and `destroy()`
+is idempotent.
+
+## Using it
+
+Everything the user can do is a command. Every state change is an event.
+
+```ts
 editor.commands.execute('docier.command.format.bold')
-editor.events.on('docier:doc:change', ({ patches }) => save(patches))
+editor.commands.execute('docier.command.insert.table', { rows: 3, columns: 4 })
+
+const bold = editor.commands.describe('docier.command.format.bold')
+// { enabled: true, active: false, ... }
+
+const blocked = editor.commands.describe('docier.command.table.deleteRow')
+// { enabled: false, reason: 'The caret is not inside a table' }
 ```
 
-## Why it exists
+A command that cannot run tells you why. Nothing is silently inert, and nothing reports success while
+doing nothing: `describe` returns a reason, and executing a blocked command returns a structured status
+carrying the same reason.
 
-Browser editors either emulate a word processor or embed one behind a server. docier takes the position
-that a document editor should be a library, that DOCX is the document, and that what you see must be
-exactly what prints.
+Events follow the same naming scheme, `docier:<area>:<verb>`, with the cancellable ones named
+`before<Verb>`:
 
-## Architecture
-
-One engine owns layout. Two painters render it.
-
-```
-.docx bytes
-   │  ooxml: ZIP + prefix-preserving XML + part registry
-   ▼
-document model ── layout engine ──► LayoutResult (immutable, millipoints)
-   (OOXML-faithful)                        │
-                                           ├──► DOM painter   (screen)
-                                           └──► PDF painter   (paper)
+```ts
+editor.events.on('docier:selection:change', ({ from, to }) => updateToolbar(from, to))
+editor.events.on('docier:doc:beforechange', (event) => {
+  if (!confirmDiscard()) event.preventDefault()
+})
 ```
 
-**The engine is the only layout authority.** The renderer positions one absolutely-positioned box per run
-from engine coordinates, and no CSS participates in layout. Point-to-pixel conversion happens in exactly
-one function. Zoom is a pure paint scale that never re-runs layout. The PDF exporter paints the *same*
-`LayoutResult` — it is never a DOCX-to-PDF conversion through LibreOffice or any external converter,
-because that would reintroduce a second layout engine and the drift this architecture exists to prevent.
+## Exporting
 
-The invariant is enforced mechanically rather than by review: a contract test reads the renderer's source
-and fails if it imports the layout layer, so the renderer cannot re-run layout even by accident.
+PDF export is a separate entry point, so an application that never exports never loads it.
 
-**"Exact" means screen equals print, and both are faithful to the DOCX semantics** — not pixel-identical
-to Microsoft Word. Nothing in a browser is, including LibreOffice, ONLYOFFICE and Word Online. And it is
-not required here: templates are authored in docier, so Word is never in the loop and there is nothing to
-be exact *with* except itself.
+```ts
+import { exportPdf } from 'docier/pdf'
 
-## Design commitments
+const { bytes, report } = await exportPdf(editor.layout, { pdfa: 'a-2b' })
+```
 
-- **Unknown markup is preserved, never dropped.** Documents come from Word full of things this library
-  does not model. Re-saving must not destroy them. Unmodelled parts pass through as raw bytes.
-- **Everything is a command; every state change is an event.** One surface for actions and observation, so
-  any host can drive the library and the token module is just another consumer.
-- **Unicode is preserved, not normalised**, on save. A name's byte representation must not change because
-  we re-saved the file.
-- **Deterministic output.** The same document produces byte-identical bytes, proven across separate
-  processes. This is why `fflate` is a dependency: the platform's compressor is not reproducible across
-  engines, and determinism cannot be met without pinning it.
-- **A command that cannot run says why.** No control is silently inert, and nothing reports success while
-  doing nothing.
-- **No fonts and no dictionary data are bundled.** Both are host-supplied, which keeps the package small
-  and leaves licensing with the host.
+The exporter renders the same computed layout the screen renders. It does not re-run layout, re-measure
+text, or consult the document for any position. That is what makes the screen and the printed page agree
+rather than approximately agree. Glyph advances come from the same font measurement the layout used, and
+a font whose metrics disagree is reported rather than substituted.
 
-## The tokenization module
+Output is deterministic: the same document produces byte-identical bytes, verified across separate
+processes. Missing fonts and missing images are reported as losses rather than silently omitted.
 
-Optional, its own entry point, off by default. A host that does not enable it never loads it.
+Printing is available too, with page ranges shared by the print and PDF paths.
 
-A token is a real Word **content control** (`w:sdt`) whose tag is the field code, so a template stays a
-valid `.docx` that can be opened and edited in Word itself.
+## Document templates
+
+Optional, a separate entry point, and off unless enabled. An application that does not use templates
+never loads it.
+
+A token is a real Word **content control**. It is the same mechanism Word itself uses for fillable
+fields, which means a template stays a valid `.docx` that a person can open and edit in Word, with the
+fields still working. Placeholders are not a special text syntax that only `docier` understands.
 
 ```ts
 import { createTokenAttachment, fillTemplate } from 'docier/tokens'
@@ -84,54 +117,73 @@ tokens.data.setData({ 'employee.surname': 'Popescu' })
 const { bytes, issues } = await fillTemplate({ template, catalogue, data, locale: 'ro-RO' })
 ```
 
-Fill runs **headless** — bytes in, bytes out, no DOM and no network — so a backend can fill a template
-without a browser. A missing value is reported by code *and* rendered visibly, because a contract must
-never print a silently blank name.
+The catalogue is the backend's authority. A template that references a field the catalogue does not
+define is reported rather than rendering as blank, and a value that is missing is both reported by code
+and shown as a visible placeholder. A contract must never print a silently empty name.
 
-## Export
+Filling runs headlessly: bytes in, bytes out, no DOM and no network, so a server can fill a template
+without a browser.
 
-Its own entry point, so a host that does not export never loads it.
+## What it handles
 
-```ts
-import { renderPdf } from 'docier/pdf'
-
-const { bytes, report } = await exportPdf(layoutResult, { pdfa: 'a-2b' })
-```
-
-The exporter paints the **same `LayoutResult`** the screen paints — it re-runs no layout, re-measures no
-text, and consults the model for no position. Glyph advances come from the same measurer the engine
-measured with, and a font whose metrics disagree is reported rather than substituted.
-
-Output is deterministic: the same document produces byte-identical bytes, proven across separate
-processes. PDF/A-2b is available for archival, and a missing font or image is reported as a loss rather
-than silently omitted.
-
-Verified against **poppler** rather than against itself — `pdftotext` extracts text at the coordinates
-the engine computed, and `pdftoppm` rasterises with ink where the engine placed it.
+- **DOCX fidelity.** Round-trips a real `.docx`, preserving markup it does not model as raw bytes rather
+  than dropping it. Unicode is preserved exactly, not normalised.
+- **Layout.** Line breaking, justification, hyphenation points, widow and orphan control, keep-with-next
+  and keep-lines-together, page breaks, sections, columns, tab stops, borders and shading.
+- **Tables.** Column resolution, all three row height rules, row splitting across pages, repeating header
+  rows, merged cells, nested tables, and editing inside cells.
+- **Headers, footers and page fields.** Default, first-page and even/odd variants, with `PAGE`,
+  `NUMPAGES`, `SECTION` and `SECTIONPAGES` resolved to real values.
+- **Styles.** The full cascade: document defaults, table styles and conditional formatting, numbering,
+  paragraph and character styles with their `basedOn` chain, and direct formatting, with Word's toggle
+  semantics.
+- **Editing.** Caret and selection, Word's navigation keys, typing, splitting and joining, clipboard with
+  a model-content buffer, undo and redo with one entry per gesture, and 112 commands.
+- **Chrome.** Ribbon with tabs and groups, context menus on every surface, a floating selection toolbar,
+  a ruler, a status bar, and theming through CSS custom properties.
 
 ## Requirements
 
-Evergreen browsers: Chrome/Edge 120+, Firefox 121+, Safari 17.4+. The floor is capability-based —
-`CompressionStream`, `Intl.Segmenter` (locale-aware line and word breaking for Romanian and Russian),
-`Popover API`, `structuredClone`, ESM with top-level await. No legacy polyfills.
+Evergreen browsers: Chrome and Edge 120+, Firefox 121+, Safari 17.4+.
+
+The floor is set by capability rather than version. `docier` uses `CompressionStream`, `Intl.Segmenter`
+for locale-aware line and word breaking, the Popover API, `structuredClone`, and ES modules with
+top-level await. There are no polyfills for older browsers.
+
+**Fonts are not bundled.** You supply them. This keeps the package small and leaves font licensing with
+you, but it means text will not render correctly until you wire up the fonts your documents use. See
+`docs/` for the requirement.
 
 ## Status
 
-Under active development. Verified by the test suite and CI on every push.
+Version 0.x. Under active development, CI on every push, 1,100+ assertions.
 
-**Working:** DOCX round trip with unmodelled markup preserved; the document model including styles with
-the real cascade and Word's toggle semantics, numbering, tables and sections; layout with line breaking,
-pagination, widow and orphan control, keeps, and full table layout with row splitting and repeating
-headers; a paint-only renderer with a divergence detector; the editor with caret, selection, navigation,
-mutation and undo; 112 registered commands with honest availability; clipboard with a model-content
-buffer; the chrome — ribbon, menus, context menus, ruler, status bar; and the tokenization module.
+**Working:** everything listed under "What it handles".
 
-**Not yet:** loops and conditionals in tokens; block-level tokens spanning paragraphs; objects (authoring
-images and shapes); comments, headers, footers and footnotes — these need the transaction snapshot widened
-beyond the document body, which is the largest remaining architectural gap; find and replace; and
-proofing.
+**Not yet:** templates with repeating sections and conditionals; inserting images and shapes, as opposed
+to rendering ones already in a document; comments; footnotes; find and replace; proofing; and editing a
+header or footer from the UI. See `agent_progress.md` for the current state and `docs/SPEC.md` for the
+full design.
+
+## Architecture
+
+For contributors, and for anyone who wants to know why the page you see is the page that prints.
+
+There is one layout engine and two renderers. The engine produces an immutable layout result in
+millipoints; the screen renderer paints it into the DOM and the PDF exporter paints it into a file. No CSS
+takes part in layout, the point-to-pixel conversion happens in exactly one place, and zoom is a paint
+scale that never triggers a re-layout. The constraint is enforced by a test that fails if the renderer
+imports the layout layer, so the two cannot drift apart through inattention.
+
+The document model is a typed view over the parsed XML rather than a structure rebuilt from it. That is
+what lets unmodelled markup survive an edit, and it is why an unknown element in a contract is still
+there after a save.
+
+See `docs/SPEC.md` for the full design and `docs/adr/` for the decisions behind it.
 
 ## Licence
 
-Dual-licensed: **AGPL-3.0-only** for open source, or a **commercial licence** for proprietary use. See
-`LICENSE` and `COMMERCIAL.md`.
+Dual-licensed: **AGPL-3.0-only** for open source, or a **commercial licence** for proprietary use.
+
+The AGPL covers use over a network, so it applies to a hosted product as well as a distributed one. If
+that does not suit your project, a commercial licence is available. See `LICENSE` and `COMMERCIAL.md`.
