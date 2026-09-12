@@ -1,0 +1,366 @@
+import type { DocxPackage } from '../ooxml/package.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
+import { rootElement } from '../ooxml/xml/index.js';
+import { R_NAMESPACE, RELATIONSHIP_TYPES } from '../ooxml/namespaces.js';
+import type { BlockNode } from './blocks/block-node.js';
+import type { ContentControl } from './blocks/content-control.js';
+import type { Paragraph } from './blocks/paragraph.js';
+import type { Table } from './blocks/table.js';
+import { ModelContext } from './context.js';
+import type { DiagnosticCollector } from './diagnostics.js';
+import type { NumberingContext } from './styles/cascade.js';
+import { MAX_NUMBERING_LEVEL } from './numbering/level.js';
+import { NumberingPart } from './numbering/numbering-part.js';
+import { findOrderedChild, findOrderedChildren } from './schema-order.js';
+import { SettingsPart } from './settings.js';
+import type { StoryKind } from './story.js';
+import { Story } from './story.js';
+import { StyleResolver, tableStyleContextOf } from './styles/cascade.js';
+import type { ResolvedProperties } from './styles/resolved.js';
+import { StylesPart } from './styles/styles-part.js';
+import { childElements, isWElement } from './xml.js';
+
+const STYLES_PART_NAME = 'word/styles.xml';
+const NUMBERING_PART_NAME = 'word/numbering.xml';
+const SETTINGS_PART_NAME = 'word/settings.xml';
+
+export interface LoadModelOptions {
+  readonly context?: ModelContext;
+  readonly readHeadersAndFooters?: boolean;
+  readonly readNotes?: boolean;
+}
+
+export interface ModelParts {
+  readonly styles: string | undefined;
+  readonly numbering: string | undefined;
+  readonly settings: string | undefined;
+}
+
+export interface NoteReference {
+  readonly noteId: number;
+  readonly isFootnote: boolean;
+  readonly storyId: string;
+  readonly paragraphId: number;
+}
+
+interface DocumentInit {
+  readonly pkg: DocxPackage;
+  readonly context: ModelContext;
+  readonly mainPartName: string;
+  readonly stories: readonly Story[];
+  readonly styles: StylesPart | undefined;
+  readonly numbering: NumberingPart | undefined;
+  readonly settings: SettingsPart | undefined;
+  readonly resolver: StyleResolver;
+  readonly parts: ModelParts;
+}
+
+const relationshipIdOf = (element: XmlElement): string | undefined =>
+  element.attributes.find(
+    (attribute) => attribute.uri === R_NAMESPACE && attribute.localName === 'id',
+  )?.value;
+
+const sectionElementsOf = (body: XmlElement): readonly XmlElement[] => {
+  const sections: XmlElement[] = [];
+  for (const child of childElements(body)) {
+    if (isWElement(child, 'sectPr')) {
+      sections.push(child);
+      continue;
+    }
+    if (!isWElement(child, 'p')) continue;
+    const properties = findOrderedChild(child, 'pPr');
+    if (properties === undefined) continue;
+    const section = findOrderedChild(properties, 'sectPr');
+    if (section !== undefined) sections.push(section);
+  }
+  return sections;
+};
+
+export class DocumentModel {
+  readonly package: DocxPackage;
+  readonly context: ModelContext;
+  readonly diagnostics: DiagnosticCollector;
+  readonly styles: StylesPart | undefined;
+  readonly numbering: NumberingPart | undefined;
+  readonly settings: SettingsPart | undefined;
+  readonly resolver: StyleResolver;
+  readonly mainPartName: string;
+  readonly parts: ModelParts;
+  private readonly storyList: readonly Story[];
+  private readonly storyById: Map<string, Story>;
+
+  private constructor(init: DocumentInit) {
+    this.package = init.pkg;
+    this.context = init.context;
+    this.diagnostics = init.context.diagnostics;
+    this.mainPartName = init.mainPartName;
+    this.storyList = init.stories;
+    this.storyById = new Map(init.stories.map((story) => [story.id, story]));
+    this.styles = init.styles;
+    this.numbering = init.numbering;
+    this.settings = init.settings;
+    this.resolver = init.resolver;
+    this.parts = init.parts;
+  }
+
+  static async load(pkg: DocxPackage, options: LoadModelOptions = {}): Promise<DocumentModel> {
+    const context = options.context ?? new ModelContext();
+    const diagnostics = context.diagnostics;
+    const mainPartName = pkg.mainDocumentPartName;
+    const mainPart = pkg.mainPart();
+    if (mainPart === undefined) {
+      throw new Error('The package has no main document part');
+    }
+    const root = rootElement(await mainPart.document());
+    if (root === undefined) throw new Error('The main document part has no root element');
+
+    const resolveDependency = (which: 'styles' | 'numbering' | 'settings', fallback: string): string | undefined => {
+      const type = RELATIONSHIP_TYPES[which];
+      const relationship =
+        type === undefined ? undefined : pkg.relationships.firstRelationshipOfType(mainPartName, type);
+      if (relationship !== undefined && pkg.hasPart(relationship.resolvedTarget)) {
+        return relationship.resolvedTarget;
+      }
+      if (pkg.hasPart(fallback)) {
+        diagnostics.info('missingHeaderPart', `using conventional part name ${fallback}`, {
+          partName: fallback,
+        });
+        return fallback;
+      }
+      return undefined;
+    };
+
+    const readRootOf = async (partName: string | undefined): Promise<XmlElement | undefined> => {
+      if (partName === undefined) return undefined;
+      const part = pkg.getPart(partName);
+      if (part === undefined) return undefined;
+      return rootElement(await part.document());
+    };
+
+    const stylesName = resolveDependency('styles', STYLES_PART_NAME);
+    const numberingName = resolveDependency('numbering', NUMBERING_PART_NAME);
+    const settingsName = resolveDependency('settings', SETTINGS_PART_NAME);
+
+    const stylesRoot = await readRootOf(stylesName);
+    const numberingRoot = await readRootOf(numberingName);
+    const settingsRoot = await readRootOf(settingsName);
+
+    const styles = stylesRoot === undefined ? undefined : new StylesPart(stylesRoot, context);
+    const numbering = numberingRoot === undefined ? undefined : new NumberingPart(numberingRoot, context);
+    const settings = settingsRoot === undefined ? undefined : new SettingsPart(settingsRoot);
+    const resolver = new StyleResolver(styles);
+
+    const stories: Story[] = [];
+    const addStory = (kind: StoryKind, partName: string, element: XmlElement): Story => {
+      const id = kind === 'body' ? 'body' : `${kind}:${partName}`;
+      const story = new Story({ kind, id, partName, element, context });
+      stories.push(story);
+      return story;
+    };
+
+    const body = findOrderedChild(root, 'body');
+    if (body === undefined) {
+      diagnostics.warn('missingHeaderPart', 'main document part has no w:body', {
+        partName: mainPartName,
+      });
+    } else {
+      addStory('body', mainPartName, body);
+      if (options.readHeadersAndFooters !== false) {
+        for (const [localName, kind] of [
+          ['headerReference', 'header'],
+          ['footerReference', 'footer'],
+        ] as const) {
+          const seen = new Set<string>();
+          for (const section of sectionElementsOf(body)) {
+            for (const reference of findOrderedChildren(section, localName)) {
+              const id = relationshipIdOf(reference);
+              if (id === undefined) continue;
+              const relationship = pkg.relationships.findById(mainPartName, id);
+              if (relationship === undefined) continue;
+              const partName = relationship.resolvedTarget;
+              if (seen.has(partName)) continue;
+              seen.add(partName);
+              const element = await readRootOf(partName);
+              if (element === undefined) {
+                diagnostics.warn('missingHeaderPart', `cannot read ${partName}`, { partName });
+                continue;
+              }
+              addStory(kind, partName, element);
+            }
+          }
+        }
+      }
+    }
+
+    if (options.readNotes !== false) {
+      for (const [which, kind] of [
+        ['footnotes', 'footnote'],
+        ['endnotes', 'endnote'],
+        ['comments', 'comment'],
+      ] as const) {
+        const type = RELATIONSHIP_TYPES[which];
+        const relationship =
+          type === undefined ? undefined : pkg.relationships.firstRelationshipOfType(mainPartName, type);
+        if (relationship === undefined) continue;
+        const partName = relationship.resolvedTarget;
+        const element = await readRootOf(partName);
+        if (element === undefined) continue;
+        addStory(kind, partName, element);
+      }
+    }
+
+    return new DocumentModel({
+      pkg,
+      context,
+      mainPartName,
+      stories,
+      styles,
+      numbering,
+      settings,
+      resolver,
+      parts: { styles: stylesName, numbering: numberingName, settings: settingsName },
+    });
+  }
+
+  stories(): readonly Story[] {
+    return this.storyList;
+  }
+
+  story(id: string): Story | undefined {
+    return this.storyById.get(id);
+  }
+
+  storiesOfKind(kind: StoryKind): readonly Story[] {
+    return this.storyList.filter((story) => story.kind === kind);
+  }
+
+  body(): Story {
+    const body = this.storyById.get('body');
+    if (body === undefined) throw new Error('The document has no body story');
+    return body;
+  }
+
+  blocks(): readonly BlockNode[] {
+    return this.body().blocks();
+  }
+
+  paragraphs(): readonly Paragraph[] {
+    return this.body().paragraphs();
+  }
+
+  tables(): readonly Table[] {
+    return this.body().tables();
+  }
+
+  contentControls(): readonly ContentControl[] {
+    const controls: ContentControl[] = [];
+    const visitBlocks = (blocks: readonly BlockNode[]): void => {
+      for (const block of blocks) {
+        if (block.blockKind === 'contentControl') {
+          const control = block as ContentControl;
+          controls.push(control);
+          visitBlocks(control.blocks());
+          continue;
+        }
+        if (block.blockKind !== 'table') continue;
+        for (const row of (block as Table).rows()) {
+          for (const cell of row.cells()) visitBlocks(cell.blocks());
+        }
+      }
+    };
+    for (const story of this.storyList) visitBlocks(story.blocks());
+    return controls;
+  }
+
+  contentControlsByTag(tag: string): readonly ContentControl[] {
+    return this.contentControls().filter((control) => control.tag === tag);
+  }
+
+  contentControlById(sdtId: number): ContentControl | undefined {
+    return this.contentControls().find((control) => control.sdtId === sdtId);
+  }
+
+  taggedContentControlTags(): readonly string[] {
+    const tags = new Set<string>();
+    for (const control of this.contentControls()) {
+      const tag = control.tag;
+      if (tag !== undefined && tag.length > 0) tags.add(tag);
+    }
+    return [...tags];
+  }
+
+  fillByTag(tag: string, value: string): number {
+    const controls = this.contentControlsByTag(tag);
+    for (const control of controls) control.setText(value);
+    return controls.length;
+  }
+
+  numberingFor(paragraphProperties: XmlElement | undefined): NumberingContext | undefined {
+    const numbering = this.numbering;
+    if (numbering === undefined || paragraphProperties === undefined) return undefined;
+    const resolved = this.resolver.resolveParagraph({
+      paragraphProperties,
+      tableStyle: undefined,
+      numbering: undefined,
+    });
+    const numId = resolved.numberingId;
+    if (numId === undefined || numId === 0) return undefined;
+    const declared = resolved.numberingLevel ?? 0;
+    const ilvl = declared > MAX_NUMBERING_LEVEL ? MAX_NUMBERING_LEVEL : declared < 0 ? 0 : declared;
+    const level = numbering.levelFor(numId, ilvl);
+    if (level === undefined) return undefined;
+    return { numId, ilvl, level };
+  }
+
+  resolveParagraphProperties(paragraph: Paragraph): ResolvedProperties {
+    const properties = paragraph.properties.element;
+    return this.resolver.resolveParagraph({
+      paragraphProperties: properties,
+      tableStyle: tableStyleContextOf(paragraph.element),
+      numbering: this.numberingFor(properties),
+    });
+  }
+
+  resolveRunProperties(
+    paragraph: Paragraph,
+    runProperties: XmlElement | undefined,
+  ): ResolvedProperties {
+    const properties = paragraph.properties.element;
+    return this.resolver.resolveRun({
+      runProperties,
+      paragraphProperties: properties,
+      tableStyle: tableStyleContextOf(paragraph.element),
+      numbering: this.numberingFor(properties),
+    });
+  }
+
+  noteReferences(): readonly NoteReference[] {
+    const references: NoteReference[] = [];
+    for (const story of this.storyList) {
+      for (const paragraph of story.paragraphs()) {
+        for (const run of paragraph.runs()) {
+          for (const content of run.contents()) {
+            if (content.kind !== 'noteReference') continue;
+            const reference = content as { noteId?: number; isFootnote?: boolean };
+            references.push({
+              noteId: reference.noteId ?? 0,
+              isFootnote: reference.isFootnote ?? true,
+              storyId: story.id,
+              paragraphId: paragraph.id,
+            });
+          }
+        }
+      }
+    }
+    return references;
+  }
+
+  invalidateStyles(): void {
+    this.styles?.invalidate();
+    this.resolver.invalidate();
+  }
+
+  async save(options: Parameters<DocxPackage['save']>[0] = {}): Promise<Uint8Array> {
+    return this.package.save(options);
+  }
+}

@@ -1,6 +1,6 @@
 import type { TextEncoding } from './bytes.js';
 import { encodeText } from './bytes.js';
-import { DocierParseError } from './errors.js';
+import { DocierError, DocierParseError } from './errors.js';
 import { sha256, toHex } from './sha256.js';
 import type { DeflateBackend, ZipArchive, ZipEntry } from './zip/index.js';
 import { readZipEntry, zipEntryDataOffset } from './zip/index.js';
@@ -236,7 +236,14 @@ export class Part {
     const content = this.content;
     if (content.kind === 'document') return serializeXmlBytes(content.document);
     if (content.kind === 'bytes') return content.bytes;
-    return this.cachedBytes ?? new Uint8Array(0);
+    const cached = this.cachedBytes;
+    if (cached === undefined) {
+      throw new DocierError(
+        `Part "${this.name}" has not been read yet; await part.bytes() before reading its bytes synchronously`,
+        { code: 'PART_NOT_FOUND' },
+      );
+    }
+    return cached;
   }
 
   writePlan(): PartWritePlan {

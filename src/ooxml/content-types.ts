@@ -3,6 +3,7 @@ import { DocierError } from './errors.js';
 import { CONTENT_TYPES_NAMESPACE } from './namespaces.js';
 import type { XmlAttribute, XmlDocument, XmlElement, XmlNode } from './xml/index.js';
 import {
+  cloneNode,
   createAttribute,
   createDeclaration,
   createDocument,
@@ -123,6 +124,7 @@ export class ContentTypes {
   readonly overrides: ContentTypeOverride[];
   readonly diagnostics: ContentTypeDiagnostic[];
   private readonly rootAttributes: XmlAttribute[];
+  private readonly extraChildren: XmlNode[];
   private dirtyFlag: boolean;
 
   private constructor(
@@ -130,12 +132,14 @@ export class ContentTypes {
     overrides: ContentTypeOverride[],
     diagnostics: ContentTypeDiagnostic[],
     rootAttributes: XmlAttribute[],
+    extraChildren: XmlNode[],
     dirty: boolean,
   ) {
     this.defaults = defaults;
     this.overrides = overrides;
     this.diagnostics = diagnostics;
     this.rootAttributes = rootAttributes;
+    this.extraChildren = extraChildren;
     this.dirtyFlag = dirty;
   }
 
@@ -145,6 +149,7 @@ export class ContentTypes {
         extension,
         contentType,
       })),
+      [],
       [],
       [],
       [],
@@ -172,10 +177,14 @@ export class ContentTypes {
     }
     const defaults: ContentTypeDefault[] = [];
     const overrides: ContentTypeOverride[] = [];
+    const extraChildren: XmlNode[] = [];
     const seenExtensions = new Set<string>();
     const seenParts = new Set<string>();
     for (const child of root.children) {
-      if (child.kind !== 'element') continue;
+      if (child.kind !== 'element') {
+        extraChildren.push(child);
+        continue;
+      }
       if (child.localName === 'Default' && child.uri === CONTENT_TYPES_NAMESPACE) {
         const extension = getAttributeValue(child, '', 'Extension') ?? '';
         const contentType = getAttributeValue(child, '', 'ContentType');
@@ -221,13 +230,16 @@ export class ContentTypes {
         }
         seenParts.add(normalised);
         overrides.push({ partName: normalised, contentType });
+        continue;
       }
+      extraChildren.push(child);
     }
     return new ContentTypes(
       defaults,
       overrides,
       diagnostics,
       preservedRootAttributes(root),
+      extraChildren,
       false,
     );
   }
@@ -280,7 +292,6 @@ export class ContentTypes {
       this.overrides.push({ partName, contentType });
     }
     this.dirtyFlag = true;
-    this.diagnostics.length = 0;
   }
 
   removeOverride(partName: string): boolean {
@@ -376,6 +387,11 @@ export class ContentTypes {
     for (const child of children) {
       child.parent = root;
       root.children.push(child);
+    }
+    for (const extra of this.extraChildren) {
+      const copy = cloneNode(extra);
+      copy.parent = root;
+      root.children.push(copy);
     }
     document.children.push(root);
     return document;

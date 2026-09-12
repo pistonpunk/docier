@@ -12,6 +12,7 @@ export interface DeflateBackend {
   readonly flavour: DeflateFlavour;
   readonly deflateRaw: (data: Uint8Array) => Promise<Uint8Array>;
   readonly inflateRaw: (data: Uint8Array) => Promise<Uint8Array>;
+  readonly inflateRawBounded?: (data: Uint8Array, maxBytes: number) => Promise<Uint8Array>;
 }
 
 export interface DeflateResolution {
@@ -31,17 +32,32 @@ interface DeflateStreamHost {
 
 const host = globalThis as unknown as DeflateStreamHost;
 
-const pump = async (stream: DeflateStreamLike, data: Uint8Array): Promise<Uint8Array> => {
+const limitExceeded = (maxBytes: number): DocierError =>
+  new DocierError(`Decompressed data exceeds the configured limit of ${maxBytes} bytes`, {
+    code: 'DOCUMENT_TOO_LARGE',
+  });
+
+const pump = async (
+  stream: DeflateStreamLike,
+  data: Uint8Array,
+  maxBytes: number | undefined,
+): Promise<Uint8Array> => {
   const writer = stream.writable.getWriter();
   const writePromise = writer
     .write(data)
     .then(() => writer.close())
     .catch(() => undefined);
   const chunks: Uint8Array[] = [];
+  let total = 0;
   const reader = stream.readable.getReader();
   for (;;) {
     const result = await reader.read();
     if (result.done) break;
+    total += result.value.byteLength;
+    if (maxBytes !== undefined && total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw limitExceeded(maxBytes);
+    }
     chunks.push(result.value);
   }
   await writePromise;
@@ -59,6 +75,7 @@ const runStream = (
   data: Uint8Array,
   detail: string,
   code: 'ZIP_MALFORMED' | 'UNSUPPORTED_COMPRESSION',
+  maxBytes: number | undefined = undefined,
 ): Promise<Uint8Array> => {
   let stream: DeflateStreamLike;
   try {
@@ -66,7 +83,7 @@ const runStream = (
   } catch {
     return Promise.reject(noBackend(detail));
   }
-  return pump(stream, data).catch((error: unknown) => {
+  return pump(stream, data, maxBytes).catch((error: unknown) => {
     if (error instanceof DocierError) throw error;
     throw new DocierError(`Raw DEFLATE failed: ${String(error)}`, { code, cause: error });
   });
@@ -107,7 +124,27 @@ export const createPlatformDeflateBackend = (): DeflateBackend | undefined => {
         'DecompressionStream is present but not usable',
         'ZIP_MALFORMED',
       ),
+    inflateRawBounded: (data, maxBytes) =>
+      runStream(
+        (format) => new Decompressor(format),
+        data,
+        'DecompressionStream is present but not usable',
+        'ZIP_MALFORMED',
+        maxBytes,
+      ),
   };
+};
+
+export const inflateRawWithLimit = async (
+  backend: DeflateBackend,
+  data: Uint8Array,
+  maxBytes: number,
+): Promise<Uint8Array> => {
+  const bounded = backend.inflateRawBounded;
+  const result =
+    bounded === undefined ? await backend.inflateRaw(data) : await bounded.call(backend, data, maxBytes);
+  if (result.byteLength > maxBytes) throw limitExceeded(maxBytes);
+  return result;
 };
 
 let platformBackend: DeflateBackend | undefined;

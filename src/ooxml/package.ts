@@ -55,6 +55,8 @@ import type {
   ZipWriteEntry,
 } from './zip/index.js';
 import {
+  DEFAULT_MAX_PACKAGE_BYTES,
+  DEFAULT_MAX_PART_BYTES,
   createDeflatedZipEntry,
   createPassthroughZipEntry,
   createStoredZipEntry,
@@ -138,8 +140,7 @@ const RIGHTS_MANAGEMENT_STREAM = 'RightsManagement';
 const DRM_CONTENT_STREAM = 'DRMContent';
 const DRM_CONTENT_STREAM_NAME = '\u0006\u0009\u002a\u0086\u0048\u0086\u00f7\u0014\u0003\u000b\u0002';
 
-export const DEFAULT_MAX_PACKAGE_BYTES = 2 * 1024 * 1024 * 1024;
-export const DEFAULT_MAX_PART_BYTES = 512 * 1024 * 1024;
+export { DEFAULT_MAX_PACKAGE_BYTES, DEFAULT_MAX_PART_BYTES } from './zip/index.js';
 
 const ZIP_CONTENT_TYPE = 'application/zip';
 const SPREADSHEET_HINT = 'spreadsheetml';
@@ -695,8 +696,12 @@ export class DocxPackage {
 
   hasChanges(): boolean {
     if (this.structureChanged) return true;
+    if (this.contentTypes.dirty) return true;
     for (const part of this.parts.values()) {
       if (part.isDirty) return true;
+    }
+    for (const sourcePartName of this.relationships.sourceParts()) {
+      if (this.relationships.get(sourcePartName)?.dirty === true) return true;
     }
     return false;
   }
@@ -706,7 +711,10 @@ export class DocxPackage {
     for (const name of names) {
       this.parts.delete(name);
       this.contentTypes.dropPart(name);
+      const sourcePartName = sourcePartNameFor(name);
+      if (sourcePartName !== undefined) this.relationships.delete(sourcePartName);
     }
+    for (const name of names) this.relationships.removeRelationshipsTo(name);
     if (names.length > 0) {
       this.structureChanged = true;
       this.diagnostics.push({
@@ -764,6 +772,18 @@ export class DocxPackage {
     const findings: PackageValidationFinding[] = [];
     for (const name of this.parts.keys()) {
       if (name === CONTENT_TYPES_PART_NAME) continue;
+      const sourcePartName = sourcePartNameFor(name);
+      if (
+        sourcePartName !== undefined &&
+        sourcePartName !== '' &&
+        !this.parts.has(sourcePartName)
+      ) {
+        findings.push({
+          code: 'RELATIONSHIPS_PART_ORPHANED',
+          message: `"${name}" describes relationships for the missing part "${sourcePartName}"`,
+          partName: name,
+        });
+      }
       if (this.contentTypes.getContentType(name) !== undefined) continue;
       findings.push({
         code: 'CONTENT_TYPE_MISSING',
@@ -787,10 +807,10 @@ export class DocxPackage {
     const resolution = this.resolveWriteBackend(options);
     const backend = resolution.backend;
     if (!resolution.deterministic) this.noteNondeterministicCompression(backend.name);
-    if (options.keepSignatures !== true && this.hasChanges()) this.dropSignatures();
     if (options.pruneOrphanRelationships === true) this.pruneOrphanRelationships();
-    this.syncContentTypesPart();
-    this.syncRelationshipsParts();
+    this.syncGeneratedParts();
+    if (options.keepSignatures !== true && this.hasChanges()) this.dropSignatures();
+    this.syncGeneratedParts();
 
     const names = options.entryOrder === 'source' ? this.sourceFirstOrder() : this.canonicalOrder();
     const entries: ZipWriteEntry[] = [];
@@ -889,6 +909,11 @@ export class DocxPackage {
       severity: 'warning',
       message: `Compressed with "${backendName}", which is not a pinned DEFLATE; the output bytes are not reproducible across engines. Install one with setPinnedDeflateBackend().`,
     });
+  }
+
+  private syncGeneratedParts(): void {
+    this.syncContentTypesPart();
+    this.syncRelationshipsParts();
   }
 
   private syncContentTypesPart(): void {

@@ -2,6 +2,7 @@ import { decodeUtf8 } from '../bytes.js';
 import { DocierError, DocierParseError } from '../errors.js';
 import { crc32 } from './crc32.js';
 import type { DeflateBackend } from './deflate.js';
+import { inflateRawWithLimit } from './deflate.js';
 import type { ZipArchive, ZipEntry } from './types.js';
 import {
   COMPRESSION_METHOD_DEFLATE,
@@ -387,7 +388,7 @@ export const readZipEntry = async (
   const maxPartBytes = options.maxPartBytes ?? DEFAULT_MAX_PART_BYTES;
   if (entry.uncompressedSize > maxPartBytes) {
     throw new DocierError(
-      `Part "${entry.name}" inflates to ${entry.uncompressedSize} bytes, above the configured limit of ${maxPartBytes}`,
+      `Part "${entry.name}" declares an uncompressed size of ${entry.uncompressedSize} bytes, above the configured limit of ${maxPartBytes}`,
       { code: 'DOCUMENT_TOO_LARGE' },
     );
   }
@@ -407,11 +408,33 @@ export const readZipEntry = async (
   if (entry.method === COMPRESSION_METHOD_STORE) {
     result = compressed.slice();
   } else if (entry.method === COMPRESSION_METHOD_DEFLATE) {
-    result = await backend.inflateRaw(compressed);
+    try {
+      result = await inflateRawWithLimit(backend, compressed, maxPartBytes);
+    } catch (error) {
+      if (error instanceof DocierError && error.code === 'DOCUMENT_TOO_LARGE') {
+        throw new DocierError(
+          `Part "${entry.name}" inflates to more than ${maxPartBytes} bytes, above the configured limit of ${maxPartBytes}`,
+          { code: 'DOCUMENT_TOO_LARGE', cause: error },
+        );
+      }
+      throw error;
+    }
   } else {
     throw new DocierError(
       `Part "${entry.name}" uses compression method ${entry.method}, which is not supported`,
       { code: 'UNSUPPORTED_COMPRESSION' },
+    );
+  }
+  if (result.byteLength > maxPartBytes) {
+    throw new DocierError(
+      `Part "${entry.name}" inflates to ${result.byteLength} bytes, above the configured limit of ${maxPartBytes}`,
+      { code: 'DOCUMENT_TOO_LARGE' },
+    );
+  }
+  if (result.byteLength !== entry.uncompressedSize) {
+    throw new DocierParseError(
+      `Part "${entry.name}" inflates to ${result.byteLength} bytes but the archive declares ${entry.uncompressedSize}`,
+      { code: 'ZIP_MALFORMED', partName: entry.name },
     );
   }
   if (options.verifyCrc === true && crc32(result) !== entry.crc32) {

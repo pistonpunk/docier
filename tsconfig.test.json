@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": ".",
+    "outDir": "./dist-test",
+    "tsBuildInfoFile": "./tsconfig.test.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src", "test"],
+  "exclude": ["test/model-gate.test.ts"]
+}

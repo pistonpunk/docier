@@ -1,3 +1,4 @@
+import { DocierParseError } from '../errors.js';
 import { XMLNS_NAMESPACE, XML_NAMESPACE } from '../namespaces.js';
 import type {
   XmlAttribute,
@@ -42,6 +43,8 @@ const CODE_UPPER_X = 0x58;
 
 export const MAX_CHARACTER_REFERENCE_LENGTH = 12;
 
+const MAX_ELEMENT_DEPTH = 1024;
+
 export const PREDEFINED_ENTITIES: Readonly<Record<string, string>> = {
   amp: '&',
   lt: '<',
@@ -77,7 +80,7 @@ const splitQualifiedName = (rawName: string): readonly [string, string] => {
 };
 
 const decodeCharacterReference = (body: string): string | undefined => {
-  if (body.length < 2) return undefined;
+  if (body.length === 0) return undefined;
   const head = body.charCodeAt(0);
   const hexadecimal = head === CODE_LOWER_X || head === CODE_UPPER_X;
   const digits = hexadecimal ? body.slice(1) : body;
@@ -480,13 +483,15 @@ class XmlParser {
     const [prefix, localName] = splitQualifiedName(rawName);
     let uri = this.namespaces.get(prefix);
     if (uri === undefined) {
-      this.diagnostic(
-        'undeclaredPrefix',
-        'error',
-        `Namespace prefix "${prefix}" is not declared`,
-        start,
-        rawName,
-      );
+      if (prefix !== '') {
+        this.diagnostic(
+          'undeclaredPrefix',
+          'error',
+          `Namespace prefix "${prefix}" is not declared`,
+          start,
+          rawName,
+        );
+      }
       uri = '';
     }
 
@@ -513,8 +518,17 @@ class XmlParser {
       selfClosing,
     };
     this.appendNode(element);
-    if (!selfClosing) this.stack.push(element);
-    else this.restoreScope(this.scopes.pop());
+    if (selfClosing) {
+      this.restoreScope(this.scopes.pop());
+      return;
+    }
+    this.stack.push(element);
+    if (this.stack.length > MAX_ELEMENT_DEPTH) {
+      throw new DocierParseError(
+        `Element nesting is deeper than the supported limit of ${MAX_ELEMENT_DEPTH}`,
+        { code: 'XML_MALFORMED', offset: start },
+      );
+    }
   }
 
   private pushScratch(

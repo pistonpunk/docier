@@ -511,9 +511,7 @@ export class RelationshipGraph {
   removeRelationship(sourcePartName: string, id: string): boolean {
     const part = this.parts.get(sourcePartName);
     if (part === undefined) return false;
-    const removed = part.remove(id);
-    if (removed && part.isEmpty) this.parts.delete(sourcePartName);
-    return removed;
+    return part.remove(id);
   }
 
   retarget(sourcePartName: string, id: string, targetPartName: string): Relationship | undefined {
@@ -530,11 +528,10 @@ export class RelationshipGraph {
 
   removeRelationshipsTo(targetPartName: string): readonly Relationship[] {
     const removed: Relationship[] = [];
-    for (const [sourcePartName, part] of [...this.parts]) {
+    for (const part of this.parts.values()) {
       for (const relationship of part.targetsPart(targetPartName)) {
         if (part.remove(relationship.id)) removed.push(relationship);
       }
-      if (part.isEmpty) this.parts.delete(sourcePartName);
     }
     return removed;
   }
@@ -548,6 +545,15 @@ export class RelationshipGraph {
   validate(target: RelationshipValidationTarget): readonly RelationshipDiagnostic[] {
     const findings: RelationshipDiagnostic[] = [];
     for (const part of this.parts.values()) {
+      if (part.sourcePartName !== PACKAGE_ROOT_PART_NAME && !target.hasPart(part.sourcePartName)) {
+        findings.push({
+          code: 'orphanRelationshipsPart',
+          message: `"${part.partName}" describes relationships for the missing part "${part.sourcePartName}"`,
+          partName: part.partName,
+          id: undefined,
+        });
+        continue;
+      }
       if (part.isEmpty) {
         findings.push({
           code: 'emptyRelationshipsPart',

@@ -62,12 +62,20 @@ export const ratioToPercentFiftieth = (value: number): PercentFiftieth =>
 export const EMU_TO_MP_EXACT_LIMIT = Math.floor(Number.MAX_SAFE_INTEGER / EMU_TO_MP_NUM);
 export const MP_TO_EMU_EXACT_LIMIT = Math.floor(Number.MAX_SAFE_INTEGER / EMU_TO_MP_DEN);
 
+const isExactProduct = (value: number, numerator: number, denominator: number, limit: number): boolean => {
+  if (!Number.isInteger(value)) return false;
+  if (Math.abs(value) <= limit) return (value * numerator) % denominator === 0;
+  return (BigInt(value) * BigInt(numerator)) % BigInt(denominator) === 0n;
+};
+
 export const isExactEmuToTwip = (value: Emu): boolean => value % EMU_PER_TWIP === 0;
-export const isExactEmuToMp = (value: Emu): boolean => (value * EMU_TO_MP_NUM) % EMU_TO_MP_DEN === 0;
+export const isExactEmuToMp = (value: Emu): boolean =>
+  isExactProduct(value, EMU_TO_MP_NUM, EMU_TO_MP_DEN, EMU_TO_MP_EXACT_LIMIT);
 export const isExactEmuToPoint = (value: Emu): boolean => value % EMU_PER_POINT === 0;
 
 export const isExactMpToTwip = (value: Mp): boolean => value % MP_PER_TWIP === 0;
 export const isExactMpToHalfPoint = (value: Mp): boolean => value % MP_PER_HALF_POINT === 0;
 export const isExactMpToEighthPoint = (value: Mp): boolean => value % MP_PER_EIGHTH_POINT === 0;
 export const isExactMpToPoint = (value: Mp): boolean => value % MP_PER_POINT === 0;
-export const isExactMpToEmu = (value: Mp): boolean => (value * EMU_TO_MP_DEN) % EMU_TO_MP_NUM === 0;
+export const isExactMpToEmu = (value: Mp): boolean =>
+  isExactProduct(value, EMU_TO_MP_DEN, EMU_TO_MP_NUM, MP_TO_EMU_EXACT_LIMIT);
