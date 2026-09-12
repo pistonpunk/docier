@@ -230,8 +230,10 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
   const setZoom = (value: number): void => {
     const clamped = Math.min(4, Math.max(0.25, value));
-    store.set({ zoom: clamped });
     handle.setZoom(clamped);
+    store.set({ zoom: clamped });
+    ruler?.refresh();
+    verticalRuler?.refresh();
   };
 
   const FIT_SLACK_PX = 24;
