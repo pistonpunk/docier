@@ -14,7 +14,7 @@
     "pdf",
     "typescript"
   ],
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

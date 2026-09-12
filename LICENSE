@@ -1,0 +1,50 @@
+docier is dual-licensed. You choose which licence applies to you.
+
+================================================================================
+1. OPEN SOURCE — GNU Affero General Public License, version 3
+================================================================================
+
+If your project is open source, or is otherwise compatible with a copyleft
+licence, you may use docier under the GNU Affero General Public License,
+version 3.0 only (AGPL-3.0-only). The full text is in LICENSE.AGPL-3.0 and at
+https://www.gnu.org/licenses/agpl-3.0.txt
+
+The AGPL is a strong copyleft licence with one property that matters here: it
+covers use *over a network*. If you run docier as part of a service that users
+interact with remotely, the AGPL requires you to offer those users the
+Corresponding Source of the covered work. A plain GPL would not, which is why
+the AGPL is the licence used for this half of the dual licence.
+
+================================================================================
+2. COMMERCIAL — a commercial licence
+================================================================================
+
+If you want to use docier in a proprietary product, or in a network service
+whose source you do not wish to publish, the AGPL does not fit. A commercial
+licence is available that permits exactly that, without the copyleft
+obligations. See COMMERCIAL.md.
+
+You do not need a commercial licence to:
+  - use docier in an open-source project under the AGPL;
+  - evaluate docier, or use it in development and testing;
+  - read, study and modify the source for your own understanding.
+
+You do need one to ship docier inside a closed-source product or a closed
+network service.
+
+================================================================================
+3. CONTRIBUTIONS
+================================================================================
+
+Unless you state otherwise, any contribution you intentionally submit for
+inclusion in docier shall be licensed as above, without additional terms, so
+that the dual licence can continue to operate. A Contributor Licence Agreement
+may be introduced before the first external contribution is accepted.
+
+================================================================================
+
+Copyright (C) 2026 docier contributors.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.

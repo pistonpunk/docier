@@ -35,9 +35,24 @@ pleasant to integrate for a developer.
 | D9 | **Unknown OOXML parts and markup are preserved, never dropped.** | Documents come from Word full of things we do not model. Re-saving must not destroy them. |
 | D10 | **No comments in code.** Explanation lives in `docs/` and commit messages. | Owner preference. |
 
-Still open as **product** calls (recorded as ADRs, not decided): PDF/A profile for RO/RU archiving
-regimes; licensing of the Romanian/Russian hyphenation and dictionary data (several common ones are
-GPL/LGPL — a distribution question, not an engineering one).
+| D11 | **Dual licence: AGPL-3.0-only + commercial.** Free for open source, paid for proprietary. `LICENSE`, `LICENSE.AGPL-3.0`, `COMMERCIAL.md`. | The field's standard shape for this (SuperDoc, ONLYOFFICE, Grafana). AGPL rather than GPL because it covers *network* use, so a SaaS cannot route around it. The owner holds copyright, so their own portal uses it freely. |
+| D12 | **i18n: English is the only bundled language. Others are registered at runtime.** | A library should not ship three locales of strings nobody asked for. `registerLanguage(code, messages)`; the UI reads from the registry. |
+| D13 | **Mobile shows an "unsupported" message.** No degraded mobile editing. | Explicitly the owner's call. Better a clear statement than a half-working surface. |
+| D14 | **No fonts and no dictionary data are bundled.** Both are host-supplied through config. | Removes the font-licensing and the ro/ru dictionary-licensing problems entirely rather than negotiating them. Also keeps the package small. |
+| D15 | **Unicode is preserved on save, not normalised** (D7 confirmed as the resolution of ADR-0001). | Legal fidelity. |
+| D16 | **PDF/A-2b** as the archival profile, configurable. | The pragmatic archival choice, and it permits transparency that PDF/A-1b does not. The RO/RU compliance question remains open for the owner to confirm. |
+
+### Resolved product calls
+
+The owner resolved the eleven ADR items that needed a product decision on 2026-09-12: licence and
+i18n as D11–D12 above, mobile as D13, fonts and dictionary data as D14 (sidestepping both licensing
+questions rather than answering them), and the remaining scope questions as engineering defaults —
+Bézier node editing deferred to v2, section-move by drag is navigate-only in v1, connector re-routing
+stays where drawn in v1, `altChunk` is preserved rather than flattened, and image compression defaults
+to a PPI ladder that never downsamples below print resolution.
+
+The only item still genuinely open is **which PDF/A profile the Romanian and Russian archiving regimes
+accept** — a compliance question, not an engineering one.
 
 ---
 
