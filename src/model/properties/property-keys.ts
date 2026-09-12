@@ -102,12 +102,36 @@ export interface PropertyEntry {
 
 export const propertyKey = (name: string, attribute: string): string => `${name}/${attribute}`;
 
+const FLATTENED_CONTAINERS: ReadonlySet<string> = new Set(['numPr']);
+
+const flattenedEntries = (container: XmlElement, entries: PropertyEntry[]): void => {
+  for (const nested of container.children) {
+    if (nested.kind !== 'element') continue;
+    if (nested.uri !== W_NAMESPACE) continue;
+    for (const attribute of nested.attributes) {
+      if (attribute.uri !== W_NAMESPACE) continue;
+      entries.push({
+        name: nested.localName,
+        attribute: attribute.localName,
+        key: propertyKey(nested.localName, attribute.localName),
+        value: attribute.value,
+        toggle: false,
+        element: nested,
+      });
+    }
+  }
+};
+
 export const entriesOf = (properties: XmlElement | undefined): readonly PropertyEntry[] => {
   if (properties === undefined) return [];
   const entries: PropertyEntry[] = [];
   for (const child of properties.children) {
     if (child.kind !== 'element') continue;
     if (child.uri !== W_NAMESPACE) continue;
+    if (FLATTENED_CONTAINERS.has(child.localName)) {
+      flattenedEntries(child, entries);
+      continue;
+    }
     const boolean = isBooleanElement(child.localName);
     const toggle = isToggleProperty(child.localName);
     const scoped = child.attributes.filter((attribute) => attribute.uri === W_NAMESPACE);

@@ -1,6 +1,7 @@
+import { bytesEqual } from '../ooxml/bytes.js';
 import type { DocxPackage } from '../ooxml/package.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
-import { rootElement } from '../ooxml/xml/index.js';
+import { rootElement, serializeXmlBytes } from '../ooxml/xml/index.js';
 import { R_NAMESPACE, RELATIONSHIP_TYPES } from '../ooxml/namespaces.js';
 import type { BlockNode } from './blocks/block-node.js';
 import type { ContentControl } from './blocks/content-control.js';
@@ -254,12 +255,22 @@ export class DocumentModel {
 
   contentControls(): readonly ContentControl[] {
     const controls: ContentControl[] = [];
+    const seen = new Set<ContentControl>();
+    const add = (control: ContentControl): void => {
+      if (seen.has(control)) return;
+      seen.add(control);
+      controls.push(control);
+    };
     const visitBlocks = (blocks: readonly BlockNode[]): void => {
       for (const block of blocks) {
         if (block.blockKind === 'contentControl') {
           const control = block as ContentControl;
-          controls.push(control);
+          add(control);
           visitBlocks(control.blocks());
+          continue;
+        }
+        if (block.blockKind === 'paragraph') {
+          for (const control of (block as Paragraph).contentControls()) add(control);
           continue;
         }
         if (block.blockKind !== 'table') continue;
@@ -360,7 +371,31 @@ export class DocumentModel {
     this.resolver.invalidate();
   }
 
+  editablePartNames(): readonly string[] {
+    const names = new Set<string>([this.mainPartName]);
+    for (const story of this.storyList) names.add(story.partName);
+    for (const name of [this.parts.styles, this.parts.numbering, this.parts.settings]) {
+      if (name !== undefined) names.add(name);
+    }
+    return [...names];
+  }
+
+  async synchroniseEditedParts(): Promise<readonly string[]> {
+    const edited: string[] = [];
+    for (const name of this.editablePartNames()) {
+      const part = this.package.getPart(name);
+      if (part === undefined || !part.isPassthrough) continue;
+      const stored = await part.bytes();
+      const document = await part.document();
+      if (bytesEqual(stored, serializeXmlBytes(document))) continue;
+      part.setDocument(document);
+      edited.push(name);
+    }
+    return edited;
+  }
+
   async save(options: Parameters<DocxPackage['save']>[0] = {}): Promise<Uint8Array> {
+    await this.synchroniseEditedParts();
     return this.package.save(options);
   }
 }

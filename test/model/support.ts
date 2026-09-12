@@ -1,3 +1,6 @@
+import { DocumentModel } from '../../src/model/document.js';
+import type { LoadModelOptions } from '../../src/model/document.js';
+import { DocxPackage } from '../../src/ooxml/package.js';
 import type { XmlDocument, XmlElement } from '../../src/ooxml/xml/index.js';
 import { parseXmlBytes, rootElement } from '../../src/ooxml/xml/index.js';
 import type { FixtureEntry } from '../harness/zip-build.js';
@@ -59,6 +62,46 @@ export const memberText = (archive: Uint8Array, name: string): string | undefine
 
 export const memberNames = (archive: Uint8Array): readonly string[] =>
   readZipMembers(archive).map((member) => member.name);
+
+export const stylesXml = (body: string): string =>
+  `${DECLARATION}<w:styles xmlns:w="${W}">${body}</w:styles>`;
+
+export const numberingXml = (body: string): string =>
+  `${DECLARATION}<w:numbering xmlns:w="${W}">${body}</w:numbering>`;
+
+export const settingsXml = (body: string): string =>
+  `${DECLARATION}<w:settings xmlns:w="${W}">${body}</w:settings>`;
+
+export const headerXml = (body: string): string =>
+  `${DECLARATION}<w:hdr xmlns:w="${W}" xmlns:r="${R}">${body}</w:hdr>`;
+
+export const relationship = (id: string, type: string, target: string): string =>
+  `<Relationship Id="${id}" Type="${R}/${type}" Target="${target}"/>`;
+
+export const stylesRelationship = (id = 'rIdStyles'): string =>
+  relationship(id, 'styles', 'styles.xml');
+
+export const numberingRelationship = (id = 'rIdNumbering'): string =>
+  relationship(id, 'numbering', 'numbering.xml');
+
+export const settingsRelationship = (id = 'rIdSettings'): string =>
+  relationship(id, 'settings', 'settings.xml');
+
+export const openModel = async (
+  spec: DocxSpec,
+  options: LoadModelOptions = {},
+): Promise<DocumentModel> => {
+  const pkg = await DocxPackage.open(buildDocx(spec));
+  return DocumentModel.load(pkg, options);
+};
+
+export const reopenModel = async (
+  bytes: Uint8Array,
+  options: LoadModelOptions = {},
+): Promise<DocumentModel> => {
+  const pkg = await DocxPackage.open(bytes);
+  return DocumentModel.load(pkg, options);
+};
 
 export interface DocxSpec {
   readonly body: string;

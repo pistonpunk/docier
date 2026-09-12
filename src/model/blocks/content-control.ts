@@ -3,10 +3,11 @@ import type { ModelContext } from '../context.js';
 import type { NodeId } from '../ids.js';
 import { ParagraphProperties } from '../properties/paragraph-properties.js';
 import { RunProperties } from '../properties/run-properties.js';
+import { buildInlineChildren } from '../inline/index.js';
 import { insertOrdered } from '../schema-order.js';
-import { childElements, createWElement, isWElement, removeElement, setElementText, setWAttr, textOfElement, wAttr } from '../xml.js';
+import { W, childElements, createWElement, isWElement, removeElement, setElementText, setWAttr, textOfElement, wAttr } from '../xml.js';
 import type { BlockNode } from './block-node.js';
-import { BlockNode as BlockNodeBase, OpaqueBlock } from './block-node.js';
+import { BlockNode as BlockNodeBase, OpaqueBlock, isBlockElement } from './block-node.js';
 import { Paragraph } from './paragraph.js';
 import { Table } from './table.js';
 
@@ -64,9 +65,12 @@ const SDT_PROPERTY_ORDER: readonly string[] = [
   'tabIndex',
 ];
 
+const NON_CONTENT_CHILDREN: ReadonlySet<string> = new Set(['tcPr', 'trPr', 'tblPr', 'tblGrid']);
+
 export const buildBlocks = (context: ModelContext, parent: XmlElement): readonly BlockNode[] => {
   const blocks: BlockNode[] = [];
   for (const child of childElements(parent)) {
+    if (child.uri === W && NON_CONTENT_CHILDREN.has(child.localName)) continue;
     if (isWElement(child, 'p')) {
       blocks.push(context.view(child, (id, element) => new Paragraph(id, element, context)));
     } else if (isWElement(child, 'tbl')) {
@@ -286,7 +290,12 @@ export class ContentControl extends BlockNodeBase {
   get logicalText(): string {
     const content = this.contentElement;
     if (content === undefined) return '';
-    return blocksLogicalText(this.context, content);
+    if (childElements(content).some((child) => isBlockElement(child))) {
+      return blocksLogicalText(this.context, content);
+    }
+    return buildInlineChildren(this.context, content)
+      .map((child) => child.logicalText)
+      .join('');
   }
 
   get isEmptyContent(): boolean {
@@ -312,8 +321,6 @@ export class ContentControl extends BlockNodeBase {
     }
     const runs = childElements(content).filter((child) => isWElement(child, 'r'));
     if (runs.length > 0 && this.level === 'inline') {
-      const first = runs[0];
-      if (first !== undefined) Paragraph.of(this.context, first.parent ?? content);
       const run = runs[0];
       if (run !== undefined) {
         const texts = childElements(run).filter((child) => isWElement(child, 't'));

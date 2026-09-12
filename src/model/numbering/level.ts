@@ -176,7 +176,8 @@ export const parseLevelText = (text: string): readonly LevelTextSegment[] => {
           segments.push({ literal: true, value: literal });
           literal = '';
         }
-        segments.push({ literal: false, value: next, level: Number(next) });
+        const digit = Number(next);
+        segments.push({ literal: false, value: next, level: digit > 0 ? digit - 1 : 0 });
         index += 2;
         continue;
       }

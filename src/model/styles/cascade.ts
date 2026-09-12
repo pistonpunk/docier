@@ -184,32 +184,34 @@ const gridSpanOf = (cell: XmlElement): number => {
   return raw === undefined || raw < 1 ? 1 : raw;
 };
 
+const gridBeforeOf = (row: XmlElement): number => {
+  const properties = findOrderedChild(row, 'trPr');
+  if (properties === undefined) return 0;
+  const before = findOrderedChild(properties, 'gridBefore');
+  if (before === undefined) return 0;
+  const raw = integerFrom(wAttr(before, 'val'));
+  return raw === undefined || raw < 0 ? 0 : raw;
+};
+
 export const cellPositionOf = (cell: XmlElement): CellPosition => {
   const row = ancestorOfKind(cell, 'tr');
   if (row === undefined) return { rowIndex: 0, columnIndex: 0, rowCount: 1, columnCount: 1 };
   const table = ancestorOfKind(row, 'tbl');
   const rowList = table === undefined ? [] : findOrderedChildren(table, 'tr');
-  const rowIndex = rowList.indexOf(row);
-  let columnIndex = 0;
-  for (let index = 0; index < rowIndex; index += 1) {
-    const previous = rowList[index];
-    if (previous === undefined) continue;
-    for (const previousCell of findOrderedChildren(previous, 'tc')) {
-      columnIndex += gridSpanOf(previousCell);
-    }
-  }
+  const rowIndex = Math.max(rowList.indexOf(row), 0);
+  let columnIndex = gridBeforeOf(row);
   for (const sibling of findOrderedChildren(row, 'tc')) {
     if (sibling === cell) break;
     columnIndex += gridSpanOf(sibling);
   }
   let columnCount = 0;
   for (const each of rowList) {
-    let width = 0;
+    let width = gridBeforeOf(each);
     for (const eachCell of findOrderedChildren(each, 'tc')) width += gridSpanOf(eachCell);
     if (width > columnCount) columnCount = width;
   }
   return {
-    rowIndex: Math.max(rowIndex, 0),
+    rowIndex,
     columnIndex,
     rowCount: Math.max(rowList.length, 1),
     columnCount: Math.max(columnCount, 1),

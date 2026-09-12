@@ -419,11 +419,11 @@ export class ResolvedProperties {
     return this.value('tblStyle');
   }
 
-  describe(name: string): string | undefined {
-    const origin = this.originOf(name);
+  describe(name: string, attribute = 'val'): string | undefined {
+    const origin = this.originOf(name, attribute);
     if (origin === undefined) return undefined;
-    if (origin.styleId !== undefined) return `style:${origin.styleId}`;
     if (origin.condition !== undefined) return `table-style:${origin.condition}`;
+    if (origin.styleId !== undefined) return `style:${origin.styleId}`;
     if (origin.numId !== undefined) return `numbering:${origin.numId}/${origin.ilvl ?? 0}`;
     return origin.layer;
   }
