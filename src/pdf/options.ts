@@ -82,6 +82,8 @@ export const resolvePdfOptions = (options: PdfOptions = {}): ResolvedPdfOptions 
     );
   }
   return {
+    pageRange: options.pageRange,
+    pageRangeFilter: options.pageRangeFilter ?? 'all',
     metadata: options.metadata ?? {},
     pdfa: resolvePdfa(options.pdfa),
     deterministic,

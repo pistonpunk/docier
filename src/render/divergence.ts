@@ -24,7 +24,7 @@ import { ATTR, frameOf, geometryAt } from './dom.js';
 import { fontShorthand, runFontSpec } from './style.js';
 import { BORDER_SIDES, edgeBandOf, shadingColorOf } from './decoration.js';
 import { needsSegmentation, segmentsOf } from './runs.js';
-import { objectBoxOf } from './objects.js';
+import { objectBoxOf } from './inline-object.js';
 
 export const DEFAULT_TOLERANCE_PX = 0.5;
 export const DEFAULT_MAX_DIVERGENCES = 100;

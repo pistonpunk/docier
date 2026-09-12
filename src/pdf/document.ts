@@ -11,8 +11,10 @@ import type { PdfRef } from './objects.js';
 import { ContentStream } from './content.js';
 import { pdfPageRect } from './geometry.js';
 import { drawableTokens, paintPage } from './page.js';
+import { selectedPages } from './selection.js';
 import { FontRegistry } from './fonts/registry.js';
 import { ImageRegistry } from './images/registry.js';
+import { missingImageLabel } from '../render/inline-object.js';
 import { buildXmp } from './xmp.js';
 import { iccStream, outputIntent } from './pdfa.js';
 import { infoDict, resolveMetadata } from './metadata.js';
@@ -27,7 +29,7 @@ const painterGaps = (): readonly PdfLoss[] =>
     detail: gap,
   }));
 
-const collectGlyphs = (result: LayoutResult, fonts: FontRegistry): void => {
+const collectGlyphs = (result: LayoutResult, fonts: FontRegistry, images: ImageRegistry): void => {
   for (const page of result.pages) {
     for (const block of page.blocks) {
       for (const line of block.lines) {
@@ -38,6 +40,13 @@ const collectGlyphs = (result: LayoutResult, fonts: FontRegistry): void => {
           if (slot === undefined) continue;
           for (const atom of line.atoms) {
             if (atom.source.start < run.source.start || atom.source.end > run.source.end) continue;
+            const object = atom.object;
+            if (object !== undefined) {
+              if (images.nameFor(object.relationshipId) === undefined) {
+                slot.record(missingImageLabel(object.relationshipId));
+              }
+              continue;
+            }
             if (atom.text === '') continue;
             slot.record(atom.text);
           }
@@ -73,22 +82,23 @@ export const buildPdf = async (
   losses.push(...(await images.load(drawableTokens(result))));
   throwIfAborted(options.signal);
 
-  collectGlyphs(result, fonts);
+  collectGlyphs(result, fonts, images);
   losses.push(...(await fonts.embed(writer, compressor)));
   throwIfAborted(options.signal);
 
+  const selection = selectedPages(result, options);
   const contents: Uint8Array[] = [];
   const contentRefs: PdfRef[] = [];
-  for (let index = 0; index < result.pages.length; index += 1) {
+  for (let index = 0; index < selection.length; index += 1) {
     throwIfAborted(options.signal);
-    const page = result.pages[index];
+    const page = selection[index];
     if (page === undefined) continue;
     const stream = new ContentStream();
     paintPage(page, { result, content: stream, fonts, images, measurer: options.measurer, losses });
     const data = await compressor.compress(stream.bytes());
     contents.push(data);
     contentRefs.push(writer.add(pdfStream(pdfDict({ Filter: new PdfName('FlateDecode') }), data)));
-    options.onProgress?.({ phase: 'pages', fraction: (index + 1) / result.pages.length });
+    options.onProgress?.({ phase: 'pages', fraction: (index + 1) / selection.length });
   }
 
   const resources = new PdfDict();
@@ -115,8 +125,8 @@ export const buildPdf = async (
 
   const pagesRef = writer.reserve();
   const pageRefs: PdfRef[] = [];
-  for (let index = 0; index < result.pages.length; index += 1) {
-    const page = result.pages[index];
+  for (let index = 0; index < selection.length; index += 1) {
+    const page = selection[index];
     const content = contentRefs[index];
     if (page === undefined || content === undefined) continue;
     const box = pdfPageRect(page);

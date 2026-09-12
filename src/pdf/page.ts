@@ -8,22 +8,32 @@ import type {
   ObjectPlacement,
   PageFragment,
   RowFragment,
+  RunPaint,
   TableFragment,
 } from '../layout/index.js';
-import type { Mp } from '../units/index.js';
-import { mp } from '../units/index.js';
+import { fromCssPx, mp } from '../units/index.js';
 import type { TextMeasurer } from '../measure/index.js';
+import {
+  MISSING_IMAGE_BACKGROUND,
+  MISSING_IMAGE_FONT_SIZE_PX,
+  MISSING_IMAGE_OUTLINE,
+  MISSING_IMAGE_OUTLINE_WIDTH_PX,
+  clockwiseRadians,
+  missingImageLabel,
+  objectBoxOf,
+} from '../render/inline-object.js';
+import { dashPatternOf } from '../render/decoration.js';
 import type { ContentStream } from './content.js';
+import { insetted } from './content.js';
 import type { PdfFrame } from './geometry.js';
 import { pdfBaseline, pdfFrame, pdfLength, pdfRect, pdfX } from './geometry.js';
 import { hasBorders, paintBorders, paintShading } from './decoration.js';
 import { paintRun } from './runs.js';
-import type { FontRegistry } from './fonts/registry.js';
+import { glyphsOf } from './fonts/advance.js';
+import type { FontRegistry, FontSlot } from './fonts/registry.js';
 import type { ImageRegistry } from './images/registry.js';
+import { rgbOfHex } from './color.js';
 import type { PdfLoss } from './types.js';
-
-const MILLI_DEGREES_PER_DEGREE = 1000;
-const DEGREES_PER_RADIAN = 180 / Math.PI;
 
 export interface PagePaintContext {
   readonly result: LayoutResult;
@@ -74,9 +84,9 @@ const imageBox = (
   const f = bottom - pdfLength(offsetBottom);
   const milli = object.rotationMilliDegrees;
   if (milli === 0) return { a, b: 0, c: 0, d, e, f };
-  const angle = milli / MILLI_DEGREES_PER_DEGREE / DEGREES_PER_RADIAN;
+  const angle = clockwiseRadians(milli);
   const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
+  const sin = -Math.sin(angle);
   const cx = e + a / 2;
   const cy = f + d / 2;
   return {
@@ -89,23 +99,70 @@ const imageBox = (
   };
 };
 
-const paintObject = (
-  object: ObjectPlacement,
-  x: Mp,
-  bottom: number,
+const paintMissingObject = (
+  line: LineFragment,
+  run: LineRun,
+  atom: AtomPlacement,
+  paint: RunPaint,
   frame: PdfFrame,
   context: PagePaintContext,
 ): void => {
-  const name = context.images.nameFor(object.relationshipId);
-  if (name === undefined) {
+  const object = atom.object;
+  if (object === undefined) return;
+  const rect = pdfRect(frame, objectBoxOf(line, run, atom));
+  const width = pdfLength(fromCssPx(MISSING_IMAGE_OUTLINE_WIDTH_PX, 1));
+  context.content.fillRgb(rgbOfHex(MISSING_IMAGE_BACKGROUND));
+  context.content.fillRect(rect);
+  context.content.strokeRgb(rgbOfHex(MISSING_IMAGE_OUTLINE));
+  const [on, off] = dashPatternOf('dashed', width);
+  context.content.dash(on, off);
+  context.content.strokeRect(insetted(rect, width / 2));
+  context.content.solidDash();
+  const slot: FontSlot | undefined = context.fonts.slotFor(paint);
+  if (slot === undefined || slot.ref === undefined) {
     context.losses.push({
-      code: 'missingImage',
-      message: `no image was supplied for ${object.relationshipId ?? 'an inline drawing'}`,
+      code: 'textNotDrawn',
+      message: 'no embedded font is available for the missing-image label',
+      detail: paint.faceId,
     });
     return;
   }
+  const size = pdfLength(fromCssPx(MISSING_IMAGE_FONT_SIZE_PX, 1));
+  const ascent = (slot.font.hhea.ascender / slot.unitsPerEm) * size;
+  context.content.save();
+  context.content.clip(rect);
+  context.content.fillRgb(rgbOfHex(MISSING_IMAGE_OUTLINE));
+  context.content.beginText();
+  context.content.setFont(slot.name, size);
+  context.content.setTextAt(rect.x, rect.y + rect.height - ascent);
+  context.content.showGlyphs(glyphsOf(missingImageLabel(object.relationshipId), slot.font), []);
+  context.content.endText();
+  context.content.restore();
+};
+
+const paintObject = (
+  object: ObjectPlacement,
+  line: LineFragment,
+  run: LineRun,
+  atom: AtomPlacement,
+  paint: RunPaint,
+  frame: PdfFrame,
+  context: PagePaintContext,
+): void => {
+  const id = object.relationshipId;
+  const name = context.images.nameFor(id);
+  if (name === undefined) {
+    context.losses.push(
+      id === undefined
+        ? { code: 'missingImage', message: 'no image was supplied for an inline drawing' }
+        : { code: 'missingImage', message: `no image was supplied for ${id}`, detail: id },
+    );
+    paintMissingObject(line, run, atom, paint, frame, context);
+    return;
+  }
   const report = context.images.reportFor(object.relationshipId);
-  const box = imageBox(object, pdfX(frame, x), bottom, report);
+  const bottom = pdfBaseline(frame, mp(line.baselineY - run.shift));
+  const box = imageBox(object, pdfX(frame, atom.x), bottom, report);
   context.content.drawImage(name, box.a, box.b, box.c, box.d, box.e, box.f);
 };
 
@@ -129,9 +186,10 @@ const paintLine = (line: LineFragment, frame: PdfFrame, context: PagePaintContex
       content: context.content,
       losses: context.losses,
     });
-    const bottom = pdfBaseline(frame, mp(line.baselineY - run.shift));
     for (const atom of objectsOfRun(line, run)) {
-      if (atom.object !== undefined) paintObject(atom.object, atom.x, bottom, frame, context);
+      if (atom.object !== undefined) {
+        paintObject(atom.object, line, run, atom, paint, frame, context);
+      }
     }
   }
 };

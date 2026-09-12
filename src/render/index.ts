@@ -56,7 +56,21 @@ export type { BorderAxis, BorderSide } from './decoration.js';
 export { edgeBandOf, paintBorders, paintShading } from './decoration.js';
 
 export type { ImageBox, ObjectPaintInput } from './objects.js';
-export { imageBoxOf, objectBoxOf, paintObjects } from './objects.js';
+export { imageBoxOf, paintObjects } from './objects.js';
+
+export {
+  DEGREES_PER_RADIAN,
+  MILLI_DEGREES_PER_DEGREE,
+  MISSING_IMAGE_BACKGROUND,
+  MISSING_IMAGE_FONT_SIZE_PX,
+  MISSING_IMAGE_LABEL,
+  MISSING_IMAGE_OUTLINE,
+  MISSING_IMAGE_OUTLINE_WIDTH_PX,
+  clockwiseRadians,
+  cssRotationOf,
+  missingImageLabel,
+  objectBoxOf,
+} from './inline-object.js';
 
 export type {
   ImageRegistry,
@@ -75,6 +89,30 @@ export type { PagePaintContext } from './pages.js';
 export { paintBlock, paintPage, paintPageSheet, paintTable } from './pages.js';
 
 export { paintDefaultDocument, renderDocument, resolveRenderOptions } from './document.js';
+
+export type { PageRange, PageRangeFilter } from './page-range.js';
+export { INVALID_PAGE_RANGE, PageRangeError, parsePageRange } from './page-range.js';
+
+export type { PrintCss, PrintCssOptions, PrintMedia, PrintSheet } from './print-style.js';
+export { buildPrintCss } from './print-style.js';
+
+export type {
+  AnnotationPolicy,
+  PdfPrintOptions,
+  PdfPrintSession,
+  PrintDiagnostic,
+  PrintDiagnosticCode,
+  PrintMode,
+  PrintOptions,
+  PrintSession,
+} from './print.js';
+export {
+  PrintError,
+  beginPdfPrint,
+  beginPrint,
+  beginPrintPreview,
+  printStyleSheet,
+} from './print.js';
 
 export type {
   DivergenceCheckOptions,

@@ -47,7 +47,11 @@ export class ImageRegistry {
     const source = await this.sourceOf(id);
     if (source === undefined) {
       this.byId.set(id, null);
-      this.losses.push({ code: 'missingImage', message: `no image bytes were supplied for ${id}` });
+      this.losses.push({
+        code: 'missingImage',
+        message: `no image bytes were supplied for ${id}`,
+        detail: id,
+      });
       return;
     }
     const hash = sha256Hex(source.bytes);

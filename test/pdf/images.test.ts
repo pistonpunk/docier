@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { mp, toPt } from '../../src/units/index.js';
+import { objectBoxOf } from '../../src/render/index.js';
 import { exportPdf, renderPdf } from '../../src/pdf/index.js';
 import type { PdfExportResult, PdfImageSource } from '../../src/pdf/index.js';
+import { pdfFrame, pdfRect } from '../../src/pdf/geometry.js';
 import { JPEG_BYTES, JPEG_HEIGHT, JPEG_WIDTH } from './fixtures.js';
 import {
+  HAS_PDFTOPPM,
+  HAS_POPPLER,
   ascii,
   buildTestFont,
   contentStreamOf,
   fontOptions,
   imageSource,
   inflatedStreams,
+  inkBoxOf,
   layoutOf,
+  pdfTextOf,
   pngOf,
+  rasterOf,
   sampleBody,
 } from './support.js';
 
@@ -23,19 +30,33 @@ const PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
 
 const PICTURE_EMU = 254000;
 const PICTURE_MP = 20000;
+const WIDE_EMU = 508000;
+const WIDE_MP = 40000;
 
-const picture = (id: string, sourceRect = ''): string =>
+interface PictureSpec {
+  readonly sourceRect?: string;
+  readonly transform?: string;
+  readonly widthEmu?: number;
+  readonly heightEmu?: number;
+}
+
+const picture = (id: string, spec: PictureSpec = {}): string =>
   '<w:drawing>' +
   `<wp:inline xmlns:wp="${WP}">` +
-  `<wp:extent cx="${PICTURE_EMU}" cy="${PICTURE_EMU}"/><wp:docPr id="1" name="Picture 1"/>` +
+  `<wp:extent cx="${spec.widthEmu ?? PICTURE_EMU}" cy="${spec.heightEmu ?? PICTURE_EMU}"/>` +
+  `<wp:docPr id="1" name="Picture 1"/>` +
   `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">` +
   `<pic:pic xmlns:pic="${PIC}">` +
-  `<pic:blipFill><a:blip r:embed="${id}"/>${sourceRect}</pic:blipFill>` +
-  `<pic:spPr/></pic:pic></a:graphicData></a:graphic>` +
+  `<pic:blipFill><a:blip r:embed="${id}"/>${spec.sourceRect ?? ''}</pic:blipFill>` +
+  `<pic:spPr>${spec.transform ?? ''}</pic:spPr></pic:pic></a:graphicData></a:graphic>` +
   `</wp:inline></w:drawing>`;
 
-const drawingParagraph = (id: string, sourceRect = ''): string =>
-  `<w:p><w:r>${picture(id, sourceRect)}</w:r></w:p>`;
+const drawingParagraph = (id: string, spec: PictureSpec = {}): string =>
+  `<w:p><w:r>${picture(id, spec)}</w:r></w:p>`;
+
+const rotation = (sixtieths: number): string => `<a:xfrm rot="${String(sixtieths)}"/>`;
+
+const turn = (degrees: number): string => rotation(degrees * 60000);
 
 interface Rendered {
   readonly result: Awaited<ReturnType<typeof layoutOf>>;
@@ -56,7 +77,12 @@ const imageAtomOf = (result: Awaited<ReturnType<typeof layoutOf>>) => {
     for (const block of page.blocks) {
       for (const line of block.lines) {
         for (const atom of line.atoms) {
-          if (atom.object !== undefined) return { page, line, atom };
+          if (atom.object === undefined) continue;
+          for (const run of line.runs) {
+            if (run.source.start <= atom.source.start && run.source.end >= atom.source.end) {
+              return { page, line, run, atom };
+            }
+          }
         }
       }
     }
@@ -152,7 +178,7 @@ describe('an image the layout result places', () => {
   it('sizes a cropped image through the crop rectangle the layout kept', async () => {
     const png = await pngOf(8, 8, 'rgb');
     const { result, exported } = await render(
-      drawingParagraph('rId7', '<a:srcRect l="10000" t="20000" r="30000" b="10000"/>'),
+      drawingParagraph('rId7', { sourceRect: '<a:srcRect l="10000" t="20000" r="30000" b="10000"/>' }),
       [imageSource('rId7', 'image/png', png)],
     );
     const found = imageAtomOf(result);
@@ -192,6 +218,62 @@ describe('an image the layout result places', () => {
     ]);
     expect(realLosses(exported)).toContain('unsupportedImage');
     expect(exported.images).toHaveLength(0);
+  });
+
+  it('paints a rotated image where the engine put it, as a renderer sees it', async () => {
+    const png = await pngOf(40, 20, 'gray');
+    const { result, exported } = await render(
+      drawingParagraph('rId7', { transform: turn(90), widthEmu: WIDE_EMU }),
+      [imageSource('rId7', 'image/png', png)],
+    );
+    expect(realLosses(exported)).toEqual([]);
+    const found = imageAtomOf(result);
+    const object = found.atom.object;
+    if (object === undefined) throw new Error('the atom places no object');
+    expect(object.rotationMilliDegrees).toBe(90000);
+    expect(object.width).toBe(WIDE_MP);
+    expect(object.height).toBe(PICTURE_MP);
+    const rect = pdfRect(pdfFrame(found.page), objectBoxOf(found.line, found.run, found.atom));
+    expect(rect.width).toBeCloseTo(toPt(mp(WIDE_MP)), 4);
+    expect(rect.height).toBeCloseTo(toPt(mp(PICTURE_MP)), 4);
+    if (!HAS_PDFTOPPM) return;
+    const ink = inkBoxOf(rasterOf(exported.bytes, 72), 128);
+    expect(ink.pixels).toBeGreaterThan(0);
+    const centreX = rect.x + rect.width / 2;
+    const centreY = toPt(found.page.page.height) - (rect.y + rect.height / 2);
+    expect(ink.left).toBeCloseTo(centreX - rect.height / 2, -1);
+    expect(ink.right).toBeCloseTo(centreX + rect.height / 2, -1);
+    expect(ink.bottom).toBeCloseTo(centreY, -1);
+    expect(ink.top).toBeCloseTo(centreY - rect.width / 2, -1);
+    const above = centreY - (ink.top + ink.bottom) / 2;
+    expect(above).toBeGreaterThan(rect.width / 4 - 2);
+    expect(above).toBeLessThan(rect.width / 4 + 2);
+  });
+
+  it('prints the missing-image placeholder where the engine put the object', async () => {
+    const { result, exported } = await render(
+      drawingParagraph('rId7', { widthEmu: WIDE_EMU }),
+      [],
+    );
+    expect(exported.images).toHaveLength(0);
+    expect(exported.losses).toContainEqual({
+      code: 'missingImage',
+      message: 'no image was supplied for rId7',
+      detail: 'rId7',
+    });
+    const found = imageAtomOf(result);
+    const rect = pdfRect(pdfFrame(found.page), objectBoxOf(found.line, found.run, found.atom));
+    const content = await contentStreamOf(exported.bytes);
+    const filled = /([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) re f/.exec(content);
+    if (filled === null) throw new Error('the PDF paints no placeholder rectangle');
+    expect(Number(filled[1])).toBeCloseTo(rect.x, 3);
+    expect(Number(filled[2])).toBeCloseTo(rect.y, 3);
+    expect(Number(filled[3])).toBeCloseTo(rect.width, 3);
+    expect(Number(filled[4])).toBeCloseTo(rect.height, 3);
+    expect(/\[[\d. ]+\] 0 d/.test(content)).toBe(true);
+    expect(content).toContain('S');
+    if (!HAS_POPPLER) return;
+    expect(pdfTextOf(exported.bytes)).toContain('missing image: rId7');
   });
 
   it('renders a page that carries an image through an independent parser', async () => {

@@ -1,15 +1,20 @@
-import type { AtomPlacement, LineFragment, LineRun, ObjectPlacement, Rect } from '../layout/index.js';
+import type { LineFragment, LineRun, ObjectPlacement } from '../layout/index.js';
 import { mp } from '../units/index.js';
 import type { Frame } from './types.js';
 import type { PaintScale } from './scale.js';
-import { formatNumber, formatPx } from './scale.js';
+import { formatPx } from './scale.js';
 import type { ImageRegistry } from './images.js';
 import { applyStyle, positionStyle } from './style.js';
 import { ATTR, box, element, geometryAt, stamp } from './dom.js';
-
-const MILLI_DEGREES_PER_DEGREE = 1000;
-
-const MISSING_LABEL = 'missing image';
+import {
+  MISSING_IMAGE_BACKGROUND,
+  MISSING_IMAGE_FONT_SIZE_PX,
+  MISSING_IMAGE_OUTLINE,
+  MISSING_IMAGE_OUTLINE_WIDTH_PX,
+  cssRotationOf,
+  missingImageLabel,
+  objectBoxOf,
+} from './inline-object.js';
 
 export interface ImageBox {
   readonly left: number;
@@ -17,13 +22,6 @@ export interface ImageBox {
   readonly width: number;
   readonly height: number;
 }
-
-export const objectBoxOf = (line: LineFragment, run: LineRun, atom: AtomPlacement): Rect => ({
-  x: atom.x,
-  y: mp(line.baselineY - run.ascent),
-  width: atom.object?.width ?? mp(0),
-  height: atom.object?.height ?? mp(0),
-});
 
 export const imageBoxOf = (object: ObjectPlacement, scale: PaintScale): ImageBox => {
   const crop = object.crop;
@@ -40,9 +38,6 @@ export const imageBoxOf = (object: ObjectPlacement, scale: PaintScale): ImageBox
   };
 };
 
-const missingLabel = (id: string | undefined): string =>
-  id === undefined ? MISSING_LABEL : `${MISSING_LABEL}: ${id}`;
-
 const paintMissing = (
   container: HTMLElement,
   id: string | undefined,
@@ -51,11 +46,11 @@ const paintMissing = (
 ): void => {
   stamp(container, { [ATTR.imageMissing]: id ?? '' });
   applyStyle(container, {
-    'background-color': 'var(--docier-surface-raised, #ffffff)',
-    'outline-color': 'var(--docier-error, #b00020)',
-    'outline-offset': '-1px',
+    'background-color': `var(--docier-surface-raised, ${MISSING_IMAGE_BACKGROUND})`,
+    'outline-color': `var(--docier-error, ${MISSING_IMAGE_OUTLINE})`,
+    'outline-offset': `-${formatPx(MISSING_IMAGE_OUTLINE_WIDTH_PX)}`,
     'outline-style': 'dashed',
-    'outline-width': '1px',
+    'outline-width': formatPx(MISSING_IMAGE_OUTLINE_WIDTH_PX),
   });
   const label = box('docier-image-missing-label');
   applyStyle(label, {
@@ -65,12 +60,12 @@ const paintMissing = (
     width: formatPx(scale.px(object.width)),
     height: formatPx(scale.px(object.height)),
     'font-family': 'var(--docier-ui-font, sans-serif)',
-    'font-size': 'var(--docier-ui-font-size, 12px)',
-    color: 'var(--docier-error, #b00020)',
+    'font-size': `var(--docier-ui-font-size, ${formatPx(MISSING_IMAGE_FONT_SIZE_PX)})`,
+    color: `var(--docier-error, ${MISSING_IMAGE_OUTLINE})`,
     overflow: 'hidden',
     'white-space': 'pre',
   });
-  label.textContent = missingLabel(id);
+  label.textContent = missingImageLabel(id);
   container.appendChild(label);
 };
 
@@ -80,7 +75,7 @@ const paintImage = (container: HTMLElement, object: ObjectPlacement, url: string
   applyStyle(
     node,
     positionStyle(imageBoxOf(object, scale), {
-      transform: `rotate(${formatNumber(object.rotationMilliDegrees / MILLI_DEGREES_PER_DEGREE)}deg)`,
+      transform: cssRotationOf(object.rotationMilliDegrees),
       'transform-origin': '50% 50%',
     }),
   );

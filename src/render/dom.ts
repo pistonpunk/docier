@@ -29,6 +29,8 @@ export const ATTR = {
   shading: 'data-docier-shading',
   overlay: 'data-docier-overlay',
   slotError: 'data-docier-slot-error',
+  printStyle: 'data-docier-print-style',
+  printFrame: 'data-docier-print-frame',
 } as const;
 
 export const element = (tag: string, className: string): HTMLElement => {

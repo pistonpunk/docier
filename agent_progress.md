@@ -230,14 +230,26 @@ painted segment's `font-size` is compared to the atom size it came from (`runFon
 engine reports and the DOM has no node for is a divergence rather than a skip — the old code counted that
 as "could not check", which is exactly how a silently absent rectangle hides.
 
-**Two real screen-vs-print differences remain, both in `src/pdf/` and therefore out of this change's
-scope.** (a) `src/pdf/page.ts` `imageBox()` builds `[cos, sin; -sin, cos]` for a positive
-`rotationMilliDegrees`, which in PDF's y-up space rotates counter-clockwise; OOXML `rot` and CSS `rotate()`
-are clockwise for the same value, so a rotated image prints mirrored in direction from how it paints on
-screen. Verified against the exporter: `rot="5400000"` (90°) emits `0 20 -20 0 92 700 cm`, i.e. the
-image's x-axis pointing up. (b) a missing image prints nothing and records a `missingImage` loss, where the
-screen paints the visible placeholder above; making the screen silent to match would reintroduce the defect
-the placeholder exists to prevent, so the PDF should adopt the placeholder instead.
+**Both screen-vs-print differences this change left in `src/pdf/` are now closed.**
+
+(a) `src/pdf/page.ts` `imageBox()` built `[cos, sin; -sin, cos]` for a positive `rotationMilliDegrees`,
+which in PDF's y-up space rotates counter-clockwise, while OOXML `rot` and CSS `rotate()` are clockwise for
+the same value — a rotated image printed mirrored in direction from how it painted on screen, and the
+exporter emitted `0 20 -20 0 92 700 cm` for `rot="5400000"`. The writer now negates the sine, so the same
+image emits `0 -40 20 0 82 730 cm` and the PDF matrix and the DOM's `rotate()` box land on the same four
+corners. `test/render/rotation.test.ts` asserts
+that agreement corner by corner at 90°, 180°, 30°, 217° and −45°, over a crop as well, and holds a
+regression guard that the PDF corners are *not* the counter-clockwise ones (the old output is exactly the
+centre-preserving rotation by −θ). `test/pdf/images.test.ts` rasterises the file with `pdftoppm` and checks
+that the dark half of a 40×20 pt gradient lands in the top half of the rotated footprint the engine placed —
+the old sign put it in the bottom half, 20 pt away.
+
+(b) A missing image printed nothing. `paintMissingObject` now paints what the screen paints: the fill, the
+dashed outline and the label, at `objectBoxOf` in the engine's coordinates, and the `missingImage` loss and
+its new `detail` (the relationship id, matching the render issue payload) are kept. Both painters were
+checked against the engine box rather than against each other: the DOM container's summed inline position
+and the PDF's `re f` rectangle are both compared to `objectBoxOf(line, run, atom)`, and `pdftotext` extracts
+`missing image: rId7` from the exported file.
 
 Tests added: `test/render/images.test.ts` (12), plus image zoom cases in `test/render/zoom.test.ts`,
 superscript/small-caps/decoration/gap cases in `test/render/divergence.test.ts`, including a document that
@@ -278,10 +290,55 @@ exercises every closed gap at once and a `detectDivergence` run over it that rep
       images embed and dedupe per document. Deterministic by default: no wall clock, `/ID` and
       `xmpMM:DocumentID` from the document hash, pinned DEFLATE. PDF/A-2b, A-2u and A-3b with a
       built sRGB output intent; A-1b is refused citing ADR-0006. Not done: encryption and signing.
-- [ ] Print path and print preview
+- [x] Print path and print preview
 - [ ] Accessibility pass, i18n pass (en/ro/ru + RTL groundwork)
 - [ ] Performance pass on a 200-page document
 - [ ] `README.md`, API docs, examples, npm publish (`docier`)
+
+**The print path, as built.** Two sessions, one per path the spec names (EXP-03), and neither
+re-implements what the other owns. `beginPrint(rendered, options)` is the CSS path: it builds a stylesheet
+from the same `LayoutResult` the screen painted, appends it to the document head, forces zoom 1, and calls
+`window.print()` through an injected printer. `beginPdfPrint(bytes, options)` is the default path: it takes
+the bytes `exportPdf` produced and prints them from a hidden blob `<iframe>`, which is what gives exact
+pagination and exact page ranges. Ranges are parsed once, in `src/render/page-range.ts`, and shared with the
+exporter, so `"1-3,5,8-"`, reverse ranges and the odd/even filters behave identically in print and in the
+file (EXP-02). Print preview is our own renderer: `beginPrintPreview` is the same session with the rules
+unwrapped from `@media print`, so the preview shows the sheets at paper size, in print order, with the range
+applied — the browser's dialog is never the preview surface.
+
+The CSS path does not re-lay-out anything, which is what D17 asks. Each sheet is already the engine's
+`LayoutResult` painted at scale 1 into a fixed-size box, so the printed page *is* the screen page; the
+stylesheet only takes away the screen positioning that the print engine cannot break across paper
+(`position: absolute` on the sheets, the scale transform, the surface's fixed size), leaving the sheet
+`position: relative` so it stays the containing block for the absolutely positioned content inside it. Each
+sheet gets `@page { size: <w>pt <h>pt; margin: 0 }` from its own section's page size — every distinct size
+gets a named `@page` and a `page:` declaration, so a landscape section in the middle of a portrait document
+prints on landscape paper, and `margin: 0` is what leaves no room for chrome the browser would otherwise
+add. One `break-after: page` on every sheet but the last in print order, plus `display: none` on the pages a
+range excluded. Ordering is the one thing block flow cannot express, so a selection that is not in document
+order switches the stack to a column flex container and gives each sheet its `order` — flex only then,
+because block flow is the more reliable thing to fragment.
+
+Diagnostics carry the limits rather than pretending: the browser owns the dialog's copies field, the
+browser re-renders these sheets itself (so text is rasterised by the browser, not taken from the exported
+file), a browser without named `@page` support prints every section at the first page size, and the dialog's
+range field cannot be pre-set — which is why `exportPdf(result, { pageRange })` exists and why the file, not
+the dialog, is how a range gets exact.
+
+Tests: `test/render/print.test.ts` (17) asserts the stylesheet and both sessions, `test/render/page-range.test.ts`
+(7) the shared grammar, `test/pdf/selection.test.ts` (5) the narrowed export and the per-section paper sizes,
+`test/render/rotation.test.ts` (8) the two painters' agreement, and `test/pdf/images.test.ts` the two
+round-trips above. Verification: `npx tsc --noEmit -p tsconfig.json`, `npx tsc --noEmit -p tsconfig.test.json`
+and `npx vitest run` (1089 passed, 2 skipped, 82 files) all green.
+
+**Not done, and not stubbed:** grayscale and background suppression are implemented in the CSS path
+(`filter: grayscale(1)`, and a skip of the page/shading backgrounds) but *not* in the PDF writer, where
+EXP-03 places them; `w:settings/w:printTwoOnOne` and `printerSettings/*.bin` are unparsed by this slice, so
+two-up and printer-specific duplex/paper-source hints are neither honoured nor reported; `PRINTDATE` has no
+engine support; nothing lays out headers or footers, so preview cannot show `PAGE`/`NUMPAGES` substitutions;
+there is no annotation class in the layout for an annotation policy to select; and the API-level
+`print({ mode })` dispatcher does not exist — `mode` is expressed by which session the host calls, because
+D8 forbids `src/render` importing `src/pdf`, so the dispatcher belongs wherever both are importable.
 
 ---
 

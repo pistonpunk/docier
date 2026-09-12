@@ -1,5 +1,6 @@
 export type PdfErrorCode =
   | 'PDF_INVALID_OPTION'
+  | 'PDF_INVALID_PAGE_RANGE'
   | 'PDF_NO_PAGES'
   | 'PDF_ARCHIVAL_1B_REFUSED'
   | 'PDF_FONT_MISSING'

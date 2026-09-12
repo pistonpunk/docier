@@ -1,5 +1,6 @@
 import type { TextMeasurer } from '../measure/index.js';
 import type { LayoutDiagnostic } from '../layout/index.js';
+import type { PageRangeFilter } from '../render/page-range.js';
 
 export type PdfaProfile = 'a-2b' | 'a-2u' | 'a-3b';
 
@@ -110,6 +111,8 @@ export interface PdfExportResult extends PdfExportReport {
 }
 
 export interface PdfOptions {
+  readonly pageRange?: string;
+  readonly pageRangeFilter?: PageRangeFilter;
   readonly metadata?: PdfMetadata;
   readonly pdfa?: PdfaSelection;
   readonly deterministic?: boolean;
@@ -126,6 +129,8 @@ export interface PdfOptions {
 }
 
 export interface ResolvedPdfOptions {
+  readonly pageRange: string | undefined;
+  readonly pageRangeFilter: PageRangeFilter;
   readonly metadata: PdfMetadata;
   readonly pdfa: PdfaProfile | 'none';
   readonly deterministic: boolean;
