@@ -2,6 +2,7 @@ import type {
   AtomPlacement,
   BlockFragment,
   CellFragment,
+  HeaderFooterFragment,
   LayoutResult,
   LineFragment,
   LineRun,
@@ -244,6 +245,14 @@ const paintTable = (
   for (const row of table.rows) paintRow(row, blocks, frame, context);
 };
 
+export const paintRegion = (
+  region: HeaderFooterFragment,
+  frame: PdfFrame,
+  context: PagePaintContext,
+): void => {
+  for (const block of region.blocks) paintBlock(block, frame, context);
+};
+
 export const paintPage = (page: PageFragment, context: PagePaintContext): void => {
   const frame = pdfFrame(page);
   const blocks = blocksById(page);
@@ -251,12 +260,21 @@ export const paintPage = (page: PageFragment, context: PagePaintContext): void =
     if (block.cell === undefined) paintBlock(block, frame, context);
   }
   for (const table of page.tables) paintTable(table, blocks, frame, context);
+  if (page.header !== undefined) paintRegion(page.header, frame, context);
+  if (page.footer !== undefined) paintRegion(page.footer, frame, context);
+};
+
+export const blocksOfPage = (page: PageFragment): readonly BlockFragment[] => {
+  const out: BlockFragment[] = [...page.blocks];
+  if (page.header !== undefined) out.push(...page.header.blocks);
+  if (page.footer !== undefined) out.push(...page.footer.blocks);
+  return out;
 };
 
 export const drawableTokens = (result: LayoutResult): readonly string[] => {
   const ids: string[] = [];
   for (const page of result.pages) {
-    for (const block of page.blocks) {
+    for (const block of blocksOfPage(page)) {
       for (const line of block.lines) {
         for (const atom of line.atoms) {
           if (atom.object?.relationshipId !== undefined) ids.push(atom.object.relationshipId);

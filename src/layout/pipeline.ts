@@ -6,7 +6,7 @@ import { SINGLE_LINE_MULTIPLE, autoSpacing, createDeterministicMeasurer } from '
 import { ingest } from './ingest.js';
 import type { IngestedTable } from './table-ingest.js';
 import type { Section } from './sections.js';
-import { buildSections, sectionOfBlock } from './sections.js';
+import { buildSections, pageVariantOf, sectionOfBlock, withContentBoxes } from './sections.js';
 import { FontResolver } from './fonts.js';
 import { PaintRegistry } from './paint.js';
 import type { RunFormat } from './format.js';
@@ -15,12 +15,27 @@ import type { IntrinsicWidths, PreparedParagraph } from './paragraph-blocks.js';
 import { buildParagraphBlock, intrinsicWidths, prepareParagraphs } from './paragraph-blocks.js';
 import type { PreparedTable, TablePrepareRequest } from './table-prepare.js';
 import { prepareTables } from './table-prepare.js';
-import type { FlowBlock, PaginateBlock } from './paginate.js';
+import type { FlowBlock, PaginateBlock, PaginationResult } from './paginate.js';
 import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
+import type { PageHeaderFooter } from './finalize.js';
 import { finalize } from './finalize.js';
-import type { LayoutDiagnostic, LayoutResult } from './types.js';
+import type {
+  BlockFragment,
+  HeaderFooterFragment,
+  HeaderFooterVariant,
+  LayoutDiagnostic,
+  LayoutResult,
+  LineFragment,
+  Rect,
+} from './types.js';
+import type { HeaderFooterSlot } from './header-footer.js';
+import { HEADER_FOOTER_VARIANTS, layoutRegion, resolveHeaderFooterPlan, storyLayoutOf } from './header-footer.js';
+import type { PageFieldValues } from './fields.js';
+import { maxMp, minMp } from '../units/index.js';
 
 export const DEFAULT_TAB_STOP_TWIPS = 720;
+
+export const MAX_PAGE_COUNT_ITERATIONS = 4;
 
 export interface LayoutOptions {
   readonly measurer?: TextMeasurer;
@@ -29,6 +44,31 @@ export interface LayoutOptions {
   readonly widowControl?: boolean;
   readonly storyId?: string;
 }
+
+const rectOf = (x: Mp, y: Mp, width: Mp, height: Mp): Rect => ({ x, y, width, height });
+
+const placeBlocks = (
+  blocks: readonly BlockFragment[],
+  dy: Mp,
+  lineId: number,
+): { readonly blocks: readonly BlockFragment[]; readonly nextLineId: number } => {
+  let next = lineId;
+  const placed = blocks.map((block): BlockFragment => ({
+    ...block,
+    box: rectOf(block.box.x, mp(block.box.y + dy), block.box.width, block.box.height),
+    lines: block.lines.map((line): LineFragment => {
+      const id = next;
+      next -= 1;
+      return {
+        ...line,
+        id,
+        box: rectOf(line.box.x, mp(line.box.y + dy), line.box.width, line.box.height),
+        baselineY: mp(line.baselineY + dy),
+      };
+    }),
+  }));
+  return { blocks: placed, nextLineId: next };
+};
 
 const dedupe = (diagnostics: readonly LayoutDiagnostic[]): readonly LayoutDiagnostic[] => {
   const seen = new Set<string>();
@@ -90,6 +130,9 @@ export const layoutDocument = (
   hash.field(defaultFontFamily);
   hash.field(defaultTabStop);
   hash.field(options.widowControl ?? true);
+  const evenAndOddHeaders =
+    model.settings?.evenAndOddHeaders === true || sections.some((section) => section.evenAndOddHeaders);
+  hash.field(evenAndOddHeaders);
   for (const section of sections) {
     hash.field(section.index);
     hash.field(section.breakType);
@@ -100,6 +143,9 @@ export const layoutDocument = (
     hash.field(section.contentBox.y);
     hash.field(section.contentBox.width);
     hash.field(section.contentBox.height);
+    hash.field(section.titlePage);
+    hash.field(section.headerDistance);
+    hash.field(section.footerDistance);
   }
   for (const block of ingested.blocks) hash.field(block.kind);
 
@@ -193,9 +239,152 @@ export const layoutDocument = (
     });
   }
 
-  const paginated = paginateFlow(flow, sections, diagnostics, {
+  const plan = resolveHeaderFooterPlan(model, sections);
+  for (const sectionPlan of plan.sections) {
+    for (const variant of HEADER_FOOTER_VARIANTS) {
+      hash.field(sectionPlan.header[variant]?.story.id);
+      hash.field(sectionPlan.footer[variant]?.story.id);
+    }
+  }
+  for (const story of plan.stories) hash.field(story.id);
+
+  const blockIdBases = new Map<string, number>();
+  let nextBlockId = ingested.blocks.length + 1;
+  const blockIdBase = (storyId: string, paragraphCount: number): number => {
+    const existing = blockIdBases.get(storyId);
+    if (existing !== undefined) return existing;
+    const base = nextBlockId;
+    nextBlockId += paragraphCount + 2;
+    blockIdBases.set(storyId, base);
+    return base;
+  };
+
+  const regionCache = new Map<string, HeaderFooterFragment>();
+  let regionLineId = -1;
+
+  const regionOf = (
+    section: Section,
+    page: number,
+    variant: HeaderFooterVariant,
+    slot: HeaderFooterSlot | undefined,
+    values: PageFieldValues,
+  ): HeaderFooterFragment | undefined => {
+    if (slot === undefined) return undefined;
+    const key = `${slot.story.id}|${section.index}|${variant}|${page}|${values.pages}|${values.sectionPages}`;
+    const cached = regionCache.get(key);
+    if (cached !== undefined) return cached;
+    const layout = layoutRegion({
+      model,
+      story: slot.story,
+      page,
+      values,
+      x: section.contentBox.x,
+      width: section.contentBox.width,
+      blockIdBase: blockIdBase(slot.story.id, slot.story.paragraphCount),
+      lineIdBase: 0,
+      measurer,
+      fonts,
+      paint,
+      hash,
+      defaultFontFamily,
+      defaultTabStop: defaultTabStopMp,
+      diagnostics,
+    });
+    const distance = slot.kind === 'header' ? section.headerDistance : section.footerDistance;
+    const y = slot.kind === 'header'
+      ? distance
+      : mp(section.page.y + section.page.height - distance - layout.height);
+    const placed = placeBlocks(layout.blocks, y, regionLineId);
+    regionLineId = placed.nextLineId;
+    const fragment: HeaderFooterFragment = {
+      kind: slot.kind,
+      storyId: slot.story.id,
+      variant,
+      section: section.index,
+      distance,
+      box: rectOf(section.contentBox.x, y, section.contentBox.width, layout.height),
+      blocks: placed.blocks,
+    };
+    regionCache.set(key, fragment);
+    return fragment;
+  };
+
+  const regionsFor = (
+    paginated: PaginationResult,
+  ): RegionsForResult => {
+    const firstPageOfSection = new Map<number, number>();
+    const sectionPageCounts = new Map<number, number>();
+    for (const page of paginated.pages) {
+      if (!firstPageOfSection.has(page.section)) firstPageOfSection.set(page.section, page.index);
+      sectionPageCounts.set(page.section, (sectionPageCounts.get(page.section) ?? 0) + 1);
+    }
+    const byPage = new Map<number, PageHeaderFooter>();
+    const reserves = new Map<string, RegionReserve>();
+    for (const page of paginated.pages) {
+      const section = sections[page.section];
+      if (section === undefined) continue;
+      const variant = pageVariantOf(
+        section,
+        page.kind,
+        firstPageOfSection.get(page.section) === page.index,
+        evenAndOddHeaders,
+      );
+      const values: PageFieldValues = {
+        page: page.index + 1,
+        pages: paginated.pages.length,
+        section: section.index + 1,
+        sectionPages: sectionPageCounts.get(page.section) ?? 1,
+      };
+      const sectionPlan = plan.sections[section.index];
+      const header = regionOf(section, page.index, variant, sectionPlan?.header[variant], values);
+      const footer = regionOf(section, page.index, variant, sectionPlan?.footer[variant], values);
+      byPage.set(page.index, { header, footer });
+      const key = reserveKey(section.index, variant);
+      const existing = reserves.get(key) ?? { header: undefined, footer: undefined };
+      reserves.set(key, {
+        header: widest(existing.header, header?.box.height),
+        footer: widest(existing.footer, footer?.box.height),
+      });
+    }
+    return { byPage, reserves };
+  };
+
+  let reserves: ReserveMap = new Map();
+  let reserved = sectionsWithReserve(sections, reserves, defaultLineBox.height);
+  let paginated = paginateFlow(flow, reserved.sections, diagnostics, {
     widowControlEnabled: options.widowControl ?? true,
+    evenAndOddHeaders,
   });
+  let regions = regionsFor(paginated);
+  let converged = reservesEqual(reserves, regions.reserves);
+  for (let attempt = 0; !converged && attempt < MAX_PAGE_COUNT_ITERATIONS; attempt += 1) {
+    reserves = regions.reserves;
+    reserved = sectionsWithReserve(sections, reserves, defaultLineBox.height);
+    paginated = paginateFlow(flow, reserved.sections, diagnostics, {
+      widowControlEnabled: options.widowControl ?? true,
+      evenAndOddHeaders,
+    });
+    regions = regionsFor(paginated);
+    converged = reservesEqual(reserves, regions.reserves);
+  }
+  if (!converged) {
+    diagnostics.push({
+      code: 'pageCountUnstable',
+      severity: 'warning',
+      message: `header and footer heights did not settle after ${MAX_PAGE_COUNT_ITERATIONS} iterations; the last layout was used`,
+      docPos: undefined,
+    });
+  }
+  if (reserved.clamped) {
+    diagnostics.push({
+      code: 'headerFooterTooTall',
+      severity: 'warning',
+      message:
+        'the header and footer of a section leave the page no content height; the body overflows the page',
+      docPos: undefined,
+    });
+  }
+
   for (const paintEntry of paint.list()) {
     hash.field(paintEntry.size);
     hash.field(paintEntry.faceId);
@@ -213,8 +402,79 @@ export const layoutDocument = (
     storyId: options.storyId ?? model.body().id,
     storyKind: model.body().kind,
     blockCount: ingested.blocks.length,
+    headerFooters: paginated.pages.map(
+      (page): PageHeaderFooter => regions.byPage.get(page.index) ?? { header: undefined, footer: undefined },
+    ),
+    stories: plan.stories.map((story) => storyLayoutOf(story, story.blocks().length)),
+    lineIdBase: 0,
   });
 };
+
+interface RegionReserve {
+  readonly header: Mp | undefined;
+  readonly footer: Mp | undefined;
+}
+
+type ReserveMap = ReadonlyMap<string, RegionReserve>;
+
+interface RegionsForResult {
+  readonly byPage: ReadonlyMap<number, PageHeaderFooter>;
+  readonly reserves: ReserveMap;
+}
+
+const reserveKey = (section: number, variant: HeaderFooterVariant): string => `${section}|${variant}`;
+
+const widest = (current: Mp | undefined, candidate: Mp | undefined): Mp | undefined => {
+  if (candidate === undefined) return current;
+  if (current === undefined) return candidate;
+  return mp(Math.max(current, candidate));
+};
+
+const reservesEqual = (left: ReserveMap, right: ReserveMap): boolean => {
+  if (left.size !== right.size) return false;
+  for (const [key, entry] of left) {
+    const other = right.get(key);
+    if (other === undefined) return false;
+    if (entry.header !== other.header || entry.footer !== other.footer) return false;
+  }
+  return true;
+};
+
+const sectionsWithReserve = (
+  sections: readonly Section[],
+  reserves: ReserveMap,
+  minimumHeight: Mp,
+): ReservedSections => {
+  let clamped = false;
+  const out = sections.map((section) => {
+    const boxes = {} as Record<HeaderFooterVariant, Rect>;
+    for (const variant of HEADER_FOOTER_VARIANTS) {
+      const reserve = reserves.get(reserveKey(section.index, variant));
+      if (reserve === undefined) {
+        boxes[variant] = section.contentBox;
+        continue;
+      }
+      const box = section.contentBox;
+      const top = reserve.header === undefined
+        ? box.y
+        : maxMp(box.y, mp(section.headerDistance + reserve.header));
+      const limit = mp(box.y + box.height);
+      const bottom = reserve.footer === undefined
+        ? limit
+        : minMp(limit, mp(section.page.y + section.page.height - section.footerDistance - reserve.footer));
+      const height = bottom - top;
+      if (height < minimumHeight) clamped = true;
+      boxes[variant] = rectOf(box.x, top, box.width, mp(Math.max(minimumHeight, height)));
+    }
+    return withContentBoxes(section, boxes);
+  });
+  return { sections: out, clamped };
+};
+
+interface ReservedSections {
+  readonly sections: readonly Section[];
+  readonly clamped: boolean;
+}
 
 const coverageDiagnostics = (
   hasThemeFonts: boolean,

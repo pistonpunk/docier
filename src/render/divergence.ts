@@ -1,4 +1,5 @@
 import type {
+  BlockFragment,
   BorderSet,
   LayoutResult,
   LineFragment,
@@ -28,6 +29,13 @@ import { objectBoxOf } from './inline-object.js';
 
 export const DEFAULT_TOLERANCE_PX = 0.5;
 export const DEFAULT_MAX_DIVERGENCES = 100;
+
+const regionBlocks = (page: PageFragment): readonly BlockFragment[] => {
+  const out: BlockFragment[] = [];
+  if (page.header !== undefined) out.push(...page.header.blocks);
+  if (page.footer !== undefined) out.push(...page.footer.blocks);
+  return out;
+};
 
 export const RESULT_GAPS: readonly string[] = ['fontFileHash'];
 
@@ -728,6 +736,27 @@ export const detectDivergence = (
     });
   };
 
+  const checkBlock = (
+    page: PageFragment,
+    sheet: HTMLElement,
+    sheetRect: MeasuredRect,
+    block: BlockFragment,
+  ): void => {
+    const blockNode = sheet.querySelector<HTMLElement>(`[${ATTR.block}="${String(block.id)}"]`);
+    checkDecoration(blockNode, page, sheetRect, block.box, block.shading, block.borders, {
+      blockId: block.id,
+      lineId: -1,
+      label: `paragraph ${String(block.id)}`,
+    });
+    for (const line of block.lines) {
+      lines += 1;
+      line.runs.forEach((run, index) => {
+        checkRun(page, sheet, sheetRect, block.id, line, index, run, result.paint[run.paint]);
+        checkObjects(page, sheet, sheetRect, block.id, line, index, run);
+      });
+    }
+  };
+
   for (const page of result.pages) {
     const sheet = sheets[page.index];
     if (sheet === undefined) continue;
@@ -751,19 +780,10 @@ export const detectDivergence = (
       );
     }
     for (const block of page.blocks) {
-      const blockNode = sheet.querySelector<HTMLElement>(`[${ATTR.block}="${String(block.id)}"]`);
-      checkDecoration(blockNode, page, sheetRect, block.box, block.shading, block.borders, {
-        blockId: block.id,
-        lineId: -1,
-        label: `paragraph ${String(block.id)}`,
-      });
-      for (const line of block.lines) {
-        lines += 1;
-        line.runs.forEach((run, index) => {
-          checkRun(page, sheet, sheetRect, block.id, line, index, run, result.paint[run.paint]);
-          checkObjects(page, sheet, sheetRect, block.id, line, index, run);
-        });
-      }
+      checkBlock(page, sheet, sheetRect, block);
+    }
+    for (const block of regionBlocks(page)) {
+      checkBlock(page, sheet, sheetRect, block);
     }
     for (const table of page.tables) {
       const tableNode = sheet.querySelector<HTMLElement>(`[${ATTR.table}="${String(table.table)}"]`);

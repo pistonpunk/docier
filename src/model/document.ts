@@ -257,6 +257,10 @@ export class DocumentModel {
     return this.storyList.filter((story) => story.kind === kind);
   }
 
+  relationshipTarget(relationshipId: string): string | undefined {
+    return this.package.relationships.findById(this.mainPartName, relationshipId)?.resolvedTarget;
+  }
+
   body(): Story {
     const body = this.storyById.get('body');
     if (body === undefined) throw new Error('The document has no body story');

@@ -3,7 +3,7 @@ import { mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
 import type { ParagraphFormat } from './format.js';
 import type { Section } from './sections.js';
-import { geometryChanged, sectionOfBlock } from './sections.js';
+import { contentBoxFor, geometryChanged, pageVariantOf, sectionOfBlock } from './sections.js';
 import type { PreparedTable } from './table-prepare.js';
 import type { PlacedRow, PlacedTable, TableFlowHost } from './table-flow.js';
 import { flowTable } from './table-flow.js';
@@ -49,6 +49,7 @@ export interface PageState {
   readonly page: Rect;
   readonly contentBox: Rect;
   readonly column: number;
+  readonly section: number;
 }
 
 export interface PaginationResult {
@@ -60,31 +61,41 @@ export interface PaginationResult {
 
 export interface PaginateOptions {
   readonly widowControlEnabled: boolean;
+  readonly evenAndOddHeaders: boolean;
 }
 
-const fallbackSection = (): Section => ({
-  index: 0,
-  breakType: 'nextPage',
-  firstBlock: 0,
-  blockCount: 0,
-  page: { x: mp(0), y: mp(0), width: mp(0), height: mp(0) },
-  contentBox: { x: mp(0), y: mp(0), width: mp(0), height: mp(0) },
-  pageWidth: mp(0),
-  pageHeight: mp(0),
-});
+const fallbackSection = (): Section => {
+  const box = { x: mp(0), y: mp(0), width: mp(0), height: mp(0) };
+  return {
+    index: 0,
+    breakType: 'nextPage',
+    firstBlock: 0,
+    blockCount: 0,
+    page: box,
+    contentBox: box,
+    contentBoxes: { default: box, first: box, even: box },
+    pageWidth: mp(0),
+    pageHeight: mp(0),
+    titlePage: false,
+    evenAndOddHeaders: false,
+    headerDistance: mp(0),
+    footerDistance: mp(0),
+    propertiesElement: undefined,
+  };
+};
 
 export const pageKindOf = (index: number): PageKind => {
   if (index === 0) return 'first';
   return (index + 1) % 2 === 0 ? 'even' : 'odd';
 };
 
-const spaceBeforeOf = (block: PaginateBlock): Mp => {
+export const spaceBeforeOf = (block: PaginateBlock): Mp => {
   const lines = block.format.spaceBeforeLines;
   if (lines !== undefined) return mp(Math.round(lines * block.lineHeight));
   return block.format.spaceBefore;
 };
 
-const spaceAfterOf = (block: PaginateBlock): Mp => {
+export const spaceAfterOf = (block: PaginateBlock): Mp => {
   const lines = block.format.spaceAfterLines;
   if (lines !== undefined) return mp(Math.round(lines * block.lineHeight));
   return block.format.spaceAfter;
@@ -138,6 +149,7 @@ export const paginateFlow = (
   const pieces: PlacedPiece[] = [];
   const rows: PlacedRow[] = [];
   const tables: PlacedTable[] = [];
+  const openedSections = new Set<number>();
   const effectiveSections = sections.length === 0 ? [fallbackSection()] : sections;
 
   let pageIndex = 0;
@@ -161,17 +173,23 @@ export const paginateFlow = (
         }
       }
     }
+    const box = contentBoxFor(
+      section,
+      pageVariantOf(section, kind, !openedSections.has(section.index), options.evenAndOddHeaders),
+    );
+    openedSections.add(section.index);
     currentSection = section;
     pages.push({
       index: pageIndex,
       kind,
       page: section.page,
-      contentBox: section.contentBox,
+      contentBox: box,
       column: 0,
+      section: section.index,
     });
-    contentTop = section.contentBox.y;
+    contentTop = box.y;
     cursor = contentTop;
-    bottom = mp(section.contentBox.y + section.contentBox.height);
+    bottom = mp(box.y + box.height);
     pageHasContent = false;
     pendingPageBreak = false;
   };
@@ -260,10 +278,14 @@ export const paginateFlow = (
     const section = sectionOfBlock(effectiveSections, paragraphIndex) ?? currentSection;
     if (section !== currentSection) {
       if (section.breakType === 'continuous' && !geometryChanged(currentSection, section)) {
+        const box = contentBoxFor(
+          section,
+          pageVariantOf(section, kind, !openedSections.has(section.index), options.evenAndOddHeaders),
+        );
         currentSection = section;
-        cursor = mp(Math.max(cursor, section.contentBox.y));
-        contentTop = section.contentBox.y;
-        bottom = mp(section.contentBox.y + section.contentBox.height);
+        cursor = mp(Math.max(cursor, box.y));
+        contentTop = box.y;
+        bottom = mp(box.y + box.height);
       } else {
         if (section.breakType === 'continuous') {
           diagnostics.push({

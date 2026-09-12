@@ -31,6 +31,9 @@ export const ATTR = {
   slotError: 'data-docier-slot-error',
   printStyle: 'data-docier-print-style',
   printFrame: 'data-docier-print-frame',
+  header: 'data-docier-header',
+  footer: 'data-docier-footer',
+  regionVariant: 'data-docier-region-variant',
 } as const;
 
 export const element = (tag: string, className: string): HTMLElement => {

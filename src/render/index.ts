@@ -86,7 +86,7 @@ export type { Segment } from './runs.js';
 export { paintLine, segmentsOf } from './runs.js';
 
 export type { PagePaintContext } from './pages.js';
-export { paintBlock, paintPage, paintPageSheet, paintTable } from './pages.js';
+export { paintBlock, paintPage, paintPageSheet, paintRegion, paintTable } from './pages.js';
 
 export { paintDefaultDocument, renderDocument, resolveRenderOptions } from './document.js';
 

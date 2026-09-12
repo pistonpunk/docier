@@ -22,6 +22,8 @@ export const CONTENT_TYPE_SETTINGS =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml';
 export const CONTENT_TYPE_HEADER =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml';
+export const CONTENT_TYPE_FOOTER =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml';
 export const CONTENT_TYPE_RELS = 'application/vnd.openxmlformats-package.relationships+xml';
 export const CONTENT_TYPE_XML = 'application/xml';
 
@@ -75,8 +77,17 @@ export const settingsXml = (body: string): string =>
 export const headerXml = (body: string): string =>
   `${DECLARATION}<w:hdr xmlns:w="${W}" xmlns:r="${R}">${body}</w:hdr>`;
 
+export const footerXml = (body: string): string =>
+  `${DECLARATION}<w:ftr xmlns:w="${W}" xmlns:r="${R}">${body}</w:ftr>`;
+
 export const relationship = (id: string, type: string, target: string): string =>
   `<Relationship Id="${id}" Type="${R}/${type}" Target="${target}"/>`;
+
+export const headerRelationship = (id: string, target: string): string =>
+  relationship(id, 'header', target);
+
+export const footerRelationship = (id: string, target: string): string =>
+  relationship(id, 'footer', target);
 
 export const stylesRelationship = (id = 'rIdStyles'): string =>
   relationship(id, 'styles', 'styles.xml');
@@ -109,18 +120,30 @@ export interface DocxSpec {
   readonly numbering?: string;
   readonly settings?: string;
   readonly header?: string;
+  readonly headers?: readonly string[];
+  readonly footers?: readonly string[];
   readonly documentRelationships?: readonly string[];
   readonly extraParts?: readonly FixtureEntry[];
   readonly documentAttributes?: string;
   readonly extraDocumentNamespaces?: string;
 }
 
+export const headerParts = (spec: DocxSpec): readonly string[] =>
+  spec.header === undefined ? (spec.headers ?? []) : [spec.header, ...(spec.headers ?? [])];
+
 export const buildDocx = (spec: DocxSpec): Uint8Array => {
+  const headers = headerParts(spec);
+  const footers = spec.footers ?? [];
   const overrides: [string, string][] = [['/word/document.xml', CONTENT_TYPE_MAIN]];
   if (spec.styles !== undefined) overrides.push(['/word/styles.xml', CONTENT_TYPE_STYLES]);
   if (spec.numbering !== undefined) overrides.push(['/word/numbering.xml', CONTENT_TYPE_NUMBERING]);
   if (spec.settings !== undefined) overrides.push(['/word/settings.xml', CONTENT_TYPE_SETTINGS]);
-  if (spec.header !== undefined) overrides.push(['/word/header1.xml', CONTENT_TYPE_HEADER]);
+  headers.forEach((_header, index) =>
+    overrides.push([`/word/header${String(index + 1)}.xml`, CONTENT_TYPE_HEADER]),
+  );
+  footers.forEach((_footer, index) =>
+    overrides.push([`/word/footer${String(index + 1)}.xml`, CONTENT_TYPE_FOOTER]),
+  );
 
   const parts: FixtureEntry[] = [
     xmlPart(
@@ -148,7 +171,12 @@ export const buildDocx = (spec: DocxSpec): Uint8Array => {
   if (spec.styles !== undefined) parts.push(xmlPart('word/styles.xml', spec.styles));
   if (spec.numbering !== undefined) parts.push(xmlPart('word/numbering.xml', spec.numbering));
   if (spec.settings !== undefined) parts.push(xmlPart('word/settings.xml', spec.settings));
-  if (spec.header !== undefined) parts.push(xmlPart('word/header1.xml', spec.header));
+  headers.forEach((header, index) =>
+    parts.push(xmlPart(`word/header${String(index + 1)}.xml`, header)),
+  );
+  footers.forEach((footer, index) =>
+    parts.push(xmlPart(`word/footer${String(index + 1)}.xml`, footer)),
+  );
   for (const extra of spec.extraParts ?? []) parts.push(extra);
 
   return buildZip(parts);

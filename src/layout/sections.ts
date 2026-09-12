@@ -1,8 +1,11 @@
 import type { Mp } from '../units/index.js';
 import { mp, twipToMp } from '../units/index.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
 import type { SectionBreakType, SectionProperties } from '../model/index.js';
 import {
+  DEFAULT_FOOTER_DISTANCE,
   DEFAULT_GUTTER,
+  DEFAULT_HEADER_DISTANCE,
   DEFAULT_MARGIN_BOTTOM,
   DEFAULT_MARGIN_LEFT,
   DEFAULT_MARGIN_RIGHT,
@@ -11,7 +14,7 @@ import {
   DEFAULT_PAGE_WIDTH,
   SectionProperties as SectionPropertiesClass,
 } from '../model/index.js';
-import type { Rect } from './types.js';
+import type { HeaderFooterVariant, PageKind, Rect } from './types.js';
 import type { LayoutDiagnostic } from './types.js';
 import type { IngestedDocument, IngestedParagraph } from './ingest.js';
 
@@ -22,9 +25,37 @@ export interface Section {
   readonly blockCount: number;
   readonly page: Rect;
   readonly contentBox: Rect;
+  readonly contentBoxes: Readonly<Record<HeaderFooterVariant, Rect>>;
   readonly pageWidth: Mp;
   readonly pageHeight: Mp;
+  readonly titlePage: boolean;
+  readonly evenAndOddHeaders: boolean;
+  readonly headerDistance: Mp;
+  readonly footerDistance: Mp;
+  readonly propertiesElement: XmlElement | undefined;
 }
+
+export const contentBoxFor = (section: Section, variant: HeaderFooterVariant): Rect =>
+  section.contentBoxes[variant];
+
+export const withContentBoxes = (
+  section: Section,
+  boxes: Readonly<Record<HeaderFooterVariant, Rect>>,
+): Section => ({
+  ...section,
+  contentBoxes: boxes,
+});
+
+export const pageVariantOf = (
+  section: Section,
+  kind: PageKind,
+  firstOfSection: boolean,
+  evenAndOddHeaders: boolean,
+): HeaderFooterVariant => {
+  if (firstOfSection && section.titlePage) return 'first';
+  if (evenAndOddHeaders && kind === 'even') return 'even';
+  return 'default';
+};
 
 const rectOf = (x: Mp, y: Mp, width: Mp, height: Mp): Rect => ({ x, y, width, height });
 
@@ -77,6 +108,7 @@ export const buildSections = (
       element === undefined ? undefined : SectionPropertiesClass.of(element);
     const { page, contentBox } = geometryOf(properties);
     const breakType: SectionBreakType = index === 0 ? 'nextPage' : properties?.effectiveType ?? 'nextPage';
+    const margins = properties?.margins;
 
     if (properties !== undefined) {
       if (properties.columnCount > 1) {
@@ -103,14 +135,6 @@ export const buildSections = (
           docPos: undefined,
         });
       }
-      if (properties.referenceCount > 0) {
-        diagnostics.push({
-          code: 'headerFooterNotLaidOut',
-          severity: 'info',
-          message: `section ${index} headers and footers are not laid out by this slice`,
-          docPos: undefined,
-        });
-      }
     }
 
     sections.push({
@@ -120,8 +144,14 @@ export const buildSections = (
       blockCount: group.length,
       page,
       contentBox,
+      contentBoxes: { default: contentBox, first: contentBox, even: contentBox },
       pageWidth: page.width,
       pageHeight: page.height,
+      titlePage: properties?.titlePage === true,
+      evenAndOddHeaders: properties?.evenAndOddHeaders === true,
+      headerDistance: twipToMp(margins?.header ?? DEFAULT_HEADER_DISTANCE),
+      footerDistance: twipToMp(margins?.footer ?? DEFAULT_FOOTER_DISTANCE),
+      propertiesElement: element,
     });
     firstBlock += group.length;
   }

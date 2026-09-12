@@ -1,9 +1,34 @@
 import type { DocumentModel } from '../../src/model/document.js';
 import type { LayoutOptions, LayoutResult, LineFragment } from '../../src/layout/index.js';
 import { layoutDocument } from '../../src/layout/index.js';
+import type { DocxSpec } from '../model/support.js';
 import { openModel, run, wrap } from '../model/support.js';
 
 export { run, wrap };
+
+export const layoutSpecOf = async (
+  spec: DocxSpec,
+  options: LayoutOptions = {},
+): Promise<LayoutResult> => {
+  const model: DocumentModel = await openModel(spec);
+  return layoutDocument(model, options);
+};
+
+export const headerLineTexts = (
+  result: LayoutResult,
+  page: number,
+): readonly string[] =>
+  result.pages[page]?.header?.blocks.flatMap((block) =>
+    block.lines.map((line) => line.runs.map((r) => r.text).join('')),
+  ) ?? [];
+
+export const footerLineTexts = (
+  result: LayoutResult,
+  page: number,
+): readonly string[] =>
+  result.pages[page]?.footer?.blocks.flatMap((block) =>
+    block.lines.map((line) => line.runs.map((r) => r.text).join('')),
+  ) ?? [];
 
 export const PAGE_WIDTH_TWIPS = 3000;
 export const PAGE_HEIGHT_TWIPS = 3000;

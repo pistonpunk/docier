@@ -10,7 +10,7 @@ import { PdfArray, PdfDict, PdfName, PdfString, PdfWriter, pdfDict, pdfLiteral, 
 import type { PdfRef } from './objects.js';
 import { ContentStream } from './content.js';
 import { pdfPageRect } from './geometry.js';
-import { drawableTokens, paintPage } from './page.js';
+import { blocksOfPage, drawableTokens, paintPage } from './page.js';
 import { selectedPages } from './selection.js';
 import { FontRegistry } from './fonts/registry.js';
 import { ImageRegistry } from './images/registry.js';
@@ -31,7 +31,7 @@ const painterGaps = (): readonly PdfLoss[] =>
 
 const collectGlyphs = (result: LayoutResult, fonts: FontRegistry, images: ImageRegistry): void => {
   for (const page of result.pages) {
-    for (const block of page.blocks) {
+    for (const block of blocksOfPage(page)) {
       for (const line of block.lines) {
         for (const run of line.runs) {
           const paint = result.paint[run.paint];

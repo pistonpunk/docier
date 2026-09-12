@@ -1,6 +1,7 @@
 import type {
   BlockFragment,
   CellFragment,
+  HeaderFooterFragment,
   LayoutResult,
   PageFragment,
   RowFragment,
@@ -122,6 +123,25 @@ export const paintTable = (
   return node;
 };
 
+export const paintRegion = (
+  sheet: HTMLElement,
+  region: HeaderFooterFragment,
+  frame: Frame,
+  context: PagePaintContext,
+): HTMLElement => {
+  const header = region.kind === 'header';
+  const node = box(header ? 'docier-header' : 'docier-footer');
+  stamp(node, {
+    [header ? ATTR.header : ATTR.footer]: String(region.section),
+    [ATTR.regionVariant]: region.variant,
+  });
+  applyStyle(node, positionStyle(geometryAt(region.box, frame, context.scale)));
+  const inner = frameOf(region.box);
+  for (const block of region.blocks) paintBlock(node, block, inner, context);
+  sheet.appendChild(node);
+  return node;
+};
+
 export const paintPage = (
   sheet: HTMLElement,
   page: PageFragment,
@@ -133,6 +153,8 @@ export const paintPage = (
     if (block.cell === undefined) paintBlock(sheet, block, frame, context);
   }
   for (const table of page.tables) paintTable(sheet, table, blocks, frame, context);
+  if (page.header !== undefined) paintRegion(sheet, page.header, frame, context);
+  if (page.footer !== undefined) paintRegion(sheet, page.footer, frame, context);
 };
 
 export const paintOverlay = (

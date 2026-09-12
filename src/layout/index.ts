@@ -16,6 +16,9 @@ export type {
   ForcedBreak,
   FragmentRef,
   FragmentSplit,
+  HeaderFooterFragment,
+  HeaderFooterRegionKind,
+  HeaderFooterVariant,
   Justification,
   LayoutDiagnostic,
   LayoutDiagnosticCode,
@@ -78,7 +81,34 @@ export {
 } from '../measure/index.js';
 
 export { finalize } from './finalize.js';
-export type { FinalizeInput } from './finalize.js';
+export type { FinalizeInput, PageHeaderFooter } from './finalize.js';
+
+export type {
+  FieldInjection,
+  FieldSubstitution,
+  PageFieldType,
+  PageFieldValues,
+} from './fields.js';
+export {
+  PAGE_FIELD_TYPES,
+  fieldSubstitutions,
+  pageFieldText,
+  pageFieldTypeOf,
+} from './fields.js';
+
+export type {
+  HeaderFooterPlan,
+  HeaderFooterSlot,
+  RegionLayout,
+  RegionRequest,
+  SectionHeaderFooters,
+} from './header-footer.js';
+export {
+  HEADER_FOOTER_VARIANTS,
+  layoutRegion,
+  resolveHeaderFooterPlan,
+  storyLayoutOf,
+} from './header-footer.js';
 
 export type { FontFace } from './fonts.js';
 export { FontResolver } from './fonts.js';
@@ -142,7 +172,15 @@ export type {
   PaginationResult,
   PlacedPiece,
 } from './paginate.js';
-export { flowParagraphBlock, flowTableBlock, pageKindOf, paginate, paginateFlow } from './paginate.js';
+export {
+  flowParagraphBlock,
+  flowTableBlock,
+  pageKindOf,
+  paginate,
+  paginateFlow,
+  spaceAfterOf,
+  spaceBeforeOf,
+} from './paginate.js';
 
 export type {
   IntrinsicWidths,
@@ -219,10 +257,17 @@ export { prepareTable, prepareTables, tableIntrinsic } from './table-prepare.js'
 export type { PlacedRow, PlacedTable, TableFlowHost, TableSink } from './table-flow.js';
 export { emitRowFragment, flowTable, placeTableAt } from './table-flow.js';
 
-export { DEFAULT_TAB_STOP_TWIPS, layoutDocument } from './pipeline.js';
+export { DEFAULT_TAB_STOP_TWIPS, MAX_PAGE_COUNT_ITERATIONS, layoutDocument } from './pipeline.js';
 export type { LayoutOptions } from './pipeline.js';
 
 export type { Section } from './sections.js';
-export { buildSections, geometryChanged, sectionOfBlock } from './sections.js';
+export {
+  buildSections,
+  contentBoxFor,
+  geometryChanged,
+  pageVariantOf,
+  sectionOfBlock,
+  withContentBoxes,
+} from './sections.js';
 
 export { toCssPx, toPt } from '../units/index.js';

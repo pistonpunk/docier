@@ -1,4 +1,5 @@
 import { mp } from '../units/index.js';
+import type { Mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
 import type { PageState, PaginateBlock, PlacedPiece } from './paginate.js';
 import type { PlacedRow, PlacedTable } from './table-flow.js';
@@ -12,7 +13,10 @@ import type {
   BlockFragment,
   CaretStop,
   CellFragment,
+  CellRef,
   DocPos,
+  FragmentSplit,
+  HeaderFooterFragment,
   LayoutDiagnostic,
   LayoutResult,
   LineFragment,
@@ -28,6 +32,11 @@ import type {
 import { LAYOUT_RESULT_VERSION, docPos } from './types.js';
 import { deepFreeze } from './freeze.js';
 
+export interface PageHeaderFooter {
+  readonly header: HeaderFooterFragment | undefined;
+  readonly footer: HeaderFooterFragment | undefined;
+}
+
 export interface FinalizeInput {
   readonly blocks: readonly (PaginateBlock | undefined)[];
   readonly rows: readonly PlacedRow[];
@@ -40,6 +49,9 @@ export interface FinalizeInput {
   readonly storyId: StoryId;
   readonly storyKind: string;
   readonly blockCount: number;
+  readonly headerFooters: readonly PageHeaderFooter[];
+  readonly stories: readonly StoryLayout[];
+  readonly lineIdBase: number;
 }
 
 const atomsOf = (line: LaidLine): readonly AtomPlacement[] =>
@@ -65,6 +77,107 @@ const lineEndOf = (line: LaidLine, fallback: DocPos): DocPos => {
 };
 
 const cellKey = (table: number, row: number, column: number): string => `${table}:${row}:${column}`;
+
+export interface BlockFragmentRequest {
+  readonly block: PaginateBlock;
+  readonly id: number;
+  readonly page: number;
+  readonly x: Mp;
+  readonly width: Mp;
+  readonly boxTop: Mp;
+  readonly lineStart: number;
+  readonly lineEnd: number;
+  readonly split: FragmentSplit;
+  readonly cell: CellRef | undefined;
+  readonly lineIdStart: number;
+  readonly collect: boolean;
+}
+
+export interface BlockFragmentResult {
+  readonly fragment: BlockFragment;
+  readonly refs: readonly LineRef[];
+  readonly caretStops: readonly CaretStop[];
+  readonly nextLineId: number;
+}
+
+export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentResult => {
+  const block = request.block;
+  const refs: LineRef[] = [];
+  const caretStops: CaretStop[] = [];
+  const lineFragments: LineFragment[] = [];
+  let lineId = request.lineIdStart;
+  let y = request.boxTop;
+
+  for (let index = request.lineStart; index < request.lineEnd; index += 1) {
+    const line = block.lines[index];
+    if (line === undefined) continue;
+    const geometry = line.geometry;
+    const baselineY = mp(y + geometry.aboveBaseline);
+    const markPos = docPos((block.docRange.end as number) - 1);
+    const end = lineEndOf(line, markPos);
+    const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
+    const stops = request.collect ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak) : [];
+    const runs: LineRun[] = [];
+    for (const run of runsOfPlaced(line.prefix)) runs.push(run);
+    for (const run of runsOfPlaced(line.placed)) runs.push(run);
+    const fragment: LineFragment = {
+      id: lineId,
+      box: { x: request.x, y, width: geometry.width, height: geometry.height },
+      baselineY,
+      ascent: geometry.aboveBaseline,
+      descent: geometry.belowBaseline,
+      lineHeight: geometry.height,
+      atoms: atomsOf(line),
+      runs,
+      caretStops: stops,
+      justified: line.justified,
+      bidiLevels: [],
+      breakAfter: line.breakAfter,
+    };
+    lineFragments.push(fragment);
+    lineId += 1;
+    if (request.collect) {
+      const first = runs[0];
+      refs.push({
+        start: line.placed[0]?.measured.atom.source.start ?? end,
+        end,
+        page: request.page,
+        block: request.id,
+        line: index,
+        paint: first?.paint ?? 0,
+        x: first?.x ?? request.x,
+        baselineY,
+        caretStops: stops,
+      });
+      for (const stop of stops) caretStops.push(stop);
+    }
+    y = mp(y + geometry.height);
+  }
+
+  return {
+    fragment: {
+      id: request.id,
+      kind: 'paragraph',
+      box: {
+        x: request.x,
+        y: request.boxTop,
+        width: request.width,
+        height: mp(y - request.boxTop),
+      },
+      page: request.page,
+      column: 0,
+      docRange: block.docRange,
+      split: request.split,
+      lines: lineFragments,
+      borders: block.format.borders,
+      shading: block.format.shading,
+      cell: request.cell,
+    },
+    refs,
+    caretStops,
+    nextLineId: lineId,
+  };
+};
 
 const unionBox = (boxes: readonly Rect[]): Rect => {
   const first = boxes[0];
@@ -131,7 +244,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
   const orderOf = (id: number): number => tableOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
   const firstPageOf = new Map<number, number>();
   const origins = pageOrigins(input.pages);
-  let lineId = 0;
+  let lineId = input.lineIdBase;
 
   for (const page of input.pages) {
     const pagePieces = input.pieces.filter((piece) => piece.page === page.index);
@@ -153,73 +266,24 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
         : cellFragments.get(cellKey(piece.cell.table, piece.cell.row, piece.cell.column));
       const x = container === undefined ? page.contentBox.x : container.contentBox.x;
       const width = container === undefined ? page.contentBox.width : container.contentBox.width;
-      let y = piece.boxTop;
-      const lineFragments: LineFragment[] = [];
-
-      for (let index = piece.lineStart; index < piece.lineEnd; index += 1) {
-        const line = block.lines[index];
-        if (line === undefined) continue;
-        const geometry = line.geometry;
-        const baselineY = mp(y + geometry.aboveBaseline);
-        const markPos = docPos((block.docRange.end as number) - 1);
-        const end = lineEndOf(line, markPos);
-        const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
-        const stops = caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak);
-        const runs: LineRun[] = [];
-        for (const run of runsOfPlaced(line.prefix)) runs.push(run);
-        for (const run of runsOfPlaced(line.placed)) runs.push(run);
-        const fragment: LineFragment = {
-          id: lineId,
-          box: { x, y, width: geometry.width, height: geometry.height },
-          baselineY,
-          ascent: geometry.aboveBaseline,
-          descent: geometry.belowBaseline,
-          lineHeight: geometry.height,
-          atoms: atomsOf(line),
-          runs,
-          caretStops: stops,
-          justified: line.justified,
-          bidiLevels: [],
-          breakAfter: line.breakAfter,
-        };
-        lineFragments.push(fragment);
-        lineId += 1;
-        if (!piece.repeat) {
-          const first = runs[0];
-          refs.push({
-            start: line.placed[0]?.measured.atom.source.start ?? end,
-            end,
-            page: page.index,
-            block: piece.block,
-            line: index,
-            paint: first?.paint ?? 0,
-            x: first?.x ?? x,
-            baselineY,
-            caretStops: stops,
-          });
-          for (const stop of stops) caretStops.push(stop);
-        }
-        y = mp(y + geometry.height);
-      }
-
-      blocks.push({
+      const result = blockFragmentOf({
+        block,
         id: piece.block,
-        kind: 'paragraph',
-        box: {
-          x,
-          y: piece.boxTop,
-          width,
-          height: mp(y - piece.boxTop),
-        },
         page: page.index,
-        column: 0,
-        docRange: block.docRange,
+        x,
+        width,
+        boxTop: piece.boxTop,
+        lineStart: piece.lineStart,
+        lineEnd: piece.lineEnd,
         split: piece.split,
-        lines: lineFragments,
-        borders: block.format.borders,
-        shading: block.format.shading,
         cell: piece.cell,
+        lineIdStart: lineId,
+        collect: !piece.repeat,
       });
+      for (const ref of result.refs) refs.push(ref);
+      for (const stop of result.caretStops) caretStops.push(stop);
+      lineId = result.nextLineId;
+      blocks.push(result.fragment);
     }
 
     const tables: TableFragment[] = [];
@@ -241,6 +305,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
     }
     tables.sort((first, second) => orderOf(first.table) - orderOf(second.table));
 
+    const regions = input.headerFooters[page.index];
     pages.push({
       index: page.index,
       kind: page.kind,
@@ -248,6 +313,9 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
       origin: origins[pages.length] ?? { x: mp(0), y: mp(0) },
       contentBox: page.contentBox,
       column: page.column,
+      section: page.section,
+      header: regions?.header,
+      footer: regions?.footer,
       blocks,
       tables,
     });
@@ -263,6 +331,9 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
         blockCount: input.blockCount,
       },
     ],
+    ...input.stories.map(
+      (story): readonly [StoryId, StoryLayout] => [story.id, story],
+    ),
   ]);
 
   return deepFreeze({

@@ -44,6 +44,7 @@ pleasant to integrate for a developer.
 | D17 | **One engine, two painters.** The PDF exporter renders the *same* `LayoutResult` the screen renders — it is a second painter, never a DOCX→PDF conversion through LibreOffice or any external converter. | This is the Google Docs property and the whole point of D2. Routing print through a converter reintroduces a second layout engine, and the screen/print drift returns one step downstream. Two painters of one layout is what makes "exact" true rather than aspirational. Resolves ADR-0002. |
 | D18 | **"Exact" means screen equals print, and both are faithful to the DOCX semantics — NOT pixel-identical to Microsoft Word.** | Nothing in a browser is pixel-identical to Word, including LibreOffice, ONLYOFFICE and Word Online. And it is not required here: templates are authored in docier, so Word is never in the loop and there is nothing to be exact *with* except ourselves. Setting the bar at Word-parity would mean chasing an impossible target for years. |
 | D19 | **The undo snapshot covers `numbering.xml`, and restoring it forgets the derived caches explicitly rather than keying them on content.** The part is captured copy-on-write (one shared clone, refreshed only when a numbering command's own before/after serialisation says the part changed) and restored as a minimal diff by `abstractNumId`/`numId`, so untouched definitions keep their parsed XML. `EditSession.changeNumbering` owns every numbering write and is the only thing that invalidates `NumberingPart`'s index maps and the `StyleResolver`. | A numbered clause is the commonest layout in the templates this library serves, and every `numbering.*` command was refused while the part sat outside the snapshot. Explicit forgetting over content-keying: a run's numbering depends on the whole `num → abstractNumId → abstractNum → lvl` chain plus the part's own key→object maps, so content-keying would mean serialising that chain per run in the layout hot path. The body still clones before every mutation — that clone is the pre-mutation state and cannot be shared. |
+| D20 | **Header and footer regions reserve real space through a bounded fixpoint.** Regions are laid out once per (story, section, variant, page) so `PAGE` is right on every page; the body's content box is the section's box displaced to `max(topMargin, headerDistance + headerHeight)` at the top and `min(contentBox bottom, pageHeight − footerDistance − footerHeight)` at the bottom, clamped to at least one line with a `headerFooterTooTall` diagnostic; pagination then re-runs with the measured heights until the reserve map stops changing, at most 4 iterations (L3), after which `pageCountUnstable` is emitted and the last layout stands. Region lines are numbered in a negative id space. | Word's rule — the regions come out of the margins and a tall header pushes the body down rather than being overlapped by it — cannot be applied in one pass, because a `NUMPAGES` value's width can change a header's height, which changes the content box, which changes the page count. A bounded, deterministic loop beats an open convergence search, and the alternative (laying the body out first and shifting it afterwards) silently overlaps text. Negative line ids because the divergence detector keys on `data-docier-line`: a header line must never be mistaken for a body line. |
 
 ### Resolved product calls
 
@@ -152,6 +153,42 @@ open and should be fixed in `src/ooxml/part.ts`.
 - [x] Line breaking to millipoint `LayoutResult`
 - [x] Pagination: page boxes, margins, breaks, widow/orphan, keep-with-next
 - [x] The rendered-DOM-vs-engine divergence detector (`test/render/divergence.test.ts`)
+- [x] Headers and footers: per-section default/first/even variants, link-to-previous inheritance,
+      reserved region heights, displaced content box, painted by both painters
+- [x] Page-number fields: `PAGE`, `NUMPAGES`, `SECTION`, `SECTIONPAGES` resolved end to end as laid-out
+      text
+
+**Headers, footers and page-number fields, as built.** `src/layout/header-footer.ts` resolves the plan —
+`w:headerReference`/`w:footerReference` across `default`/`first`/`even`, `w:titlePg`,
+`w:settings/evenAndOddHeaders`, and Word's inheritance rule where an absent reference continues the previous
+section's region of that kind while an explicitly empty header part ends that inheritance — and lays one
+region's story out with the same passes as the body. `src/layout/fields.ts` substitutes a field's text
+before the paragraph is measured, so `PAGE` is a number the line breaker sees, not glyphs painted over the
+page afterwards.
+
+Every `PageFragment` now carries `header` and `footer` `HeaderFooterFragment`s: kind, story id, variant,
+section, the `w:pgMar w:header`/`w:footer` distance, a page-absolute box and the laid-out blocks. The box is
+the section's content width, its top at `headerDistance` below the page edge, and for a footer at
+`pageHeight − footerDistance − footerHeight` — Word's geometry, so the distances are measured to the region's
+near edge, not its far one. The body's content box is *displaced*, never overlapped: top =
+`max(topMargin, headerDistance + headerHeight)`, bottom = `min(contentBox bottom, pageHeight − footerDistance
+− footerHeight)`, clamped to at least one line with `headerFooterTooTall` when a region leaves no room (Word
+pushes the body off the page there; we stop at one line and say so). Because a region's height can depend on
+the page count through `NUMPAGES` and the page count depends on the content box, pagination runs as a bounded
+fixpoint (L3, 4 iterations; `pageCountUnstable` and the last layout stands otherwise).
+
+Region lines are renumbered into a negative id space, so a header line can never collide with a body line.
+Both painters place a region container at the engine's own box — the DOM positions it with
+`geometryAt(region.box, pageFrame)` and paints its blocks against `frameOf(region.box)`, the PDF paints the
+same page-absolute block boxes through `pdfFrame` — and the divergence detector checks region blocks as well
+as body blocks, so a header that drifts from the engine's millipoints fails in CI. A document with no
+`sectPr` region references takes the pre-existing path untouched: content box, block boxes, every line box,
+page kinds and story list were diffed byte-for-byte against the previous build.
+
+Not done: a table inside a header or footer is skipped with `headerFooterTableNotLaidOut`; `w:pgNumType
+w:start` and `w:fmt` are not read, so numbering starts at 1 and every format is decimal
+(`fieldNumberFormatNotLaidOut` when the field carries a `\*` switch); footnotes in a region.
+`LAYOUT_RESULT_VERSION` moved to 3 because `PageFragment` gained `header`, `footer` and `section`.
 
 ### Phase 3 — A visible, editable document
 - [x] `src/render/` — paint-only DOM renderer from `LayoutResult`

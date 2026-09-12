@@ -1,6 +1,6 @@
 import type { Mp } from '../units/index.js';
 
-export const LAYOUT_RESULT_VERSION = 2;
+export const LAYOUT_RESULT_VERSION = 3;
 
 export const DOC_POS_ORIGIN = 0;
 
@@ -62,7 +62,10 @@ export type LayoutDiagnosticCode =
   | 'verticalAlignmentNotLaidOut'
   | 'lineRuleDegenerate'
   | 'zeroContentBox'
-  | 'headerFooterNotLaidOut'
+  | 'headerFooterTableNotLaidOut'
+  | 'headerFooterTooTall'
+  | 'pageCountUnstable'
+  | 'fieldNumberFormatNotLaidOut'
   | 'footnotesNotLaidOut'
   | 'documentGridNotLaidOut'
   | 'pageBreakSuppressed'
@@ -266,6 +269,20 @@ export interface PageOrigin {
   readonly y: Mp;
 }
 
+export type HeaderFooterVariant = 'default' | 'first' | 'even';
+
+export type HeaderFooterRegionKind = 'header' | 'footer';
+
+export interface HeaderFooterFragment {
+  readonly kind: HeaderFooterRegionKind;
+  readonly storyId: StoryId;
+  readonly variant: HeaderFooterVariant;
+  readonly section: number;
+  readonly distance: Mp;
+  readonly box: Rect;
+  readonly blocks: readonly BlockFragment[];
+}
+
 export interface PageFragment {
   readonly index: number;
   readonly kind: PageKind;
@@ -273,6 +290,9 @@ export interface PageFragment {
   readonly origin: PageOrigin;
   readonly contentBox: Rect;
   readonly column: number;
+  readonly section: number;
+  readonly header: HeaderFooterFragment | undefined;
+  readonly footer: HeaderFooterFragment | undefined;
   readonly blocks: readonly BlockFragment[];
   readonly tables: readonly TableFragment[];
 }

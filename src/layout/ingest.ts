@@ -9,6 +9,7 @@ import type {
   LevelSuffix,
   Paragraph,
   RunContent,
+  Story,
 } from '../model/index.js';
 import {
   AlternateContentContent,
@@ -30,6 +31,8 @@ import { NumberingCounters, defaultLevelText, numberTextOf } from './numbering.j
 import { objectPlacementOf } from './objects.js';
 import { borderSetOf, shadingOf } from './table-borders.js';
 import { Hasher } from './hash.js';
+import type { PageFieldValues } from './fields.js';
+import { fieldSubstitutions } from './fields.js';
 import type { DocPos, ForcedBreak, LayoutDiagnostic, ObjectPlacement } from './types.js';
 import { docPos } from './types.js';
 import type { IngestState, IngestedTable } from './table-ingest.js';
@@ -98,6 +101,8 @@ export interface IngestedDocument {
 export interface IngestOptions {
   readonly defaultFontFamily: string;
   readonly defaultTabStop: Mp;
+  readonly pageFields?: PageFieldValues;
+  readonly hash?: Hasher;
 }
 
 const MARK_POSITION = 1;
@@ -355,11 +360,22 @@ export const ingestParagraph = (
     diagnostics.push(...alternateContentDiagnostics(wrapper.selection, start));
   }
 
+  const fields = options.pageFields;
+  const substitution =
+    fields === undefined ? undefined : fieldSubstitutions(paragraph, fields);
+  if (substitution !== undefined && substitution.formats.length > 0) {
+    diagnostics.push({
+      code: 'fieldNumberFormatNotLaidOut',
+      severity: 'info',
+      message: `the field number format "${substitution.formats.join('", "')}" is not produced by this slice; the value was written in decimal`,
+      docPos: start,
+    });
+  }
+
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);
     const runFormat = runFormatOf(resolvedRun, options.defaultFontFamily);
     if (hasThemeFont(resolvedRun)) hasThemeFontSeen = true;
-    if (runFormat.hidden) continue;
     const runStart = docPos(cursor);
     const items: IngestedItem[] = [];
 
@@ -386,16 +402,45 @@ export const ingestParagraph = (
       absorb(itemFromContent(content, runFormat, docPos(cursor)));
     };
 
-    for (const content of run.contents()) {
-      if (content instanceof AlternateContentContent) {
-        diagnostics.push(...alternateContentDiagnostics(content.selection, docPos(cursor)));
-        for (const inner of resolvedRunContents(model.context, [content])) absorbContent(inner);
-        continue;
+    const suppressed = runFormat.hidden || substitution?.suppressed.has(run) === true;
+    if (!suppressed) {
+      for (const content of run.contents()) {
+        if (content instanceof AlternateContentContent) {
+          diagnostics.push(...alternateContentDiagnostics(content.selection, docPos(cursor)));
+          for (const inner of resolvedRunContents(model.context, [content])) absorbContent(inner);
+          continue;
+        }
+        absorbContent(content);
       }
-      absorbContent(content);
     }
-    if (items.length === 0) continue;
-    runs.push({ format: runFormat, items, docStart: runStart, docEnd: docPos(cursor) });
+    if (items.length > 0) {
+      runs.push({ format: runFormat, items, docStart: runStart, docEnd: docPos(cursor) });
+    }
+
+    const injection = substitution?.injections.get(run);
+    if (injection === undefined) continue;
+    const injectionFormat = runFormatOf(
+      model.resolveRunProperties(paragraph, injection.run.properties.element),
+      options.defaultFontFamily,
+    );
+    if (injectionFormat.hidden) continue;
+    const injectionStart = docPos(cursor);
+    const injected = itemOf(
+      'text',
+      injection.text,
+      injectionFormat.requestedFamily,
+      injectionFormat.size,
+      injectionStart,
+      'none',
+      0,
+    );
+    cursor += ingestedItemLength(injected);
+    runs.push({
+      format: injectionFormat,
+      items: [injected],
+      docStart: injectionStart,
+      docEnd: docPos(cursor),
+    });
   }
 
   const numbering = resolveNumbering(model, paragraph, start, options, counters);
@@ -423,9 +468,13 @@ export const ingestParagraph = (
   };
 };
 
-export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDocument => {
+export const ingestStory = (
+  model: DocumentModel,
+  story: Story,
+  options: IngestOptions,
+): IngestedDocument => {
   const diagnostics: LayoutDiagnostic[] = [];
-  const hash = new Hasher();
+  const hash = options.hash ?? new Hasher();
   hash.field('docier-layout/1');
   hash.field(options.defaultFontFamily);
   hash.field(options.defaultTabStop);
@@ -445,12 +494,12 @@ export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDo
     },
     cursor: 0,
   };
-  const blocks = ingestBlockList(state, model.body().blocks(), 0);
+  const blocks = ingestBlockList(state, story.blocks(), 0);
 
   return {
     blocks,
     paragraphs: state.paragraphs,
-    bodySectionPropertiesElement: model.body().sectionPropertiesElement(),
+    bodySectionPropertiesElement: story.isBody ? story.sectionPropertiesElement() : undefined,
     defaultTabStop: options.defaultTabStop,
     hasThemeFonts: state.flags.themeFonts,
     hasFields: state.flags.fields,
@@ -461,3 +510,6 @@ export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDo
     hash,
   };
 };
+
+export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDocument =>
+  ingestStory(model, model.body(), options);
