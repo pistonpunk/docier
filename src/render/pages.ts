@@ -196,7 +196,7 @@ export const paintPageSheet = (
   const extra: Record<string, string> = {
     'background-color': context.options.pageBackground,
   };
-  if (context.options.pageShadow) extra['box-shadow'] = '0 1px 4px rgba(0,0,0,0.25)';
+  if (context.options.pageShadow) extra['box-shadow'] = 'var(--docier-page-shadow, 0 2px 6px rgba(0, 0, 0, 0.10))';
   applyStyle(
     sheet,
     positionStyle(

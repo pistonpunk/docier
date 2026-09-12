@@ -137,5 +137,5 @@ export interface ResolvedRenderOptions {
 
 export const DEFAULT_PAGE_GAP_PX = 24;
 export const DEFAULT_PAGE_BACKGROUND = '#ffffff';
-export const DEFAULT_SURFACE_BACKGROUND = '#f4f4f4';
+export const DEFAULT_SURFACE_BACKGROUND = '#e6e6e6';
 export const DEFAULT_CLASS_NAME = 'docier-render';
