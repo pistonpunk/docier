@@ -4,8 +4,10 @@ import type { NodeId } from '../ids.js';
 import { RunProperties } from '../properties/run-properties.js';
 import { W, childElements, createWElement, isWElement, removeElement, setElementText, setWAttr, textOfElement, wAttr } from '../xml.js';
 import { ModelNode } from '../view.js';
+import type { AlternateContentSelection } from './alternate-content.js';
+import { isAlternateContentElement, selectAlternateContent } from './alternate-content.js';
 import type { RunContent } from './run-content.js';
-import { createRunContent, logicalTextOfContent, runContentKindOf } from './run-content.js';
+import { createRunContent, logicalTextOfContent, resolvedRunContents, runContentKindOf } from './run-content.js';
 
 export type InlineKind =
   | 'run'
@@ -13,6 +15,7 @@ export type InlineKind =
   | 'simpleField'
   | 'contentControl'
   | 'container'
+  | 'alternateContent'
   | 'bookmarkStart'
   | 'bookmarkEnd'
   | 'rangeMarker'
@@ -62,6 +65,10 @@ export class Run extends InlineNode {
     return items;
   }
 
+  resolvedContents(): readonly RunContent[] {
+    return resolvedRunContents(this.context, this.contents());
+  }
+
   get logicalText(): string {
     return this.contents().map((item) => item.logicalText).join('');
   }
@@ -77,7 +84,7 @@ export class Run extends InlineNode {
   }
 
   get hasDrawing(): boolean {
-    return this.contents().some(
+    return this.resolvedContents().some(
       (item) => item.kind === 'drawing' || item.kind === 'picture' || item.kind === 'object',
     );
   }
@@ -484,6 +491,52 @@ export class RangeMarker extends InlineNode {
   }
 }
 
+export class AlternateContent extends InlineNode {
+  readonly inlineKind = 'alternateContent' as const;
+  private readonly context: ModelContext;
+  private readonly resolution: AlternateContentSelection;
+  private childrenCache: readonly InlineNode[] | undefined;
+
+  constructor(id: NodeId, element: XmlElement, context: ModelContext) {
+    super(id, element);
+    this.context = context;
+    this.resolution = selectAlternateContent(element);
+  }
+
+  get selection(): AlternateContentSelection {
+    return this.resolution;
+  }
+
+  get chosenElement(): XmlElement | undefined {
+    return this.resolution.element;
+  }
+
+  get isUsable(): boolean {
+    return this.resolution.kind !== 'none';
+  }
+
+  children(): readonly InlineNode[] {
+    if (this.childrenCache !== undefined) return this.childrenCache;
+    const chosen = this.chosenElement;
+    this.childrenCache = chosen === undefined ? [] : buildInlineChildren(this.context, chosen);
+    return this.childrenCache;
+  }
+
+  get logicalText(): string {
+    return logicalTextOfChildren(this.children());
+  }
+
+  get isTextual(): boolean {
+    return this.children().some((child) => child.isTextual);
+  }
+
+  remove(): boolean {
+    const removed = removeElement(this.element);
+    if (removed) this.context.forgetSubtree(this.element);
+    return removed;
+  }
+}
+
 export class OpaqueInline extends InlineNode {
   readonly inlineKind = 'opaque' as const;
 
@@ -516,6 +569,26 @@ export const isWordManagedBookmark = (name: string): boolean =>
   /^_Sect\w*$/.test(name) ||
   /^_GoBack\d*$/.test(name);
 
+export const collectAlternateContent = (
+  nodes: readonly InlineNode[],
+): readonly AlternateContent[] => {
+  const found: AlternateContent[] = [];
+  const walk = (current: readonly InlineNode[]): void => {
+    for (const node of current) {
+      if (node instanceof AlternateContent) {
+        found.push(node);
+        walk(node.children());
+        continue;
+      }
+      if (node instanceof Hyperlink || node instanceof InlineContainer || node instanceof SimpleField) {
+        walk(node.children());
+      }
+    }
+  };
+  walk(nodes);
+  return found;
+};
+
 export const buildInlineChildren = (
   context: ModelContext,
   parent: XmlElement,
@@ -530,6 +603,9 @@ export const buildInlineChildren = (
 };
 
 export const inlineNodeOf = (context: ModelContext, element: XmlElement): InlineNode => {
+  if (isAlternateContentElement(element)) {
+    return context.view(element, (id, target) => new AlternateContent(id, target, context));
+  }
   if (element.uri === W) {
     switch (element.localName) {
       case 'r':

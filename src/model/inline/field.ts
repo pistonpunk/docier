@@ -1,5 +1,5 @@
 import type { InlineNode, Run } from './nodes.js';
-import { Hyperlink, InlineContainer, Run as RunView, SimpleField } from './nodes.js';
+import { AlternateContent, Hyperlink, InlineContainer, Run as RunView, SimpleField } from './nodes.js';
 import { FieldCharContent, InstructionTextContent, TextContent } from './run-content.js';
 
 export interface FieldSwitch {
@@ -66,6 +66,7 @@ export const collectRuns = (inlines: readonly InlineNode[]): readonly Run[] => {
       if (node instanceof RunView) runs.push(node);
       else if (node instanceof Hyperlink || node instanceof InlineContainer) walk(node.children());
       else if (node instanceof SimpleField) walk(node.children());
+      else if (node instanceof AlternateContent) walk(node.children());
     }
   };
   walk(inlines);

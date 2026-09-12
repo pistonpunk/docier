@@ -386,6 +386,7 @@ export const ingestBlockList = (
       }
       state.cursor = result.next;
       state.paragraphs.push(result.paragraph);
+      for (const diagnostic of result.diagnostics) state.diagnostics.push(diagnostic);
       state.flags.themeFonts = state.flags.themeFonts || result.hasThemeFont;
       state.flags.fields = state.flags.fields || result.hasFields;
       state.flags.notes = state.flags.notes || result.hasNotes;

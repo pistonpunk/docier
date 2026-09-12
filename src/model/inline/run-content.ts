@@ -1,7 +1,10 @@
 import type { XmlElement } from '../../ooxml/xml/index.js';
+import type { ModelContext } from '../context.js';
 import type { NodeId } from '../ids.js';
 import { ModelNode } from '../view.js';
 import { W, childElements, isWElement, setElementText, setWAttr, textOfElement, wAttr } from '../xml.js';
+import type { AlternateContentSelection } from './alternate-content.js';
+import { isAlternateContentElement, selectAlternateContent } from './alternate-content.js';
 
 export const TAB_CHARACTER = '\t';
 export const LINE_BREAK_CHARACTER = '\n';
@@ -30,6 +33,7 @@ export type RunContentKind =
   | 'pageNumber'
   | 'lastRenderedPageBreak'
   | 'positionalTab'
+  | 'alternateContent'
   | 'opaque';
 
 export type BreakKind = 'text' | 'page' | 'column' | 'lineClear';
@@ -313,6 +317,52 @@ export class OpaqueContent extends RunContent {
   }
 }
 
+export class AlternateContentContent extends RunContent {
+  readonly kind = 'alternateContent' as const;
+  private readonly resolution: AlternateContentSelection;
+
+  constructor(id: NodeId, element: XmlElement) {
+    super(id, element);
+    this.resolution = selectAlternateContent(element);
+  }
+
+  get selection(): AlternateContentSelection {
+    return this.resolution;
+  }
+
+  get chosenElement(): XmlElement | undefined {
+    return this.resolution.element;
+  }
+
+  get isUsable(): boolean {
+    return this.resolution.kind !== 'none';
+  }
+
+  get logicalText(): string {
+    return logicalTextOfContent(this.element);
+  }
+}
+
+export const resolvedRunContents = (
+  context: ModelContext,
+  contents: readonly RunContent[],
+): readonly RunContent[] => {
+  const out: RunContent[] = [];
+  for (const content of contents) {
+    if (!(content instanceof AlternateContentContent)) {
+      out.push(content);
+      continue;
+    }
+    const chosen = content.chosenElement;
+    if (chosen === undefined) continue;
+    const children = childElements(chosen).map((child) =>
+      context.view(child, (id, element) => createRunContent(id, element)),
+    );
+    out.push(...resolvedRunContents(context, children));
+  }
+  return out;
+};
+
 const KIND_BY_LOCAL_NAME: Readonly<Record<string, RunContentKind>> = {
   t: 'text',
   delText: 'deletedText',
@@ -339,7 +389,8 @@ const KIND_BY_LOCAL_NAME: Readonly<Record<string, RunContentKind>> = {
 };
 
 export const runContentKindOf = (element: XmlElement): RunContentKind =>
-  (element.uri === W && KIND_BY_LOCAL_NAME[element.localName]) || 'opaque';
+  (element.uri === W && KIND_BY_LOCAL_NAME[element.localName]) ||
+  (isAlternateContentElement(element) ? 'alternateContent' : 'opaque');
 
 export const createRunContent = (id: NodeId, element: XmlElement): RunContent => {
   switch (runContentKindOf(element)) {
@@ -374,6 +425,8 @@ export const createRunContent = (id: NodeId, element: XmlElement): RunContent =>
     case 'lastRenderedPageBreak':
     case 'positionalTab':
       return new MarkerContent(id, element);
+    case 'alternateContent':
+      return new AlternateContentContent(id, element);
     default:
       return new OpaqueContent(id, element);
   }
@@ -385,6 +438,13 @@ export const logicalTextOfContent = (element: XmlElement): string => {
     case 'text':
     case 'deletedText':
       return textOfElement(element);
+    case 'alternateContent': {
+      const chosen = selectAlternateContent(element).element;
+      if (chosen === undefined) return '';
+      let text = '';
+      for (const child of childElements(chosen)) text += logicalTextOfContent(child);
+      return text;
+    }
     case 'tab':
       return TAB_CHARACTER;
     case 'break': {

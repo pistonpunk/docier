@@ -1,8 +1,15 @@
 import type { Mp } from '../units/index.js';
 import { twipToMp } from '../units/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
-import type { DocumentModel, Paragraph } from '../model/index.js';
+import type {
+  AlternateChoice,
+  AlternateContentSelection,
+  DocumentModel,
+  Paragraph,
+  RunContent,
+} from '../model/index.js';
 import {
+  AlternateContentContent,
   BreakContent,
   CarriageReturnContent,
   DrawingContent,
@@ -11,6 +18,9 @@ import {
   SymbolContent,
   TabContent,
   TextContent,
+  branchCarriesModelledContent,
+  collectAlternateContent,
+  resolvedRunContents,
 } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
 import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
@@ -178,7 +188,59 @@ interface ParagraphIngest {
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
   readonly hasNumbering: boolean;
+  readonly diagnostics: readonly LayoutDiagnostic[];
 }
+
+const requiresReason = (choice: AlternateChoice): string => {
+  for (const resolution of choice.resolutions) {
+    if (resolution.kind === 'undeclared') {
+      return `its Requires="${choice.requires}" names the undeclared prefix "${resolution.prefix}"`;
+    }
+    if (resolution.kind === 'unsupported') {
+      return `its Requires="${choice.requires}" names "${resolution.namespace}", which this library does not implement`;
+    }
+  }
+  return choice.requires === ''
+    ? 'it declares no Requires attribute'
+    : `its Requires="${choice.requires}" names no namespace this library implements`;
+};
+
+const alternateContentDiagnostics = (
+  selection: AlternateContentSelection,
+  at: DocPos,
+): readonly LayoutDiagnostic[] => {
+  const out: LayoutDiagnostic[] = [];
+  for (const choice of selection.skipped) {
+    out.push({
+      code: 'alternateContentChoiceSkipped',
+      severity: 'info',
+      message: `an mc:Choice was not used: ${requiresReason(choice)}`,
+      docPos: at,
+    });
+  }
+  if (selection.kind === 'none') {
+    out.push({
+      code: 'alternateContentUnresolved',
+      severity: 'error',
+      message:
+        'an mc:AlternateContent has no branch this library can use and no mc:Fallback; its content was not laid out',
+      docPos: at,
+    });
+    return out;
+  }
+  if (!branchCarriesModelledContent(selection.element)) {
+    out.push({
+      code: 'alternateContentNotLaidOut',
+      severity: 'warning',
+      message:
+        selection.kind === 'choice'
+          ? 'the mc:Choice this library selected carries no w: content, so nothing was laid out for it'
+          : 'the mc:Fallback this library selected carries no w: content, so nothing was laid out for it',
+      docPos: at,
+    });
+  }
+  return out;
+};
 
 export const paragraphDecorationOf = (
   paragraph: Paragraph,
@@ -209,11 +271,16 @@ export const ingestParagraph = (
   };
 
   const runs: IngestedRun[] = [];
+  const diagnostics: LayoutDiagnostic[] = [];
   let cursor = start as number;
   let hasThemeFontSeen = hasThemeFont(resolvedParagraph);
   let hasNotes = false;
   let hasDrawings = false;
   let hasUnresolvedDrawings = false;
+
+  for (const wrapper of collectAlternateContent(paragraph.inlineChildren())) {
+    diagnostics.push(...alternateContentDiagnostics(wrapper.selection, start));
+  }
 
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);
@@ -222,9 +289,9 @@ export const ingestParagraph = (
     if (runFormat.hidden) continue;
     const runStart = docPos(cursor);
     const items: IngestedItem[] = [];
-    for (const content of run.contents()) {
-      const item = itemFromContent(content, runFormat, docPos(cursor));
-      if (item === undefined) continue;
+
+    const absorb = (item: IngestedItem | undefined): void => {
+      if (item === undefined) return;
       if (item.kind === 'object') {
         hasDrawings = true;
         if (item.object === undefined) hasUnresolvedDrawings = true;
@@ -232,6 +299,27 @@ export const ingestParagraph = (
       if (item.kind === 'noteRef') hasNotes = true;
       items.push(item);
       cursor += ingestedItemLength(item);
+    };
+
+    const absorbContent = (content: RunContent): void => {
+      if (content instanceof DrawingContent && content.textboxParagraphs.length > 0) {
+        diagnostics.push({
+          code: 'textboxContentNotLaidOut',
+          severity: 'info',
+          message: 'the paragraphs of a shape or text box are not laid out by this slice',
+          docPos: docPos(cursor),
+        });
+      }
+      absorb(itemFromContent(content, runFormat, docPos(cursor)));
+    };
+
+    for (const content of run.contents()) {
+      if (content instanceof AlternateContentContent) {
+        diagnostics.push(...alternateContentDiagnostics(content.selection, docPos(cursor)));
+        for (const inner of resolvedRunContents(model.context, [content])) absorbContent(inner);
+        continue;
+      }
+      absorbContent(content);
     }
     if (items.length === 0) continue;
     runs.push({ format: runFormat, items, docStart: runStart, docEnd: docPos(cursor) });
@@ -257,6 +345,7 @@ export const ingestParagraph = (
     hasDrawings,
     hasUnresolvedDrawings,
     hasNumbering: numberingId !== undefined && numberingId !== 0,
+    diagnostics,
   };
 };
 
