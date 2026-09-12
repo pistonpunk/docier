@@ -1,0 +1,150 @@
+# docier — Progress Tracker
+
+Anchor document for long-running work. Read this first, update it last.
+
+---
+
+## Ultimate Goal
+
+**docier** — a standalone, framework-agnostic **TypeScript** library for editing DOCX documents in the
+browser, exposed on npm, as a credible open alternative to ONLYOFFICE for a document-template product
+(HR contracts, orders, letters; Romanian and Russian as common document languages).
+
+Success means: a host app mounts it into a DOM element, configures it with one config object, drives it
+through commands, observes it through events, gets a real Word-compatible `.docx` in and out, and can turn
+tokenization on or off by config. It must feel like Word to a non-technical HR manager, and it must be
+pleasant to integrate for a developer.
+
+**Repo:** `git@github.com:pistonpunk/docier.git` · local `/home/daniel/work/docier` · branch `main`
+**Licence:** MIT · **Runtime deps:** zero, if attainable
+
+---
+
+## Decisions made (do not re-litigate)
+
+| # | Decision | Rationale |
+|---|---|---|
+| D1 | **DOCX (OOXML) is the native format.** Never "an HTML editor with docx export". | A specified format with a real model, and it round-trips through Word itself. |
+| D2 | **The engine owns layout. The DOM only paints it.** Immutable millipoint `LayoutResult` is the only layout authority; the renderer positions one absolute box per run from engine coordinates; **no CSS participates in layout**; pt→px in exactly one function; zoom is a pure paint scale that never re-runs layout; a divergence detector compares rendered DOM to engine in dev and CI. | The previous in-app attempt failed precisely here: the browser laid text out and a hand-written CSS mirror chased the engine's constants, so screen and export silently disagreed. |
+| D3 | **Everything is a command; every state change is an event.** One surface for actions and observation. | Makes the library drivable by any host, and makes the token module just another consumer. |
+| D4 | **Tokenization is an optional module**, separate entry point (`docier/tokens`), off by default. | A plain DOCX editor must not pay for templating. |
+| D5 | **Chrome is plain DOM in the core** + thin `docier/react` adapter. **Not custom elements.** | Matches how the field does it (CodeMirror, ProseMirror, Lexical, Tiptap). Custom elements fight SSR and give poor TS DX via attribute/property duality. |
+| D6 | **Browser floor is capability-based:** `CompressionStream`, `Intl.Segmenter`, `Popover API`, `structuredClone`, ESM + top-level await. In practice Chrome/Edge 120+, Firefox 121+, Safari 17.4+. No polyfills for legacy. | `Intl.Segmenter` gives real locale-aware line and word breaking for ro/ru. Zero zip dependency via `CompressionStream`. |
+| D7 | **Unicode is preserved, not normalised**, on save. No NFC. | Legal fidelity: a name's byte representation must not change because we re-saved the file. |
+| D8 | **PDF export is a separate entry point** (`docier/pdf`), not in the core. | Keeps the core lean; PDF generation is large and not every consumer wants it. |
+| D9 | **Unknown OOXML parts and markup are preserved, never dropped.** | Documents come from Word full of things we do not model. Re-saving must not destroy them. |
+| D10 | **No comments in code.** Explanation lives in `docs/` and commit messages. | Owner preference. |
+
+Still open as **product** calls (recorded as ADRs, not decided): PDF/A profile for RO/RU archiving
+regimes; licensing of the Romanian/Russian hyphenation and dictionary data (several common ones are
+GPL/LGPL — a distribution question, not an engineering one).
+
+---
+
+## Blocker — read before planning any work
+
+**There is no Node, npm or Docker in this environment.** I cannot build, typecheck or run tests here.
+Verification is limited to reading code and to CI you run. This breaks the "verify immediately" step of
+the micro-iteration loop, so the loop is adapted below rather than skipped.
+
+**Consequences:**
+- Every commit is unverified at the time it is made.
+- A single type error fails the build later, so strict settings are enforced by discipline, not by the compiler.
+- Pushing to GitHub does not run anything unless we add CI.
+
+**Mitigation, in order of preference:**
+1. Add `.github/workflows/ci.yml` running `npm ci && npm run typecheck && npm run build && npm test` on push.
+   I cannot read the result myself (no `gh`, no API token) — **you would have to relay failures**, or grant a token.
+2. You run `npm run typecheck` locally in `/home/daniel/work/docier` and paste failures.
+3. Failing both, work proceeds blind and bugs surface in review — the situation that produced the
+   layout mess in the previous attempt.
+
+**Do not silently proceed as though code is verified.** State plainly what is and is not checked.
+
+---
+
+## Deadlines, blockers and error log
+
+| Date | Item | Status |
+|---|---|---|
+| 2026-09-12 | No Node/npm/Docker in the sandbox | **OPEN — structural** |
+| 2026-09-12 | CI workflow not yet added | OPEN |
+| 2026-09-12 | Hyphenation/dictionary licensing for ro/ru | OPEN — product call |
+| 2026-09-12 | PDF/A profile for RO/RU archiving | OPEN — product call |
+
+---
+
+## Task list
+
+### Phase 0 — Foundations
+- [x] Create the repo, scaffold `package.json` / `tsconfig.json` / `.gitignore`
+- [x] Five parallel domain specifications in `docs/spec/` (~360 features)
+- [ ] Consolidate into `docs/SPEC.md` + `docs/adr/`  *(agent running)*
+- [ ] `src/units/` — EMU / twip / point / **millipoint** as branded types, exact round-trips  *(agent running)*
+- [ ] `src/ooxml/` — .docx package layer: zip read/write, part registry, XML parse/serialise  *(agent running)*
+- [ ] Add `.github/workflows/ci.yml`
+- [ ] Decide the module boundary map from `docs/SPEC.md` and create the empty module folders
+
+### Phase 1 — A document that survives a round trip
+- [ ] `src/model/` — the OOXML-faithful document model (paragraphs, runs, rPr/pPr, styles, numbering)
+- [ ] Parse a real Word `.docx` into the model
+- [ ] Serialise the model back to a byte-comparable `.docx`
+- [ ] **Round-trip test against real Word files** — this is the gate for everything else
+- [ ] Styles resolution (basedOn chain, docDefaults, direct formatting precedence)
+
+### Phase 2 — Layout
+- [ ] `src/layout/` — the pass pipeline in dependency order, per spec 02
+- [ ] Font metrics and measurement (the single measurement seam)
+- [ ] Line breaking to millipoint `LayoutResult`
+- [ ] Pagination: page boxes, margins, breaks, widow/orphan, keep-with-next
+- [ ] The rendered-DOM-vs-engine divergence detector
+
+### Phase 3 — A visible, editable document
+- [ ] `src/render/` — paint-only DOM renderer from `LayoutResult`
+- [ ] `src/edit/` — caret, selection, keyboard, IME, undo/redo
+- [ ] `createEditor(el, config)` mount API and the command/event surface
+- [ ] Minimum viable chrome so it is actually usable
+
+### Phase 4 — Word-like
+- [ ] Formatting and the styles engine
+- [ ] Rulers (one per document, not per page), status bar, zoom
+- [ ] Menu bar / ribbon, dialogs, context menus for every surface
+- [ ] Floating selection controls
+- [ ] Objects: images, shapes, z-order, handles, wrapping
+
+### Phase 5 — Tokens
+- [ ] `src/tokens/` as a separate entry point, off by default
+- [ ] Content controls (`w:sdt`) as the token carrier
+- [ ] Insert by palette / trigger-autocomplete / dialog
+- [ ] Fill, preview, unresolved-value reporting, unlink
+
+### Phase 6 — Output and release
+- [ ] `src/pdf/` — PDF export, separate entry point
+- [ ] Print path and print preview
+- [ ] Accessibility pass, i18n pass (en/ro/ru + RTL groundwork)
+- [ ] Performance pass on a 200-page document
+- [ ] `README.md`, API docs, examples, npm publish (`docier`)
+
+---
+
+## Micro-iteration loop (adapted for a no-compiler environment)
+
+1. **Sync** — read this file before starting.
+2. **Scope** — one file or one function. No multi-file rewrites in a single step.
+3. **Verify** — there is no local build. Substitute: re-read the changed file in full, check every import
+   resolves, every type is satisfied by hand, and no unused symbol remains. Then push, and ask for CI or a
+   local `npm run typecheck` when the change is large enough to be worth a round trip.
+4. **Persist** — update this file: check off what is done, record what is now active.
+5. **Commit** — concise, descriptive message.
+
+**Infinite-loop protection:** if the same failure repeats three times, stop. Run `git diff`, write the
+failure under Blockers, and change approach rather than retrying.
+
+---
+
+## Current active sub-task
+
+**Awaiting the consolidation agent (`docs/SPEC.md` + `docs/adr/`) and the foundation agent
+(`src/units/`, `src/ooxml/`).** Both were running when this file was created. Next action on their
+completion: review their output against the decisions above, resolve any conflict with D1–D10, commit,
+and open Phase 1 with the document model.
