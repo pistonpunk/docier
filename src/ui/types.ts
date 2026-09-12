@@ -162,3 +162,5 @@ export const STATUS_ITEM_IDS: readonly StatusItemId[] = [
 ];
 
 export const VIEW_MODES: readonly ViewMode[] = ['print', 'web', 'draft', 'read'];
+
+export const STATUS_VIEW_MODES: readonly ViewMode[] = ['read', 'print', 'web'];

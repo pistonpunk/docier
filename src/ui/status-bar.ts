@@ -1,6 +1,6 @@
 import type { Disposable } from '../api/types.js';
 import { createDisposableStore, markPart, markSlot, make, setText } from './dom.js';
-import { VIEW_MODES as MODES } from './types.js';
+import { STATUS_VIEW_MODES as MODES } from './types.js';
 import type { ChromeContext, SaveState, StatusItemId, ViewMode } from './types.js';
 
 export interface StatusBarOptions {
@@ -122,6 +122,16 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
     zoom: zoomGroup,
   };
 
+  const languageNameOf = (tag: string | undefined): string => {
+    if (tag === undefined || tag === '') return '';
+    try {
+      const names = new Intl.DisplayNames([tag], { type: 'language' });
+      return names.of(tag) ?? tag;
+    } catch {
+      return tag;
+    }
+  };
+
   const order: readonly StatusItemId[] = ['page', 'words', 'language', 'save', 'view', 'zoom'];
 
   let appliedOrder = '';
@@ -165,7 +175,8 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
         : context.i18n.text('ui.status.words', { count: context.i18n.formatNumber(state.words) }),
     );
     words.setAttribute('title', words.textContent ?? '');
-    setText(language, state.language ?? '');
+    setText(language, languageNameOf(state.language));
+    language.dataset.docierTag = state.language ?? '';
     language.setAttribute('title', context.i18n.text('ui.status.language'));
     setText(save, context.i18n.text(SAVE_KEYS[state.save]));
     save.setAttribute('title', context.i18n.text('ui.status.save'));

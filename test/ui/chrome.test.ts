@@ -370,7 +370,9 @@ describe('localisation', () => {
       language: () => 'de-DE',
     });
     expect(chrome.store.get().language).toBe('de-DE');
-    expect(chrome.statusBar!.language.textContent).toBe('de-DE');
+    expect(chrome.statusBar!.language.dataset.docierTag).toBe('de-DE');
+    expect(chrome.statusBar!.language.textContent).not.toBe('de-DE');
+    expect(chrome.statusBar!.language.textContent).not.toBe('');
     expect(chrome.statusBar!.language.getAttribute('title')).toBe('Proofing language');
   });
 
