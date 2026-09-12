@@ -25,7 +25,7 @@ import { createChromeStore, initialChromeState } from './store.js';
 import type { ChromeStore } from './store.js';
 import { injectStyles } from './styles.js';
 import { applyTheme, DEFAULT_THEME_TOKENS, DENSITY_TOKENS } from './theme.js';
-import { createStatusBar } from './status-bar.js';
+import { ZOOM_MAX, ZOOM_MIN, createStatusBar } from './status-bar.js';
 import type { StatusBarHandle } from './status-bar.js';
 import type {
   ChromeActionArgs,
@@ -229,7 +229,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   };
 
   const setZoom = (value: number): void => {
-    const clamped = Math.min(4, Math.max(0.25, value));
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
     handle.setZoom(clamped);
     store.set({ zoom: clamped });
     ruler?.refresh();

@@ -35,8 +35,28 @@ const VIEW_KEYS: Readonly<Record<ViewMode, string>> = {
   read: 'ui.control.viewRead',
 };
 
-export const ZOOM_MIN = 0.25;
-export const ZOOM_MAX = 4;
+export const ZOOM_MIN = 0.1;
+export const ZOOM_MAX = 5;
+
+const ZOOM_POSITIONS = 1000;
+
+export const zoomAtPosition = (position: number): number => {
+  const t = Math.min(ZOOM_POSITIONS, Math.max(0, position)) / ZOOM_POSITIONS;
+  const value =
+    t <= 0.5
+      ? ZOOM_MIN * (1 / ZOOM_MIN) ** (t * 2)
+      : 1 * (ZOOM_MAX / 1) ** (t * 2 - 1);
+  return Math.round(value * 100) / 100;
+};
+
+export const positionOfZoom = (zoom: number): number => {
+  const value = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+  const t =
+    value <= 1
+      ? Math.log(value / ZOOM_MIN) / Math.log(1 / ZOOM_MIN) / 2
+      : 0.5 + Math.log(value) / Math.log(ZOOM_MAX) / 2;
+  return Math.round(t * ZOOM_POSITIONS);
+};
 export const ZOOM_STEP = 0.05;
 
 export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
@@ -92,15 +112,16 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
   const zoom = doc.createElement('input');
   zoom.className = 'docier-status-range';
   zoom.setAttribute('type', 'range');
-  zoom.setAttribute('min', String(ZOOM_MIN));
-  zoom.setAttribute('max', String(ZOOM_MAX));
-  zoom.setAttribute('step', String(ZOOM_STEP));
+  zoom.setAttribute('min', '0');
+  zoom.setAttribute('max', String(ZOOM_POSITIONS));
+  zoom.setAttribute('step', '1');
   zoom.setAttribute('data-docier-part', 'zoom');
   zoom.setAttribute('aria-label', context.i18n.text('ui.status.zoom'));
-  zoom.value = '1';
+  zoom.value = String(positionOfZoom(1));
   zoom.addEventListener('input', () => {
-    const value = Number(zoom.value);
-    if (!Number.isFinite(value)) return;
+    const position = Number(zoom.value);
+    if (!Number.isFinite(position)) return;
+    const value = zoomAtPosition(position);
     options.onZoom?.(value);
     context.run('zoomSet', { zoom: value });
   });
@@ -187,7 +208,7 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
       node.setAttribute('title', context.i18n.text(VIEW_KEYS[mode]));
       node.setAttribute('aria-label', context.i18n.text(VIEW_KEYS[mode]));
     }
-    zoom.value = String(state.zoom);
+    zoom.value = String(positionOfZoom(state.zoom));
     setText(zoomLabel, context.i18n.text('ui.status.zoomPercent', { percent: Math.round(state.zoom * 100) }));
     zoomLabel.setAttribute('title', context.i18n.text('ui.status.zoom'));
     zoomOut.setAttribute('aria-label', context.i18n.text('ui.control.zoomOut'));

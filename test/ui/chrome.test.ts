@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerLanguage, messagesFor } from '../../src/ui/i18n.js';
 import { mountChrome } from '../../src/ui/chrome.js';
+import { ZOOM_MAX, ZOOM_MIN, positionOfZoom, zoomAtPosition } from '../../src/ui/status-bar.js';
 import type { ChromeHandle } from '../../src/ui/chrome.js';
 import { editorWith, disposeEditors } from '../api/support.js';
 import { bodyOf, chromeOf, click, disposeChromes, longBody, paragraphText } from './support.js';
@@ -222,25 +223,42 @@ describe('status bar', () => {
     expect(status.words.textContent).toMatch(/words$/);
     expect(status.save.textContent).toBe('Saved');
     expect(status.zoom.getAttribute('aria-label')).toBe('Zoom');
-    expect(status.zoom.value).toBe('1');
+    expect(status.zoom.value).toBe(String(positionOfZoom(1)));
 
     chrome.store.set({ page: 3, words: 1, save: 'unsaved', zoom: 1.5 });
     expect(status.page.textContent).toBe('Page 3 of 15');
     expect(status.words.textContent).toBe('1 word');
     expect(status.save.textContent).toBe('Unsaved changes');
     expect(status.save.getAttribute('data-docier-save')).toBe('unsaved');
-    expect(status.zoom.value).toBe('1.5');
+    expect(status.zoom.value).toBe(String(positionOfZoom(1.5)));
   });
 
-  it('drives zoom through the editor', async () => {
+  it('drives zoom through the editor from a slider position', async () => {
     const { handle, chrome } = await mountWith(longBody(), { mode: 'full' });
     const status = chrome.statusBar!;
-    status.zoom.value = '2';
+    status.zoom.value = String(positionOfZoom(2));
     status.zoom.dispatchEvent(new Event('input', { bubbles: true }));
     expect(chrome.store.get().zoom).toBe(2);
     chrome.sync();
     expect(chrome.store.get().zoom).toBe(2);
     expect(handle).toBeDefined();
+  });
+
+  it('puts a hundred percent at the centre of the zoom slider and the ends at the range', () => {
+    expect(zoomAtPosition(positionOfZoom(1))).toBe(1);
+    expect(positionOfZoom(1)).toBe(500);
+    expect(zoomAtPosition(0)).toBe(ZOOM_MIN);
+    expect(zoomAtPosition(1000)).toBe(ZOOM_MAX);
+  });
+
+  it('climbs the zoom ladder without a dead zone', () => {
+    let previous = 0;
+    for (let position = 0; position <= 1000; position += 100) {
+      const zoom = zoomAtPosition(position);
+      expect(zoom).toBeGreaterThan(previous);
+      previous = zoom;
+    }
+    expect(previous).toBe(ZOOM_MAX);
   });
 
   it('reorders items when the host changes the set', async () => {
