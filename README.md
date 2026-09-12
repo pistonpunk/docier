@@ -88,6 +88,27 @@ Fill runs **headless** — bytes in, bytes out, no DOM and no network — so a b
 without a browser. A missing value is reported by code *and* rendered visibly, because a contract must
 never print a silently blank name.
 
+## Export
+
+Its own entry point, so a host that does not export never loads it.
+
+```ts
+import { renderPdf } from 'docier/pdf'
+
+const { bytes, report } = await exportPdf(layoutResult, { pdfa: 'a-2b' })
+```
+
+The exporter paints the **same `LayoutResult`** the screen paints — it re-runs no layout, re-measures no
+text, and consults the model for no position. Glyph advances come from the same measurer the engine
+measured with, and a font whose metrics disagree is reported rather than substituted.
+
+Output is deterministic: the same document produces byte-identical bytes, proven across separate
+processes. PDF/A-2b is available for archival, and a missing font or image is reported as a loss rather
+than silently omitted.
+
+Verified against **poppler** rather than against itself — `pdftotext` extracts text at the coordinates
+the engine computed, and `pdftoppm` rasterises with ink where the engine placed it.
+
 ## Requirements
 
 Evergreen browsers: Chrome/Edge 120+, Firefox 121+, Safari 17.4+. The floor is capability-based —
