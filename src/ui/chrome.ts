@@ -672,6 +672,12 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     statusBar?.refresh();
   }
 
+  function applyThemeMode(): void {
+    const mode = handle.config.theme?.mode ?? 'system';
+    if (mode === 'system') root.removeAttribute('data-docier-theme');
+    else root.setAttribute('data-docier-theme', mode);
+  }
+
   function mirrorPortal(): void {
     if (portal === undefined) return;
     portal.setAttribute('data-docier-density', store.get().density);
@@ -688,6 +694,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   const ownerDocument = handle.root.ownerDocument;
   ownerWindow?.addEventListener('resize', viewportChanged);
   ownerDocument.addEventListener('scroll', viewportChanged, true);
+
+  applyThemeMode();
 
   if (mode !== 'none') sync();
 

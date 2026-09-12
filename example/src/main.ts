@@ -108,7 +108,7 @@ try {
       permissions: { readOnly: false, allow: [], regionEnforcement: false },
       export: { fontMissing: 'fallback' },
       debug: { logCommands: true, includeValues: true },
-      theme: { vars: {} },
+      theme: { vars: {}, mode: 'light' },
     },
     {
       zoom: 1,

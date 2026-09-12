@@ -452,6 +452,8 @@ export interface TokenizationConfig {
   readonly triggerEnabled: boolean;
 }
 
+export type ThemeMode = 'system' | 'light' | 'dark';
+
 export interface UiConfig {
   readonly chrome: ChromeMode;
   readonly mountDetached: 'allow' | 'reject';
@@ -487,6 +489,7 @@ export interface ExportConfig {
 
 export interface ThemeConfig {
   readonly vars: Readonly<Record<string, string>>;
+  readonly mode: ThemeMode;
 }
 
 export interface TelemetryConfig {
