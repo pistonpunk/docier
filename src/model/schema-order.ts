@@ -1,11 +1,21 @@
 import type { XmlElement } from '../ooxml/xml/index.js';
 import { childElements, createWElement, isWElement } from './xml.js';
 
-const order = (names: readonly string[]): ReadonlyMap<string, number> =>
-  new Map(names.map((name, index) => [name, index]));
+type Wildcard = 'none' | 'head' | 'tail';
 
-const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
-  rPr: order([
+interface ContentModel {
+  readonly order: readonly string[];
+  readonly wildcard: Wildcard;
+}
+
+const model = (order: readonly string[], wildcard: Wildcard = 'none'): ContentModel => ({
+  order,
+  wildcard,
+});
+
+const CONTENT_MODELS: Readonly<Record<string, ContentModel>> = {
+  r: model(['rPr'], 'tail'),
+  rPr: model([
     'rStyle',
     'rFonts',
     'b',
@@ -47,7 +57,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'oMath',
     'rPrChange',
   ]),
-  pPr: order([
+  p: model(['pPr'], 'tail'),
+  pPr: model([
     'pStyle',
     'keepNext',
     'keepLines',
@@ -85,7 +96,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'sectPr',
     'pPrChange',
   ]),
-  sectPr: order([
+  body: model(['sectPr'], 'head'),
+  sectPr: model([
     'headerReference',
     'footerReference',
     'footnotePr',
@@ -109,7 +121,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'printerSettings',
     'sectPrChange',
   ]),
-  tblPr: order([
+  tbl: model(['tblPr', 'tblGrid'], 'tail'),
+  tblPr: model([
     'tblStyle',
     'tblpPr',
     'tblOverlap',
@@ -129,7 +142,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'tblDescription',
     'tblPrChange',
   ]),
-  trPr: order([
+  tr: model(['tblPrEx', 'trPr'], 'tail'),
+  trPr: model([
     'cnfStyle',
     'divId',
     'gridBefore',
@@ -146,7 +160,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'del',
     'trPrChange',
   ]),
-  tcPr: order([
+  tc: model(['tcPr'], 'tail'),
+  tcPr: model([
     'cnfStyle',
     'tcW',
     'gridSpan',
@@ -166,7 +181,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'cellMerge',
     'tcPrChange',
   ]),
-  sdtPr: order([
+  sdt: model(['sdtPr', 'sdtEndPr'], 'tail'),
+  sdtPr: model([
     'rPr',
     'alias',
     'tag',
@@ -196,7 +212,7 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'color',
     'entityPicker',
   ]),
-  style: order([
+  style: model([
     'name',
     'aliases',
     'basedOn',
@@ -220,7 +236,8 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'tcPr',
     'tblStylePr',
   ]),
-  lvl: order([
+  styles: model(['docDefaults', 'latentStyles'], 'tail'),
+  lvl: model([
     'start',
     'numFmt',
     'lvlRestart',
@@ -234,7 +251,7 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'pPr',
     'rPr',
   ]),
-  abstractNum: order([
+  abstractNum: model([
     'nsid',
     'multiLevelType',
     'tmpl',
@@ -243,17 +260,185 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'numStyleLink',
     'lvl',
   ]),
-  num: order(['abstractNumId', 'lvlOverride']),
-  lvlOverride: order(['startOverride', 'lvl']),
-  docDefaults: order(['rPrDefault', 'pPrDefault']),
-  rPrDefault: order(['rPr']),
-  pPrDefault: order(['pPr']),
-  numbering: order(['numPicBullet', 'abstractNum', 'num', 'numIdMacAtCleanup']),
-  styles: order(['docDefaults', 'latentStyles', 'style']),
-  tabs: order(['tab']),
-  pBdr: order(['top', 'left', 'bottom', 'right', 'between', 'bar']),
-  tblBorders: order(['top', 'start', 'left', 'bottom', 'end', 'right', 'insideH', 'insideV']),
-  tcBorders: order([
+  num: model(['abstractNumId', 'lvlOverride']),
+  lvlOverride: model(['startOverride', 'lvl']),
+  docDefaults: model(['rPrDefault', 'pPrDefault']),
+  rPrDefault: model(['rPr']),
+  pPrDefault: model(['pPr']),
+  numbering: model(['numPicBullet', 'abstractNum', 'num', 'numIdMacAtCleanup']),
+  settings: model([
+    'writeProtection',
+    'view',
+    'zoom',
+    'removePersonalInformation',
+    'removeDateAndTime',
+    'doNotDisplayPageBoundaries',
+    'displayBackgroundShape',
+    'printPostScriptOverText',
+    'printFractionalCharacterWidth',
+    'printFormsData',
+    'embedTrueTypeFonts',
+    'embedSystemFonts',
+    'saveSubsetFonts',
+    'saveFormsData',
+    'mirrorMargins',
+    'alignBordersAndEdges',
+    'bordersDoNotSurroundHeader',
+    'bordersDoNotSurroundFooter',
+    'gutterAtTop',
+    'hideSpellingErrors',
+    'hideGrammaticalErrors',
+    'activeWritingStyle',
+    'proofState',
+    'formsDesign',
+    'attachedTemplate',
+    'linkStyles',
+    'stylePaneFormatFilter',
+    'stylePaneSortMethod',
+    'documentType',
+    'mailMerge',
+    'revisionView',
+    'trackChanges',
+    'doNotTrackMoves',
+    'doNotTrackFormatting',
+    'documentProtection',
+    'autoFormatOverride',
+    'styleLockTheme',
+    'styleLockQFSet',
+    'defaultTabStop',
+    'autoHyphenation',
+    'consecutiveHyphenLimit',
+    'hyphenationZone',
+    'doNotHyphenateCaps',
+    'showEnvelope',
+    'summaryLength',
+    'clickAndTypeStyle',
+    'defaultTableStyle',
+    'evenAndOddHeaders',
+    'bookFoldRevPrinting',
+    'bookFoldPrinting',
+    'bookFoldPrintingSheets',
+    'drawingGridHorizontalSpacing',
+    'drawingGridVerticalSpacing',
+    'displayHorizontalDrawingGridEvery',
+    'displayVerticalDrawingGridEvery',
+    'doNotUseMarginsForDrawingGridOrigin',
+    'drawingGridHorizontalOrigin',
+    'drawingGridVerticalOrigin',
+    'doNotShadeFormData',
+    'noPunctuationKerning',
+    'characterSpacingControl',
+    'printTwoOnOne',
+    'strictFirstAndLastChars',
+    'noLineBreaksAfter',
+    'noLineBreaksBefore',
+    'savePreviewPicture',
+    'doNotValidateAgainstSchema',
+    'saveInvalidXml',
+    'ignoreMixedContent',
+    'alwaysShowPlaceholderText',
+    'doNotDemarcateInvalidXml',
+    'saveXmlDataOnly',
+    'useXSLTWhenSaving',
+    'saveThroughXslt',
+    'showXMLTags',
+    'alwaysMergeEmptyNamespace',
+    'updateFields',
+    'hdrShapeDefaults',
+    'footnotePr',
+    'endnotePr',
+    'compat',
+    'docVars',
+    'rsids',
+    'mathPr',
+    'uiCompat97To2003',
+    'attachedSchema',
+    'themeFontLang',
+    'clrSchemeMapping',
+    'doNotIncludeSubdocsInStats',
+    'doNotAutoCompressPictures',
+    'forceUpgrade',
+    'captions',
+    'readModeInkLockDown',
+    'smartTagType',
+    'schemaLibrary',
+    'shapeDefaults',
+    'doNotEmbedSmartTags',
+    'decimalSymbol',
+    'listSeparator',
+  ]),
+  compat: model([
+    'useSingleBorderforContiguousCells',
+    'wpJustification',
+    'noTabHangInd',
+    'noLeading',
+    'spaceForUL',
+    'noColumnBalance',
+    'balanceSingleByteDoubleByteWidth',
+    'noExtraLineSpacing',
+    'doNotLeaveBackslashAlone',
+    'ulTrailSpace',
+    'doNotExpandShiftReturn',
+    'spacingInWholePoints',
+    'lineWrapLikeWord6',
+    'printBodyTextBeforeHeader',
+    'printColBlack',
+    'wpSpaceWidth',
+    'showBreaksInFrames',
+    'subFontBySize',
+    'suppressBottomSpacing',
+    'suppressTopSpacing',
+    'suppressSpacingAtTopOfPage',
+    'suppressTopSpacingWP',
+    'suppressSpBfAfterPgBrk',
+    'swapBordersFacingPages',
+    'convMailMergeEsc',
+    'truncateFontHeightsLikeWP6',
+    'mwSmallCaps',
+    'usePrinterMetrics',
+    'doNotSuppressParagraphBorders',
+    'wrapTrailSpaces',
+    'footnoteLayoutLikeWW8',
+    'shapeLayoutLikeWW8',
+    'alignTablesRowByRow',
+    'forgetLastTabAlignment',
+    'adjustLineHeightInTable',
+    'autoSpaceLikeWord95',
+    'noSpaceRaiseLower',
+    'doNotUseHTMLParagraphAutoSpacing',
+    'layoutRawTableWidth',
+    'layoutTableRowsApart',
+    'useWord97LineBreakRules',
+    'doNotBreakWrappedTables',
+    'doNotSnapToGridInCell',
+    'selectFldWithFirstOrLastChar',
+    'applyBreakingRules',
+    'doNotWrapTextWithPunct',
+    'doNotUseEastAsianBreakRules',
+    'useWord2002TableStyleRules',
+    'growAutofit',
+    'useFELayout',
+    'useNormalStyleForList',
+    'doNotUseIndentAsNumberingTabStop',
+    'useAltKinsokuLineBreakRules',
+    'allowSpaceOfSameStyleInTable',
+    'doNotSuppressIndentation',
+    'doNotAutofitConstrainedTables',
+    'autofitToFirstFixedWidthCell',
+    'underlineTabInNumList',
+    'displayHangulFixedWidth',
+    'splitPgBreakAndParaMark',
+    'doNotVertAlignCellWithSp',
+    'doNotBreakConstrainedForcedTable',
+    'doNotVertAlignInTxbx',
+    'useAnsiKerningPairs',
+    'cachedColBalance',
+    'compatSetting',
+  ]),
+  tabs: model(['tab']),
+  pBdr: model(['top', 'left', 'bottom', 'right', 'between', 'bar']),
+  tblBorders: model(['top', 'start', 'left', 'bottom', 'end', 'right', 'insideH', 'insideV']),
+  tcBorders: model([
     'top',
     'start',
     'left',
@@ -265,30 +450,62 @@ const CHILD_ORDER: Readonly<Record<string, ReadonlyMap<string, number>>> = {
     'tl2br',
     'tr2bl',
   ]),
-  tblCellMar: order(['top', 'start', 'left', 'bottom', 'end', 'right']),
-  tcMar: order(['top', 'start', 'left', 'bottom', 'end', 'right']),
-  pgBorders: order(['top', 'left', 'bottom', 'right']),
-  numPr: order(['ilvl', 'numId', 'numberingChange', 'ins']),
-  ind: order([]),
-  theme: order([]),
+  tblCellMar: model(['top', 'start', 'left', 'bottom', 'end', 'right']),
+  tcMar: model(['top', 'start', 'left', 'bottom', 'end', 'right']),
+  pgBorders: model(['top', 'left', 'bottom', 'right']),
+  numPr: model(['ilvl', 'numId', 'numberingChange', 'ins']),
+  ind: model([]),
+  theme: model([]),
 };
 
-export const childOrderOf = (parentLocalName: string): ReadonlyMap<string, number> | undefined =>
-  CHILD_ORDER[parentLocalName];
+const ranksByParent = new Map<string, ReadonlyMap<string, number>>();
 
-export const insertionIndex = (
-  parent: XmlElement,
+const ranksOf = (parentLocalName: string): ReadonlyMap<string, number> | undefined => {
+  const cached = ranksByParent.get(parentLocalName);
+  if (cached !== undefined) return cached;
+  const declared = CONTENT_MODELS[parentLocalName];
+  if (declared === undefined) return undefined;
+  const ranks = new Map<string, number>();
+  for (let index = 0; index < declared.order.length; index += 1) {
+    const name = declared.order[index];
+    if (name !== undefined && !ranks.has(name)) ranks.set(name, index);
+  }
+  ranksByParent.set(parentLocalName, ranks);
+  return ranks;
+};
+
+const wildcardOf = (parentLocalName: string): Wildcard =>
+  CONTENT_MODELS[parentLocalName]?.wildcard ?? 'none';
+
+export const childOrderOf = (parentLocalName: string): ReadonlyMap<string, number> | undefined =>
+  ranksOf(parentLocalName);
+
+export const childWildcardOf = (parentLocalName: string): Wildcard => wildcardOf(parentLocalName);
+
+const rankOf = (
+  table: ReadonlyMap<string, number>,
+  undeclared: number | undefined,
   localName: string,
-): number => {
+): number | undefined => table.get(localName) ?? undeclared;
+
+export const insertionIndex = (parent: XmlElement, localName: string): number => {
   const table = childOrderOf(parent.localName);
   const children = parent.children;
-  const rank = table?.get(localName);
-  if (table === undefined || rank === undefined) return children.length;
+  if (table === undefined) return children.length;
+  const wildcard = wildcardOf(parent.localName);
+  const undeclared =
+    wildcard === 'tail'
+      ? Number.POSITIVE_INFINITY
+      : wildcard === 'head'
+        ? Number.NEGATIVE_INFINITY
+        : undefined;
+  const rank = rankOf(table, undeclared, localName);
+  if (rank === undefined) return children.length;
   for (let index = 0; index < children.length; index += 1) {
     const child = children[index];
     if (child === undefined || child.kind !== 'element') continue;
     if (child.uri !== parent.uri) continue;
-    const existing = table.get(child.localName);
+    const existing = rankOf(table, undeclared, child.localName);
     if (existing !== undefined && existing > rank) return index;
   }
   return children.length;
@@ -337,7 +554,7 @@ export const removeOrderedChildren = (parent: XmlElement, localName: string): nu
 };
 
 export const isKnownChildOf = (parentLocalName: string, localName: string): boolean =>
-  CHILD_ORDER[parentLocalName]?.has(localName) ?? false;
+  childOrderOf(parentLocalName)?.has(localName) ?? false;
 
 export const namespacedLocalName = (element: XmlElement): string => element.localName;
 
