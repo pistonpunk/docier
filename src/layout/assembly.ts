@@ -2,6 +2,8 @@ import type { Mp } from '../units/index.js';
 import { maxMp, mp, roundHalfEven } from '../units/index.js';
 import type { LineBox } from '../measure/index.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
+import { measureAtom } from './intrinsic.js';
+import type { Atom } from './atoms.js';
 import type { BreakLine } from './breaking.js';
 import { greedyBreaker } from './breaking.js';
 import type { LineGeometry, PlacedAtom } from './line-geometry.js';
@@ -27,6 +29,26 @@ export interface AssembleRequest {
   readonly contentX: Mp;
   readonly contentWidth: Mp;
 }
+
+const hyphenAtomOf = (atom: Atom): Atom | undefined => {
+  const glyph = atom.hyphen;
+  if (glyph === undefined) return undefined;
+  return {
+    ...atom,
+    text: HYPHEN_TEXT,
+    units: glyph.units,
+    lengths: [1],
+    suppressible: false,
+    breakBefore: false,
+    breakAfter: false,
+    breakHyphen: false,
+    forcedBreak: 'none',
+    source: glyph.source,
+    hyphen: undefined,
+  };
+};
+
+const HYPHEN_TEXT = '-';
 
 export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[] => {
   const { measured, format, contentX, contentWidth } = request;
@@ -56,6 +78,14 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
     const last = index === breaks.length - 1;
 
     let placed = placeAtoms(measured, line.start, line.end, lineOrigin, request.context);
+    if (line.hyphenated) {
+      const last = measured[line.end - 1];
+      const glyph = last === undefined ? undefined : hyphenAtomOf(last.atom);
+      if (glyph !== undefined) {
+        const hyphen = measureAtom(glyph);
+        placed = [...placed, { measured: hyphen, x: lineEndOf(placed, lineOrigin), width: hyphen.width }];
+      }
+    }
     const natural = mp(lineEndOf(placed, lineOrigin) - lineOrigin);
     const extra = mp(lineWidth - natural);
 

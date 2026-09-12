@@ -4,7 +4,11 @@ import type { LaidLine } from './assembly.js';
 import type { ParagraphFormat } from './format.js';
 import type { Section } from './sections.js';
 import { geometryChanged, sectionOfBlock } from './sections.js';
-import type { DocRange, LayoutDiagnostic, PageKind, Rect } from './types.js';
+import type { PreparedTable } from './table-prepare.js';
+import type { PlacedRow, PlacedTable, TableFlowHost } from './table-flow.js';
+import { flowTable } from './table-flow.js';
+import type { CellRef, DocRange, LayoutDiagnostic, PageKind, Rect } from './types.js';
+import { docPos } from './types.js';
 
 export interface PaginateBlock {
   readonly index: number;
@@ -15,6 +19,18 @@ export interface PaginateBlock {
   readonly lineHeight: Mp;
 }
 
+export type FlowBlock =
+  | { readonly kind: 'paragraph'; readonly block: PaginateBlock }
+  | { readonly kind: 'table'; readonly table: PreparedTable; readonly docStart: ReturnType<typeof docPos> };
+
+export const flowParagraphBlock = (block: PaginateBlock): FlowBlock => ({ kind: 'paragraph', block });
+
+export const flowTableBlock = (table: PreparedTable): FlowBlock => ({
+  kind: 'table',
+  table,
+  docStart: docPos(table.docStart),
+});
+
 export interface PlacedPiece {
   readonly block: number;
   readonly page: number;
@@ -23,6 +39,8 @@ export interface PlacedPiece {
   readonly lineEnd: number;
   readonly boxTop: Mp;
   readonly spaceBefore: Mp;
+  readonly cell: CellRef | undefined;
+  readonly repeat: boolean;
 }
 
 export interface PageState {
@@ -36,6 +54,8 @@ export interface PageState {
 export interface PaginationResult {
   readonly pages: readonly PageState[];
   readonly pieces: readonly PlacedPiece[];
+  readonly rows: readonly PlacedRow[];
+  readonly tables: readonly PlacedTable[];
 }
 
 export interface PaginateOptions {
@@ -108,14 +128,16 @@ const parityOf = (section: Section): 'any' | 'even' | 'odd' => {
   return 'any';
 };
 
-export const paginate = (
-  blocks: readonly PaginateBlock[],
+export const paginateFlow = (
+  flow: readonly FlowBlock[],
   sections: readonly Section[],
   diagnostics: LayoutDiagnostic[],
   options: PaginateOptions,
 ): PaginationResult => {
   const pages: PageState[] = [];
   const pieces: PlacedPiece[] = [];
+  const rows: PlacedRow[] = [];
+  const tables: PlacedTable[] = [];
   const effectiveSections = sections.length === 0 ? [fallbackSection()] : sections;
 
   let pageIndex = 0;
@@ -156,23 +178,86 @@ export const paginate = (
 
   openPage(currentSection, 'any');
 
+  const host: TableFlowHost = {
+    get page(): number {
+      return pageIndex;
+    },
+    get contentBottom(): Mp {
+      return bottom;
+    },
+    get cursor(): Mp {
+      return cursor;
+    },
+    get remaining(): Mp {
+      return mp(bottom - cursor);
+    },
+    get pageHeight(): Mp {
+      return mp(bottom - contentTop);
+    },
+    get atPageTop(): boolean {
+      return !pageHasContent;
+    },
+    openPage(): void {
+      openPage(currentSection, 'any');
+    },
+    advance(height: Mp): void {
+      cursor = mp(cursor + height);
+      pageHasContent = true;
+    },
+    registerTable(table: PlacedTable): void {
+      if (tables.some((existing) => existing.table === table.table)) return;
+      tables.push(table);
+    },
+    emitRow(row: PlacedRow): void {
+      rows.push(row);
+    },
+    emitPiece(piece: PlacedPiece): void {
+      pieces.push(piece);
+    },
+    diagnostic(diagnostic: LayoutDiagnostic): void {
+      diagnostics.push(diagnostic);
+    },
+  };
+
+  const paragraphAt = (from: number): PaginateBlock | undefined => {
+    for (let index = from; index < flow.length; index += 1) {
+      const item = flow[index];
+      if (item === undefined) return undefined;
+      if (item.kind === 'paragraph') return item.block;
+      return undefined;
+    }
+    return undefined;
+  };
+
   const keepReserve = (from: number): Mp => {
     let reserve: number = 0;
     let index = from;
-    while (index < blocks.length && blocks[index]?.format.keepNext === true) {
-      const next = blocks[index + 1];
+    while (index < flow.length) {
+      const item = flow[index];
+      if (item === undefined) break;
+      if (item.kind !== 'paragraph') {
+        index += 1;
+        continue;
+      }
+      if (item.block.format.keepNext !== true) break;
+      const next = paragraphAt(index + 1);
       if (next === undefined) break;
+      if (next.format.pageBreakBefore === true) break;
+      const nextSection = sectionOfBlock(effectiveSections, next.index);
+      if (nextSection !== undefined && nextSection !== currentSection) break;
       reserve += spaceBeforeOf(next) + (next.lines[0]?.geometry.height ?? 0);
       index += 1;
     }
     return mp(reserve);
   };
 
-  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
-    const block = blocks[blockIndex];
-    if (block === undefined) continue;
+  for (let flowIndex = 0; flowIndex < flow.length; flowIndex += 1) {
+    const item = flow[flowIndex];
+    if (item === undefined) continue;
+    const paragraphIndex = item.kind === 'paragraph' ? item.block.index : item.table.paragraphIndex;
+    const docStart = item.kind === 'paragraph' ? item.block.docRange.start : item.docStart;
 
-    const section = sectionOfBlock(effectiveSections, blockIndex) ?? currentSection;
+    const section = sectionOfBlock(effectiveSections, paragraphIndex) ?? currentSection;
     if (section !== currentSection) {
       if (section.breakType === 'continuous' && !geometryChanged(currentSection, section)) {
         currentSection = section;
@@ -185,7 +270,7 @@ export const paginate = (
             code: 'continuousSectionPageBreak',
             severity: 'info',
             message: `section ${section.index} is continuous but changes the page size, so it starts a new page`,
-            docPos: block.docRange.start,
+            docPos: docStart,
           });
         }
         openPage(section, parityOf(section));
@@ -194,9 +279,15 @@ export const paginate = (
 
     if (pendingPageBreak) openPage(currentSection, 'any');
 
+    if (item.kind === 'table') {
+      flowTable(host, item.table);
+      continue;
+    }
+
+    const block = item.block;
     const total = block.lines.length;
-    const isSectionFirst = section.firstBlock === blockIndex;
-    const reserve = keepReserve(blockIndex);
+    const isSectionFirst = section.firstBlock === paragraphIndex;
+    const reserve = keepReserve(flowIndex);
     let lineIndex = 0;
 
     while (lineIndex < total) {
@@ -278,13 +369,15 @@ export const paginate = (
       const height = sumHeights(block.lines, lineIndex, lineIndex + count);
       const finished = lineIndex + count >= total;
       pieces.push({
-        block: blockIndex,
+        block: paragraphIndex,
         page: pageIndex,
         split: splitOf(lineIndex, lineIndex + count, total),
         lineStart: lineIndex,
         lineEnd: lineIndex + count,
         boxTop: startTop,
         spaceBefore,
+        cell: undefined,
+        repeat: false,
       });
 
       cursor = mp(startTop + height + (finished ? spaceAfterOf(block) : 0));
@@ -297,5 +390,13 @@ export const paginate = (
     }
   }
 
-  return { pages, pieces };
+  return { pages, pieces, rows, tables };
 };
+
+export const paginate = (
+  blocks: readonly PaginateBlock[],
+  sections: readonly Section[],
+  diagnostics: LayoutDiagnostic[],
+  options: PaginateOptions,
+): PaginationResult =>
+  paginateFlow(blocks.map(flowParagraphBlock), sections, diagnostics, options);

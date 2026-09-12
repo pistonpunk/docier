@@ -10,6 +10,7 @@ export interface BreakLine {
   readonly next: number;
   readonly width: Mp;
   readonly forced: ForcedBreak;
+  readonly hyphenated: boolean;
 }
 
 export interface BreakRequest {
@@ -59,14 +60,19 @@ export const greedyBreaker: Breaker = {
     while (index < total) {
       let cursor = index;
       if (!first && request.skipLeadingSpaces) {
-        while (cursor < total && measured[cursor]?.atom.suppressible === true) cursor += 1;
+        let probe = index;
+        while (probe < total && measured[probe]?.atom.suppressible === true) probe += 1;
+        if (probe >= total) break;
+        cursor = probe;
       }
+      const lineStart = cursor;
 
       const origin = first ? request.firstLineOrigin : request.origin;
       const limit = mp(origin + (first ? request.firstLineAvailable : request.available));
       let x = origin;
       let forced: ForcedBreak = 'none';
       let opportunity: Opportunity | undefined;
+      let opportunityHyphen = false;
       let overflowed = false;
 
       while (cursor < total) {
@@ -82,21 +88,28 @@ export const greedyBreaker: Breaker = {
 
         const next = mp(x + advanceAt(item, x, context));
 
-        if (atom.breakBefore && next > limit && cursor > index) {
-          opportunity = { end: cursor, next: cursor, width: mp(x - origin) };
-          overflowed = true;
-          break;
-        }
-
-        if (next > limit && cursor > index && opportunity !== undefined) {
-          overflowed = true;
-          break;
+        if (next > limit && cursor > lineStart) {
+          if (atom.breakBefore) {
+            opportunity = { end: cursor, next: cursor, width: mp(x - origin) };
+            opportunityHyphen = false;
+            overflowed = true;
+            break;
+          }
+          if (atom.suppressible === true) {
+            opportunity = { end: cursor, next: cursor, width: mp(x - origin) };
+            opportunityHyphen = false;
+          }
+          if (opportunity !== undefined) {
+            overflowed = true;
+            break;
+          }
         }
 
         if (atom.breakAfter) {
           opportunity = atom.suppressible
             ? { end: cursor, next: cursor + 1, width: mp(x - origin) }
             : { end: cursor + 1, next: cursor + 1, width: mp(next - origin) };
+          opportunityHyphen = atom.breakHyphen;
         }
 
         x = next;
@@ -105,23 +118,29 @@ export const greedyBreaker: Breaker = {
 
       if (overflowed && opportunity !== undefined) {
         lines.push({
-          start: index,
+          start: lineStart,
           end: opportunity.end,
           next: opportunity.next,
           width: opportunity.width,
           forced: 'none',
+          hyphenated: opportunityHyphen,
         });
         index = opportunity.next;
       } else {
-        const rawEnd = cursor > index ? cursor : index + 1;
+        const rawEnd = cursor > lineStart ? cursor : lineStart + 1;
         let end = rawEnd;
-        while (end > index && measured[end - 1]?.atom.suppressible === true) end -= 1;
+        while (end > lineStart && measured[end - 1]?.atom.suppressible === true) end -= 1;
+        if (end === lineStart) end = rawEnd;
         lines.push({
-          start: index,
+          start: lineStart,
           end,
           next: rawEnd,
-          width: end === rawEnd ? mp(x - origin) : measureRange(measured, index, end, origin, context),
+          width:
+            end === rawEnd
+              ? mp(x - origin)
+              : measureRange(measured, lineStart, end, origin, context),
           forced,
+          hyphenated: false,
         });
         index = rawEnd;
       }
@@ -129,7 +148,7 @@ export const greedyBreaker: Breaker = {
     }
 
     if (lines.length === 0) {
-      lines.push({ start: 0, end: 0, next: 0, width: mp(0), forced: 'none' });
+      lines.push({ start: 0, end: 0, next: 0, width: mp(0), forced: 'none', hyphenated: false });
     }
     return lines;
   },

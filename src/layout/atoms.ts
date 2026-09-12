@@ -1,10 +1,16 @@
 import type { Mp } from '../units/index.js';
+import { mp, roundHalfEven } from '../units/index.js';
 import type { MeasuredCluster, TextMeasurer } from '../measure/index.js';
 import type { RunFormat } from './format.js';
 import type { FontFace } from './fonts.js';
 import type { IngestedItem, IngestedParagraph } from './ingest.js';
 import type { AtomKind, DocRange, ForcedBreak } from './types.js';
 import { docPos } from './types.js';
+
+export interface HyphenGlyph {
+  readonly units: readonly number[];
+  readonly source: DocRange;
+}
 
 export interface Atom {
   readonly id: number;
@@ -23,6 +29,7 @@ export interface Atom {
   readonly breakHyphen: boolean;
   readonly forcedBreak: ForcedBreak;
   readonly source: DocRange;
+  readonly hyphen: HyphenGlyph | undefined;
   readonly level: number;
 }
 
@@ -33,6 +40,8 @@ export interface ParagraphAtoms {
 const SOFT_HYPHEN = 0x00ad;
 const ZERO_WIDTH_SPACE = 0x200b;
 const NO_BREAK_HYPHEN = 0x2011;
+const HYPHEN_TEXT = '-';
+const SMALL_CAPS_PERCENT = 80;
 
 export const isCollapsibleSpace = (codePoint: number): boolean =>
   codePoint === 0x20 ||
@@ -56,6 +65,11 @@ const isCjk = (codePoint: number): boolean =>
   (codePoint >= 0xff00 && codePoint <= 0xff60) ||
   (codePoint >= 0xffe0 && codePoint <= 0xffe6);
 
+const isLowercaseLetter = (codePoint: number): boolean => {
+  const letter = String.fromCodePoint(codePoint);
+  return letter !== letter.toUpperCase() && letter === letter.toLowerCase();
+};
+
 export interface AtomizeOptions {
   readonly measurer: TextMeasurer;
   readonly faceOf: (format: RunFormat, item: IngestedItem) => FontFace;
@@ -73,7 +87,33 @@ interface Draft {
   readonly breakHyphen: boolean;
   readonly forcedBreak: ForcedBreak;
   readonly source: DocRange;
+  readonly hyphen: HyphenGlyph | undefined;
 }
+
+interface RenderedText {
+  readonly text: string;
+  readonly origins: readonly number[];
+  readonly length: number;
+}
+
+const renderText = (text: string, capitalise: boolean): RenderedText => {
+  const origins: number[] = [];
+  let rendered = '';
+  let offset = 0;
+  while (offset < text.length) {
+    const codePoint = text.codePointAt(offset) ?? 0;
+    const length = codePoint > 0xffff ? 2 : 1;
+    const source = String.fromCodePoint(codePoint);
+    const shown = capitalise ? source.toUpperCase() : source;
+    for (let index = 0; index < shown.length; index += 1) origins.push(offset);
+    rendered += shown;
+    offset += length;
+  }
+  return { text: rendered, origins, length: text.length };
+};
+
+const sourceLengthOf = (rendered: RenderedText, index: number): number =>
+  (rendered.origins[index + 1] ?? rendered.length) - (rendered.origins[index] ?? 0);
 
 export const atomize = (
   paragraph: IngestedParagraph,
@@ -100,6 +140,7 @@ export const atomize = (
       breakHyphen: draft.breakHyphen,
       forcedBreak: draft.forcedBreak,
       source: draft.source,
+      hyphen: draft.hyphen,
       level: 0,
     });
     nextId += 1;
@@ -107,12 +148,17 @@ export const atomize = (
 
   for (const run of paragraph.runs) {
     const format = run.format;
-    const capitalise = format.allCaps || format.smallCaps;
+    const capitalise = format.allCaps;
+    const smallCaps = format.smallCaps && !format.allCaps;
+    const smallFormat = smallCaps
+      ? { ...format, size: mp(roundHalfEven((format.size * SMALL_CAPS_PERCENT) / 100)) }
+      : format;
 
     for (const item of run.items) {
       const itemFormat =
         item.family === format.requestedFamily ? format : { ...format, requestedFamily: item.family };
       const face = options.faceOf(itemFormat, item);
+      const smallFace = smallCaps ? options.faceOf(smallFormat, item) : face;
       const base = item.docStart as number;
 
       if (item.kind !== 'text' && item.kind !== 'symbol') {
@@ -128,6 +174,7 @@ export const atomize = (
             breakHyphen: false,
             forcedBreak: item.forcedBreak,
             source: { start: item.docStart, end: docPos(base + 1) },
+            hyphen: undefined,
           },
           face,
           itemFormat,
@@ -135,50 +182,80 @@ export const atomize = (
         continue;
       }
 
-      const text = capitalise ? item.text.toUpperCase() : item.text;
-      const clusters: readonly MeasuredCluster[] = options.measurer.clusters(face.family, text);
-      let pending: MeasuredCluster[] = [];
+      const rendered = renderText(item.text, capitalise);
+      const clusters = options.measurer.clusters(face.family, rendered.text);
+      let covered = 0;
+      let pendingText: string[] = [];
+      let pendingUnits: number[] = [];
+      let pendingLengths: number[] = [];
+      let pendingFace = face;
       let pendingStart = base;
       let pendingKind: AtomKind = item.kind === 'symbol' ? 'symbol' : 'word';
       let pendingSuppressible = false;
-      let cursor = base;
+
+      const sourceEnd = (): number =>
+        (rendered.origins[covered - 1] ?? 0) + sourceLengthOf(rendered, covered - 1);
 
       const flush = (breakAfter: boolean, breakHyphen: boolean): void => {
-        if (pending.length === 0) return;
+        if (pendingText.length === 0) return;
+        const end = sourceEnd();
         push(
           {
             kind: pendingKind,
-            text: pending.map((cluster) => cluster.text).join(''),
-            units: pending.map((cluster) => cluster.advance),
-            lengths: pending.map((cluster) => cluster.text.length),
+            text: pendingText.join(''),
+            units: pendingUnits,
+            lengths: pendingLengths,
             suppressible: pendingSuppressible,
             breakBefore: false,
             breakAfter,
             breakHyphen,
             forcedBreak: 'none',
-            source: { start: docPos(pendingStart), end: docPos(cursor) },
+            source: { start: docPos(pendingStart), end: docPos(base + end) },
+            hyphen: breakHyphen
+              ? {
+                  units: [hyphenAdvance(options.measurer, pendingFace)],
+                  source: { start: docPos(base + end), end: docPos(base + end + 1) },
+                }
+              : undefined,
           },
-          face,
+          pendingFace,
           itemFormat,
         );
-        pending = [];
+        pendingText = [];
+        pendingUnits = [];
+        pendingLengths = [];
         pendingKind = 'word';
         pendingSuppressible = false;
       };
 
-      for (const cluster of clusters) {
+      const add = (cluster: MeasuredCluster, clusterFace: FontFace, at: number): void => {
+        if (pendingText.length === 0) {
+          pendingStart = base + at;
+          pendingFace = clusterFace;
+        }
+        pendingText.push(cluster.text);
+        pendingUnits.push(cluster.advance);
+        pendingLengths.push(sourceLengthOf(rendered, covered));
+        covered += 1;
+      };
+
+      for (;;) {
+        const cluster = clusters[covered];
+        if (cluster === undefined) break;
         const codePoint = cluster.codePoint;
-        const clusterStart = cursor;
-        cursor += cluster.text.length;
+        const at = rendered.origins[covered] ?? 0;
+        const clusterFace =
+          smallCaps && isLowercaseLetter(codePoint) ? smallFace : face;
+        if (clusterFace !== pendingFace && pendingText.length > 0) flush(false, false);
 
         if (codePoint === SOFT_HYPHEN) {
           flush(true, true);
-          pendingStart = cursor;
+          covered += 1;
           continue;
         }
         if (codePoint === ZERO_WIDTH_SPACE) {
           flush(true, false);
-          pendingStart = cursor;
+          covered += 1;
           continue;
         }
         if (isCollapsibleSpace(codePoint)) {
@@ -188,62 +265,64 @@ export const atomize = (
             previous !== undefined &&
             previous.kind === 'space' &&
             previous.suppressible &&
-            previous.paint === options.paintOf(itemFormat, face) &&
-            previous.source.end === docPos(clusterStart)
+            previous.paint === options.paintOf(itemFormat, clusterFace) &&
+            previous.source.end === docPos(base + at)
           ) {
-            const lengths = [...previous.lengths];
-            const lastIndex = lengths.length - 1;
-            lengths[lastIndex] = (lengths[lastIndex] ?? 0) + cluster.text.length;
             atoms[atoms.length - 1] = {
               ...previous,
-              lengths,
-              source: { start: previous.source.start, end: docPos(cursor) },
+              text: previous.text + cluster.text,
+              units: [...previous.units, cluster.advance],
+              lengths: [...previous.lengths, sourceLengthOf(rendered, covered)],
+              source: {
+                start: previous.source.start,
+                end: docPos(base + at + sourceLengthOf(rendered, covered)),
+              },
             };
-            pendingStart = cursor;
+            covered += 1;
             continue;
           }
+          add(cluster, clusterFace, at);
           pendingKind = 'space';
           pendingSuppressible = true;
-          pendingStart = clusterStart;
-          pending.push(cluster);
           flush(true, false);
-          pendingStart = cursor;
           continue;
         }
         if (isNonBreakingSpace(codePoint)) {
           flush(false, false);
+          add(cluster, clusterFace, at);
           pendingKind = 'space';
           pendingSuppressible = false;
-          pendingStart = clusterStart;
-          pending.push(cluster);
           flush(false, false);
-          pendingStart = cursor;
           continue;
         }
         if (codePoint === NO_BREAK_HYPHEN) {
-          pending.push(cluster);
+          add(cluster, clusterFace, at);
           continue;
         }
         if (isHyphen(codePoint)) {
-          pending.push(cluster);
+          add(cluster, clusterFace, at);
           flush(true, false);
-          pendingStart = cursor;
           continue;
         }
         if (isCjk(codePoint)) {
           flush(false, false);
-          pendingKind = 'word';
-          pendingStart = clusterStart;
-          pending.push(cluster);
+          add(cluster, clusterFace, at);
           flush(true, false);
-          pendingStart = cursor;
           continue;
         }
-        pending.push(cluster);
+        add(cluster, clusterFace, at);
       }
       flush(false, false);
+      if (covered !== clusters.length) {
+        throw new Error(
+          `layout atom covered ${covered} of ${clusters.length} clusters of the item text`,
+        );
+      }
     }
   }
 
   return { atoms };
 };
+
+const hyphenAdvance = (measurer: TextMeasurer, face: FontFace): number =>
+  measurer.clusters(face.family, HYPHEN_TEXT)[0]?.advance ?? 0;

@@ -1,27 +1,35 @@
 import { mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
 import type { PageState, PaginateBlock, PlacedPiece } from './paginate.js';
+import type { PlacedRow, PlacedTable } from './table-flow.js';
 import { buildIndices } from './indices.js';
 import type { LineRef } from './indices.js';
+import { frozenMapOf } from './frozen-map.js';
 import { caretStopsOfPlaced, runsOfPlaced } from './line-geometry.js';
 import type {
   AtomPlacement,
   BlockFragment,
   CaretStop,
+  CellFragment,
   DocPos,
   LayoutDiagnostic,
   LayoutResult,
   LineFragment,
   PageFragment,
+  Rect,
+  RowFragment,
   RunPaint,
   StoryId,
   StoryLayout,
+  TableFragment,
 } from './types.js';
 import { LAYOUT_RESULT_VERSION, docPos } from './types.js';
 import { deepFreeze } from './freeze.js';
 
 export interface FinalizeInput {
-  readonly blocks: readonly PaginateBlock[];
+  readonly blocks: readonly (PaginateBlock | undefined)[];
+  readonly rows: readonly PlacedRow[];
+  readonly tables: readonly PlacedTable[];
   readonly pieces: readonly PlacedPiece[];
   readonly pages: readonly PageState[];
   readonly paint: readonly RunPaint[];
@@ -29,6 +37,7 @@ export interface FinalizeInput {
   readonly hash: string;
   readonly storyId: StoryId;
   readonly storyKind: string;
+  readonly blockCount: number;
 }
 
 const atomsOf = (line: LaidLine): readonly AtomPlacement[] =>
@@ -51,20 +60,94 @@ const lineEndOf = (line: LaidLine, fallback: DocPos): DocPos => {
   return last === undefined ? fallback : last.measured.atom.source.end;
 };
 
+const cellKey = (table: number, row: number, column: number): string => `${table}:${row}:${column}`;
+
+const unionBox = (boxes: readonly Rect[]): Rect => {
+  const first = boxes[0];
+  if (first === undefined) return { x: mp(0), y: mp(0), width: mp(0), height: mp(0) };
+  let left: number = first.x;
+  let top: number = first.y;
+  let right: number = first.x + first.width;
+  let bottom: number = first.y + first.height;
+  for (const box of boxes) {
+    left = Math.min(left, box.x);
+    top = Math.min(top, box.y);
+    right = Math.max(right, box.x + box.width);
+    bottom = Math.max(bottom, box.y + box.height);
+  }
+  return { x: mp(left), y: mp(top), width: mp(right - left), height: mp(bottom - top) };
+};
+
+interface TableGroup {
+  readonly id: number;
+  readonly rows: RowFragment[];
+}
+
+const groupRows = (rows: readonly PlacedRow[]): readonly TableGroup[] => {
+  const order: number[] = [];
+  const groups = new Map<number, TableGroup>();
+  for (const row of rows) {
+    let group = groups.get(row.table);
+    if (group === undefined) {
+      group = { id: row.table, rows: [] };
+      groups.set(row.table, group);
+      order.push(row.table);
+    }
+    group.rows.push({
+      table: row.table,
+      page: row.page,
+      row: row.row,
+      box: row.box,
+      split: row.split,
+      repeat: row.repeat,
+      cantSplit: row.cantSplit,
+      header: row.header,
+      cells: row.cells,
+    });
+  }
+  const out: TableGroup[] = [];
+  for (const id of order) {
+    const group = groups.get(id);
+    if (group !== undefined) out.push(group);
+  }
+  return out;
+};
+
+
 export const finalize = (input: FinalizeInput): LayoutResult => {
   const caretStops: CaretStop[] = [];
   const refs: LineRef[] = [];
   const pages: PageFragment[] = [];
+  const tableById = new Map<number, PlacedTable>();
+  const tableOrder = new Map<number, number>();
+  for (const table of input.tables) {
+    tableById.set(table.table, table);
+    tableOrder.set(table.table, tableOrder.size);
+  }
+  const orderOf = (id: number): number => tableOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
+  const firstPageOf = new Map<number, number>();
   let lineId = 0;
 
   for (const page of input.pages) {
     const pagePieces = input.pieces.filter((piece) => piece.page === page.index);
+    const pageRows = input.rows.filter((row) => row.page === page.index);
+    const cellFragments = new Map<string, CellFragment>();
+    for (const row of pageRows) {
+      for (const cell of row.cells) {
+        cellFragments.set(cellKey(row.table, row.row, cell.column), cell);
+      }
+    }
+
     const blocks: BlockFragment[] = [];
 
     for (const piece of pagePieces) {
       const block = input.blocks[piece.block];
       if (block === undefined) continue;
-      const x = page.contentBox.x;
+      const container = piece.cell === undefined
+        ? undefined
+        : cellFragments.get(cellKey(piece.cell.table, piece.cell.row, piece.cell.column));
+      const x = container === undefined ? page.contentBox.x : container.contentBox.x;
+      const width = container === undefined ? page.contentBox.width : container.contentBox.width;
       let y = piece.boxTop;
       const lineFragments: LineFragment[] = [];
 
@@ -92,21 +175,23 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
           bidiLevels: [],
           breakAfter: line.breakAfter,
         };
-        const first = runs[0];
-        refs.push({
-          start: line.placed[0]?.measured.atom.source.start ?? end,
-          end,
-          page: page.index,
-          block: piece.block,
-          line: index,
-          paint: first?.paint ?? 0,
-          x: first?.x ?? x,
-          baselineY,
-          caretStops: stops,
-        });
-        for (const stop of stops) caretStops.push(stop);
         lineFragments.push(fragment);
         lineId += 1;
+        if (!piece.repeat) {
+          const first = runs[0];
+          refs.push({
+            start: line.placed[0]?.measured.atom.source.start ?? end,
+            end,
+            page: page.index,
+            block: piece.block,
+            line: index,
+            paint: first?.paint ?? 0,
+            x: first?.x ?? x,
+            baselineY,
+            caretStops: stops,
+          });
+          for (const stop of stops) caretStops.push(stop);
+        }
         y = mp(y + geometry.height);
       }
 
@@ -116,7 +201,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
         box: {
           x,
           y: piece.boxTop,
-          width: page.contentBox.width,
+          width,
           height: mp(y - piece.boxTop),
         },
         page: page.index,
@@ -124,8 +209,28 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
         docRange: block.docRange,
         split: piece.split,
         lines: lineFragments,
+        cell: piece.cell,
       });
     }
+
+    const tables: TableFragment[] = [];
+    for (const group of groupRows(pageRows)) {
+      const placed = tableById.get(group.id);
+      if (placed === undefined) continue;
+      const seen = firstPageOf.get(group.id);
+      if (seen === undefined) firstPageOf.set(group.id, page.index);
+      tables.push({
+        table: group.id,
+        box: unionBox(group.rows.map((row) => row.box)),
+        columns: placed.columns,
+        columnOffsets: placed.offsets,
+        borders: placed.borders,
+        shading: placed.shading,
+        continuation: seen !== undefined && seen !== page.index,
+        rows: group.rows,
+      });
+    }
+    tables.sort((first, second) => orderOf(first.table) - orderOf(second.table));
 
     pages.push({
       index: page.index,
@@ -134,16 +239,21 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
       contentBox: page.contentBox,
       column: page.column,
       blocks,
+      tables,
     });
   }
 
-  const stories = new Map<StoryId, StoryLayout>();
-  stories.set(input.storyId, {
-    id: input.storyId,
-    kind: input.storyKind,
-    laidOut: true,
-    blockCount: input.blocks.length,
-  });
+  const stories = frozenMapOf<StoryId, StoryLayout>([
+    [
+      input.storyId,
+      {
+        id: input.storyId,
+        kind: input.storyKind,
+        laidOut: true,
+        blockCount: input.blockCount,
+      },
+    ],
+  ]);
 
   return deepFreeze({
     version: LAYOUT_RESULT_VERSION,

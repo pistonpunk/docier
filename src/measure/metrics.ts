@@ -66,7 +66,10 @@ export const lineBoxOf = (metrics: ScaledFontMetrics, spacing: LineSpacing): Lin
   const height = lineHeightOf(metrics, spacing);
   const textHeight = mp(metrics.ascent + metrics.descent);
   const halfLeading = roundHalfEven((height - textHeight) / 2);
-  const aboveBaseline = maxMp(metrics.ascent, mp(halfLeading + metrics.ascent));
+  const aboveBaseline =
+    spacing.rule === 'exact' && height < textHeight
+      ? mp(Math.min(metrics.ascent, height))
+      : maxMp(metrics.ascent, mp(halfLeading + metrics.ascent));
   const belowBaseline = mp(height - aboveBaseline);
   return { height: mp(aboveBaseline + belowBaseline), aboveBaseline, belowBaseline };
 };

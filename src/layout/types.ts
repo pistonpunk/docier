@@ -61,7 +61,16 @@ export type LayoutDiagnosticCode =
   | 'footnotesNotLaidOut'
   | 'documentGridNotLaidOut'
   | 'pageBreakSuppressed'
-  | 'continuousSectionPageBreak';
+  | 'continuousSectionPageBreak'
+  | 'tableOverflow'
+  | 'tableGridInconsistent'
+  | 'tableRowUnsplittable'
+  | 'tableNestingTooDeep'
+  | 'tableCellClipped'
+  | 'tableTextDirectionNotLaidOut'
+  | 'tableCellSpacingNotLaidOut'
+  | 'verticalMergeOrphan'
+  | 'floatingTableNotLaidOut';
 
 export type LayoutDiagnosticSeverity = 'info' | 'warning' | 'error';
 
@@ -143,6 +152,90 @@ export interface BlockFragment {
   readonly docRange: DocRange;
   readonly split: FragmentSplit;
   readonly lines: readonly LineFragment[];
+  readonly cell: CellRef | undefined;
+}
+
+export interface CellRef {
+  readonly table: number;
+  readonly row: number;
+  readonly column: number;
+}
+
+export type BorderLineStyle =
+  | 'single'
+  | 'thick'
+  | 'double'
+  | 'dotted'
+  | 'dashed'
+  | 'dotDash'
+  | 'dotDotDash'
+  | 'triple'
+  | 'wave'
+  | 'doubleWave'
+  | 'dashSmallGap'
+  | 'dashDotStroked'
+  | 'threeDEmboss'
+  | 'threeDEngrave'
+  | 'outset'
+  | 'inset';
+
+export interface BorderEdge {
+  readonly style: BorderLineStyle;
+  readonly width: Mp;
+  readonly color: string | undefined;
+}
+
+export interface BorderSet {
+  readonly top: BorderEdge | undefined;
+  readonly right: BorderEdge | undefined;
+  readonly bottom: BorderEdge | undefined;
+  readonly left: BorderEdge | undefined;
+}
+
+export interface Shading {
+  readonly fill: string | undefined;
+  readonly pattern: string | undefined;
+  readonly color: string | undefined;
+}
+
+export type CellVerticalAlignment = 'top' | 'center' | 'bottom';
+
+export type CellMergeRole = 'none' | 'restart' | 'continue';
+
+export interface CellFragment {
+  readonly column: number;
+  readonly columnSpan: number;
+  readonly box: Rect;
+  readonly contentBox: Rect;
+  readonly borders: BorderSet;
+  readonly shading: Shading | undefined;
+  readonly verticalAlign: CellVerticalAlignment;
+  readonly merge: CellMergeRole;
+  readonly blocks: readonly number[];
+  readonly clip: Rect | undefined;
+}
+
+export interface RowFragment {
+  readonly table: number;
+  readonly page: number;
+  readonly row: number;
+  readonly box: Rect;
+  readonly split: FragmentSplit;
+  readonly repeat: boolean;
+  readonly cantSplit: boolean;
+  readonly header: boolean;
+  readonly cells: readonly CellFragment[];
+}
+
+export interface TableFragment {
+  readonly table: number;
+  readonly box: Rect;
+  readonly columns: readonly Mp[];
+  readonly columnOffsets: readonly Mp[];
+  readonly borders: BorderSet;
+  readonly shading: Shading | undefined;
+  readonly continuation: boolean;
+  readonly rows: readonly RowFragment[];
 }
 
 export interface PageFragment {
@@ -152,6 +245,7 @@ export interface PageFragment {
   readonly contentBox: Rect;
   readonly column: number;
   readonly blocks: readonly BlockFragment[];
+  readonly tables: readonly TableFragment[];
 }
 
 export interface StoryLayout {

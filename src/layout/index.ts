@@ -2,7 +2,14 @@ export type {
   AtomKind,
   AtomPlacement,
   BlockFragment,
+  BorderEdge,
+  BorderLineStyle,
+  BorderSet,
   CaretStop,
+  CellFragment,
+  CellMergeRole,
+  CellRef,
+  CellVerticalAlignment,
   DocPos,
   DocRange,
   DocSpan,
@@ -20,9 +27,12 @@ export type {
   PageFragment,
   PageKind,
   Rect,
+  RowFragment,
   RunPaint,
+  Shading,
   StoryId,
   StoryLayout,
+  TableFragment,
   TextDirection,
   VerticalAlign,
 } from './types.js';
@@ -94,8 +104,90 @@ export { justifyPlaced, shiftPlaced, stretchableCount } from './justify.js';
 
 export { PaintRegistry } from './paint.js';
 
-export type { PageState, PaginateBlock, PaginateOptions, PaginationResult, PlacedPiece } from './paginate.js';
-export { pageKindOf, paginate } from './paginate.js';
+export type {
+  FlowBlock,
+  PageState,
+  PaginateBlock,
+  PaginateOptions,
+  PaginationResult,
+  PlacedPiece,
+} from './paginate.js';
+export { flowParagraphBlock, flowTableBlock, pageKindOf, paginate, paginateFlow } from './paginate.js';
+
+export type {
+  IntrinsicWidths,
+  ParagraphBlockContext,
+  ParagraphPrepareContext,
+  PreparedParagraph,
+} from './paragraph-blocks.js';
+export {
+  blockContentHeight,
+  buildParagraphBlock,
+  intrinsicWidths,
+  lineHeightsOf,
+  prepareParagraph,
+  prepareParagraphs,
+} from './paragraph-blocks.js';
+
+export type { TableBorderDeclarations } from './table-borders.js';
+export {
+  DEFAULT_BORDER_EIGHTHS,
+  borderEdgeOf,
+  borderHalf,
+  borderSetOf,
+  borderSideOf,
+  borderWidth,
+  cellBordersOf,
+  emptyBorderSet,
+  outerBorderSet,
+  resolveBorder,
+  resolveEdge,
+  shadingOf,
+  tableBordersOf,
+} from './table-borders.js';
+
+export type { ColumnRequirement, ColumnWidths, FixedInput, SpanRequirement } from './table-columns.js';
+export {
+  columnOffsets,
+  equalRequirements,
+  resolveAutofit,
+  resolveFixed,
+  resolveTarget,
+  spanWidth,
+  spreadSpanning,
+  tableShift,
+} from './table-columns.js';
+
+export type {
+  CellMarginSet,
+  IngestFlags,
+  IngestState,
+  IngestedCell,
+  IngestedRow,
+  IngestedTable,
+  RowHeightRuleKind,
+  TableJustification,
+  TableLayoutKind,
+  TableWidth,
+  TableWidthRule,
+} from './table-ingest.js';
+export { DEFAULT_CELL_MARGIN_MP, MAX_TABLE_DEPTH, ingestBlockList, ingestTable } from './table-ingest.js';
+
+export type {
+  CellItem,
+  CellUnit,
+  MergeRegion,
+  PreparedCell,
+  PreparedRow,
+  PreparedTable,
+  TablePrepareRequest,
+  TablePrepareResult,
+  TablePrepareState,
+} from './table-prepare.js';
+export { prepareTable, prepareTables, tableIntrinsic } from './table-prepare.js';
+
+export type { PlacedRow, PlacedTable, TableFlowHost, TableSink } from './table-flow.js';
+export { emitRowFragment, flowTable, placeTableAt } from './table-flow.js';
 
 export { DEFAULT_TAB_STOP_TWIPS, layoutDocument } from './pipeline.js';
 export type { LayoutOptions } from './pipeline.js';

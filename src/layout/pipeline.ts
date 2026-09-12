@@ -1,22 +1,22 @@
 import type { Mp, Twip } from '../units/index.js';
 import { mp, twip, twipToMp } from '../units/index.js';
 import type { DocumentModel } from '../model/index.js';
-import type { LineBox, TextMeasurer } from '../measure/index.js';
-import { createDeterministicMeasurer } from '../measure/index.js';
-import type { IngestedParagraph } from './ingest.js';
+import type { TextMeasurer } from '../measure/index.js';
+import { SINGLE_LINE_MULTIPLE, autoSpacing, createDeterministicMeasurer } from '../measure/index.js';
 import { ingest } from './ingest.js';
+import type { IngestedTable } from './table-ingest.js';
 import type { Section } from './sections.js';
 import { buildSections, sectionOfBlock } from './sections.js';
 import { FontResolver } from './fonts.js';
 import { PaintRegistry } from './paint.js';
-import type { Atom } from './atoms.js';
-import { atomize } from './atoms.js';
-import type { MeasuredAtom } from './intrinsic.js';
-import { measureAtoms } from './intrinsic.js';
-import type { LaidLine } from './assembly.js';
-import { assembleParagraph } from './assembly.js';
-import type { PaginateBlock } from './paginate.js';
-import { paginate } from './paginate.js';
+import type { RunFormat } from './format.js';
+import { DEFAULT_FONT_SIZE } from './format.js';
+import type { IntrinsicWidths, PreparedParagraph } from './paragraph-blocks.js';
+import { buildParagraphBlock, intrinsicWidths, prepareParagraphs } from './paragraph-blocks.js';
+import type { PreparedTable, TablePrepareRequest } from './table-prepare.js';
+import { prepareTables } from './table-prepare.js';
+import type { FlowBlock, PaginateBlock } from './paginate.js';
+import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
 import { finalize } from './finalize.js';
 import type { LayoutDiagnostic, LayoutResult } from './types.js';
 
@@ -28,13 +28,6 @@ export interface LayoutOptions {
   readonly defaultTabStop?: Twip;
   readonly widowControl?: boolean;
   readonly storyId?: string;
-}
-
-interface PreparedParagraph {
-  readonly paragraph: IngestedParagraph;
-  readonly atoms: readonly Atom[];
-  readonly measured: readonly MeasuredAtom[];
-  readonly markBox: LineBox;
 }
 
 const dedupe = (diagnostics: readonly LayoutDiagnostic[]): readonly LayoutDiagnostic[] => {
@@ -54,6 +47,30 @@ const tabStopTwips = (model: DocumentModel): Twip => {
   return raw === undefined || raw <= 0 ? twip(DEFAULT_TAB_STOP_TWIPS) : twip(raw);
 };
 
+const fallbackRunFormat = (family: string): RunFormat => ({
+  requestedFamily: family,
+  size: DEFAULT_FONT_SIZE,
+  bold: false,
+  italic: false,
+  underline: false,
+  strike: false,
+  allCaps: false,
+  smallCaps: false,
+  hidden: false,
+  color: undefined,
+  highlight: undefined,
+  verticalAlign: 'baseline',
+  position: mp(0),
+  characterSpacing: mp(0),
+  characterScale: 100,
+  rightToLeft: false,
+});
+
+const contentBoxOf = (section: Section | undefined): { x: Mp; width: Mp } => ({
+  x: section?.contentBox.x ?? mp(0),
+  width: section?.contentBox.width ?? mp(0),
+});
+
 export const layoutDocument = (
   model: DocumentModel,
   options: LayoutOptions = {},
@@ -72,59 +89,79 @@ export const layoutDocument = (
   hash.field(measurer.id);
   hash.field(defaultFontFamily);
   hash.field(defaultTabStop);
+  hash.field(options.widowControl ?? true);
+  for (const section of sections) {
+    hash.field(section.index);
+    hash.field(section.breakType);
+    hash.field(section.firstBlock);
+    hash.field(section.page.width);
+    hash.field(section.page.height);
+    hash.field(section.contentBox.x);
+    hash.field(section.contentBox.y);
+    hash.field(section.contentBox.width);
+    hash.field(section.contentBox.height);
+  }
+  for (const block of ingested.blocks) hash.field(block.kind);
 
-  const prepared: PreparedParagraph[] = [];
-  for (const paragraph of ingested.paragraphs) {
-    const spacing = paragraph.format.spacing;
-    const atoms = atomize(paragraph, {
-      measurer,
-      faceOf: (format) => fonts.face(format, spacing),
-      paintOf: (format, face) => paint.indexOf(format, face),
-    }).atoms;
-    const markBox = fonts.face(paragraph.markFormat, spacing).lineBox;
-    hash.field(paragraph.docStart);
-    hash.field(paragraph.docEnd);
-    hash.field(paragraph.format.justification);
-    hash.field(paragraph.format.spacing.rule);
-    for (const atom of atoms) {
-      hash.field(atom.kind);
-      hash.field(atom.text);
-      hash.field(atom.face.family);
-      hash.field(atom.face.size);
-      for (const unit of atom.units) hash.field(unit);
-    }
-    prepared.push({ paragraph, atoms, measured: measureAtoms(atoms), markBox });
+  const prepared: readonly PreparedParagraph[] = prepareParagraphs(ingested.paragraphs, {
+    measurer,
+    fonts,
+    paint,
+    hash,
+  });
+  const defaultLineBox = fonts.face(
+    fallbackRunFormat(defaultFontFamily),
+    autoSpacing(SINGLE_LINE_MULTIPLE),
+  ).lineBox;
+
+  const paragraphWidths = new Map<number, IntrinsicWidths>();
+  for (const entry of prepared) {
+    paragraphWidths.set(entry.paragraph.index, intrinsicWidths(entry.measured));
   }
 
-  const blocks: PaginateBlock[] = [];
-  for (let index = 0; index < prepared.length; index += 1) {
-    const entry = prepared[index];
+  const paragraphBlocks: (PaginateBlock | undefined)[] = [];
+  for (const block of ingested.blocks) {
+    if (block.kind !== 'paragraph') continue;
+    const entry = prepared[block.paragraph.index];
     if (entry === undefined) continue;
-    const section = sectionOfBlock(sections, index) ?? sections[0];
-    const format = entry.paragraph.format;
-    const lines: readonly LaidLine[] = assembleParagraph({
-      measured: entry.measured,
-      format,
-      fallbackBox: entry.markBox,
-      context: {
-        tabOrigin: section?.contentBox.x ?? mp(0),
-        tabStops: format.tabStops,
-        defaultTabStop: defaultTabStopMp,
-      },
-      contentX: section?.contentBox.x ?? mp(0),
-      contentWidth: section?.contentBox.width ?? mp(0),
-    });
-    blocks.push({
-      index,
-      format,
-      paragraphGroup: entry.paragraph.paragraphGroup,
-      lines,
-      docRange: { start: entry.paragraph.docStart, end: entry.paragraph.docEnd },
-      lineHeight: entry.markBox.height,
-    });
+    const box = contentBoxOf(sectionOfBlock(sections, block.paragraph.index) ?? sections[0]);
+    paragraphBlocks[block.paragraph.index] = buildParagraphBlock(
+      entry,
+      box.x,
+      box.width,
+      { defaultTabStop: defaultTabStopMp },
+    );
+  }
+
+  const requestOrder = new Map<IngestedTable, number>();
+  const requests: TablePrepareRequest[] = [];
+  for (const block of ingested.blocks) {
+    if (block.kind !== 'table') continue;
+    const box = contentBoxOf(sectionOfBlock(sections, block.table.paragraphIndex) ?? sections[0]);
+    requestOrder.set(block.table, requests.length);
+    requests.push({ table: block.table, containerX: box.x, available: box.width });
+  }
+  const tablePrepare = prepareTables(
+    { prepared, paragraphWidths, defaultTabStop: defaultTabStopMp, defaultLineBox,
+      contentX: contentBoxOf(sections[0]).x },
+    requests,
+  );
+  for (const block of tablePrepare.blocks) paragraphBlocks[block.index] = block;
+
+  const flow: FlowBlock[] = [];
+  for (const block of ingested.blocks) {
+    if (block.kind === 'paragraph') {
+      const laid = paragraphBlocks[block.paragraph.index];
+      if (laid !== undefined) flow.push(flowParagraphBlock(laid));
+      continue;
+    }
+    const at = requestOrder.get(block.table);
+    const table: PreparedTable | undefined = at === undefined ? undefined : tablePrepare.tables[at];
+    if (table !== undefined) flow.push(flowTableBlock(table));
   }
 
   for (const diagnostic of ingested.diagnostics) diagnostics.push(diagnostic);
+  for (const diagnostic of tablePrepare.diagnostics) diagnostics.push(diagnostic);
   for (const diagnostic of coverageDiagnostics(ingested.hasThemeFonts, ingested.hasFields, ingested.hasNotes, ingested.hasDrawings, ingested.hasNumbering)) {
     diagnostics.push(diagnostic);
   }
@@ -136,7 +173,7 @@ export const layoutDocument = (
       docPos: undefined,
     });
   }
-  if (blocks.some((block) => block.format.direction === 'rtl')) {
+  if (prepared.some((entry) => entry.paragraph.format.direction === 'rtl')) {
     diagnostics.push({
       code: 'bidiNotLaidOut',
       severity: 'warning',
@@ -144,7 +181,7 @@ export const layoutDocument = (
       docPos: undefined,
     });
   }
-  if (blocks.some((block) => block.format.tabStops.length > 0)) {
+  if (prepared.some((entry) => entry.paragraph.format.tabStops.length > 0)) {
     diagnostics.push({
       code: 'tabStopsPartial',
       severity: 'info',
@@ -153,13 +190,15 @@ export const layoutDocument = (
     });
   }
 
-  const paginated = paginate(blocks, sections, diagnostics, {
+  const paginated = paginateFlow(flow, sections, diagnostics, {
     widowControlEnabled: options.widowControl ?? true,
   });
   for (const paintEntry of paint.list()) hash.field(paintEntry.size);
 
   return finalize({
-    blocks,
+    blocks: paragraphBlocks,
+    rows: paginated.rows,
+    tables: paginated.tables,
     pieces: paginated.pieces,
     pages: paginated.pages,
     paint: paint.list(),
@@ -167,6 +206,7 @@ export const layoutDocument = (
     hash: hash.digest(),
     storyId: options.storyId ?? model.body().id,
     storyKind: model.body().kind,
+    blockCount: ingested.blocks.length,
   });
 };
 

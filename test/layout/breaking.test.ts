@@ -46,12 +46,12 @@ describe('greedy line breaking', () => {
     expect(lineWidths(result)).toEqual([20000]);
   });
 
-  it('collapses runs of spaces into one rendered space', async () => {
+  it('preserves runs of spaces', async () => {
     const result = await layoutOf(
       bodyOf(wrap(`${run('', 'aaaa')}${run('', '   ')}${run('', 'aaaa')}`)),
     );
-    expect(lineTexts(result)).toEqual(['aaaa aaaa']);
-    expect(lineWidths(result)).toEqual([42500]);
+    expect(lineTexts(result)).toEqual(['aaaa   aaaa']);
+    expect(lineWidths(result)).toEqual([47500]);
   });
 
   it('does not break inside a word split across runs', async () => {
@@ -62,12 +62,12 @@ describe('greedy line breaking', () => {
     expect(lineWidths(result)[0]).toBe(100000);
   });
 
-  it('breaks at a soft hyphen without consuming it', async () => {
+  it('breaks at a soft hyphen and renders the hyphen', async () => {
     const result = await layoutOf(
       bodyOf(paragraphText(`${'a'.repeat(10)}­${'b'.repeat(10)}`)),
     );
-    expect(lineTexts(result)).toEqual(['aaaaaaaaaa', 'bbbbbbbbbb']);
-    expect(lineWidths(result)).toEqual([50000, 50000]);
+    expect(lineTexts(result)).toEqual(['aaaaaaaaaa-', 'bbbbbbbbbb']);
+    expect(lineWidths(result)).toEqual([53330, 50000]);
   });
 
   it('does not break at a zero width space', async () => {

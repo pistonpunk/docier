@@ -60,6 +60,14 @@ export class FontResolver {
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
     const metrics = scaleFontMetrics(this.measurer.metrics(family), format.size);
+    if (spacing.rule === 'exact' && spacing.height < metrics.naturalHeight) {
+      this.diagnostics.push({
+        code: 'lineRuleDegenerate',
+        severity: 'warning',
+        message: `exact line height ${spacing.height} mp clips the ${format.size} mp "${family}" text`,
+        docPos: undefined,
+      });
+    }
     const face: FontFace = {
       requestedFamily: format.requestedFamily,
       family,

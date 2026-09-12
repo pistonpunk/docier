@@ -1,7 +1,7 @@
 import type { Mp } from '../units/index.js';
 import { twipToMp } from '../units/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
-import type { BlockNode, ContentControl, DocumentModel, Paragraph } from '../model/index.js';
+import type { DocumentModel, Paragraph } from '../model/index.js';
 import {
   BreakContent,
   CarriageReturnContent,
@@ -17,6 +17,8 @@ import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
 import { Hasher } from './hash.js';
 import type { DocPos, ForcedBreak, LayoutDiagnostic } from './types.js';
 import { docPos } from './types.js';
+import type { IngestState, IngestedTable } from './table-ingest.js';
+import { ingestBlockList } from './table-ingest.js';
 
 export const MAX_DOC_POS = 0x7fffffff;
 
@@ -51,7 +53,12 @@ export interface IngestedParagraph {
   readonly sectionPropertiesElement: XmlElement | undefined;
 }
 
+export type IngestedBlock =
+  | { readonly kind: 'paragraph'; readonly paragraph: IngestedParagraph }
+  | { readonly kind: 'table'; readonly table: IngestedTable };
+
 export interface IngestedDocument {
+  readonly blocks: readonly IngestedBlock[];
   readonly paragraphs: readonly IngestedParagraph[];
   readonly bodySectionPropertiesElement: XmlElement | undefined;
   readonly defaultTabStop: Mp;
@@ -241,91 +248,33 @@ export const ingestParagraph = (
   };
 };
 
-const STRUCTURAL_BLOCKS: ReadonlySet<string> = new Set([
-  'sectPr',
-  'bookmarkStart',
-  'bookmarkEnd',
-  'proofErr',
-  'commentRangeStart',
-  'commentRangeEnd',
-]);
-
-const collectParagraphs = (
-  blocks: readonly BlockNode[],
-  out: Paragraph[],
-  unsupported: Map<string, number>,
-): void => {
-  for (const block of blocks) {
-    if (block.blockKind === 'paragraph') {
-      out.push(block as Paragraph);
-      continue;
-    }
-    if (block.blockKind === 'contentControl') {
-      collectParagraphs((block as ContentControl).blocks(), out, unsupported);
-      continue;
-    }
-    if (STRUCTURAL_BLOCKS.has(block.localName)) continue;
-    const seen = unsupported.get(block.localName);
-    unsupported.set(block.localName, seen === undefined ? 1 : seen + 1);
-  }
-};
-
 export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDocument => {
   const diagnostics: LayoutDiagnostic[] = [];
-  const paragraphs: Paragraph[] = [];
-  const unsupported = new Map<string, number>();
-  collectParagraphs(model.body().blocks(), paragraphs, unsupported);
-  for (const [kind, count] of unsupported) {
-    diagnostics.push({
-      code: 'unsupportedBlock',
-      severity: 'warning',
-      message: `${count} ${kind} block(s) are skipped by this layout slice`,
-      docPos: undefined,
-    });
-  }
-
   const hash = new Hasher();
   hash.field('docier-layout/1');
   hash.field(options.defaultFontFamily);
   hash.field(options.defaultTabStop);
 
-  const ingested: IngestedParagraph[] = [];
-  let cursor = 0;
-  let hasNumbering = false;
-  let hasThemeFonts = false;
-  let hasFields = false;
-  let hasNotes = false;
-  let hasDrawings = false;
-
-  for (const paragraph of paragraphs) {
-    const result = ingestParagraph(model, paragraph, ingested.length, docPos(cursor), options);
-    if (result.next > MAX_DOC_POS) {
-      diagnostics.push({
-        code: 'unsupportedBlock',
-        severity: 'error',
-        message: 'document exceeds the supported position range; the remaining blocks were skipped',
-        docPos: undefined,
-      });
-      break;
-    }
-    cursor = result.next;
-    ingested.push(result.paragraph);
-    if (result.hasThemeFont) hasThemeFonts = true;
-    if (result.hasFields) hasFields = true;
-    if (result.hasNotes) hasNotes = true;
-    if (result.hasDrawings) hasDrawings = true;
-    if (result.hasNumbering) hasNumbering = true;
-  }
+  const state: IngestState = {
+    model,
+    options,
+    diagnostics,
+    paragraphs: [],
+    flags: { themeFonts: false, fields: false, notes: false, drawings: false, numbering: false },
+    cursor: 0,
+  };
+  const blocks = ingestBlockList(state, model.body().blocks(), 0);
 
   return {
-    paragraphs: ingested,
+    blocks,
+    paragraphs: state.paragraphs,
     bodySectionPropertiesElement: model.body().sectionPropertiesElement(),
     defaultTabStop: options.defaultTabStop,
-    hasNumbering,
-    hasThemeFonts,
-    hasFields,
-    hasNotes,
-    hasDrawings,
+    hasNumbering: state.flags.numbering,
+    hasThemeFonts: state.flags.themeFonts,
+    hasFields: state.flags.fields,
+    hasNotes: state.flags.notes,
+    hasDrawings: state.flags.drawings,
     diagnostics,
     hash,
   };

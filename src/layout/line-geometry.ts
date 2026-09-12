@@ -63,7 +63,7 @@ export const geometryOfPlaced = (
   return {
     aboveBaseline: mp(above),
     belowBaseline: mp(below),
-    height: mp(above + below),
+    height: mp(Math.max(0, above + below)),
     width: mp(lineEndOf(placed, offset) - offset),
   };
 };
@@ -103,6 +103,7 @@ export const caretStopsOfPlaced = (
   baselineY: Mp,
   lineEnd: DocPos,
   endsWithBreak: boolean,
+  origin: Mp = mp(0),
 ): readonly CaretStop[] => {
   const stops: CaretStop[] = [];
   for (const item of placed) {
@@ -111,17 +112,19 @@ export const caretStopsOfPlaced = (
     const offsets = item.measured.offsets;
     let position = atom.source.start as number;
     for (let index = 0; index < offsets.length; index += 1) {
-      stops.push({
+      const stop: CaretStop = {
         docPos: docPos(position),
         x: mp(item.x + (offsets[index] ?? 0)),
         baselineY,
         level: atom.level,
         affinity: 'downstream',
-      });
+      };
+      const previous = stops[stops.length - 1];
+      if (previous === undefined || previous.docPos !== stop.docPos) stops.push(stop);
       if (index < lengths.length) position += lengths[index] ?? 0;
     }
   }
-  const endX = lineEndOf(placed, mp(0));
+  const endX = lineEndOf(placed, origin);
   const tail: CaretStop = {
     docPos: lineEnd,
     x: endX,
