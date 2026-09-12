@@ -1,8 +1,8 @@
-# docier — Consolidated Specification
+# docier - Consolidated Specification
 
 **Status:** authoritative. This document supersedes the five domain drafts in `docs/spec/`, which are kept
 for provenance only. Where a domain draft and this document disagree, this document wins.
-**Scope:** the whole library — document model and file layer, layout engine, editing and formatting,
+**Scope:** the whole library - document model and file layer, layout engine, editing and formatting,
 objects and UI chrome, public API, tokenization module, and cross-cutting quality.
 
 **Provenance.** Consolidated from `docs/spec/01-document-model-and-export.md` (73 features),
@@ -13,7 +13,7 @@ deliverable the entry carries both ids.
 
 **Reading the ids.** Source ids are stable and are kept as the audit trail (`PKG-01`, `LE-004`, `ED-023`,
 `FM-021`, `OBJ-25`, `UI-08`, `TOK-01`, `API-03`, `QUA-16`, …). They are not a dependency graph; use the
-module names below. Cross-references in the drafts that name a sibling spec by number are unreliable — each
+module names below. Cross-references in the drafts that name a sibling spec by number are unreliable - each
 draft numbered the others differently, and §1.6 records the mapping.
 
 ---
@@ -25,10 +25,10 @@ draft numbered the others differently, and §1.6 records the mapping.
 **One npm package, `docier`, ESM-only, subpath exports, no monorepo.** The drafts variously assumed
 `@docier/core`, `@docier/pdf` and per-framework packages; the repository's `package.json` (single package
 `docier`, `"type": "module"`, `sideEffects: false`) is the ground truth and is correct. `@docier/*` is used
-only for genuinely separate packages — the framework bindings.
+only for genuinely separate packages - the framework bindings.
 
 ```jsonc
-// package.json — exports, normative
+// package.json - exports, normative
 {
   "name": "docier",
   "type": "module",
@@ -121,27 +121,27 @@ Consequences that bind the rest of the document:
 
 15 passes plus two sub-passes, four bounded loops. Every pass is a pure function of the model plus the
 outputs of the passes it depends on; passes are individually cacheable and individually invalidatable. This
-order is load-bearing — the non-obvious edges are listed after it.
+order is load-bearing - the non-obvious edges are listed after it.
 
 | # | Pass | Consumes | Produces | Depends on |
 |---|---|---|---|---|
-| **P0** | Ingest and style resolution | OOXML tree, styles, theme, numbering, settings | Normalised tree with flat, fully resolved property bags; no style indirection remains | — |
+| **P0** | Ingest and style resolution | OOXML tree, styles, theme, numbering, settings | Normalised tree with flat, fully resolved property bags; no style indirection remains | - |
 | **P1** | Sectioning and page setup | P0 | Ordered sections: page size, margins, gutter, columns, header/footer refs, borders, `vAlign`, line numbering, per-section block ranges | P0 |
 | **P2** | Font resolution and metrics | P0, P1, font registry, embedded fonts | Concrete font per character run; `FontMetrics` parsed from the font binaries | P0, P1 |
 | **P3** | Shaping and inline atomization | P0, P2 | `InlineAtom[]` per paragraph: glyph clusters with advances, tabs, breaks, inline drawings, note refs, field results; measured `xAdvance` in mp | P2 |
 | **P4** | Bidi and paragraph direction | P0, P3 | Per-atom bidi level, paragraph base direction, logical→visual run order | P3 |
 | **P5** | Intrinsic width measurement | P3, P4 | Per block: `minWidth` (widest unbreakable unit) and `preferredWidth` | P3, P4 |
 | **P6** | Table column resolution | P5 (recursively), P1 | Every table grid resolved to concrete column widths in mp | P5 |
-| **P7** | Header/footer layout | P3–P6 on each header/footer story, P1 | Per (section × page kind) header/footer fragments and stack heights | P3–P6 |
+| **P7** | Header/footer layout | P3-P6 on each header/footer story, P1 | Per (section × page kind) header/footer fragments and stack heights | P3-P6 |
 | **P8** | Content box resolution | P1, P7 | Body content box **per page kind** (first/even/odd), displaced by actual header/footer heights | P7 |
 | **P9** | Line breaking (P9a provisional → P9b anchors → P9c re-break) | P3, P4, P5, P8; loop L1 with P10 | `LineFragment`s: atom ranges, break positions, widths, caret stops | P8 |
 | **P10** | Float, frame and exclusion resolution | P9a, P0 | Anchored object boxes, wrap polygons, exclusion bands per page/column | P9a |
 | **P11** | Line assembly | P9, P10 | Baseline y, line advance, inter-atom x in visual order, ascent/descent | P9c |
 | **P12** | Justification | P11 | Final x positions, exact right-edge landing | P11 |
 | **P13** | Block flow and pagination | P11, P12, P5, P6; loop with P14 | Vertical machine: spacing, keeps, widow/orphan, breaks, row placement and splitting, footnote reservation; page/column assignment | P12 |
-| **P14** | Footnote/endnote placement | P13, P3–P12 on note stories | Note-area fragments; displaced body lines | P13 |
+| **P14** | Footnote/endnote placement | P13, P3-P12 on note stories | Note-area fragments; displaced body lines | P13 |
 | **P15** | Section balancing and break types | P13, P14 | Column balancing, even/odd forcing, section vertical alignment | P14 |
-| **P16** | Page-count convergence (L3) | P7, P13–P15 | Header/footer heights and field widths re-resolved against the real page count | P15 |
+| **P16** | Page-count convergence (L3) | P7, P13-P15 | Header/footer heights and field widths re-resolved against the real page count | P15 |
 | **P17** | Finalization | all | Immutable `LayoutResult`, indices, diagnostics, hash, per-page diff | all |
 
 Edges that must not be "optimised" away: shaping (P3) before breaking (P9); intrinsic widths (P5) before
@@ -163,7 +163,7 @@ a diagnostic and freezes its last state rather than freezing the editor.
 | **L4** incremental resync | scheduling, not layout | re-run the dirty suffix until a page's fragment set is identical to the previous version's | stop at the document end, re-publish the whole tail |
 
 **Incremental contract.** Paragraph-local relayout is synchronous and always correct; pagination is
-asynchronous and eventually consistent. A keystroke re-runs P3 → P9 → P11–P12 for one paragraph
+asynchronous and eventually consistent. A keystroke re-runs P3 → P9 → P11-P12 for one paragraph
 synchronously, then P13 forward in a worker in time slices. Resync stops as soon as a page is structurally
 identical to the previous result (unchanged pages are the same objects, so the renderer diffs by identity).
 A page not yet repaginated is painted from the previous result with its pagination marked provisional, and
@@ -202,9 +202,9 @@ count equals the final `NUMPAGES` value.
 
 - **OOXML is the model.** The in-memory tree is a lossless-enough projection of WordprocessingML; edits never
   route through HTML, which exists only as an export target. Unmodelled elements, attributes and parts are
-  carried as preserved raw markup and re-emitted in place — "unsupported" means "untouched", never "deleted".
+  carried as preserved raw markup and re-emitted in place - "unsupported" means "untouched", never "deleted".
 - **Untouched bytes stay bytes.** A part that was not modified is written back from its original compressed
-  bytes. Round-trip guarantees are graded FL0–FL3 (byte-identical, semantically equivalent with **cycle
+  bytes. Round-trip guarantees are graded FL0-FL3 (byte-identical, semantically equivalent with **cycle
   stability**, structurally preserved, declared lossy) and every feature states its level; the loss ledger
   is reported on parse and export.
 - **Node identity and addressing.** Nodes carry stable ids (not indices); mutations go through transactions
@@ -220,7 +220,7 @@ count equals the final `NUMPAGES` value.
   logical text. Field *codes* are not part of it; field *results* are.
 - **The property cascade resolves once, in P0**, to flat bags with no inheritance left, so no later pass can
   re-derive a property differently. Toggle properties XOR rather than override. This single implementation
-  serves layout, the formatting toolbar, "reveal formatting" and every style query — see §1.6 conflict 4.
+  serves layout, the formatting toolbar, "reveal formatting" and every style query - see §1.6 conflict 4.
 - **Units.** The model stores what OOXML stores: EMU for drawing properties, twips for text and section
   properties, half-points for `w:sz`, eighths for border widths, and the OOXML integer scale for
   percentages. Nothing is stored in px; no float geometry is stored. Conversion happens at the ingest/layout
@@ -233,7 +233,7 @@ count equals the final `NUMPAGES` value.
 ### 1.5 The command and event surface
 
 **Every state change is a command; every state change is observable as an event.** No code path mutates the
-document directly — not autocorrect, not paste, not drag-and-drop, not IME commit, not token insertion, and
+document directly - not autocorrect, not paste, not drag-and-drop, not IME commit, not token insertion, and
 not a UI control. This is what makes the chrome replaceable and the library headless.
 
 **Command ids** are `docier.command.<area>.<action>`, lowerCamelCase, with `<area>` from the closed set:
@@ -303,23 +303,23 @@ The following are the substantive disagreements found while consolidating; every
 |---|---|---|---|
 | 1 | **Sibling numbering.** Draft 01 calls 04 "tokenization" and 05 "UI"; 02 calls 04 "rendering" and 05 "export"; 04 calls 02 "editing-and-text" and 03 "layout-and-pagination". None matches the filenames. | 01, 02, 04 headers | Canonical **module names only** in this document: model, ooxml, layout, render, editing, format, objects, ui, api, tokens, export, i18n, server. The numeric filenames are historical. Any cross-reference in the drafts must be re-read as a module name. |
 | 2 | **Unit of record.** 04: the document model stores geometry as integer EMU, floats only at the render boundary. 02: the engine's result is integer mp and `emu→mp` is "applied once, at ingest, and never again". | 04 §1, 02 §1.3 | Both, at different layers: the model stores the OOXML unit (EMU/twips/half-points/eighths) with no floats; **mp is the only geometry unit inside `LayoutResult`, hit testing, caret geometry and PDF writing**; px exists only in `toCssPx`. `emu→mp` is the single lossy conversion and happens once at the model→layout boundary. |
-| 3 | **Percentages.** 04: DrawingML percentages are 1/1000 of a percent and must **never** be stored as 0–1 floats. 02: `a:srcRect` is normalised at ingest into fractions. | 04 §1, 02 `LE-053` | Store the **OOXML integer** (thousandths of a percent for DrawingML, fiftieths for `w:tblW/@w:type="pct"`) and convert to a fraction or mp only at the layout boundary. The two scales must not share a helper. |
+| 3 | **Percentages.** 04: DrawingML percentages are 1/1000 of a percent and must **never** be stored as 0-1 floats. 02: `a:srcRect` is normalised at ingest into fractions. | 04 §1, 02 `LE-053` | Store the **OOXML integer** (thousandths of a percent for DrawingML, fiftieths for `w:tblW/@w:type="pct"`) and convert to a fraction or mp only at the layout boundary. The two scales must not share a helper. |
 | 4 | **Effective formatting / style cascade implemented twice.** 01/02 put cascade resolution in P0 with flat bags; 03 specifies its own cascade for runs and paragraphs (`FM-021`, `FM-022`), and `LE-008` specifies a third description of the same rules. | 01, 02, 03 | **One implementation, in P0** (`LE-008` + `FM-021` + `FM-022` merged). The editing side consumes resolved bags through a query API for the toolbar, the Font/Paragraph dialogs and reveal-formatting; it never re-resolves. This is the largest single correctness win in the consolidation, because a second cascade is exactly how the previous attempt's toolbar and page disagreed. |
 | 5 | **Command naming.** 05: `docier.command.<area>.<action>`. 03: bare `edit.*`, `format.*`, `view.*`, `selection.*`. 04: `object.*`, `view.*`, `ui.*`. | 03 §1.4, 04 §2, 05 `API-06` | 05's convention wins (it owns the public API); the area set is **extended** to cover 03's and 04's namespaces (see §1.5). Bare prefixes map 1:1 by adding `docier.command.`. |
 | 6 | **Command result shape.** 03: synchronous `{ ok: true, affectedRanges, layoutInvalidation } \| { ok: false, code, message }`. 05: `Promise<CommandResult<R>>` with `ok \| blocked \| noop \| failed`. | 03 §1.4, 05 `API-06` | 05's shape wins, with 03's `layoutInvalidation` retained inside the `ok` variant, and 03's "I4 silence" rule expressed as the `noop` status. All command execution is async, including for pure-model mutations (`batch` is the synchronous plugin path). |
-| 7 | **Refusal and error codes, three incompatible schemes.** 05 has a closed SCREAMING_SNAKE `DocierErrorCode` union; 03 enumerates 15 rejection reasons in lower-kebab (`protected`, `read-only`, `inapplicable`, `not-found`, `empty-selection`, `document-boundary`, `clipboard-unavailable`, `layout-unavailable`, `pattern-too-complex`, `no-op-selection`, `incompatible-target`, `style-not-found`, `builtin-not-deletable`, `style-in-use-by-token`, `special-unavailable`) returned as `ok: false`; 01 defines a third set on its own `DocierParseError` (`NOT_A_PACKAGE`, `NOT_OOXML`, `WRONG_DOCUMENT_TYPE`, `LEGACY_DOC_NOT_SUPPORTED`, `PACKAGE_ENCRYPTED`, `PACKAGE_RIGHTS_MANAGED`, `DOCUMENT_TOO_LARGE`, `EXPORT_IN_FLIGHT`, `INVALID_PAGE_RANGE`, `LAYOUT_REQUIRED`). All three are closed and none overlaps. | 01 `SER-01`, 03 §4.1, 05 `API-26` | **One closed union**, spelled SCREAMING_SNAKE, in §2.8. It is 05's set (05 owns the error surface and the `DocierError` class) plus 01's package codes verbatim — 01's parse vocabulary is the right one for a package that cannot be opened, and re-spelling it would lose precision — plus 03's refusal reasons promoted one-for-one (`not-found` → `NOT_FOUND`, `style-in-use-by-token` → `STYLE_IN_USE_BY_TOKEN`, …), with `no-op-selection` dropped because it is the `noop` status, not a refusal. `LAYOUT_REQUIRED` is kept in the union but becomes unreachable for PDF export, which computes layout on demand. `blocked` results and thrown `DocierError`s draw from the same union; 03's `command.rejected` event becomes `docier:command:blocked` carrying `{ code, reason }`. |
+| 7 | **Refusal and error codes, three incompatible schemes.** 05 has a closed SCREAMING_SNAKE `DocierErrorCode` union; 03 enumerates 15 rejection reasons in lower-kebab (`protected`, `read-only`, `inapplicable`, `not-found`, `empty-selection`, `document-boundary`, `clipboard-unavailable`, `layout-unavailable`, `pattern-too-complex`, `no-op-selection`, `incompatible-target`, `style-not-found`, `builtin-not-deletable`, `style-in-use-by-token`, `special-unavailable`) returned as `ok: false`; 01 defines a third set on its own `DocierParseError` (`NOT_A_PACKAGE`, `NOT_OOXML`, `WRONG_DOCUMENT_TYPE`, `LEGACY_DOC_NOT_SUPPORTED`, `PACKAGE_ENCRYPTED`, `PACKAGE_RIGHTS_MANAGED`, `DOCUMENT_TOO_LARGE`, `EXPORT_IN_FLIGHT`, `INVALID_PAGE_RANGE`, `LAYOUT_REQUIRED`). All three are closed and none overlaps. | 01 `SER-01`, 03 §4.1, 05 `API-26` | **One closed union**, spelled SCREAMING_SNAKE, in §2.8. It is 05's set (05 owns the error surface and the `DocierError` class) plus 01's package codes verbatim - 01's parse vocabulary is the right one for a package that cannot be opened, and re-spelling it would lose precision - plus 03's refusal reasons promoted one-for-one (`not-found` → `NOT_FOUND`, `style-in-use-by-token` → `STYLE_IN_USE_BY_TOKEN`, …), with `no-op-selection` dropped because it is the `noop` status, not a refusal. `LAYOUT_REQUIRED` is kept in the union but becomes unreachable for PDF export, which computes layout on demand. `blocked` results and thrown `DocierError`s draw from the same union; 03's `command.rejected` event becomes `docier:command:blocked` carrying `{ code, reason }`. |
 | 8 | **Cyrillic and `w:cs`.** 02 says a Cyrillic character in a run whose `w:rFonts/@w:cs` differs from `@w:ascii` **resolves against `w:cs`**. 03 says Cyrillic is *not* a complex script, must be formatted through `ascii`/`hAnsi`, and that `w:szCs`/`w:bCs`/`w:iCs` must not apply to it. | 02 `LE-010`, 03 §1.8 | **03 is right and 02 is wrong.** ECMA-376 assigns `cs` to complex scripts only (Arabic, Hebrew, Syriac, Thaana, Devanagari family, Thai); Cyrillic and Romanian diacritics are Latin and resolve through `ascii`/`hAnsi`, with `w:hint` as the tie-breaker in mixed runs. `LE-010`'s rule is corrected to a script-itemisation table keyed by Unicode script, and a Russian fixture with a differing `w:cs` must assert it is **not** used. |
 | 9 | **Text measurement.** 02 forbids `measureText` outright and shapes from the font binary. 05's performance policy measures "using canvas `measureText` for bulk measurement". | 02 `LE-015`, 05 `QUA-16` | 02 wins. Shaping and advances come from the font binary (the only method that also works in a worker and in Node for golden tests). `measureText` is permitted only in the divergence detector's verification path, never in the layout path. |
-| 10 | **`contenteditable`.** 02: text is not `contenteditable` and no geometry is read back. 05 `QUA-01`: the document area is `role="document"`, `aria-multiline="true"`, `contenteditable="true"`. | 02 `LE-002`, 05 `QUA-01` | Exactly **one hidden `contenteditable` input host per instance** — the composition/clipboard/AT host from the editing draft — and it is never the painted page layer. `QUA-01`'s attribute list applies to that host and to the optional accessibility mirror, not to the run boxes. |
+| 10 | **`contenteditable`.** 02: text is not `contenteditable` and no geometry is read back. 05 `QUA-01`: the document area is `role="document"`, `aria-multiline="true"`, `contenteditable="true"`. | 02 `LE-002`, 05 `QUA-01` | Exactly **one hidden `contenteditable` input host per instance** - the composition/clipboard/AT host from the editing draft - and it is never the painted page layer. `QUA-01`'s attribute list applies to that host and to the optional accessibility mirror, not to the run boxes. |
 | 11 | **Default font set.** 02 bundles DejaVu Sans/Serif, Liberation Serif/Sans/Mono and a Cyrillic-complete serif. 05's fixtures pin Carlito/Caladea/Liberation as the metric-compatible set. | 02 §1.8, 05 `QUA-20` | One set, since both requirements are real: **Carlito** (Calibri metrics), **Caladea** (Cambria metrics), **Liberation Serif/Sans/Mono** (Times/Arial/Courier metrics), **DejaVu Sans** and a Cyrillic-complete serif for coverage. The substitution table maps DOCX names onto this set; the registry is part of `documentHash`; every substitution is a diagnostic. Licensing is ADR-0020. |
 | 12 | **Mount API.** 04: `new Docier(container, { chrome: 'full' \| 'minimal' \| 'none' \| ChromeSlots })`. 05: `createDocier(options): Promise<DocierInstance>` plus `mount(target, options)`. | 04 §3, 05 `API-01` | **Functional API wins**: `createDocier()` + `mount()`. Chrome is selected by `config.ui.chrome` with the same three modes plus `ChromeSlots`; the slot names, the `data-docier="<slot>"` attributes and the `docier:command` / `docier:state` `CustomEvent` bridge from 04 are adopted verbatim, because a non-TypeScript host must be able to integrate without importing our types. |
-| 13 | **Priority and effort scales.** 02: S<1wk, M 1–3wk, L 3–6wk, XL>6wk. 03: S≤3d, M≤2wk, L≤6wk, XL>6wk. 04: S≤3d, M 1–2wk, L 3–5wk, XL 6+wk. | 02 §3, 03 §1.2–1.3, 04 §1 | Adopt **03's scale** (S ≤ 3 days, M ≤ 2 weeks, L ≤ 6 weeks, XL > 6 weeks, one engineer including tests). Estimates in §3 are the source estimates, not re-estimates; where drafts disagreed the merged entry takes the **larger** effort and the strongest priority, and §1.6 conflict 14 records the largest disagreement. |
-| 14 | **The cascade's cost.** 02 estimates the style-resolution pass at L; 03 estimates the same cascade (`FM-021` + `FM-022`) at two XLs — a 5× disagreement. | 02 `LE-008`, 03 `FM-021/022` | Merged at **XL**, because one implementation must satisfy both consumers (layout's flat bags and the editing side's per-run/per-paragraph queries, including numbering and table-style conditional formatting). The larger estimate is the honest one; a single L estimate for this pass was how the previous attempt shipped a cascade that disagreed with itself. |
+| 13 | **Priority and effort scales.** 02: S<1wk, M 1-3wk, L 3-6wk, XL>6wk. 03: S≤3d, M≤2wk, L≤6wk, XL>6wk. 04: S≤3d, M 1-2wk, L 3-5wk, XL 6+wk. | 02 §3, 03 §1.2-1.3, 04 §1 | Adopt **03's scale** (S ≤ 3 days, M ≤ 2 weeks, L ≤ 6 weeks, XL > 6 weeks, one engineer including tests). Estimates in §3 are the source estimates, not re-estimates; where drafts disagreed the merged entry takes the **larger** effort and the strongest priority, and §1.6 conflict 14 records the largest disagreement. |
+| 14 | **The cascade's cost.** 02 estimates the style-resolution pass at L; 03 estimates the same cascade (`FM-021` + `FM-022`) at two XLs - a 5× disagreement. | 02 `LE-008`, 03 `FM-021/022` | Merged at **XL**, because one implementation must satisfy both consumers (layout's flat bags and the editing side's per-run/per-paragraph queries, including numbering and table-style conditional formatting). The larger estimate is the honest one; a single L estimate for this pass was how the previous attempt shipped a cascade that disagreed with itself. |
 | 15 | **PDF/A must be decided before layout.** 01 states that A-1b's transparency flattening "must be **decided before layout**, because flattening changes what layout renders", while PDF/A is `later` priority. | 01 `EXP-09` | Accepted and promoted to a gating decision: the profile is chosen in ADR-0006 **before the layout result is frozen**, even though the archival writer ships late. Choosing A-2b avoids the coupling; choosing A-1b makes flattening a layout input. |
 | 16 | **Chrome delivery.** 04 explicitly leaves custom elements vs plain DOM vs per-framework adapters to "spec 05". 05 specifies slots, `ui.override()` and separate binding packages but never names a chrome technology. | 04 §5 item 2, 05 `API-16`/`API-20`/`API-23` | ADR-0010: **plain DOM renderers behind the typed slot/registry API**, no custom elements, no framework in core; bindings are thin separate packages. This keeps SSR safe and lets a host copy the default chrome. |
 | 17 | **Image compression location.** 04 assumes in-browser `OffscreenCanvas`/`WebCodecs` with a host hook; the quality/PPI/codec matrix is unsettled. | 04 `OBJ-14`, 04 §5 item 3 | ADR-0011: mechanism in-browser with an injected host endpoint for batch/server paths; policy defaults are a product decision. |
 | 18 | **Deferred-item labels.** 02 marks `LE-037`/`LE-043`/`LE-044`/`LE-052`/`LE-062` `later`; 04 marks `OBJ-38` `later`; 03 marks nothing `later` but defers within `important` features; 05 marks `API-18`, `TOK-24`, `QUA-11` `later`. | 02, 03, 04, 05 | `later` means **designed-for but not scheduled**, and the interface must be present so the feature is additive. The merged list preserves each draft's own label; §4 states which `later` items are nonetheless load-bearing for the architecture (the `Shaper` interface for `LE-028`/`LE-029`, the exclusion mechanism for `LE-052`, the plugin `features` registry for `API-18`). |
-| 19 | **The config tree.** 05 owns the config object and gives it 16 top-level keys, but five keys it uses elsewhere in its own text (`config.units.imageDpi`, `config.images.maxPixels`, `config.preview.enabled`, `config.onError`, `config.maxInstancesPerPage`) appear in no block, and `config.preview.*` collides conceptually with `tokenization.preview.*`. Meanwhile the layout and file layers need inputs — the font set, compatibility overrides, the loop iteration caps, and worker and decompression ports — for which 05's tree has no home. | 02 §1.8, 04 §3, 05 `API-03` | 05's tree is authoritative and is extended in §2.2 by exactly two new keys, each with a stated reason: `layout` (fonts, compatibility overrides, loop limits — these are layout inputs and part of `documentHash`) and `transport` (I/O ports; `storage` is persistence and must not be overloaded with them), plus top-level `units`, `images`, `onError` and `maxInstancesPerPage` to resolve 05's own dangling references. `config.preview.*` resolves to `config.tokenization.preview.*` — preview is produced by the token module, so there is no top-level `preview`. |
+| 19 | **The config tree.** 05 owns the config object and gives it 16 top-level keys, but five keys it uses elsewhere in its own text (`config.units.imageDpi`, `config.images.maxPixels`, `config.preview.enabled`, `config.onError`, `config.maxInstancesPerPage`) appear in no block, and `config.preview.*` collides conceptually with `tokenization.preview.*`. Meanwhile the layout and file layers need inputs - the font set, compatibility overrides, the loop iteration caps, and worker and decompression ports - for which 05's tree has no home. | 02 §1.8, 04 §3, 05 `API-03` | 05's tree is authoritative and is extended in §2.2 by exactly two new keys, each with a stated reason: `layout` (fonts, compatibility overrides, loop limits - these are layout inputs and part of `documentHash`) and `transport` (I/O ports; `storage` is persistence and must not be overloaded with them), plus top-level `units`, `images`, `onError` and `maxInstancesPerPage` to resolve 05's own dangling references. `config.preview.*` resolves to `config.tokenization.preview.*` - preview is produced by the token module, so there is no top-level `preview`. |
 | 20 | **Public-surface naming drift.** The drafts name the same fields differently: `label` vs `title`, `category` vs `area`, `execute` vs `run`, `container` vs `target`, `updateConfig` vs `configure`, `canExecute` vs `isEnabled` + `disabledReason`, `undoable` vs `reversible`, `CommandResult`'s blocked keys `code`+`reason` (05) vs `code`+`message` (03), and 03's `message` on errors vs 05's `detail`. | 03 §1.4, 04 §2, 05 `API-01`/`API-06`/`API-26` | 05 wins throughout, because it owns the public API and the host app is written against it: `label`, `category`, `execute`, `container`, `updateConfig`, `isEnabled` + `disabledReason` + `isVisible` + `isActive`, `undoable`, `{ code, reason }`, `detail`. 04's `{ id, args, source, transient? }` survives as the *execution* envelope (`ExecuteOptions.source` plus a transient flag) because it carries the source the event envelope needs; it is not a second result type. 03's `affectedRanges` and `layoutInvalidation` survive inside the `ok` variant. |
 
 ### 1.7 Where the drafts agree (and that agreement is now binding)
@@ -401,7 +401,7 @@ export interface DestroyOptions { flushAutosave?: boolean; reason?: string }
 Lifecycle rules, all asserted by tests:
 
 - `createDocier` is async because it validates config and loads non-DOM resources. It does **no DOM work**
-  when `container` is absent — that is the whole SSR story, and it is why `isServer` is exported from the
+  when `container` is absent - that is the whole SSR story, and it is why `isServer` is exported from the
   root entry.
 - `state` progresses monotonically except during `reconfiguring`. `whenReady()` resolves once after `ready`
   and rejects if the instance is destroyed first.
@@ -410,7 +410,7 @@ Lifecycle rules, all asserted by tests:
   with `INSTANCE_LIMIT`.
 - `mount()` with the same target **moves** the instance rather than throwing; it is idempotent per target.
   A detached target rejects with `MOUNT_TARGET_DETACHED`.
-- After `destroy()`, every method **rejects** with `INSTANCE_DESTROYED` rather than throwing synchronously —
+- After `destroy()`, every method **rejects** with `INSTANCE_DESTROYED` rather than throwing synchronously -
   a difference that matters to a `useEffect` cleanup. `destroy()` is idempotent, disposes plugins in
   reverse installation order, aborts in-flight fetches, flushes autosave, and removes every listener,
   portal, observer and worker.
@@ -446,7 +446,7 @@ export interface DocierConfig {
 ```
 
 Two of 05's dangling references are resolved by naming, and the rest by the tree above: `config.preview.*`
-is **`config.tokenization.preview.*`** (the token module owns preview — there is no top-level `preview`),
+is **`config.tokenization.preview.*`** (the token module owns preview - there is no top-level `preview`),
 and `config.document.docId` lives on `DocumentConfig`. `SaveMode` is `'template' | 'document'` and is a
 field of the export and fill options, not a config key.
 
@@ -489,7 +489,7 @@ an **unknown** key produces a `config-validation` warning in `getDiagnostics()` 
 because a host shipping ahead of the library must not break; a **wrongly typed** key is a hard
 `CONFIG_INVALID` rejection, because silently coercing `enabled: "true"` has cost more than it has saved.
 
-`updateConfig(patch)` is atomic — the whole patch validates and applies, or nothing changes — and it returns
+`updateConfig(patch)` is atomic - the whole patch validates and applies, or nothing changes - and it returns
 a `ConfigApplyReport` naming any key that is `requiresReload` (document source, storage adapter, shadow DOM,
 the font set, OOXML conformance, chrome mode, tokenization enabled-state) instead of half-applying it. It
 never resets scroll position or selection and never clears undo history: **a reconfiguration that dirties
@@ -501,7 +501,7 @@ migration in diagnostics, and a migration never silently changes a value the hos
 
 Ids are `docier.command.<area>.<action>` in lowerCamelCase, with `<area>` from a **closed** set so a host can
 build a menu without a curated list: `doc`, `edit`, `format`, `insert`, `table`, `token`, `data`, `view`,
-`history`, `a11y`, `dev` — extended here with `selection`, `object`, `style`, `numbering`, `clipboard`,
+`history`, `a11y`, `dev` - extended here with `selection`, `object`, `style`, `numbering`, `clipboard`,
 `find`, `proof`, `export`, `ui` to cover the namespaces the editing, object and export drafts use. Ids are
 stable forever; renaming is a breaking change. A plugin id is `<pluginId>.<area>.<action>` and may not
 squat in `docier.command.*`.
@@ -557,7 +557,7 @@ Rules that make this safe to build on:
   and a stale UI invoking a disabled command is exactly the `blocked` case. `COMMAND_NOT_FOUND` and a
   rejected `argsSchema` are `failed`.
 - **`noop` is honoured centrally.** A command whose effect is already in force emits no event and writes no
-  history entry — the editing draft's invariant I4, enforced at the registry so no individual command can
+  history entry - the editing draft's invariant I4, enforced at the registry so no individual command can
   forget it.
 - A command is stateless and re-entrant-safe; executing a command from inside `docier:command:beforeexecute`
   for the same id is refused with `REENTRANT_COMMAND`.
@@ -609,12 +609,12 @@ first are `docier:ready`, `docier:doc:beforechange` (cancellable), `docier:doc:c
 `docier:token:change`, `docier:token:remove`, `docier:token:unlink`, `docier:token:unknown`,
 `docier:data:change`, `docier:data:error`.
 
-Payload rules: `docier:doc:change` carries a compact `patches` array — node id, operation, before/after
-lengths — sufficient for a collaborator or an audit log without shipping the whole document.
+Payload rules: `docier:doc:change` carries a compact `patches` array - node id, operation, before/after
+lengths - sufficient for a collaborator or an audit log without shipping the whole document.
 `docier:doc:save` and `docier:export:after` are **async** notifications (the bytes already exist and the
 listener is not on the critical path); their listeners are not awaited. Every event carries an envelope with
 `instanceId`, `documentRevision`, `transactionId?` and `source: 'ui' | 'api' | 'undo' | 'collab' | 'auto' |
-'plugin'`. The timestamp on that envelope is monotonic and for ordering only — it is never written into any
+'plugin'`. The timestamp on that envelope is monotonic and for ordering only - it is never written into any
 export.
 
 The ordering for one command execution is fixed and asserted as a golden trace:
@@ -691,7 +691,7 @@ oldest-first; a command marked `undoable: false` never enters it; a command that
 must be inside one transaction or dev mode reports it as a lint violation.
 
 A plugin is installed at most once per instance and everything it registers is tracked in
-`ctx.disposables` and released on uninstall — **a plugin never receives a raw registry it could leak.** A
+`ctx.disposables` and released on uninstall - **a plugin never receives a raw registry it could leak.** A
 throwing `install` reports `docier:plugin:error`, marks the plugin `failed` in `plugins.list()`, rolls back
 its registrations, and continues unless `optional: false`. A plugin throwing inside an event handler or a
 command is contained the same way. `ctx.features.register()` is the most powerful extension point and the
@@ -768,7 +768,7 @@ export interface DataResponse {
 ```
 
 `setData` replaces the whole data object; `mergeData` merges deeply at leaf level and **never element-merges
-an array** — a loop's rows are replaced wholesale. Both are async (they may fetch), both resolve after the
+an array** - a loop's rows are replaced wholesale. Both are async (they may fetch), both resolve after the
 fill pass has completed and after `docier:fill:after`, and both are idempotent: the same data twice gives
 the same document and no additional undo entry. Concurrent calls are serialised, and the later call's
 `AbortSignal` cancels the earlier in-flight fill, whose promise rejects with `FILL_ABORTED`. `clearData()`
@@ -890,14 +890,14 @@ export interface PreviewOptions {
 ```
 
 Catalogue rules: fetched once at mount when `catalogue` is a URL, cached in memory, re-fetched on
-`cataloguePollSeconds` if set, and a fetch failure **never blocks mount** — the instance starts with a
+`cataloguePollSeconds` if set, and a fetch failure **never blocks mount** - the instance starts with a
 stale or empty catalogue and records `catalogue-stale` / `catalogue-missing`. The catalogue is validated on
 receipt (duplicate keys, a loop entry without `loop.fields`, a kind missing its required format produce
 `DOC_CATALOGUE_INVALID` diagnostics and the offending entries are skipped), unknown fields are preserved and
 passed through **so the backend can ship ahead of the library**, and labels resolve through the locale
 fallback chain. The catalogue is the only source of truth for what may be inserted: the palette never
-invents an entry. Preview is produced by the same fill engine and the same layout engine as the document —
-not a separate renderer — it is read-only unless `readOnly: false`, and it reports issues but never blocks.
+invents an entry. Preview is produced by the same fill engine and the same layout engine as the document -
+not a separate renderer - it is read-only unless `readOnly: false`, and it reports issues but never blocks.
 
 Enablement, both paths:
 
@@ -905,13 +905,13 @@ Enablement, both paths:
 import { createDocier } from 'docier';
 import { createTokenModule, fillTemplate, listTemplateTokens } from 'docier/tokens';
 
-// Path 1 — config only. The module is loaded for you and everything §2.6 describes is available.
+// Path 1 - config only. The module is loaded for you and everything §2.6 describes is available.
 const docier = await createDocier({
   container: '#editor',
   config: { tokenization: { enabled: true, catalogue: '/tokens.json', trigger: '{{' } },
 });
 
-// Path 2 — host-held module. For a host that wants the catalogue and the data controller but not the
+// Path 2 - host-held module. For a host that wants the catalogue and the data controller but not the
 // recognition triggers, or that wants to read issues with no editor mounted at all.
 const tokens = createTokenModule({ catalogue, issuePolicy: 'warn' });
 await tokens.data.setData({ employee_name: 'Ana Popescu' });
@@ -927,14 +927,14 @@ const keys = await listTemplateTokens(template);
 `docier.tokens` is `null` exactly when the module is off, and the type says so, so a host cannot forget the
 check. Nodes that are not `sdt` become tokens in `storage: 'text'` mode by keeping literal marker text, but
 loops and conditionals are still expanded at fill time, rich values degrade to plain text, and a startup
-warning is emitted — that mode exists for consumers that cannot read OOXML controls, and it is not the
+warning is emitted - that mode exists for consumers that cannot read OOXML controls, and it is not the
 default. Tokens are stored as `w:sdt` content controls with `w:tag`, which is exactly the content-control
 model of the document layer: the module consumes the model and never creates a parallel one. A block-level
 `w:sdt` may not span table rows (OOXML cannot represent it), so block insertion inside a table is confined
 to a single `w:tc`. Recognition never mutates a field code, a `w:locked` or module-reserved `w:sdt`, a
 comment author field, or deleted revision text; results are cached per paragraph revision and invalidated by
 `docier:doc:change`; and background recognition is undo-transparent, because it may not create a history
-entry. **The rendered DOM is never read back into the DOCX** — an implementation that serialises what is on
+entry. **The rendered DOM is never read back into the DOCX** - an implementation that serialises what is on
 screen is a defect.
 
 ### 2.7 Export
@@ -1038,13 +1038,13 @@ export type DocierErrorCode =
   | 'SPECIAL_UNAVAILABLE' | 'INSIDE_TOKEN' | 'REGION_PROTECTED';
 ```
 
-Rules: every error thrown or rejected is a `DocierError` whose `code` comes from this union — **a raw
+Rules: every error thrown or rejected is a `DocierError` whose `code` comes from this union - **a raw
 `TypeError` reaching a host is a bug.** `recoverable` tells a host whether continuing is sane. A
 user-triggered operation (open, save, export, insert) surfaces its failure as an event plus a localised UI
 notification; a programmatic call rejects. Nothing fails silently: every caught internal error reaches
 `getDiagnostics().errors` at minimum. `config.onError` may observe every error and may replace the
 user-facing message but **may not swallow the diagnostic**. `docier.command.dev.diagnostics` copies the
-whole payload as JSON to the clipboard — the support-report path — and logging never includes token
+whole payload as JSON to the clipboard - the support-report path - and logging never includes token
 *values* unless `debug.includeValues === true`.
 
 ### 2.9 Entry points and packaging
@@ -1068,13 +1068,13 @@ explicit reviewer acknowledgement. Versioning: pre-1.0 a minor may break and eve
 "Breaking" in `CHANGELOG.md` with a codemod note; post-1.0, command ids, event names, config option names
 and CSS custom properties are stable, adding an option is a minor, and removing, re-typing or **renaming an
 event** is a major. A document saved by docier N must open in N+1 with no content loss, and the file records
-`docier:version` as a `docProps/app.xml` custom property — never a proprietary part. Theming and slots are
+`docier:version` as a `docProps/app.xml` custom property - never a proprietary part. Theming and slots are
 the two extension surfaces a host should reach for before a plugin: `theme.vars` for the `--docier-*`
 contract (class names and internal selectors are not part of it), and `ui.override({ toolbar: MyToolbar })`
 per surface, which is **all-or-nothing per surface** because partial replacement of built-in internals would
 freeze those internals into the public contract. `permissions.readOnly` is a UI guard, `role="application"`
 is used only where key handling is fully custom, and heavy template authoring on a phone is documented as
-unsupported — viewing, filling and light editing are not.
+unsupported - viewing, filling and light editing are not.
 
 ---
 
@@ -1088,12 +1088,12 @@ effort differs from a draft's own value where it does.
 
 Counts by group: A. Package, file layer and document I/O 18; B. Document model 39; C. Layout engine 67; D. Editing, input and formatting 61; E. Objects 31; F. UI chrome 30; G. Export and print 14; H. Public API, plugin surface, extensibility and tokenization 51; J. Cross-cutting quality 17. Total 328.
 
-**Priority** — `core` (required for a usable product for the HR-manager persona; ships in v1), `important`
+**Priority** - `core` (required for a usable product for the HR-manager persona; ships in v1), `important`
 (required for "feels like Word" acceptance and for HR workflows, but v1 can ship without it), `later`
-(deferred; the data model and interfaces must not be designed in a way that prevents it). **Effort** —
+(deferred; the data model and interfaces must not be designed in a way that prevents it). **Effort** -
 S ≤ 3 days, M ≤ 2 weeks, L ≤ 6 weeks, XL > 6 weeks, one engineer including tests.
 
-**Where two entries conflicted and could not be merged** — a genuine fork, not an overlap — the entry
+**Where two entries conflicted and could not be merged** - a genuine fork, not an overlap - the entry
 names the winner and §1.6 has the reasoning. There are 25 merges in total.
 
 
@@ -1195,8 +1195,8 @@ names the winner and §1.6 has the reasoning. There are 25 merges in total.
 | LE-025 | Hyphenation for Romanian, Russian and English | important | L |  |
 | LE-026 | Justification: space distribution and exact edge landing | core | M |  |
 | LE-027 | Drop caps (exclusion-based) | important | M |  |
-| LE-028 | Kashida justification (Arabic) — deferred | later | M |  |
-| LE-029 | East Asian line breaking (kinsoku) — deferred | later | M |  |
+| LE-028 | Kashida justification (Arabic) - deferred | later | M |  |
+| LE-029 | East Asian line breaking (kinsoku) - deferred | later | M |  |
 | LE-030 | Trailing/leading whitespace and empty-line semantics | core | S |  |
 | LE-031 | Deterministic behaviour when a constraint cannot be satisfied | core | M |  |
 | LE-032 | Widow and orphan control | core | M |  |
@@ -1308,8 +1308,8 @@ names the winner and §1.6 has the reasoning. There are 25 merges in total.
 |---|---|---|---|---|
 | OBJ-01 | Insert image from file | core | M |  |
 | OBJ-04 | Insert image from URL | important | M |  |
-| OBJ-07 | Resize — aspect-locked | core | M |  |
-| OBJ-08 | Resize — free (aspect unlocked) | important | S |  |
+| OBJ-07 | Resize - aspect-locked | core | M |  |
+| OBJ-08 | Resize - free (aspect unlocked) | important | S |  |
 | OBJ-09 | Crop | core | L |  |
 | OBJ-10 | Rotate | important | M |  |
 | OBJ-11 | Flip | important | S |  |
@@ -1476,9 +1476,9 @@ names the winner and §1.6 has the reasoning. There are 25 merges in total.
 Phases are ordered by **what unblocks a usable editor soonest**, not by module. Each phase ends at a
 demonstrable state with a named exit criterion, and each has an explicit dependency on the phases before
 it. Effort is given in engineer-weeks for the phase, at the effort scale of §1.6 conflict 13, and assumes
-the phase's stated scope only — it is a planning input, not a commitment.
+the phase's stated scope only - it is a planning input, not a commitment.
 
-### P0 — Foundations (no visible output)
+### P0 - Foundations (no visible output)
 
 Ships: `src/layout/units.ts` (the single conversion site and the only place `Mp` is created from document
 units); the `LayoutResult` type with its invariants; `DocierError` and the closed `DocierErrorCode` union;
@@ -1492,17 +1492,17 @@ Depends on: nothing. This phase exists to make P1's invariants testable rather t
 Exit criterion: a synthetic `LayoutResult` can be constructed, hashed, cloned and diffed, and the CI gates
 pass on an empty implementation. Removing `"jsx": "react-jsx"` from the root `tsconfig.json` is part of this
 phase.
-Effort: ~3–4 weeks. **Do not skip or compress this phase** — the divergences this specification exists to
+Effort: ~3-4 weeks. **Do not skip or compress this phase** - the divergences this specification exists to
 prevent were all introduced by starting at P1.
 
-### P1 — Open a real document and paint it
+### P1 - Open a real document and paint it
 
-Ships: OPC container read and write with unmodified-part passthrough (`PKG-01`–`PKG-06`); the parse and
+Ships: OPC container read and write with unmodified-part passthrough (`PKG-01`-`PKG-06`); the parse and
 serialise pipelines with the opaque-node mechanism and the loss ledger (`SER-01`, `SER-03`, `MOD-01`,
-`MOD-02`); the model's node identity and text addressing (`MOD-03`–`MOD-09`); the property cascade
+`MOD-02`); the model's node identity and text addressing (`MOD-03`-`MOD-09`); the property cascade
 resolved once, to flat bags, in P0 (`LE-008`, `FM-021`, `FM-022`); font registry and metrics; shaping and
 inline atomization (`LE-018`, `LE-019`); line breaking and block flow and pagination for the single-column
-body case (`LE-023`–`LE-040`); the paint-only renderer for text and simple blocks; page virtualisation;
+body case (`LE-023`-`LE-040`); the paint-only renderer for text and simple blocks; page virtualisation;
 PDF export for the same subset (`EXP-01`, `EXP-04`, `EXP-05`, `EXP-06`, `EXP-08`); and the divergence
 detector wired into dev and CI.
 
@@ -1511,71 +1511,71 @@ Exit criterion: **a 40-page DOCX opens, paints correctly, scrolls at 60 fps, sav
 not edited, and exports a PDF whose text lands where the screen put it.** The divergence detector reports
 zero exceedances on the corpus, and the PDF-parity assertion runs in CI. This is the earliest point at
 which the spine is proven end to end, and it is deliberately before any editing.
-Effort: ~10–14 weeks. The largest phase; it contains the cascade, the engine and the PDF writer.
+Effort: ~10-14 weeks. The largest phase; it contains the cascade, the engine and the PDF writer.
 
-### P2 — Edit text
+### P2 - Edit text
 
-Ships: caret and selection model and all Word navigation (`ED-001`–`ED-011`); the insertion pipeline with
+Ships: caret and selection model and all Word navigation (`ED-001`-`ED-011`); the insertion pipeline with
 run merging, the five-step formatting inheritance and O(1) typing (`ED-012`, `ED-014`, `ED-015`); word
 delete, tab and break handling; IME composition (`ED-016`); undo/redo with structural inverses, bounds and
 the save point (`ED-023`, `ED-024`); incremental relayout with the L4 resync rule and the two-tier
 synchronous/asynchronous split; caret, selection and find overlays as paint layers; the minimum chrome:
 menu bar, ribbon with the Home tab, context menus built from the registry, status bar, single sticky ruler
-(`UI-01`–`UI-07`, `UI-08`, `UI-15`, `UI-27`, `UI-33`); basic character and paragraph commands
-(`FM-001`–`FM-016`); DOCX save with dirty-part tracking.
+(`UI-01`-`UI-07`, `UI-08`, `UI-15`, `UI-27`, `UI-33`); basic character and paragraph commands
+(`FM-001`-`FM-016`); DOCX save with dirty-part tracking.
 
 Depends on: P1 (the whole phase consumes `LayoutResult` for caret geometry).
 Exit criterion: **a user can type and format a letter in Romanian and in Russian, undo it, and save it**,
 with the toolbar state derived from the resolved bags and never stored. The typing latency budget holds at
 p95 < 4 ms synchronous.
-Effort: ~8–11 weeks.
+Effort: ~8-11 weeks.
 
-### P3 — Real documents: structure, styles, tables, notes
+### P3 - Real documents: structure, styles, tables, notes
 
-Ships: numbering and list commands (`NUM-01`–`NUM-03`, `FM-026`–`FM-031`); tables — grid, merges, borders,
-cell margins, row splitting and repeated headers (`LE-041`–`LE-048`); sections, headers and footers,
-multi-column, and the L3 page-count convergence (`SEC-01`–`SEC-05`, `LE-049`, `LE-059`–`LE-061`);
+Ships: numbering and list commands (`NUM-01`-`NUM-03`, `FM-026`-`FM-031`); tables - grid, merges, borders,
+cell margins, row splitting and repeated headers (`LE-041`-`LE-048`); sections, headers and footers,
+multi-column, and the L3 page-count convergence (`SEC-01`-`SEC-05`, `LE-049`, `LE-059`-`LE-061`);
 footnotes and endnotes with the L2 loop; images and their ingest, format and placement subset
 (`MED-01`, `THM-01`, `THM-02`, `LE-053`, `LE-054`, `LE-057`, `LE-058`); the styles gallery, apply/modify/
-create, style inheritance and the reveal-formatting pane (`FM-017`–`FM-025`); clipboard with all flavours
-and the degraded event (`ED-026`–`ED-028`); find and replace including regex and formatting-aware find
-(`ED-032`–`ED-035`); and the remaining chrome: dialogs, panels, mini-toolbar, navigation pane, key tips.
+create, style inheritance and the reveal-formatting pane (`FM-017`-`FM-025`); clipboard with all flavours
+and the degraded event (`ED-026`-`ED-028`); find and replace including regex and formatting-aware find
+(`ED-032`-`ED-035`); and the remaining chrome: dialogs, panels, mini-toolbar, navigation pane, key tips.
 
 Depends on: P2 (the commands need history and addressing) and P1's L1/L2/L3 loops, which are exercised for
 the first time here.
 Exit criterion: **a contract with a header, a footer, a table, numbered clauses and a footnote opens,
 round-trips FL1 with cycle stability, and prints identically from screen and PDF.**
-Effort: ~12–16 weeks. The pagination loops and the table engine are the risk; both are already specified
+Effort: ~12-16 weeks. The pagination loops and the table engine are the risk; both are already specified
 in full, which is why they are scheduled together rather than in two phases.
 
-### P4 — Tokenization and objects
+### P4 - Tokenization and objects
 
-Ships: the token module at minimum viable depth — catalogue, data controller, issue reporting, fill,
-preview and the `w:sdt` storage (`TOK-01`–`TOK-27`), enabled per §2.6; tokens as template building blocks;
-the object layer — selection and manipulation gestures, resize, rotate, z-order, align, position presets,
+Ships: the token module at minimum viable depth - catalogue, data controller, issue reporting, fill,
+preview and the `w:sdt` storage (`TOK-01`-`TOK-27`), enabled per §2.6; tokens as template building blocks;
+the object layer - selection and manipulation gestures, resize, rotate, z-order, align, position presets,
 wrap modes with square/tight/through/top-and-bottom and the L1 float loop, alt text, and the drawing
-inspector (`OBJ-01`–`OBJ-38` minus the deferred items).
+inspector (`OBJ-01`-`OBJ-38` minus the deferred items).
 
 Depends on: P3 for tables and images (objects anchor in table cells), P2 for the gesture/undo contract.
 Exit criterion: **a template with `{{tokens}}` over a table fills from a data object, reports its issues,
 and the filled document exports to PDF with the same layout as the preview.**
-Effort: ~9–12 weeks.
+Effort: ~9-12 weeks.
 
-### P5 — Fidelity depth, quality and reach
+### P5 - Fidelity depth, quality and reach
 
-Ships: the remaining fidelity work — chart and diagram and OLE preservation, `altChunk` (only if ADR-0019
+Ships: the remaining fidelity work - chart and diagram and OLE preservation, `altChunk` (only if ADR-0019
 says yes), custom XML and data binding, mail-merge fields, glossary building blocks, and the field
-evaluator (`SC-01`–`SC-07`, `MED-03`, `ANN-01`–`ANN-05`, `SET-01`, `SET-02`); the export matrix beyond DOCX
-and PDF — HTML, Markdown, plain text, print (`EXO-01`–`EXO-03`, `EXP-03`, `EXP-07`); PDF/A and tagged PDF
+evaluator (`SC-01`-`SC-07`, `MED-03`, `ANN-01`-`ANN-05`, `SET-01`, `SET-02`); the export matrix beyond DOCX
+and PDF - HTML, Markdown, plain text, print (`EXO-01`-`EXO-03`, `EXP-03`, `EXP-07`); PDF/A and tagged PDF
 (`EXP-09`, `EXP-10`) once ADR-0006 and the archiving authority have answered; accessibility hardening to
 the I7 contract; i18n completeness for `ro-RO` and `ru-RU`; and the deferred `later` items, each behind its
 interface.
 
 Depends on: P4 for the object and token surfaces that key features here consume.
-Exit criterion: **the FL0–FL3 ledger is empty for FL0/FL1 targets on the whole corpus, the fuzz and
+Exit criterion: **the FL0-FL3 ledger is empty for FL0/FL1 targets on the whole corpus, the fuzz and
 round-trip suites are green, and the product's own acceptance documents open and export without a loss the
 ledger did not predict.**
-Effort: ~12–18 weeks, deliberately spread; this phase is a queue, not a milestone.
+Effort: ~12-18 weeks, deliberately spread; this phase is a queue, not a milestone.
 
 ### Dependency summary
 
@@ -1588,7 +1588,7 @@ P0 ──► P1 ──► P2 ──► P3 ──► P4 ──► P5
 
 Two hard edges that a re-plan may not move: **P0 before P1** (the units and the determinism lint are what
 keep the engine single-sourced), and **P1 before P2** (caret geometry is derived from `LayoutResult`, so
-editing cannot precede layout without a second geometry source — the exact defect this specification
+editing cannot precede layout without a second geometry source - the exact defect this specification
 exists to prevent). Everything else may be resequenced if the product needs a feature earlier, at the cost
 of the phase's exit criterion no longer being meaningful.
 

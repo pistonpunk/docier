@@ -1,4 +1,4 @@
-# 0002 — PDF generation strategy
+# 0002 - PDF generation strategy
 
 **Status:** accepted · **Decided by:** engineering · **Blocks:** every PDF target (`EXP-01`, `EXP-03`,
 `EXP-11`)
@@ -11,7 +11,7 @@ the export draft and three were rejected: LibreOffice headless (a server, non-de
 dependency, version drift between environments), HTML plus `window.print()` (the browser decides
 pagination, so the PDF cannot match the engine's layout, and there is no tagged-structure or PDF/A path),
 Chromium headless (same server and determinism problems), and a third-party assembler such as pdf-lib or
-jsPDF (they have no layout engine, weak or absent font subsetting, and no PDF/A or tagging support — and
+jsPDF (they have no layout engine, weak or absent font subsetting, and no PDF/A or tagging support - and
 adopting one puts our determinism claim at the mercy of their release schedule). MuPDF, PDFium and Poppler
 WASM are viable renderers but not producers, and are useful only for verification.
 
@@ -20,7 +20,7 @@ WASM are viable renderers but not producers, and are useful only for verificatio
 | Option | Tradeoff |
 |---|---|
 | Server-side rendering service only | Simplest client, but breaks the offline and no-server requirement, and makes "print to PDF" a network round trip. Kept as an option (`docier-render`), not as the primary. |
-| Own writer from our own layout result | Full control of determinism, tagging, archival and the loss ledger. Cost: we own the object/stream layer, font embedding, subsetting and colour management — a substantial, low-glamour, high-precision body of work. |
+| Own writer from our own layout result | Full control of determinism, tagging, archival and the loss ledger. Cost: we own the object/stream layer, font embedding, subsetting and colour management - a substantial, low-glamour, high-precision body of work. |
 | Own writer, but adopt an assembler for the object/stream layer | Less code to write and a smaller surface to get wrong. Cost: their object ordering and compression choices become ours, which is exactly the determinism we cannot delegate. |
 | Own writer plus a vendored pure-TypeScript DEFLATE | Removes the last non-deterministic dependency (see ADR-0003) at the cost of one vendored, pinned, tested dependency. |
 

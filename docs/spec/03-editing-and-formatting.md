@@ -1,4 +1,4 @@
-# 03 — Editing and Formatting
+# 03 - Editing and Formatting
 
 **Domain spec 3 of 5.** The editing surface (caret, selection, input, history, clipboard, find,
 proofing, modes) and the formatting system (character, paragraph, styles, themes, lists).
@@ -106,7 +106,7 @@ Every mutating command returns `layoutInvalidation`:
 | `{ kind: 'document' }` | Re-paginate the whole document (style, theme, numbering, section changes). |
 
 Rules: (a) a command that changes an `rPr`/`pPr` property must invalidate at least the affected
-paragraph range — never `none`; (b) style/theme/numbering/`docDefaults` changes are always
+paragraph range - never `none`; (b) style/theme/numbering/`docDefaults` changes are always
 `document`, because they can change any paragraph's metrics; (c) an edit inside a footnote, text box
 or table cell must also invalidate the owning story's container (the anchor line, the table, the
 page); (d) invalidation is computed by the command, not guessed by the caller; (e) commands that
@@ -136,20 +136,20 @@ This is a correctness-critical area with a common failure mode; the rules are no
 
 ### 1.9 Cross-cutting invariants
 
-- **I1 — No unreachable state.** Every mutation goes through a command; no code path mutates the
+- **I1 - No unreachable state.** Every mutation goes through a command; no code path mutates the
   document model directly, including autocorrect, paste, drag-and-drop, IME commit and token
   insertion.
-- **I2 — One gesture, one undo entry.** Any user gesture that produces a logically single change to
+- **I2 - One gesture, one undo entry.** Any user gesture that produces a logically single change to
   an object produces exactly one undo entry (ED-025).
-- **I3 — Effective formatting is computed, never stored.** The value shown for bold/font/size etc. is
+- **I3 - Effective formatting is computed, never stored.** The value shown for bold/font/size etc. is
   always derived by the resolution algorithms in FM-021/FM-022 from the current document state.
-- **I4 — Round-trip silence.** A command that changes nothing must produce no `document.changed`
+- **I4 - Round-trip silence.** A command that changes nothing must produce no `document.changed`
   event and no undo entry (e.g. clicking Bold on already-bold text with `set`, not `toggle`).
-- **I5 — Protected content is rejected, not edited then reverted.** Policy is evaluated before the
+- **I5 - Protected content is rejected, not edited then reverted.** Policy is evaluated before the
   mutation (ED-038).
-- **I6 — Locale completeness.** Every user-facing string, every typographic rule and every proofing
+- **I6 - Locale completeness.** Every user-facing string, every typographic rule and every proofing
   path defined here must behave correctly for `ro-RO` and `ru-RU`; `en-US` is the fallback.
-- **I7 — Accessibility.** The editing surface must expose caret/selection/formatting to assistive
+- **I7 - Accessibility.** The editing surface must expose caret/selection/formatting to assistive
   technology through a documented ARIA surface (`aria-activedescendant` over a virtual text
   representation, or the host's native editing bridge). Because the editor is a custom-rendered
   surface, this is a requirement, not a nicety: an HR manager using a screen reader must be able to
@@ -162,7 +162,7 @@ This is a correctness-critical area with a common failure mode; the rules are no
 
 ### 2.1 Caret and selection
 
-#### ED-001 — Caret model: placement, hit testing, affinity, rendering, blink
+#### ED-001 - Caret model: placement, hit testing, affinity, rendering, blink
 **Priority:** core · **Effort:** L · **Depends:** 02 (hit testing, caret rectangles)
 
 **Commands:** `selection.setCaret(position)`, `selection.moveCaret(direction, options)` ·
@@ -208,7 +208,7 @@ This is a correctness-critical area with a common failure mode; the rules are no
 
 ---
 
-#### ED-002 — Selection model: anchor/focus, normalization, multi-range, persistence
+#### ED-002 - Selection model: anchor/focus, normalization, multi-range, persistence
 **Priority:** core · **Effort:** L
 
 **Commands:** `selection.set(range)`, `selection.collapse(to)`, `selection.clear()`,
@@ -245,7 +245,7 @@ This is a correctness-critical area with a common failure mode; the rules are no
 
 ---
 
-#### ED-003 — Selection gestures: multi-click ladder, drag-select, autoscroll, shift-click, Extend Mode
+#### ED-003 - Selection gestures: multi-click ladder, drag-select, autoscroll, shift-click, Extend Mode
 **Priority:** core · **Effort:** L · **Depends:** ED-001, ED-004, ED-008
 
 **Commands:** `selection.extendTo(position, unit?)`, `selection.extendMode.set(on|off)`,
@@ -259,7 +259,7 @@ This is a correctness-critical area with a common failure mode; the rules are no
   Ctrl+click → the **sentence** (Word behaviour). Double-click-drag extends by whole words;
   triple-click-drag extends by whole paragraphs.
 - A double-click must also select a following space when the click lands on the first word of a
-  sentence? **No** — the selected word excludes trailing whitespace; the trailing space is included
+  sentence? **No** - the selected word excludes trailing whitespace; the trailing space is included
   when driving with Ctrl+Shift+Right (ED-009), not with the mouse.
 - **Drag-select.** Dragging extends from the anchor in the drag unit established by the initiating
   click count. Dragging beyond the window edge starts autoscroll: a proportional scroll rate that
@@ -286,7 +286,7 @@ This is a correctness-critical area with a common failure mode; the rules are no
 
 ---
 
-#### ED-004 — Selection units: character, word, sentence, line, paragraph, block, cell, row, column, object, all
+#### ED-004 - Selection units: character, word, sentence, line, paragraph, block, cell, row, column, object, all
 **Priority:** core · **Effort:** M
 
 **Commands:** `selection.selectUnit(position, unit)`, `selection.selectBlock(position)`,
@@ -294,27 +294,27 @@ This is a correctness-critical area with a common failure mode; the rules are no
 `selection.selectColumn(index)`, `selection.selectTable()` · **Events:** `selection.changed`
 **OOXML:** cell/row/column selection maps to a rectangular cell range; stored in the session model.
 Table selection writes no OOXML by itself, but the resulting formatting commands write `w:tcPr`,
-`w:trPr` (table spec) — this spec owns only the selection.
+`w:trPr` (table spec) - this spec owns only the selection.
 
 **Behaviour**
 - Units that must exist and be reachable programmatically: `character`, `word`, `sentence`, `line`
   (visual line), `paragraph`, `block`, `cell`, `row`, `column`, `object`, `all`.
-- **word** — same segmenter as ED-009 (one shared implementation; the two must never diverge).
-- **sentence** — Word's definition: a maximal run ending at `.`, `!`, `?` (plus `…`, `?!`, `!.`)
+- **word** - same segmenter as ED-009 (one shared implementation; the two must never diverge).
+- **sentence** - Word's definition: a maximal run ending at `.`, `!`, `?` (plus `…`, `?!`, `!.`)
   followed by whitespace or end of paragraph, or at a paragraph mark. Abbreviations are not
   special-cased (Word's behaviour); the unit is deterministic and documented.
-- **line** — a *visual* line, delimited by soft line breaks produced by layout; requires the layout
+- **line** - a *visual* line, delimited by soft line breaks produced by layout; requires the layout
   engine, and in headless mode without layout this unit fails with `LayoutUnavailableError`.
-- **paragraph** — the `w:p` contents including its mark.
-- **block** — the smallest enclosing structural node: a table cell's paragraph block, a whole table
+- **paragraph** - the `w:p` contents including its mark.
+- **block** - the smallest enclosing structural node: a table cell's paragraph block, a whole table
   row, a text box's paragraph block, a list item, or the whole story body when the caret is at top
   level. This unit is what "select the current block" host commands use.
-- **cell / row / column** — rectangular cell selections. A column selection is addressable even
+- **cell / row / column** - rectangular cell selections. A column selection is addressable even
   through vertically merged cells (`w:vMerge`): a column selection containing a merged cell must
   include the whole merged cell exactly once.
-- **object** — a single inline object (`w:drawing`, `w:object`, `w:pict`, `m:oMath`), a field as a
+- **object** - a single inline object (`w:drawing`, `w:object`, `w:pict`, `m:oMath`), a field as a
   unit, a content control as a unit, a footnote/endnote reference, or a bookmark.
-- **all** — the caret's story; in the body it is the body story only, excluding headers, footers and
+- **all** - the caret's story; in the body it is the body story only, excluding headers, footers and
   notes (see ED-006).
 
 **Edge cases**
@@ -327,7 +327,7 @@ Table selection writes no OOXML by itself, but the resulting formatting commands
 
 ---
 
-#### ED-005 — Block (column) selection
+#### ED-005 - Block (column) selection
 **Priority:** important · **Effort:** M
 
 **Commands:** `selection.setColumnMode(on|off)`, `selection.setBlock(anchor, focus)`
@@ -360,7 +360,7 @@ content and per-line `w:ind` where applicable.
 
 ---
 
-#### ED-006 — Select All escalation (Ctrl+A)
+#### ED-006 - Select All escalation (Ctrl+A)
 **Priority:** core · **Effort:** S
 
 **Commands:** `edit.selectAll()`, `edit.selectAllEscalated()` · **Events:** `selection.changed`
@@ -386,7 +386,7 @@ content and per-line `w:ind` where applicable.
 
 ---
 
-#### ED-007 — Object selection and manipulation gestures
+#### ED-007 - Object selection and manipulation gestures
 **Priority:** core · **Effort:** M · **Depends:** 02 (object geometry)
 
 **Commands:** `object.select(ref, { multi })`, `object.moveBy(dx, dy)`, `object.resize(handle, dx, dy)`,
@@ -401,12 +401,12 @@ spec's properties.
 **Behaviour**
 - Clicking an inline object selects it as a unit; the caret moves to before/after it. Arrow keys at
   the boundary of an inline object move **across** it (one press selects it, as Word does for
-  an inline shape; a second press crosses it) — the object is a single step in linear navigation.
+  an inline shape; a second press crosses it) - the object is a single step in linear navigation.
 - Floating objects (anchored) are selected by clicking them; a selected floating object shows 8
   resize handles, a rotation handle and an anchor glyph at its anchor paragraph.
 - **A single manipulation gesture is exactly one undo entry (I2, ED-025):** one drag-move (including
   its live preview), one resize drag, one rotation, one wrap-mode change, one nudge command.
-  During a drag the object's live position is *transient* — no command is issued, no event is
+  During a drag the object's live position is *transient* - no command is issued, no event is
   emitted, and no undo entry is created until pointer-up, which issues one `object.moveBy` command
   with the total delta. Keyboard nudges (arrow with an object selected) are separate commands and
   coalesce like typing (ED-024) while held.
@@ -423,7 +423,7 @@ spec's properties.
 
 **Edge cases**
 - Resizing an inline object must preserve the aspect ratio unless Shift is held (Word: Shift
-  constrains the ratio; the handles default to free resize) — the exact default is a host setting,
+  constrains the ratio; the handles default to free resize) - the exact default is a host setting,
   the library default is constrained for corners.
 - An object whose anchor is in a protected range may be selected but not moved (ED-038).
 - Image resize must be written to `wp:extent` only; the intrinsic pixel size and DPI in
@@ -433,7 +433,7 @@ spec's properties.
 
 ### 2.2 Keyboard navigation
 
-#### ED-008 — Character and visual-line navigation (Left/Right/Up/Down, goal column)
+#### ED-008 - Character and visual-line navigation (Left/Right/Up/Down, goal column)
 **Priority:** core · **Effort:** M · **Depends:** 02 (line boxes)
 
 **Commands:** `selection.moveLeft/Right/Up/Down({ extend, byWord, byParagraph, byPage })`
@@ -474,7 +474,7 @@ spec's properties.
 
 ---
 
-#### ED-009 — Word navigation (Ctrl+Left/Ctrl+Right, Word-exact)
+#### ED-009 - Word navigation (Ctrl+Left/Ctrl+Right, Word-exact)
 **Priority:** core · **Effort:** M
 
 **Commands:** `selection.moveWordLeft/Right({ extend })` · **Events:** `selection.changed`
@@ -498,7 +498,7 @@ spec's properties.
      mark); a further Ctrl+Right moves to the first word group of the next paragraph. Word
      navigation crosses paragraph and table-cell boundaries in document order.
   Consequences to test: from the start of "hello world", Ctrl+Right lands immediately before `w`, so
-  Ctrl+Shift+Right selects `"hello "` **including the trailing space** — this is Word's trailing-space
+  Ctrl+Shift+Right selects `"hello "` **including the trailing space** - this is Word's trailing-space
   convention and is produced by step 2+3, not by a special case.
 - **Ctrl+Left** is the mirror, with one asymmetry that must be preserved: it stops at the **first
   character of the current word group**; if the caret is already there, it moves to the first
@@ -512,7 +512,7 @@ spec's properties.
   navigation (they are reserved for host shortcuts).
 
 **Edge cases**
-- "e.g." with Ctrl+Right from the start: stops before `e`(2) i.e. after `"e."` — three presses cross
+- "e.g." with Ctrl+Right from the start: stops before `e`(2) i.e. after `"e."` - three presses cross
   `e`, `g`, and the word after. Deterministic under the two-class model; the exact stop count for
   multi-punctuation runs is fixed by the rules above and must be covered by tests, not left to the
   platform segmenter (`Intl.Segmenter` must **not** be used directly for this: its word model differs
@@ -524,7 +524,7 @@ spec's properties.
 
 ---
 
-#### ED-010 — Line and document edge navigation (Home/End, Ctrl+Home/Ctrl+End)
+#### ED-010 - Line and document edge navigation (Home/End, Ctrl+Home/Ctrl+End)
 **Priority:** core · **Effort:** S
 
 **Commands:** `selection.moveLineStart/LineEnd({ extend })`,
@@ -541,7 +541,7 @@ spec's properties.
   In a header, Ctrl+Home goes to the start of the header; in a footnote, to the start of the
   footnote's text (not its reference mark); in a comment, to the start of the comment text.
 - Ctrl+End places the caret at the end of the story's last paragraph (after its last character,
-  before the paragraph mark) — not after the mark.
+  before the paragraph mark) - not after the mark.
 - Shift variants extend: Shift+Home, Shift+End, Ctrl+Shift+Home, Ctrl+Shift+End. Ctrl+Shift+End from
   the document start must select the whole body including the final paragraph mark.
 - Home/End honour the collapsing rule of ED-008 (Home collapses to the selection start, End to the
@@ -558,7 +558,7 @@ spec's properties.
 
 ---
 
-#### ED-011 — Paragraph, page, and history navigation (Ctrl+Up/Down, Page Up/Down, Go Back)
+#### ED-011 - Paragraph, page, and history navigation (Ctrl+Up/Down, Page Up/Down, Go Back)
 **Priority:** core · **Effort:** M
 
 **Commands:** `selection.moveParagraphStart(-1|+1, { extend })`,
@@ -591,7 +591,7 @@ spec's properties.
 
 ---
 
-#### ED-012 — Insertion pipeline: typing, Tab contexts, overwrite, formatting inheritance
+#### ED-012 - Insertion pipeline: typing, Tab contexts, overwrite, formatting inheritance
 **Priority:** core · **Effort:** L
 
 **Commands:** `edit.insertText(text, { typing: true })`, `edit.insertTab()`, `edit.setOverwrite(on|off)`
@@ -646,7 +646,7 @@ spec's properties.
 
 ---
 
-#### ED-013 — Paragraph split (Enter) and break insertion (Shift+Enter, page/column)
+#### ED-013 - Paragraph split (Enter) and break insertion (Shift+Enter, page/column)
 **Priority:** core · **Effort:** M
 
 **Commands:** `edit.splitParagraph()`, `edit.insertLineBreak()`, `edit.insertPageBreak()`,
@@ -699,7 +699,7 @@ spec's properties.
 
 ---
 
-#### ED-014 — Deletion: Backspace/Delete merge rules and word/line deletion
+#### ED-014 - Deletion: Backspace/Delete merge rules and word/line deletion
 **Priority:** core · **Effort:** M
 
 **Commands:** `edit.backspace()`, `edit.deleteForward()`, `edit.deleteWordBackward()`,
@@ -722,14 +722,14 @@ content-control boundaries; `w:del` when tracking (04).
   - Backspace immediately after a `w:tab` deletes the tab (not a single space).
   - Backspace immediately after `w:br` deletes the break; a page/column break deletes as one unit.
   - Backspace at the start of a paragraph immediately following a table deletes into the last cell
-    of that table (Word behaviour) — the two blocks merge inside the cell.
+    of that table (Word behaviour) - the two blocks merge inside the cell.
   - Backspace at the start of the **first** paragraph of a table cell merges that cell's first
-    paragraph with the previous cell's last paragraph — Word refuses across a cell boundary and
+    paragraph with the previous cell's last paragraph - Word refuses across a cell boundary and
     instead deletes nothing; the library must follow Word and refuse, emitting `command.rejected`.
   - Backspace when the caret is at the very start of a content control and the control is empty
     deletes the whole control (one undo entry, `document.changed`).
   - Backspace when the caret is immediately after an inline object selects and deletes the object
-    (first press selects, second deletes) — matching ED-007's two-step rule.
+    (first press selects, second deletes) - matching ED-007's two-step rule.
 - **Ctrl+Backspace / Ctrl+Delete** delete to the previous / next word boundary using the ED-009 word
   model. Ctrl+Backspace must delete the separator run **and** the preceding word, matching Word
   (Ctrl+Backspace after "hello world|" deletes "world" and leaves "hello "). Ctrl+Delete deletes the
@@ -753,7 +753,7 @@ content-control boundaries; `w:del` when tracking (04).
 
 ---
 
-#### ED-015 — Character input beyond typing: Insert Symbol, Alt+X, dead keys, combining marks, normalization
+#### ED-015 - Character input beyond typing: Insert Symbol, Alt+X, dead keys, combining marks, normalization
 **Priority:** important · **Effort:** M
 
 **Commands:** `edit.insertSymbol(codepoint, { font })`,
@@ -799,7 +799,7 @@ content-control boundaries; `w:del` when tracking (04).
 
 ---
 
-#### ED-016 — IME composition
+#### ED-016 - IME composition
 **Priority:** core · **Effort:** L
 
 **Commands:** `edit.beginComposition()`, `edit.updateComposition(text, { cursor, segments })`,
@@ -842,7 +842,7 @@ of a segment change when the IME marks a segment with different formatting.
 
 ---
 
-#### ED-017 — Romanian diacritics and legacy cedilla handling
+#### ED-017 - Romanian diacritics and legacy cedilla handling
 **Priority:** core · **Effort:** M · **Depends:** ED-012, ED-015, ED-036
 
 **Commands:** `edit.normalizeRomanianDiacritics({ scope })`,
@@ -891,12 +891,12 @@ document-settings extension part, from which the proofing and typographic rules 
 
 ---
 
-#### ED-018 — Russian/Cyrillic input and script switching
+#### ED-018 - Russian/Cyrillic input and script switching
 **Priority:** core · **Effort:** M
 
 **Commands:** `edit.insertText(text)` (script-switch aware), `format.lang.set(lang, script?)`
 **Events:** `document.changed`, `format.changed`
-**OOXML:** `w:rPr/w:lang/@w:val` (Cyrillic uses the Latin-script language slot — **not** `w:cs`;
+**OOXML:** `w:rPr/w:lang/@w:val` (Cyrillic uses the Latin-script language slot - **not** `w:cs`;
 see 1.8), `w:rFonts/@w:ascii`, `@w:hAnsi`, `@w:hint`; a Cyrillic-specific theme font via
 `a:fontScheme/a:majorFont/a:font[@script="Cyrl"]` (FM-025).
 
@@ -919,10 +919,10 @@ see 1.8), `w:rFonts/@w:ascii`, `@w:hAnsi`, `@w:hint`; a Cyrillic-specific theme 
 - **Russian typography** (rules owned by ED-021, listed here because they are language-specific):
   - Quotes: «…» outer, „…" inner. The conversion is driven by the run's `w:lang`, not by the UI
     locale.
-  - Dashes: an em dash `—` with spaces on both sides; a numeral range (1-5, 1990-2000) uses an en
+  - Dashes: an em dash `-` with spaces on both sides; a numeral range (1-5, 1990-2000) uses an en
     dash or hyphen per the configured rule.
   - A non-breaking space must be insertable before a dash and after short (one- and two-letter)
-    prepositions and conjunctions (в, и, с, к, о, а, у, на, по, из, от, до) — this is offered as an
+    prepositions and conjunctions (в, и, с, к, о, а, у, на, по, из, от, до) - this is offered as an
     opt-in typography rule (`typography.ru.noBreakAfterShortWords`), priority *later*, because it
     requires word lists and can surprise users.
 - Spellcheck (ED-036) for `ru-RU` must use a Russian dictionary and hyphenation (FM-016) must use a
@@ -942,7 +942,7 @@ see 1.8), `w:rFonts/@w:ascii`, `@w:hAnsi`, `@w:hint`; a Cyrillic-specific theme 
 
 ### 2.3 Autocorrect, autoformat, typography
 
-#### ED-019 — Autocorrect
+#### ED-019 - Autocorrect
 **Priority:** important · **Effort:** L
 
 **Commands:** `autocorrect.setRules(rules)`, `autocorrect.addRule(from, to, { plainText })`,
@@ -960,16 +960,16 @@ a correction that produces formatted text (e.g. `(c)` → ©) may set `w:rPr` on
   boundary, the correction replaces across runs and adopts the first run's `rPr`.
 - **Undo**: the correction and the triggering typing must be one undo entry: undo restores both the
   typed text and removes the correction (Word's behaviour for the "undo the autocorrection only"
-  path — pressing Ctrl+Z once after a correction must undo the correction only, restoring the typed
+  path - pressing Ctrl+Z once after a correction must undo the correction only, restoring the typed
   text, and a second Ctrl+Z undoes the typing run; the library implements this by making the
   correction a *sub-entry* of the typing entry, and `history.undo` pops the sub-entry first).
 - **Exceptions**: a per-rule exception list and a global "do not correct this word" list; an
   exception applies to the matched word, with the matched case preserved. Exceptions are matched
   case-insensitively but only when the rule is case-insensitive.
 - **Rule sets shipped**: a built-in base set (the common `(c)`, `(r)`, `(tm)`, `-->`, `<--`, `:-)`,
-  `:-(`, `;-)`, `...` — note that `...` conflicts with smart ellipsis, see below), a Romanian set
+  `:-(`, `;-)`, `...` - note that `...` conflicts with smart ellipsis, see below), a Romanian set
   (the common word corrections: "esut"? the plan is: common misspellings from the RO dictionary
-  project, `atit`→`atât`, `aint`→`ain't` no — the RO set is: common diacritic-missing words handled
+  project, `atit`→`atât`, `aint`→`ain't` no - the RO set is: common diacritic-missing words handled
   by ED-017 instead, plus `neserios`→`neserios`; the concrete set is a data file, see OI-5), and a
   Russian set (ё restoration on words where ё is mandatory, plus common typos, driven by a data file).
 - **Conflict resolution**: only one correction per typed character; the order is
@@ -993,7 +993,7 @@ a correction that produces formatted text (e.g. `(c)` → ©) may set `w:rPr` on
 
 ---
 
-#### ED-020 — AutoFormat As You Type
+#### ED-020 - AutoFormat As You Type
 **Priority:** important · **Effort:** L
 
 **Commands:** `autoformat.setOptions(options)`, `autoformat.applyAtCaret()` ·
@@ -1011,7 +1011,7 @@ a correction that produces formatted text (e.g. `(c)` → ©) may set `w:rPr` on
      `st` with `w:vertAlign="superscript"`.
   3. **Fractions (1/2) with fraction character** → `1/2` → `½`, `1/4` → `¼`, `3/4` → `¾` (and the
      RO/RU equivalents where the glyph exists). Only these three, matching Word.
-  4. **Hyphens (--) with dash (—)** and **Hyphens (-) with en dash (–)** per ED-021.
+  4. **Hyphens (--) with dash (-)** and **Hyphens (-) with en dash (-)** per ED-021.
   5. **Bold and italic with real formatting**: `*text*` → bold, `_text_` → italic, applied to the
      matched span; must not fire inside a word (`a*b*c` is left alone) and must not fire inside a
      formula or a field.
@@ -1031,13 +1031,13 @@ a correction that produces formatted text (e.g. `(c)` → ©) may set `w:rPr` on
      bottom only) and removes the typed characters; the mapping table must be documented
      (`---` → single 0.5 pt, `===` → double, `___` → single 1.5 pt thick, `***` → dotted,
      `~~~` → wavy, `###` → dashed).
- 10. **Format beginning of list item like the one before it** — a new list item inherits the
+ 10. **Format beginning of list item like the one before it** - a new list item inherits the
      previous item's character formatting **up to the first run break** (Word applies the previous
      item's leading formatting to the item's first word only).
- 11. **Set left- and first-indent with tabs and backspaces** — Tab at the start of a paragraph with
+ 11. **Set left- and first-indent with tabs and backspaces** - Tab at the start of a paragraph with
      no tab stop sets `w:ind/@w:firstLine`, Shift+Tab sets a negative first-line/hanging indent by
      a fixed step (720 twips = 0.5 in).
- 12. **Define styles based on your formatting** — when a paragraph is formatted directly and the
+ 12. **Define styles based on your formatting** - when a paragraph is formatted directly and the
      same combination repeats, Word offers to create a style; the library must **not** do this
      silently: it emits `style.suggestion` and the host decides.
 - AutoFormat follows the same undo, exception and "never in a field/protected range" rules as
@@ -1056,7 +1056,7 @@ a correction that produces formatted text (e.g. `(c)` → ©) may set `w:rPr` on
 
 ---
 
-#### ED-021 — Smart typography: quotes, dashes, ellipsis, capitalization correction
+#### ED-021 - Smart typography: quotes, dashes, ellipsis, capitalization correction
 **Priority:** core · **Effort:** M
 
 **Commands:** `typography.applyAtCaret()`, `typography.setOptions(options)`,
@@ -1079,7 +1079,7 @@ U+2019); `w:rPr/w:vanish` never; `w:rPr/w:caps`, `w:smallCaps` for case commands
 - Apostrophes are converted to U+2019 only inside a word ("don't", "Serghei's") and never as the
   first character of a word.
 - **Dashes**: `--` between words → em dash. Spacing follows the language rule: Russian and Romanian
-  use `word — word` (spaces around); English uses `word—word` (no spaces) as a Word option. `-`
+  use `word - word` (spaces around); English uses `word-word` (no spaces) as a Word option. `-`
   between digits → en dash. `--` when both neighbours are digits → en dash.
 - **Ellipsis**: `...` → U+2026, and `....` → `.` + U+2026 (Word's rule).
 - **Capitalisation correction** (all individually switchable):
@@ -1088,7 +1088,7 @@ U+2019); `w:rPr/w:vanish` never; `w:rPr/w:caps`, `w:smallCaps` for case commands
   - "Correct TWo INitial CApitals": an initial two capitals followed by a lowercase letter becomes
     `Xx` (`HEllo` → `Hello`).
   - Capitalise names of days and months in RO (luni, marți, …) and RU (понедельник, …) when typed
-    lowercase — the RO rule must respect that Romanian does **not** capitalise month names in normal
+    lowercase - the RO rule must respect that Romanian does **not** capitalise month names in normal
     prose; the library's default is therefore **off** for month/day capitalisation in `ro-RO` and
     **on** for `ru-RU` (where it is wrong to lowercase them at the start of a sentence only). The
     default is a documented decision, host-overridable.
@@ -1109,7 +1109,7 @@ U+2019); `w:rPr/w:vanish` never; `w:rPr/w:caps`, `w:smallCaps` for case commands
 
 ---
 
-#### ED-022 — Token recognition triggers (tokenization module integration)
+#### ED-022 - Token recognition triggers (tokenization module integration)
 **Priority:** important · **Effort:** S · **Depends:** 05
 
 **Commands:** `tokens.recognizeAt(position)`, `tokens.setTriggers(options)`;
@@ -1144,7 +1144,7 @@ token's `rPr`, per spec 05.
 
 ### 2.4 History
 
-#### ED-023 — Undo/redo stack, bounds, save point, dirty flag, async and remote changes
+#### ED-023 - Undo/redo stack, bounds, save point, dirty flag, async and remote changes
 **Priority:** core · **Effort:** XL · **Depends:** 01 (model), all mutating commands
 
 **Commands:** `history.undo()`, `history.redo()`, `history.beginBatch(label)`,
@@ -1203,7 +1203,7 @@ token's `rPr`, per spec 05.
 
 ---
 
-#### ED-024 — Typing-run coalescing
+#### ED-024 - Typing-run coalescing
 **Priority:** core · **Effort:** M
 
 **Commands:** (none; behaviour of `history` + `edit.*`) · **Events:** `history.changed`
@@ -1239,7 +1239,7 @@ token's `rPr`, per spec 05.
 
 ---
 
-#### ED-025 — One undo entry per object-manipulation gesture
+#### ED-025 - One undo entry per object-manipulation gesture
 **Priority:** core · **Effort:** M · **Depends:** ED-007, ED-023
 
 **Commands:** all `object.*`, `table.*` (structural), `style.*`, `theme.*`, `list.*`
@@ -1260,7 +1260,7 @@ token's `rPr`, per spec 05.
   | Drag-and-drop text | source deletion + target insertion + paragraph/`w:br` normalisation |
   | Apply a style via the gallery | `w:pStyle`/`w:rStyle` for every paragraph/run in the selection, plus `w:pPr/w:rPr` of each paragraph mark |
   | Apply a theme | theme part + any `w:themeColor`-dependent rewrite + settings |
-  | Modify a style ("OK" in the Modify Style dialog) | the style definition + all dependent styles' resolution (no document edits) — one entry |
+  | Modify a style ("OK" in the Modify Style dialog) | the style definition + all dependent styles' resolution (no document edits) - one entry |
   | Format painter application | one entry **per application** (per painted selection); painting a multi-range selection is one entry |
   | Scale a table column (drag) | `w:tblGrid/w:gridCol/@w:w` for the dragged column and the compensated neighbour |
   | Insert a table row via repeated Tab | one entry per row creation (later, group by gesture end) |
@@ -1286,7 +1286,7 @@ token's `rPr`, per spec 05.
 
 ### 2.5 Clipboard and drag-and-drop
 
-#### ED-026 — Copy and cut payload construction
+#### ED-026 - Copy and cut payload construction
 **Priority:** core · **Effort:** M
 
 **Commands:** `clipboard.copy({ format })`, `clipboard.cut()`, `clipboard.copyAsText()`
@@ -1297,16 +1297,16 @@ token's `rPr`, per spec 05.
 
 **Behaviour**
 - Flavours written, in this order of preference for a consuming docier instance:
-  1. `application/x-docier.fragment+json` — the internal representation: the OOXML fragment plus a
+  1. `application/x-docier.fragment+json` - the internal representation: the OOXML fragment plus a
      document identity (`documentId`, `revision`), the source story, and the source's style/
      numbering/theme identifiers needed to preserve appearance.
-  2. `application/vnd.openxmlformats-officedocument.wordprocessingml.document` — a full minimal DOCX
+  2. `application/vnd.openxmlformats-officedocument.wordprocessingml.document` - a full minimal DOCX
      (two parts: `word/document.xml` + `word/_rels`) for Word/ONLYOFFICE/LibreOffice consumers
      (*important*; the packaging is provided by spec 01).
-  3. `text/html` — the HTML rendering with a `<meta name="Generator" content="docier">` marker and
+  3. `text/html` - the HTML rendering with a `<meta name="Generator" content="docier">` marker and
      inline styles, so a docier instance pasting from an external app can recognise and adapt it.
   4. `application/rtf` (*later*).
-  5. `text/plain` — the layout-flattened text.
+  5. `text/plain` - the layout-flattened text.
 - **text/plain construction rules** (they matter because the HR manager's *other* destination is a
   plain email or a spreadsheet):
   - paragraph marks → `\n`; `w:br` → `\n`; `w:tab` → `\t`;
@@ -1318,7 +1318,7 @@ token's `rPr`, per spec 05.
   - inline objects → U+FFFC, and the object is dropped from the plain flavour;
   - footnote/endnote references → the note number in brackets, and the note text is appended at the
     end separated by a rule of `-` characters (Word does not do this; the library's default is to
-    omit the note text and emit `clipboard.degraded { reason: 'footnote' }` — see OI-4);
+    omit the note text and emit `clipboard.degraded { reason: 'footnote' }` - see OI-4);
   - smart quotes/typography characters are preserved (do not "downgrade" them to ASCII).
 - **Paragraph-mark inclusion rule:** if the selection covers whole paragraphs, the copy includes the
   trailing paragraph mark of the last paragraph, and the pasted content creates new paragraphs. If
@@ -1345,7 +1345,7 @@ token's `rPr`, per spec 05.
 
 ---
 
-#### ED-027 — Paste pipeline: flavours, Paste Special, cross-document
+#### ED-027 - Paste pipeline: flavours, Paste Special, cross-document
 **Priority:** core · **Effort:** XL · **Depends:** 01, ED-026
 
 **Commands:** `clipboard.paste({ flavour, mode })`, `clipboard.pasteSpecial(flavour)`,
@@ -1415,7 +1415,7 @@ token's `rPr`, per spec 05.
 
 ---
 
-#### ED-028 — Clipboard round-trip fidelity: fields, content controls, bookmarks, comments, notes
+#### ED-028 - Clipboard round-trip fidelity: fields, content controls, bookmarks, comments, notes
 **Priority:** core · **Effort:** L
 
 **Commands:** `clipboard.copy`, `clipboard.paste` (behaviour); `document.queryFidelity(range)`
@@ -1435,7 +1435,7 @@ token's `rPr`, per spec 05.
 - **Content controls.** A copied `w:sdt` keeps `w:sdtPr` (type, `w:alias`, `w:tag`, `w:lock`,
   `w:placeholder`, `w:dataBinding`, `w:date`, `w:dropDownList`), gets a new `w:id`, and keeps its
   content. A `w:dataBinding` pointing at a custom XML part must be dropped when the destination
-  document has no such part (`degraded { reason: 'dataBinding-dropped' }`) — silently keeping it
+  document has no such part (`degraded { reason: 'dataBinding-dropped' }`) - silently keeping it
   produces a control that cannot refresh.
 - **Bookmarks.** Copied as pairs; on collision the copy is renamed (`Name` → `Name_2`, then `_3`…),
   scanned against all existing names and the copy's own names. Renaming must be reflected in a
@@ -1475,7 +1475,7 @@ token's `rPr`, per spec 05.
 
 ---
 
-#### ED-029 — External HTML import (Word, Google Docs) and sanitization
+#### ED-029 - External HTML import (Word, Google Docs) and sanitization
 **Priority:** important · **Effort:** L · **Depends:** ED-027
 
 **Commands:** `clipboard.paste({ flavour: 'html' })` (behaviour); `paste.setHtmlPolicy(policy)`
@@ -1508,7 +1508,7 @@ images, `w:numPr` for `mso-list`-style lists.
   - `<br>` → `w:br`; `<div>`/`<p>` → `w:p`; `<table>` → `w:tbl` with a synthesised `w:tblGrid` from
     the first row's cell widths (a `w:tblGrid` is mandatory; its absence is the other big cause of
     broken pasted tables).
-  - Images: `data:` URIs are decoded and embedded; remote `src` URLs are **not** fetched eagerly —
+  - Images: `data:` URIs are decoded and embedded; remote `src` URLs are **not** fetched eagerly -
     the image is inserted as a link placeholder and resolved by the host's image policy
     (`paste.remoteImages: 'block' | 'placeholder' | 'fetch'`, default `'placeholder'`).
 - **Sanitization** is mandatory and applies before any model mutation:
@@ -1534,7 +1534,7 @@ images, `w:numPr` for `mso-list`-style lists.
 
 ---
 
-#### ED-030 — Images, embedded objects, and file paste
+#### ED-030 - Images, embedded objects, and file paste
 **Priority:** core · **Effort:** M · **Depends:** 01 (media parts)
 
 **Commands:** `edit.insertImage(source, options)`, `edit.insertObject(file)`,
@@ -1557,7 +1557,7 @@ images, `w:numPr` for `mso-list`-style lists.
 - **Formats**: PNG/JPEG/GIF/WebP/SVG insert directly. An unsupported format (HEIC from a phone) must
   be converted by the host's image service; the library reports `edit.imageUnsupported` rather than
   inserting a broken part.
-- **File paste**: a pasted `File` from the OS is routed by type — image → image insert; `.docx`/`.rtf`
+- **File paste**: a pasted `File` from the OS is routed by type - image → image insert; `.docx`/`.rtf`
   /`.txt` → content insert (ED-027); anything else → an embedded object placeholder: a `w:object`
   with a `v:shape` rendering an icon (from the host's icon provider), the file stored as an
   embedded part with a relationship, and a caption naming the file. Real OLE embedding is not
@@ -1579,7 +1579,7 @@ images, `w:numPr` for `mso-list`-style lists.
 
 ---
 
-#### ED-031 — Drag-and-drop of text and files
+#### ED-031 - Drag-and-drop of text and files
 **Priority:** important · **Effort:** L · **Depends:** ED-026, ED-027, 02
 
 **Commands:** `edit.moveRange(range, target)`, `edit.copyRangeTo(range, target)`,
@@ -1592,7 +1592,7 @@ images, `w:numPr` for `mso-list`-style lists.
   held during the drop copies instead. Shift+Alt+drag? not bound. The drag must start only after a
   small movement threshold (default 4 px) so that a click is never misread as a drag.
 - **Drop target computation** must be a single, testable function shared by drag-and-drop and the
-  paste-at-point path: given a point, it returns a *drop position* with a kind —
+  paste-at-point path: given a point, it returns a *drop position* with a kind -
   `inline` (between characters, indicator a vertical caret-height bar), `paragraph-boundary`
   (indicator a full-width horizontal rule at the paragraph edge), `cell` (indicator highlights the
   target cell), `object-anchor` (indicator the anchor paragraph), or `rejected` (indicator a
@@ -1600,7 +1600,7 @@ images, `w:numPr` for `mso-list`-style lists.
 - Snapping: the target snaps to the nearest legal position using the same rules as paste
   normalisation (a block cannot land inside a run; a cell selection lands only on a cell target).
 - **Auto-scroll** during a drag uses the same rate function as ED-003.
-- **Dropping files from the OS**: the drop target's kind decides the outcome — dropped onto the text
+- **Dropping files from the OS**: the drop target's kind decides the outcome - dropped onto the text
   area, an image is inserted at the drop position and a DOCX is inserted as content; dropped anywhere
   else in the editor's region (or with the drop-kind `rejected`), the files are passed to the host's
   "attach as object" flow (ED-030).
@@ -1627,7 +1627,7 @@ images, `w:numPr` for `mso-list`-style lists.
 
 ### 2.6 Find and replace
 
-#### ED-032 — Find bar, search index, and search scope
+#### ED-032 - Find bar, search index, and search scope
 **Priority:** core · **Effort:** L
 
 **Commands:** `find.open()`, `find.set(query)`, `find.next()`, `find.previous()`, `find.findAll()`,
@@ -1669,7 +1669,7 @@ fields; it never reads `w:instrText` unless "search in field codes" is on).
 - Searching must be linear in the story length per query and must be cancellable; a query over a
   large document must not block typing (chunk the scan, with a yield budget of ~8 ms per slice).
 - `find.findAll` selects all matches as a multi-range selection (ED-002) so that a subsequent
-  formatting command applies to every match — this is the mechanism behind "find all and format".
+  formatting command applies to every match - this is the mechanism behind "find all and format".
 
 **Edge cases**
 - Matching must not cross a paragraph mark unless the query contains an explicit paragraph mark
@@ -1683,7 +1683,7 @@ fields; it never reads `w:instrText` unless "search in field codes" is on).
 
 ---
 
-#### ED-033 — Formatting-aware find
+#### ED-033 - Formatting-aware find
 **Priority:** important · **Effort:** M
 
 **Commands:** `find.setFormatCriteria(criteria)`, `find.setReplaceFormatCriteria(criteria)` ·
@@ -1701,7 +1701,7 @@ only.
 - A criterion is a *partial* match: unspecified properties are wildcards. A property set to
   "not bold" is a negative criterion and must be distinguishable from "unspecified".
 - With an empty find text and non-empty criteria, the search matches the next run (or paragraph)
-  whose formatting matches — Word's formatting-only find.
+  whose formatting matches - Word's formatting-only find.
 - Matching against **resolved** formatting is the default because that is what a user means; it is
   also the more expensive path, so the implementation must first narrow candidates with cheap
   predicates (the style id, the direct properties) before resolving.
@@ -1722,7 +1722,7 @@ only.
 
 ---
 
-#### ED-034 — Regex and wildcard find and replace
+#### ED-034 - Regex and wildcard find and replace
 **Priority:** important · **Effort:** L
 
 **Commands:** `find.setMode('literal'|'regex'|'wordWildcards')`, `find.setOptions(...)` ·
@@ -1730,14 +1730,14 @@ only.
 
 **Behaviour**
 - Three modes:
-  1. `literal` — the default; all characters are literal.
-  2. `regex` — JavaScript `RegExp` semantics with the `u` flag, applied to the *logical text of one
+  1. `literal` - the default; all characters are literal.
+  2. `regex` - JavaScript `RegExp` semantics with the `u` flag, applied to the *logical text of one
      paragraph at a time* (matching never crosses a paragraph mark unless the pattern explicitly
      contains `\n`). The `g` flag is used for find-all; the `y` flag is used for next/previous
      (sticky, from the caret). Patterns that can match an empty string are rejected at compile time
      with `code: 'empty-match'` so that Replace All cannot loop forever. Backreferences `$1`…`$9`,
      `$&`, `$$` in the replacement.
-  3. `wordWildcards` — Word's wildcard syntax, translated to a regex by the library. The translation
+  3. `wordWildcards` - Word's wildcard syntax, translated to a regex by the library. The translation
      table is normative and must be documented in the user-facing help:
 
      | Word wildcard | Meaning | Regex |
@@ -1757,12 +1757,12 @@ only.
      | `\?`, `\*`, `\\` | literal | escaped literal |
 
      Characters with no wildcard meaning are literal, and literal `?`/`*` in text must be typed as
-     `\?`/`\*` — matching Word.
+     `\?`/`\*` - matching Word.
 - Both non-literal modes must be applied to the **logical text**, with matches mapped back to text
   positions through the index of ED-032. A match that starts or ends in the middle of a grapheme
   cluster, an inline object, or a field boundary is rejected (a `find.rejectedMatch` diagnostic) and
   the scan continues; a match may not span a run boundary in a way that would require splitting a
-  `w:sdt` — if it would, the match is rejected rather than silently mangling the control.
+  `w:sdt` - if it would, the match is rejected rather than silently mangling the control.
 - Replace in a non-literal mode reconstructs the runs: the matched range's formatting is applied to
   the replacement (Word's behaviour: the replacement text takes the formatting of the found text),
   and the replacement's structure (paragraph marks inserted by `^p`) is built through the normal
@@ -1782,7 +1782,7 @@ only.
 
 ---
 
-#### ED-035 — Replace, Replace All, and special character codes
+#### ED-035 - Replace, Replace All, and special character codes
 **Priority:** core · **Effort:** M
 
 **Commands:** `find.replace()`, `find.replaceAll({ scope, limit })`, `find.replaceAndFindNext()`
@@ -1845,7 +1845,7 @@ only.
 
 ### 2.7 Proofing, view, and modes
 
-#### ED-036 — Spellcheck integration and proof state
+#### ED-036 - Spellcheck integration and proof state
 **Priority:** important · **Effort:** L
 
 **Commands:** `proof.setProvider(provider)`, `proof.recheck({ scope })`,
@@ -1896,7 +1896,7 @@ only.
 
 **Edge cases**
 - A word that is misspelled in one language and correct in another (a Romanian contract with a
-  Russian annex) must not be flagged when both languages are configured — the check runs per run
+  Russian annex) must not be flagged when both languages are configured - the check runs per run
   language, not per document.
 - All-caps words, words containing digits, and mixed-script words are controlled by options
   (`ignoreWordsInUppercase`, `ignoreWordsWithNumbers`, `ignoreMixedScript`, defaults matching Word:
@@ -1909,34 +1909,34 @@ only.
 
 ---
 
-#### ED-037 — Show formatting marks
+#### ED-037 - Show formatting marks
 **Priority:** important · **Effort:** S
 
 **Commands:** `view.setFormattingMarks(options)` · **Events:** `view.changed`, layout `range`
 invalidation only
-**OOXML:** none — this is a view setting. It must **not** be written to the document, and it must not
+**OOXML:** none - this is a view setting. It must **not** be written to the document, and it must not
 round-trip through save/load (Word stores it as an application setting tied to the user, not in the
 file).
 
 **Behaviour**
 - Individual toggles (Word's list) and a "Show all" master:
-  - **paragraph marks** — a `¶` glyph rendered at the end of every `w:p`, including the paragraph
+  - **paragraph marks** - a `¶` glyph rendered at the end of every `w:p`, including the paragraph
     mark of an empty paragraph and including table-cell paragraphs and note paragraphs.
-  - **spaces** — a middle dot `·` at each space (including U+00A0, which Word renders as `°`).
-  - **tabs** — a right arrow `→` at each `w:tab`.
-  - **optional hyphens** — `¬` at each `w:softHyphen`.
-  - **non-breaking hyphens** — a raised `-` at each `w:noBreakHyphen`.
-  - **manual line breaks** — `↲` at each `w:br`.
-  - **section breaks** — a double dotted line with the label "Section Break (Next Page)" and friends,
+  - **spaces** - a middle dot `·` at each space (including U+00A0, which Word renders as `°`).
+  - **tabs** - a right arrow `→` at each `w:tab`.
+  - **optional hyphens** - `¬` at each `w:softHyphen`.
+  - **non-breaking hyphens** - a raised `-` at each `w:noBreakHyphen`.
+  - **manual line breaks** - `↲` at each `w:br`.
+  - **section breaks** - a double dotted line with the label "Section Break (Next Page)" and friends,
     placed at the section boundary (`w:sectPr`).
-  - **end-of-cell / end-of-row marks** — a distinct glyph at the end of each `w:tc` and at the row
+  - **end-of-cell / end-of-row marks** - a distinct glyph at the end of each `w:tc` and at the row
     end, so that the table structure is visible. Exact glyph is themeable; the default must be
     visually distinct from `¶`.
-  - **hidden text** (`w:vanish`) — hidden text is not rendered at all by default; when shown
+  - **hidden text** (`w:vanish`) - hidden text is not rendered at all by default; when shown
     (`view.showHiddenText`), it is rendered with a dotted underline.
-  - **object anchors** — an anchor glyph in the margin at the anchor paragraph of a floating object.
-  - **bookmarks** — grey `[` `]` brackets around bookmark ranges.
-  - **field shading** — a grey background over field results (Word's "Field shading: always/never/when
+  - **object anchors** - an anchor glyph in the margin at the anchor paragraph of a floating object.
+  - **bookmarks** - grey `[` `]` brackets around bookmark ranges.
+  - **field shading** - a grey background over field results (Word's "Field shading: always/never/when
     selected"). This is a shading, not a mark, and is listed here because it lives in the same UI.
 - **Rendering rule (normative):** marks are inserted into the line layout as *decorations* with a
   zero-width advance and a non-zero painted glyph. They must not change: the line's break points,
@@ -1960,7 +1960,7 @@ file).
 
 ---
 
-#### ED-038 — Read-only, document protection, and range-level exceptions
+#### ED-038 - Read-only, document protection, and range-level exceptions
 **Priority:** core · **Effort:** L
 
 **Commands:** `document.setReadOnly(on|off)`, `document.setProtection({ mode, password? })`,
@@ -1977,7 +1977,7 @@ file).
   applicable* wins:
   1. the library's API-level read-only flag (per document or per story), which is never written to
      the file;
-  2. `w:documentProtection` with `w:enforcement="1"` — `readOnly` blocks all mutations;
+  2. `w:documentProtection` with `w:enforcement="1"` - `readOnly` blocks all mutations;
      `comments` allows comment insertion/editing and nothing else; `trackedChanges` allows all edits
      but forces every edit to be recorded as a revision (04); `forms` allows edits only inside form
      fields and content controls whose `w:lock` permits it;
@@ -1987,12 +1987,12 @@ file).
   4. `w:sdtPr/w:lock` on a content control: `contentLocked` prevents editing the contents but allows
      deleting the control, `sdtLocked` prevents deleting the control but allows editing the contents,
      `sdtContentLocked` prevents both;
-  5. `w:writeProtection w:recommended="1"` — advisory only: the UI prompts, the library allows
+  5. `w:writeProtection w:recommended="1"` - advisory only: the UI prompts, the library allows
      editing when the host opts in.
 - **Enforcement point.** Policy is evaluated by a guard *before* a command mutates anything (I5), and
   the result is `{ ok: false, code: 'protected', range, mode }` plus a `command.rejected` event.
   Commands that only affect the view (`view.*`, `find.*`, `selection.*`) always succeed. A rejected
-  command must produce no document change, no undo entry and no partial application — including
+  command must produce no document change, no undo entry and no partial application - including
   compound commands, which must be validated as a whole before any part is applied.
 - `editor.canExecute(commandId, args)` must answer the same question synchronously so the host can
   disable toolbar buttons and menu items; it must be cheap (memoised per protection revision).
@@ -2019,7 +2019,7 @@ file).
 - Restricted editing interacts with the clipboard: cut and drag-out of a protected range are
   rejected; copy is allowed; paste into a protected range is rejected with the same code. A paste
   that *straddles* a protected boundary must be split into the permitted parts and rejected for the
-  rest, with the rejection reported — never silently partial.
+  rest, with the rejection reported - never silently partial.
 
 **Edge cases**
 - A `w:permStart` with no matching `w:permEnd` (a corrupt file) must be treated as ending at the
@@ -2028,7 +2028,7 @@ file).
   of the groups.
 - An editable range inside a table with `w:colFirst`/`w:colLast` must map to a cell rectangle, and a
   selection that partially covers it is split.
-- Read-only mode must suppress the caret? No — the caret must remain, because selection and copy must
+- Read-only mode must suppress the caret? No - the caret must remain, because selection and copy must
   work.
 - The host may set an API-level read-only that is *stricter* than the file's protection; the reverse
   (allowing editing of a password-protected file) requires an explicit host opt-in
@@ -2036,7 +2036,7 @@ file).
 
 ---
 
-#### ED-039 — Headless / no-DOM mutation driving
+#### ED-039 - Headless / no-DOM mutation driving
 **Priority:** core · **Effort:** L · **Depends:** 01, 02
 
 **Commands:** every command, plus `editor.setEnvironment(env)` ·
@@ -2075,14 +2075,14 @@ file).
   ids and part ordering), the event journal, the undo stack depth and labels, and the final
   selection.
 - Headless consumers must be able to drive the same *high-level* flows, not only primitives:
-  token substitution (05), merge-field updates, table row generation, and format application —
+  token substitution (05), merge-field updates, table row generation, and format application -
   meaning those flows may not be implemented inside the DOM layer.
 - Bulk/headless operation must support `history.setSuspended(true)` for performance, and must still
   produce valid, Word-openable output.
 - Determinism: a headless run with a fixed seed and a fixed clock must produce byte-identical OOXML
   across runs and platforms (no time-dependent ids, no map-iteration-order-dependent id allocation).
   Id allocation (relationship ids, `wp:docPr/@id`, `w:sdt/@w:id`, numbering ids) must use a
-  deterministic counter, not randomness — this is the one place where determinism and the
+  deterministic counter, not randomness - this is the one place where determinism and the
   randomness used for `w:numIdMacAtCleanup`-style counters conflict, and the counter must win.
 
 **Edge cases**
@@ -2099,7 +2099,7 @@ file).
 
 ### 3.1 Character formatting
 
-#### FM-001 — Character toggles: bold, italic, underline, strike, superscript/subscript
+#### FM-001 - Character toggles: bold, italic, underline, strike, superscript/subscript
 **Priority:** core · **Effort:** L
 
 **Commands:** `format.bold.toggle()`, `format.bold.set(on)`, `format.italic.*`, `format.underline.*`,
@@ -2119,12 +2119,12 @@ file).
   any existing text, and the change must be visible in `format.changed` so the toolbar and the
   "next typed text" preview update.
 - Toggling with a paragraph-wide selection must also write the **paragraph mark's** `rPr`
-  (`w:pPr/w:rPr`) for every wholly-selected paragraph — otherwise pressing Enter at the end of the
+  (`w:pPr/w:rPr`) for every wholly-selected paragraph - otherwise pressing Enter at the end of the
   paragraph produces text without the formatting (the classic Word bug that the library must not
   reproduce).
 - Bold/italic are **toggle properties** in the style hierarchy (FM-021). The command writes direct
-  formatting; it must never rewrite a style. The consequence — a paragraph whose style is bold and
-  whose direct `w:b` is applied becomes *not* bold under XOR — is inherent to Word's model and must
+  formatting; it must never rewrite a style. The consequence - a paragraph whose style is bold and
+  whose direct `w:b` is applied becomes *not* bold under XOR - is inherent to Word's model and must
   be preserved and documented in the UI (the toolbar shows the resolved value, not the direct one).
 - Complex-script synchronisation: if a run contains complex-script text (`w:cs`/`w:rtl` present),
   the toggle must also write `w:bCs`/`w:iCs`/`w:szCs` so Arabic/Hebrew inside a mostly-Latin
@@ -2152,7 +2152,7 @@ file).
 
 ---
 
-#### FM-002 — Fonts: family, theme fonts, script routing, size, grow/shrink
+#### FM-002 - Fonts: family, theme fonts, script routing, size, grow/shrink
 **Priority:** core · **Effort:** L · **Depends:** FM-025, 1.8
 
 **Commands:** `format.font.set({ family, script, theme })`, `format.font.size.set(pt)`,
@@ -2210,7 +2210,7 @@ file).
 
 ---
 
-#### FM-003 — Character colour, highlight, text effects, borders, and shading
+#### FM-003 - Character colour, highlight, text effects, borders, and shading
 **Priority:** core · **Effort:** L
 
 **Commands:** `format.color.set(color)`, `format.highlight.set(color|null)`,
@@ -2229,7 +2229,7 @@ darkCyan, darkGreen, darkMagenta, darkRed, darkYellow, darkGray, lightGray`, plu
   slot (`w:themeColor="accent1"` ± `w:themeTint`/`w:themeShade`). The picker must present: theme
   colours (following the theme, so a theme change updates them), standard colours, and a custom
   colour dialog with hex/RGB/HSL entry and an alpha-less 24-bit value. Choosing "Automatic" writes
-  `w:val="auto"` (which means "follow the theme's text colour" — it is not black).
+  `w:val="auto"` (which means "follow the theme's text colour" - it is not black).
 - **Highlight** is a *separate* property from shading and is deliberately restricted to the fixed
   palette (OOXML has no free-colour highlight). The picker must therefore show those 16 colours plus
   "No Colour" (`w:highlight w:val="none"`). Removing a highlight with a selection that inherits one
@@ -2263,14 +2263,14 @@ darkCyan, darkGreen, darkMagenta, darkRed, darkYellow, darkGray, lightGray`, plu
 
 ---
 
-#### FM-004 — Character spacing: spacing, kerning, scaling, position, fit text, OpenType features
+#### FM-004 - Character spacing: spacing, kerning, scaling, position, fit text, OpenType features
 **Priority:** important · **Effort:** M
 
 **Commands:** `format.charSpacing.set({ spacing, kerning, scale, position, fitText })`,
 `format.openType.set({ ligatures, numberForm, numberSpacing, stylisticSet })`
 **Events:** `format.changed`, `document.changed` (layout `paragraph`/`document`)
 **OOXML:** `w:spacing` (twentieths of a point, signed), `w:kern` (minimum font size in half-points
-below which kerning is skipped; `0` disables), `w:w` (horizontal scaling percentage, 1–600),
+below which kerning is skipped; `0` disables), `w:w` (horizontal scaling percentage, 1-600),
 `w:position` (half-points, signed vertical offset), `w:fitText` (`@w:val` in twips, `@w:id` unique
 per run), `w:eastAsianLayout`, `w:snapToGrid`, `w:noProof`, `w:rtl`, `w:cs`, `w:em`, `w:lang`,
 `w:vanish`, `w:webHidden`, `w14:ligatures`, `w14:numForm`, `w14:numSpacing`, `w14:stylisticSet`.
@@ -2280,7 +2280,7 @@ per run), `w:eastAsianLayout`, `w:snapToGrid`, `w:noProof`, `w:rtl`, `w:cs`, `w:
   with the same units as Word's UI (points for spacing/position, points for the kerning threshold).
 - **Layout consequence (normative):** every one of these properties changes the run's advance width
   or offset and therefore **must** be reflected by the layout engine (02). The formatting layer's
-  obligation is to declare invalidation `paragraph` (or `document` for a style-level change) — an
+  obligation is to declare invalidation `paragraph` (or `document` for a style-level change) - an
   implementation that writes `w:spacing` without invalidating produces a caret that visibly drifts.
 - `w:fitText` requires a **unique `@w:id` per run** within the document; the allocator must issue one
   (deterministic counter, ED-039) and must preserve existing ids on load.
@@ -2308,7 +2308,7 @@ per run), `w:eastAsianLayout`, `w:snapToGrid`, `w:noProof`, `w:rtl`, `w:cs`, `w:
 
 ---
 
-#### FM-005 — Case commands and the Change Case dialog
+#### FM-005 - Case commands and the Change Case dialog
 **Priority:** important · **Effort:** S
 
 **Commands:** `format.changeCase(mode)`, `format.caps.set(on)`, `format.smallCaps.set(on)`
@@ -2330,14 +2330,14 @@ normalises to the last one applied).
   the special handling of `â`/`î` in title case), Russian uses `locale: 'ru'`. Turkish-style dotted-i
   behaviour must come from the locale, not from a hand-written table, so that adding a language later
   does not require code changes.
-- `sentence` mode capitalises the first letter of each sentence and lowercases the rest — it must not
+- `sentence` mode capitalises the first letter of each sentence and lowercases the rest - it must not
   lowercase proper nouns in a way that destroys a contract's party names; the library's default for
   `sentence` is therefore "capitalise the first letter, leave the rest unchanged", with the
   Word-compatible behaviour (lowercase the rest) behind an option (`changeCase.sentenceLowercases:
   false` default). This is a deliberate, documented divergence from Word, chosen for the template
   use case; hosts may opt in to Word's behaviour.
 - `title` mode capitalises the first letter of each word; for Romanian and Russian it must not
-  capitalise after a hyphen-blind split ("într-o" must not become "Într-O" — the rule is: capitalise
+  capitalise after a hyphen-blind split ("într-o" must not become "Într-O" - the rule is: capitalise
   the first letter of the word and of a word after a space, not after a hyphen or an apostrophe).
 - `toggle` mode: all-lowercase → all-uppercase, all-uppercase → lowercase with the first letter
   capitalised, mixed → lowercase (Word's cycle).
@@ -2359,7 +2359,7 @@ normalises to the last one applied).
 
 ---
 
-#### FM-006 — Clear character formatting
+#### FM-006 - Clear character formatting
 **Priority:** core · **Effort:** S
 
 **Commands:** `format.clearCharacterFormatting()` (Word's Ctrl+Space),
@@ -2372,15 +2372,15 @@ below; never touches `w:rStyle`/`w:pStyle` (that is the style's job, and Ctrl+Sp
 - **Ctrl+Space (clear character formatting)** removes the *direct* `rPr` properties from every run in
   the selection, leaving the character style (`w:rStyle`) and paragraph style intact. The result is
   that the text reverts to its style's appearance. It must also clear the paragraph mark's `rPr` for
-  wholly-selected paragraphs (FM-001's rule) — otherwise typing at the end of the paragraph is still
+  wholly-selected paragraphs (FM-001's rule) - otherwise typing at the end of the paragraph is still
   bold and the user reports the feature as broken.
 - Properties that must be **preserved** because they are not "character formatting" in Word's sense:
-  `w:rStyle` (the character style), `w:lang` (proofing language — clearing it would silently change
+  `w:rStyle` (the character style), `w:lang` (proofing language - clearing it would silently change
   spelling), `w:noProof`, `w:vanish` (hidden text), `w:rsid*`, and `w:rPrChange` (revision history,
   04). The exact preservation list is normative; getting it wrong either loses user data or leaves
   the feature visibly ineffective.
 - **Ctrl+Q (clear paragraph formatting)** removes direct `pPr` properties, leaving `w:pStyle`,
-  `w:numPr` (list membership), `w:sectPr` (the section properties attached to the last paragraph —
+  `w:numPr` (list membership), `w:sectPr` (the section properties attached to the last paragraph -
   removing them would destroy the section!), `w:pPrChange`, and `w:rPr` (the mark's formatting is
   character formatting).
 - **The eraser button** (Word's "Clear All Formatting") removes direct `rPr` **and** `pPr` **and**
@@ -2403,7 +2403,7 @@ below; never touches `w:rStyle`/`w:pStyle` (that is the style's job, and Ctrl+Sp
 
 ---
 
-#### FM-007 — Format painter
+#### FM-007 - Format painter
 **Priority:** important · **Effort:** M
 
 **Commands:** `formatPainter.pick({ includeParagraph, includeStyle, includeNumbering, mode })`,
@@ -2454,7 +2454,7 @@ extension can carry a foreign document's identity into the target).
 
 ---
 
-#### FM-008 — Reveal formatting / inspect effective formatting
+#### FM-008 - Reveal formatting / inspect effective formatting
 **Priority:** important · **Effort:** M · **Depends:** FM-021, FM-022
 
 **Commands:** `format.inspect(range)`, `view.setRevealFormatting(on|off)`
@@ -2462,16 +2462,16 @@ extension can carry a foreign document's identity into the target).
 **OOXML:** read-only presentation of resolved `rPr`/`pPr` plus their provenance. No writes.
 
 **Behaviour**
-- `format.inspect(range)` returns, for the selection (or the caret), two complete property maps —
-  character and paragraph — where each property carries `{ value, source, overridden }`:
+- `format.inspect(range)` returns, for the selection (or the caret), two complete property maps -
+  character and paragraph - where each property carries `{ value, source, overridden }`:
   - `source` is one of `{ kind: 'direct' }`, `{ kind: 'characterStyle', styleId }`,
     `{ kind: 'paragraphStyle', styleId }`, `{ kind: 'numbering', numId, ilvl }`,
     `{ kind: 'tableStyle', styleId, conditional }`, `{ kind: 'docDefaults' }`,
     `{ kind: 'defaultStyle', styleId }`.
   - `overridden` lists the values that a higher-priority level shadowed, so the pane can show
-    "Bold (from Heading 1) — overridden by direct formatting: off", which is the single most useful
+    "Bold (from Heading 1) - overridden by direct formatting: off", which is the single most useful
     diagnostic for the "why is my text not bold" support question.
-- The Reveal Formatting pane (Word's Shift+F1) shows this as sections — Font, Paragraph, Section —
+- The Reveal Formatting pane (Word's Shift+F1) shows this as sections - Font, Paragraph, Section -
   with the source of each property marked, a "Distinguish style source" toggle that shows the
   style/level names inline, and a "Show all formatting marks" link that turns on ED-037.
 - The pane must also show the **applied styles** list (paragraph style, character style, table
@@ -2496,7 +2496,7 @@ extension can carry a foreign document's identity into the target).
 
 ### 3.2 Paragraph formatting
 
-#### FM-009 — Alignment, justification, and text direction
+#### FM-009 - Alignment, justification, and text direction
 **Priority:** core · **Effort:** M
 
 **Commands:** `format.alignment.set(left|center|right|justify|distribute)`,
@@ -2510,15 +2510,15 @@ extension can carry a foreign document's identity into the target).
 - Justify writes `w:jc w:val="both"`; the "Distributed" variant (which justifies the last line too)
   writes `distribute`. The UI must not conflate them: Romanian and Russian contracts commonly use
   `both`, and `distribute` is the correct choice for justifying a short line of a form field.
-- The last line of a justified paragraph is not stretched — that is layout's job (02), but this spec
+- The last line of a justified paragraph is not stretched - that is layout's job (02), but this spec
   must declare that a trailing `w:br` forces the *preceding* text to be treated as a full line and
   therefore stretched, which is Word's behaviour and a frequent layout complaint.
 - `w:jc` and justification must interact correctly with the East Asian `distribute`/`kashida` values
   on load: they must be preserved and shown as-is even though the RO/RU UI cannot produce them.
 - **Text direction** in Word has three distinct things that must not be conflated:
-  1. paragraph direction `w:bidi` (right-to-left paragraph) + run-level `w:rtl` — the "RTL/LTR"
+  1. paragraph direction `w:bidi` (right-to-left paragraph) + run-level `w:rtl` - the "RTL/LTR"
      buttons;
-  2. text *flow* direction `w:textDirection` (vertical text, `tbRl` etc.) — the "Text Direction"
+  2. text *flow* direction `w:textDirection` (vertical text, `tbRl` etc.) - the "Text Direction"
      dialog;
   3. vertical text alignment within a line `w:textAlignment`.
   All three are exposed with Word's names and all three must round-trip. For an RO/RU product the
@@ -2527,10 +2527,10 @@ extension can carry a foreign document's identity into the target).
   in Word). Setting alignment with a multi-paragraph selection applies to every paragraph in it.
 - Layout invalidation: `paragraph` for the affected paragraphs; `document` if the alignment change
   alters line breaking in a way that can move a page break? Alignment alone cannot change the number
-  of lines, except for `distribute` on a single-word line (which is impossible) — so `paragraph` is
+  of lines, except for `distribute` on a single-word line (which is impossible) - so `paragraph` is
   sufficient, except that justification changes line *content* positions and thus the pixel positions
   of every line, so the invalidation must cover the whole paragraph range.
-- Alignment must be preserved on empty paragraphs (an empty centred paragraph keeps its `w:jc`) —
+- Alignment must be preserved on empty paragraphs (an empty centred paragraph keeps its `w:jc`) -
   trivially true if the property is on the paragraph, but it must be visible in the toolbar when the
   caret is in an empty paragraph (I3).
 
@@ -2544,7 +2544,7 @@ extension can carry a foreign document's identity into the target).
 
 ---
 
-#### FM-010 — Line spacing
+#### FM-010 - Line spacing
 **Priority:** core · **Effort:** M
 
 **Commands:** `format.lineSpacing.set({ rule, value })` · **Events:** `format.changed`,
@@ -2565,15 +2565,15 @@ Asian layout).
   | At least X pt | `atLeast` | `round(X * 20)` |
   | Exactly X pt | `exact` | `round(X * 20)` |
 
-- Any multiple is allowed (Word's UI offers 0.5–3 plus the standard list); the library accepts
-  0.05–132 and stores the rounded product, preserving the user's decimal in the UI model (not in the
+- Any multiple is allowed (Word's UI offers 0.5-3 plus the standard list); the library accepts
+  0.05-132 and stores the rounded product, preserving the user's decimal in the UI model (not in the
   file, which has only integer twips).
 - "At least" and "Exactly" are line *heights*, not distances between baselines, and their interaction
   with a large inline image is a layout rule (02): with `exact`, a line taller than the exact height
   is clipped; with `atLeast`, the line grows. The formatting layer must invalidate `document` for
   `atLeast`/`exact` changes because pagination is affected, and `paragraph` for `auto` changes with
   the same `w:line` (rare).
-- Changing line spacing must never change `w:before`/`w:after` (they are independent — a common bug
+- Changing line spacing must never change `w:before`/`w:after` (they are independent - a common bug
   when a UI conflates "line spacing" with "paragraph spacing").
 - `w:snapToGrid` (FM-016) interacts: with a document grid and `w:snapToGrid` on, `w:lineRule="auto"`
   line heights are rounded to the grid. The library must not "simplify" by disabling the grid.
@@ -2590,7 +2590,7 @@ Asian layout).
 
 ---
 
-#### FM-011 — Paragraph spacing before/after and contextual spacing
+#### FM-011 - Paragraph spacing before/after and contextual spacing
 **Priority:** core · **Effort:** M
 
 **Commands:** `format.spaceBefore.set(pt)`, `format.spaceAfter.set(pt)`,
@@ -2598,13 +2598,13 @@ Asian layout).
 **Events:** `format.changed`, `document.changed`
 **OOXML:** `w:spacing/@w:before`, `@w:after` (twips), `@w:beforeAutospacing`, `@w:afterAutospacing`
 (auto spacing for HTML-ish content), `w:contextualSpacing` (the toggle property implementing "Don't
-add space between paragraphs of the same style" — note it is a **toggle property**, FM-021).
+add space between paragraphs of the same style" - note it is a **toggle property**, FM-021).
 
 **Behaviour**
 - Before/after are in points in the UI and twips in the file (1 pt = 20 twips); the dialog accepts
-  0–1584 pt and stores the rounded value, preserving the user's decimal in the UI model.
+  0-1584 pt and stores the rounded value, preserving the user's decimal in the UI model.
 - The distinction the UI must make: **line spacing** (within a paragraph) vs **spacing before/after**
-  (between paragraphs) — the toolbars present them separately, and the dialog's "Spacing" group has
+  (between paragraphs) - the toolbars present them separately, and the dialog's "Spacing" group has
   both, as Word does.
 - **`w:contextualSpacing`** means "do not add the before/after space between this paragraph and an
   adjacent paragraph that has the *same* paragraph style". Consequences that must be implemented:
@@ -2613,14 +2613,14 @@ add space between paragraphs of the same style" — note it is a **toggle proper
   - it applies between the two paragraphs, so a run of 5 identical paragraphs has internal spacing 0
     and external spacing before/after;
   - the toggle XOR rule applies (FM-021), so a style with `w:contextualSpacing` plus a paragraph with
-    `w:contextualSpacing` resolves to *off* — a real Word oddity that the library must reproduce and
+    `w:contextualSpacing` resolves to *off* - a real Word oddity that the library must reproduce and
     the reveal pane (FM-008) must explain.
 - Word's "Space Before/After" quick presets (0, 6, 12, 18, 24 pt; and the "Add space before/after
   paragraph" buttons) are UI shortcuts over the same properties and must not introduce new storage.
 - Pagination-time suppression: whether space-before is applied at the top of a page and space-after
   at the bottom is controlled by `w:compat` settings (`suppressTopSpacing`, and the Word 2013+
   "suppress space before after a hard page or column break" option). The formatting layer must read
-  and write the compat flag; the *decision* belongs to layout (02) — see §5 OI-8.
+  and write the compat flag; the *decision* belongs to layout (02) - see §5 OI-8.
 - `w:beforeAutospacing`/`w:afterAutospacing` (written by Word for HTML-ish pasted content) must be
   preserved, must suppress the numeric before/after while set, and must be clearable by the user
   editing the value (which writes the numeric value and clears the flag).
@@ -2630,7 +2630,7 @@ add space between paragraphs of the same style" — note it is a **toggle proper
   a paragraph and a content control is applied to the control's first/last paragraph, not to the
   control's boundary.
 - A paragraph with spacing at the start of a table cell: Word drops the space before the first
-  paragraph of a cell only when `w:tblCellSpacing`? No — Word *does* apply it. The library applies
+  paragraph of a cell only when `w:tblCellSpacing`? No - Word *does* apply it. The library applies
   it and lets layout decide (02); this must be tested because it is a common "the cell has a gap"
   complaint.
 - Setting spacing on a wholly-selected paragraph writes the paragraph's `w:spacing`; it must **not**
@@ -2638,7 +2638,7 @@ add space between paragraphs of the same style" — note it is a **toggle proper
 
 ---
 
-#### FM-012 — Indentation: left, right, first line, hanging, mirror indents
+#### FM-012 - Indentation: left, right, first line, hanging, mirror indents
 **Priority:** core · **Effort:** M
 
 **Commands:** `format.indent.set({ left, right, firstLine, hanging, mirror })`,
@@ -2682,7 +2682,7 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
 
 ---
 
-#### FM-013 — Tab stops: default interval, explicit stops, leaders
+#### FM-013 - Tab stops: default interval, explicit stops, leaders
 **Priority:** important · **Effort:** M
 
 **Commands:** `format.tabs.set(stops)`, `format.tabs.add(stop)`, `format.tabs.clearAll()`,
@@ -2694,7 +2694,7 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
 **Behaviour**
 - The Tabs dialog lists explicit stops (position, alignment, leader), the default interval, and
   Set/Clear/Clear All. `@w:pos` is relative to the **left indent**; the dialog shows absolute
-  positions from the margin (Word's UI) and converts — this conversion is a frequent source of
+  positions from the margin (Word's UI) and converts - this conversion is a frequent source of
   off-by-an-indent bugs and must be done in one place.
 - `w:val="clear"` is a real, meaningful value: it clears a tab stop **inherited from a style** at
   that position. Clearing an inherited stop must write `clear`, not delete a nonexistent element.
@@ -2702,7 +2702,7 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
   it is a document-level setting, not a paragraph property, and must re-flow the entire document.
 - `bar` tab stops draw a vertical rule and consume no advancing width; `decimal` stops align the
   decimal separator and must use the **paragraph's language decimal separator** (`.` in RO and
-  Russian is `,` — the Russian and Romanian decimal separator is `,`), which is why the language of
+  Russian is `,` - the Russian and Romanian decimal separator is `,`), which is why the language of
   the paragraph must be consulted; alignment happens at the separator, with the text before it
   right-aligned and after it left-aligned (the classic column-of-numbers case in a price list).
 - Tab stops interact with the default interval: typing a tab when no explicit stop lies ahead
@@ -2725,22 +2725,22 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
 
 ---
 
-#### FM-014 — Paragraph borders and shading
+#### FM-014 - Paragraph borders and shading
 **Priority:** important · **Effort:** M
 
 **Commands:** `format.paragraphBorder.set(spec|null)`, `format.paragraphShading.set(spec|null)`,
 `format.paragraphBorder.applyPreset(name)`, `format.paragraphBorder.clear()` ·
 **Events:** `format.changed`, `document.changed`
-**OOXML:** `w:pPr/w:pBdr` (`w:top`, `w:left`, `w:bottom`, `w:right`, `w:between`, `w:bar` — each with
+**OOXML:** `w:pPr/w:pBdr` (`w:top`, `w:left`, `w:bottom`, `w:right`, `w:between`, `w:bar` - each with
 `@w:val`, `@w:sz` in eighths of a point, `@w:space` in points, `@w:color`, `@w:themeColor`,
 `@w:shadow`, `@w:frame`), `w:pPr/w:shd` (`@w:val`, `@w:color`, `@w:fill`, theme variants).
 
 **Behaviour**
 - Four sides plus **between** (borders between consecutive paragraphs with the same border
-  definition — Word's "between" for a bordered block) and **bar** (a vertical bar at the paragraph's
+  definition - Word's "between" for a bordered block) and **bar** (a vertical bar at the paragraph's
   left, used with `w:ind` for a change-bar look, which is exactly the "contract clause" visual that
   HR templates use).
-- Border width in the UI is in points (0.25–6 pt) and stored in eighths of a point; the dialog must
+- Border width in the UI is in points (0.25-6 pt) and stored in eighths of a point; the dialog must
   offer Word's standard ladder (0.5, 0.75, 1.5, 2.25, 3, 4.5, 6 pt) plus "custom".
 - The 24 border styles of OOXML must be supported (`single`, `double`, `dotted`, `dashed`,
   `triple`, `thinThickSmallGap`, `thickThinSmallGap`, `wave`, `doubleWave`, `dashSmallGap`,
@@ -2750,7 +2750,7 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
   clearing an inherited border must write `nil` (otherwise the style's border resurfaces).
 - **Box vs custom**: applying a preset box writes all four sides; the dialog's preview must show a
   per-side state and the "Settings: Custom" state must be entered whenever the sides differ.
-- The border-offset (`@w:space`, 0–31 pt) is the gap between the text and the border; the UI exposes
+- The border-offset (`@w:space`, 0-31 pt) is the gap between the text and the border; the UI exposes
   it as "Options → Distance from text".
 - **`w:shd` for a paragraph is drawn behind the text and spans the full paragraph extent including
   the indent**; the UI must note that a paragraph shading with a hanging indent covers the indent
@@ -2768,12 +2768,12 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
 - A paragraph border interacts with pagination: borders are repeated across a page break depending on
   `w:pBdr` and the "surround" behaviour; that is layout's decision (02), but the formatting layer
   must not strip borders when a paragraph splits.
-- Applying shading to a paragraph with a `w:br`-separated "line" does not shade a rectangle — shading
+- Applying shading to a paragraph with a `w:br`-separated "line" does not shade a rectangle - shading
   is per paragraph. The UI must not promise "shade this line" for a line created with Shift+Enter.
 
 ---
 
-#### FM-015 — Paragraph dialog: Indents and Spacing, Line and Page Breaks, Tabs
+#### FM-015 - Paragraph dialog: Indents and Spacing, Line and Page Breaks, Tabs
 **Priority:** core · **Effort:** L
 
 **Commands:** `view.openParagraphDialog()`, `format.paragraph.applyChanges(delta)` ·
@@ -2792,7 +2792,7 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
     `w:keepNext`, Keep lines together = `w:keepLines`, Page break before = `w:pageBreakBefore`);
     Formatting exceptions (Suppress line numbers = `w:suppressLineNumbers`, Don't hyphenate =
     `w:suppressAutoHyphens`); Textbox (Wrap text / Do not wrap = `w:textboxTightWrap` values
-    `none|allLines|firstAndLastLine|firstLineOnly|lastLineOnly`, and "Fit text to shape" — a text box
+    `none|allLines|firstAndLastLine|firstLineOnly|lastLineOnly`, and "Fit text to shape" - a text box
     property owned by 02/01, shown here for completeness and written through the drawing layer).
   - **Tabs**: as FM-013.
 - **The dialog is differential (normative).** It shows the *resolved* value for a uniform selection
@@ -2802,13 +2802,13 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
 - **Mixed-state semantics**: a blank field with a mixed selection, left untouched, writes nothing; a
   blank field the user *fills in* writes that value to every paragraph in the selection; a field the
   user clears (to empty) writes the property's neutral value as direct formatting.
-- **Outline level** (`w:outlineLvl`, 0–8 for Level 1–9, 9/Body text): a direct property that
+- **Outline level** (`w:outlineLvl`, 0-8 for Level 1-9, 9/Body text): a direct property that
   overrides the style's outline level and is the mechanism behind the Navigation pane and the TOC.
   The dialog's list must show "Body Text" for `w:outlineLvl w:val="9"` and must write the property,
   noting in the help text that using a Heading style is the recommended route.
 - **OK is one undo entry** (I2); Cancel writes nothing; the unit-of-measure setting (inches, cm, mm,
   pt, picas) comes from the host's locale settings and must convert on read/write without changing
-  the stored twips (never round-trip through a formatted string and back — that loses precision and
+  the stored twips (never round-trip through a formatted string and back - that loses precision and
   is a visible bug when a paragraph's indent drifts by 1 twip on every open/OK).
 - The dialog must reflect a live preview where the layout engine supports it (02): changes are
   previewed transiently and committed on OK as one entry, and Cancel reverts the preview without
@@ -2829,7 +2829,7 @@ character, East Asian); `w:pPr/w:mirrorIndents`; `w:pPr/w:adjustRightInd`; `w:pP
 
 ---
 
-#### FM-016 — Pagination and line-break rules: keepNext, keepLines, pageBreakBefore, widowControl, hyphenation, snap to grid
+#### FM-016 - Pagination and line-break rules: keepNext, keepLines, pageBreakBefore, widowControl, hyphenation, snap to grid
 **Priority:** core · **Effort:** M
 
 **Commands:** `format.pagination.set({ keepNext, keepLines, pageBreakBefore, widowControl })`,
@@ -2849,7 +2849,7 @@ document level: `w:settings/w:autoHyphenation`, `w:hyphenationZone`, `w:consecut
   ordinary booleans where "absent" means off. `w:widowControl` is the exception: its **default is
   on**, so `w:widowControl w:val="0"` disables it and the absence of the element means on. The UI
   must therefore write `w:widowControl w:val="0"` for "off" and *remove* the element for "on" only
-  when the style does not supply it — otherwise the user cannot turn widow control back on.
+  when the style does not supply it - otherwise the user cannot turn widow control back on.
 - `w:keepNext`/`w:keepLines` would appear to be toggle properties; per ECMA-376 they are **not** in
   the toggle list (FM-021) and must be resolved as ordinary booleans with the highest level winning.
   This must be verified against Word (§5 OI-1) because a wrong choice here produces keep-with-next
@@ -2888,7 +2888,7 @@ document level: `w:settings/w:autoHyphenation`, `w:hyphenationZone`, `w:consecut
 
 ### 3.3 Styles
 
-#### FM-017 — Styles gallery and the Styles pane
+#### FM-017 - Styles gallery and the Styles pane
 **Priority:** core · **Effort:** L
 
 **Commands:** `view.openStylesPane()`, `styles.setPaneOptions(options)`,
@@ -2909,7 +2909,7 @@ document level: `w:settings/w:autoHyphenation`, `w:hyphenationZone`, `w:consecut
   sample string with the style applied) showing at least the font, size, colour, and for paragraph
   styles the indentation/alignment. Preview caching must be per style revision and must not re-render
   on every selection change; the gallery must remain responsive with 200+ styles.
-- **Styles pane options**: list ("In use" / "In current document" / "All styles" — this maps to
+- **Styles pane options**: list ("In use" / "In current document" / "All styles" - this maps to
   filtering by `w:semiHidden`/`w:unhideWhenUsed` and whether the style is referenced),
   "Show previews", "Show recommended styles" (filtering by `w:uiPriority`), "Sort by: name / priority
   / recommended", "Disable Linked Styles", and "Select All N instances" on a style's context menu.
@@ -2923,7 +2923,7 @@ document level: `w:settings/w:autoHyphenation`, `w:hyphenationZone`, `w:consecut
   the reveal pane refresh from one source of truth.
 - The gallery and pane must be driven by the same style list model, so a change in the resolution of
   "recommended" does not make the two disagree.
-- Dragging a style in the gallery writes `w:uiPriority` values (a reorder is one undo entry) — the
+- Dragging a style in the gallery writes `w:uiPriority` values (a reorder is one undo entry) - the
   gallery order is *document data*, not a user preference, and must round-trip.
 
 **Edge cases**
@@ -2940,7 +2940,7 @@ document level: `w:settings/w:autoHyphenation`, `w:hyphenationZone`, `w:consecut
 
 ---
 
-#### FM-018 — Applying styles: paragraph, character, linked, table, list
+#### FM-018 - Applying styles: paragraph, character, linked, table, list
 **Priority:** core · **Effort:** L
 
 **Commands:** `style.applyParagraph(styleId, { clearDirect })`, `style.applyCharacter(styleId)`,
@@ -2953,13 +2953,13 @@ style), `w:style/@w:type`, `w:link`, `w:aliases`; the `w:style/w:key`-equivalent
 **Behaviour**
 - **Applying a paragraph style writes only `w:pPr/w:pStyle` and never removes direct formatting.** A
   user who applies "Heading 1" to a paragraph with direct bold keeps the bold (and the toolbar shows
-  bold) — this is Word's behaviour and it is the number-one source of "the style does not work"
+  bold) - this is Word's behaviour and it is the number-one source of "the style does not work"
   confusion. The library must expose `clearDirect: true` as an explicit option and surface the
   distinction in the UI ("Apply style" vs "Apply style and clear direct formatting"):
   - `w:pStyle` is written on every paragraph in the selection;
   - the **paragraph mark's `rPr`** is *not* modified (the style supplies it);
   - `w:numPr` from the paragraph's direct formatting is **kept** (a direct list membership survives a
-    style change) — this is Word's behaviour and it means applying "Normal" to a list item does not
+    style change) - this is Word's behaviour and it means applying "Normal" to a list item does not
     remove the list (FM-030 covers removing numbering explicitly).
 - **Applying a character style** writes `w:rStyle` on every run in the selection and on the caret's
   typing context for a collapsed selection. Word's rule for a collapsed caret: the character style
@@ -3001,7 +3001,7 @@ style), `w:style/@w:type`, `w:link`, `w:aliases`; the `w:style/w:key`-equivalent
 
 ---
 
-#### FM-019 — Creating and modifying styles: update to match, autoRedefine, next style
+#### FM-019 - Creating and modifying styles: update to match, autoRedefine, next style
 **Priority:** core · **Effort:** L
 
 **Commands:** `style.create(definition)`, `style.createFromSelection({ name, type })`,
@@ -3009,7 +3009,7 @@ style), `w:style/@w:type`, `w:link`, `w:aliases`; the `w:style/w:key`-equivalent
 `style.setAutoRedefine(styleId, on)`, `style.setNextStyle(styleId, nextStyleId)`,
 `style.setShortcut(styleId, key)`, `style.setBasedOn(styleId, baseStyleId)`
 **Events:** `styles.changed`, `document.changed` (only when the definition change alters existing
-content's appearance — see below)
+content's appearance - see below)
 
 **Behaviour**
 - `style.create` requires: `type` (`paragraph|character|table|numbering`), `name`, and either a
@@ -3020,18 +3020,18 @@ content's appearance — see below)
 - `style.createFromSelection` ("New Style from Selection") captures the selection's **resolved**
   formatting as direct `pPr`/`rPr` in the style definition, with the option to include (a) the
   character formatting, (b) the paragraph formatting, (c) numbering, (d) the basedOn style, and
-  (e) the "Style for following paragraph" (`w:next`) — Word's New Style dialog's fields, all of
+  (e) the "Style for following paragraph" (`w:next`) - Word's New Style dialog's fields, all of
   which must be offered.
 - **`style.modify` semantics for existing content**: a style's definition is data that existing
   paragraphs resolve against, so modifying it changes them. The command must:
   1. re-resolve and re-invalidate every paragraph (and run) that uses the style or a style based on
-     it — layout invalidation `document`, because a modified style can change any metric;
+     it - layout invalidation `document`, because a modified style can change any metric;
   2. return the affected ranges in `CommandResult` so the host can refresh;
   3. be one undo entry whose inverse restores the previous `w:pPr`/`w:rPr` verbatim including
      element order.
 - **"Update to match selection"** (`style.updateToMatchSelection`) writes the selection's resolved
   formatting *minus* what the basedOn chain already supplies (otherwise every update accumulates the
-  entire cascade into the style and the style becomes unmaintainable — this de-duplication is
+  entire cascade into the style and the style becomes unmaintainable - this de-duplication is
   required and must be tested by modifying a style twice and asserting the definition does not grow).
   The dialog must offer Word's "Automatically update" (`w:autoRedefine`) as a per-style flag: when
   set, applying direct formatting to a paragraph of that style **redefines the style** instead of
@@ -3052,7 +3052,7 @@ content's appearance — see below)
 
 **Edge cases**
 - Creating a style whose name collides with a **latent/built-in** style must *materialise* that
-  built-in style (FM-023) rather than creating a differently-named custom style — Word's behaviour
+  built-in style (FM-023) rather than creating a differently-named custom style - Word's behaviour
   and the thing that makes "New Style called 'Heading 4'" work.
 - Modifying a style while a document is protected in `readOnly` mode is rejected; in `comments` mode
   it is rejected; in `forms` mode it is rejected unless the style is not used by protected content
@@ -3060,12 +3060,12 @@ content's appearance — see below)
 - `style.modify` on a style used by another style's `w:basedOn` must re-resolve the dependents;
   `styles.changed` must list them.
 - Undo of a style creation must remove the style and every reference to it that the creation itself
-  introduced (none, in the normal flow, because the apply is a separate command — but the *combined*
+  introduced (none, in the normal flow, because the apply is a separate command - but the *combined*
   gesture "create and apply" is one entry and must remove both).
 
 ---
 
-#### FM-020 — Style inheritance: basedOn chains, link, type, cycles, missing targets
+#### FM-020 - Style inheritance: basedOn chains, link, type, cycles, missing targets
 **Priority:** core · **Effort:** L · **Depends:** FM-021, FM-022
 
 **Commands:** `style.resolve(styleId)` (diagnostic), `style.repairInheritance(scope)`
@@ -3102,7 +3102,7 @@ content's appearance — see below)
   document is modified elsewhere).
 - **`w:aliases`**: a style may have alternative names, comma-separated; lookups by name must consider
   the primary `w:name` first, then the aliases (Word's `w:name` for a renamed built-in keeps the
-  built-in name and adds the user's name as an alias — the library follows the same convention so
+  built-in name and adds the user's name as an alias - the library follows the same convention so
   that built-in detection keeps working).
 - **Diagnostics** (`styles.invalidInheritance`, `styles.cycle`, `styles.missingTarget`) must be
   emitted once per document revision, not per resolution call, or a resolution-heavy operation
@@ -3114,7 +3114,7 @@ content's appearance — see below)
 **Edge cases**
 - A style based on a style that is based on *itself* through a longer chain (A→B→C→B): the cycle is
   broken at B and C still contributes.
-- Two styles with the same `w:styleId` (a malformed part) — the first wins, the second is renamed on
+- Two styles with the same `w:styleId` (a malformed part) - the first wins, the second is renamed on
   demand with a diagnostic.
 - `w:basedOn` on a style whose base is `w:hidden`: the hidden flag is **not** inherited (visibility
   is not an inheritable property), and the UI must not hide the dependent style.
@@ -3125,13 +3125,13 @@ content's appearance — see below)
 
 ---
 
-#### FM-021 — Effective formatting resolution for runs (Word's cascade, toggle XOR)
+#### FM-021 - Effective formatting resolution for runs (Word's cascade, toggle XOR)
 **Priority:** core · **Effort:** XL · **Depends:** FM-020
 
 **Commands:** `format.query(range)` (read-only; the API behind every toolbar state)
 **Events:** none (pure read; `format.changed` is emitted by the commands that mutate)
 **OOXML:** reads `w:docDefaults/w:rPrDefault/w:rPr`, `w:style` (paragraph and character, with
-`w:basedOn` chains), `w:pPr/w:rStyle`? no — `w:rPr/w:rStyle`, `w:p/w/pPr/w:rPr` (the paragraph
+`w:basedOn` chains), `w:pPr/w:rStyle`? no - `w:rPr/w:rStyle`, `w:p/w/pPr/w:rPr` (the paragraph
 mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr` (direct).
 
 **Behaviour**
@@ -3139,9 +3139,9 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   1. `w:docDefaults/w:rPrDefault/w:rPr`;
   2. the default *character* style (`w:style[@w:type='character'][@w:default='1']`, normally "Default
      Paragraph Font"), resolved through its chain;
-  3. the paragraph's **paragraph style chain** — the paragraph style's `w:basedOn` ancestors from the
+  3. the paragraph's **paragraph style chain** - the paragraph style's `w:basedOn` ancestors from the
      root down to the applied style, then the default paragraph style beneath it;
-  4. the **numbering level's** `w:rPr` (`w:numPr/w:ilvl` → `w:abstractNum/w:lvl/w:rPr`) — applies
+  4. the **numbering level's** `w:rPr` (`w:numPr/w:ilvl` → `w:abstractNum/w:lvl/w:rPr`) - applies
      **only to the number's own text**, not to the paragraph's runs, and is therefore consulted only
      when resolving the glyph run of a list number;
   5. the **table style's** `w:rPr` for the conditional formats that apply
@@ -3149,7 +3149,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   6. the **character style chain** from the run's `w:rStyle` (root ancestor → applied style);
   7. the run's **direct** `w:rPr`.
   The position of level 5 relative to level 3 is the one part of this order that is genuinely
-  ambiguous against Word's observed behaviour — see §5 OI-1. The implementation must make the order a
+  ambiguous against Word's observed behaviour - see §5 OI-1. The implementation must make the order a
   single ordered list of "levels" so it can be changed in one place.
 - **Toggle properties** resolve by a different rule from ordinary properties (ECMA-376 §17.7.3):
   the toggle set for runs is `w:b`, `w:bCs`, `w:i`, `w:iCs`, `w:caps`, `w:smallCaps`, `w:strike`,
@@ -3194,11 +3194,11 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   "the date field is blue but the typed date is not").
 - `w:rStyle` on the run pointing at a paragraph style is invalid; it is ignored with a diagnostic.
 - Hidden text (`w:vanish`) resolves as an ordinary toggle and must be excluded from layout when
-  `view.showHiddenText` is off (ED-037) — resolution does not change, rendering does.
+  `view.showHiddenText` is off (ED-037) - resolution does not change, rendering does.
 
 ---
 
-#### FM-022 — Effective formatting resolution for paragraphs (numbering, table styles, paragraph mark)
+#### FM-022 - Effective formatting resolution for paragraphs (numbering, table styles, paragraph mark)
 **Priority:** core · **Effort:** XL · **Depends:** FM-020, FM-021
 
 **Commands:** `format.queryParagraph(range)` · **Events:** none (read-only)
@@ -3219,13 +3219,13 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   5. the **table style's** `w:pPr` for the applicable conditional formats, for paragraphs inside a
      table (a table style's `w:pPr` supplies `w:spacing`, `w:ind`, `w:jc` for cells);
   6. the paragraph's **direct** `w:pPr`.
-  Order rationale and the one ambiguous rung (level 5 vs 3) are the same as FM-021 — see §5 OI-1.
+  Order rationale and the one ambiguous rung (level 5 vs 3) are the same as FM-021 - see §5 OI-1.
 - **`w:numPr` is not a formatting property but a structural one**, yet it participates here because
   the level's `w:pPr` contributes indentation. The rule: a direct `w:ind` on the paragraph
   **overrides** the numbering's indent for that paragraph; a direct `w:numPr` overrides a style's
   `w:numPr` entirely; `w:numPr/w:numId w:val="0"` means "no numbering", overriding any numbering the
   style supplies. All three must be honoured, and `w:numId="0"` must be preserved on round-trip
-  (deleting it silently re-applies the style's list — a real bug in naive implementations).
+  (deleting it silently re-applies the style's list - a real bug in naive implementations).
 - **Conditional table formats**: applicability is decided by `w:tblLook`'s bits
   (`firstRow`, `lastRow`, `firstColumn`, `lastColumn`, `noHBand`, `noVBand`) combined with position
   (header row, banded rows, etc.) and by `w:cnfStyle` on the row/cell when present. The reveal pane
@@ -3235,7 +3235,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   its result is what the toolbar shows when the caret is in an empty paragraph or when the whole
   paragraph is selected. Applying character formatting with the mark "covered" writes it (FM-001).
 - **Which paragraph properties are toggle properties**: the paragraph toggle set (per ECMA-376) must
-  be implemented and tested explicitly — `w:contextualSpacing` is the one that users notice
+  be implemented and tested explicitly - `w:contextualSpacing` is the one that users notice
   (`w:keepNext`/`w:keepLines`/`w:pageBreakBefore`/`w:widowControl` are ordinary booleans, and
   `w:widowControl` has a non-false default; see FM-016 and §5 OI-1).
 - **Section properties** (`w:sectPr` inside the last paragraph's `w:pPr`) are not formatting and are
@@ -3253,7 +3253,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
 - A paragraph with `w:pPr/w:ind/@w:hanging` and a numbering level that also sets a hanging indent:
   the direct `w:hanging` wins for the text position, but the **number** is still placed at the
   level's `w:ind/@w:left` position (the number's position comes from the level, the text's from the
-  paragraph) — this asymmetry is exactly what makes a mis-indented list look wrong and must be
+  paragraph) - this asymmetry is exactly what makes a mis-indented list look wrong and must be
   implemented deliberately.
 - `w:spacing` resolved from the numbering level applies to the whole paragraph (Word writes
   `w:spacing` into some list level definitions, and it takes effect).
@@ -3261,7 +3261,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
 
 ---
 
-#### FM-023 — Style management: delete, rename, hide, priority, qFormat, latent styles, docDefaults
+#### FM-023 - Style management: delete, rename, hide, priority, qFormat, latent styles, docDefaults
 **Priority:** important · **Effort:** L
 
 **Commands:** `style.delete(styleId)`, `style.rename(styleId, name)`, `style.setHidden(styleId, on)`,
@@ -3278,9 +3278,9 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
 **Behaviour**
 - **Delete a style** requires repairing every reference to it, and the repair rules are normative:
   1. paragraphs using the deleted paragraph style are reassigned to the deleted style's `w:basedOn`
-     (or the default paragraph style when there is none) — **not** blindly to "Normal";
+     (or the default paragraph style when there is none) - **not** blindly to "Normal";
   2. runs using the deleted character style lose their `w:rStyle` (and become direct formatting?
-     no — they revert to their paragraph style's character resolution);
+     no - they revert to their paragraph style's character resolution);
   3. every `w:basedOn` pointing at the deleted style is re-pointed at the deleted style's base;
   4. every `w:next` pointing at it is re-pointed at the deleted style's `w:next`, and a self-
      reference is cleared;
@@ -3296,7 +3296,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   references use; changing it would either break every reference or require an O(n) rewrite). For a
   **built-in** style, renaming writes the user's name as `w:name` and keeps the built-in name in
   `w:aliases`, so built-in detection (shortcut keys, the gallery's built-in icons, the
-  `w:link` pairing) keeps working — this mirrors Word, which stores the built-in name as the primary
+  `w:link` pairing) keeps working - this mirrors Word, which stores the built-in name as the primary
   and the user's as an alias, and the library must accept **both** arrangements on read.
 - **Hide / semi-hide**: `w:hidden` hides the style everywhere; `w:semiHidden` + `w:unhideWhenUsed`
   hides it until it is used (the mechanism behind "Normal" not appearing in the gallery). Both are
@@ -3308,10 +3308,10 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
   inserted with the built-in definition from the library's built-in style table (the same table Word
   ships in its default template), the matching `w:lsdException`'s flags are honoured
   (`w:locked`, `w:qFormat`, `w:semiHidden`, `w:uiPriority`), and no other latent style is affected.
-  The built-in table must cover at least: Normal, heading 1–9, Title, Subtitle, Title Text, Body
+  The built-in table must cover at least: Normal, heading 1-9, Title, Subtitle, Title Text, Body
   Text, Quote, Intense Quote, Caption, List Paragraph, List Bullet/Number, No Spacing, Table
   Normal/Grid, Default Paragraph Font, Hyperlink, FollowedHyperlink, Footnote/Endnote
-  Reference/Text, Header/Footer, Page Number, TOC 1–3, Strong, Emphasis, Subtle/Intense
+  Reference/Text, Header/Footer, Page Number, TOC 1-3, Strong, Emphasis, Subtle/Intense
   Emphasis/Reference, Book Title, and the caption/label styles. The list is a data file, not code.
 - **`docDefaults`**: editing the default font/size (`w:rPrDefault`) or the default paragraph
   spacing (`w:pPrDefault`) is a document-wide change (invalidation `document`) and must be one undo
@@ -3321,7 +3321,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
 - **`w:style/@w:default`** ("Set as default" for the paragraph/character default): changing it must
   clear the attribute on the previous holder in the same operation; two defaults is a corrupt state.
 - Styles-part locks: `w:settings/w:styleLockQFSet` (styles cannot be added to the gallery),
-  `w:styleLockTheme` (theme locked), `w:styleLockStylesPart` — these are honoured by
+  `w:styleLockTheme` (theme locked), `w:styleLockStylesPart` - these are honoured by
   `editor.canExecute` (ED-038) and preserved on save.
 - The style pane's **sort and filter preferences** (`w:stylePaneFormatFilter`,
   `w:stylePaneSortMethod`) are document settings in OOXML and must round-trip.
@@ -3344,7 +3344,7 @@ mark), `w:abstractNum/w:lvl/w:rPr`, `w:tblStyle` conditional formats, `w:r/w:rPr
 
 ### 3.4 Themes
 
-#### FM-024 — Theme colours: clrScheme, themeColor/themeTint/themeShade, theme switching
+#### FM-024 - Theme colours: clrScheme, themeColor/themeTint/themeShade, theme switching
 **Priority:** important · **Effort:** L
 
 **Depends:** 01 (theme part packaging)
@@ -3377,10 +3377,10 @@ each containing `a:srgbClr` or `a:sysClr`; `w:rPr/w:color/@w:themeColor`, `@w:th
   document already uses for that slot, defaulting to `dark1`/`light1`/… in `w:rPr` and to
   `text1`/`background1` in `w:tblPr`/`w:tcPr`-adjacent contexts (where Word uses the `textN`/
   `backgroundN` spelling).
-- **Tint and shade** are two-hex-digit values (00–FF) with this normative computation, applied per
+- **Tint and shade** are two-hex-digit values (00-FF) with this normative computation, applied per
   sRGB channel with rounding half-up:
-  - `shade`: `channel' = channel * (1 - shade/255)` — blend toward black;
-  - `tint`: `channel' = channel + (255 - channel) * (tint/255)` — blend toward white;
+  - `shade`: `channel' = channel * (1 - shade/255)` - blend toward black;
+  - `tint`: `channel' = channel + (255 - channel) * (tint/255)` - blend toward white;
   - both present is invalid; shade wins with a diagnostic, and only one is written.
   Word's actual rounding for some slots is a fixed ladder rather than a linear blend (see §5 OI-10);
   the linear formula above is the library's definition and the one the layout engine must use, so
@@ -3402,7 +3402,7 @@ each containing `a:srgbClr` or `a:sysClr`; `w:rPr/w:color/@w:themeColor`, `@w:th
   fonts; a change is a document-level setting with `document` invalidation.
 - Where the document has no theme part at all (a minimal DOCX), the library must synthesise the
   Office default theme **in memory** for resolution and only write a theme part when something
-  actually needs one — otherwise loading any minimal file and saving "just to check" adds a part.
+  actually needs one - otherwise loading any minimal file and saving "just to check" adds a part.
 
 **Edge cases**
 - A theme with fewer than 12 slots or with a slot out of order must be repaired on read
@@ -3412,12 +3412,12 @@ each containing `a:srgbClr` or `a:sysClr`; `w:rPr/w:color/@w:themeColor`, `@w:th
 - `themeOverride1.xml` (a part-level theme override) must be honoured for the part it is
   related to and must not leak into other parts.
 - Applying a theme to a document in which no run uses theme colours changes no run's appearance but
-  still invalidates the whole document — the command must be honest about the invalidation even when
+  still invalidates the whole document - the command must be honest about the invalidation even when
   nothing visibly changes.
 
 ---
 
-#### FM-025 — Theme fonts: major/minor, per-script fonts, themeFontLang, font substitution
+#### FM-025 - Theme fonts: major/minor, per-script fonts, themeFontLang, font substitution
 **Priority:** important · **Effort:** M · **Depends:** FM-024, FM-002
 
 **Commands:** `theme.fonts.set({ major, minor, script })`, `theme.fonts.setForScript(script, family)`
@@ -3430,13 +3430,13 @@ attributes `@w:asciiTheme`, `@w:hAnsiTheme`, `@w:cstheme`, `@w:eastAsiaTheme` wi
 
 **Behaviour**
 - The theme font slots relevant to this product:
-  - **majorLatin** (`a:majorFont/a:latin`) — used by headings; reached by `w:asciiTheme="majorHAnsi"`
+  - **majorLatin** (`a:majorFont/a:latin`) - used by headings; reached by `w:asciiTheme="majorHAnsi"`
     (and `majorAscii`).
-  - **minorLatin** (`a:minorFont/a:latin`) — body text; `minorHAnsi`/`minorAscii`.
-  - **majorBidi/minorBidi** (`a:cs`) — complex scripts; reached by `w:cstheme`. In Word, `a:cs` is
+  - **minorLatin** (`a:minorFont/a:latin`) - body text; `minorHAnsi`/`minorAscii`.
+  - **majorBidi/minorBidi** (`a:cs`) - complex scripts; reached by `w:cstheme`. In Word, `a:cs` is
     **also** what `w:hAnsiTheme`'s "Complex Script" slot shows; Romanian and Russian do **not** use
     this (1.8).
-  - **per-script overrides** (`a:font[@script="Cyrl" @typeface="…"]`) — a theme may name a different
+  - **per-script overrides** (`a:font[@script="Cyrl" @typeface="…"]`) - a theme may name a different
     face for Cyrillic. This must be honoured for Russian: when resolving the font for a Cyrillic
     character in a run that uses a theme font, the `Cyrl` override (if present) wins over
     `a:majorFont/a:latin`.
@@ -3457,7 +3457,7 @@ attributes `@w:asciiTheme`, `@w:hAnsiTheme`, `@w:cstheme`, `@w:eastAsiaTheme` wi
 - `w:rFonts` theme attributes must be written **as a set with the script class**: writing
   `w:asciiTheme="majorHAnsi"` must also write `w:hAnsiTheme="majorHAnsi"` and must **remove**
   `w:ascii`/`w:hAnsi` (FM-002).
-- **Substitution for missing theme fonts**: identical to FM-002's chain, with one addition — the
+- **Substitution for missing theme fonts**: identical to FM-002's chain, with one addition - the
   theme's fonts are commonly not installed (Calibri Light, Cambria), so the bundled metric-compatible
   set must be consulted before a last-resort fallback, and a single `fonts.substituted` summary must
   be emitted per theme (not per run) so the host can show one message.
@@ -3481,7 +3481,7 @@ attributes `@w:asciiTheme`, `@w:hAnsiTheme`, `@w:cstheme`, `@w:eastAsiaTheme` wi
 
 ### 3.5 Lists and numbering
 
-#### FM-026 — Bulleted lists
+#### FM-026 - Bulleted lists
 **Priority:** core · **Effort:** M
 
 **Commands:** `list.toggleBullets()`, `list.setBulletStyle(styleId|definition)`,
@@ -3540,14 +3540,14 @@ the symbol font.
   measured from the cell's text boundary (FM-012).
 - A paragraph whose style already supplies bullets and whose direct `w:numPr` is added: the direct
   one wins (FM-022); the UI must show "bulleted" as pressed even though the style also has bullets.
-- A list paragraph with `w:lvlText` containing more than the bullet character (a custom "• – " 
+- A list paragraph with `w:lvlText` containing more than the bullet character (a custom "• - " 
   prefix) is preserved and rendered.
 - Bullets in a right-to-left paragraph (`w:bidi`) place the bullet on the right; `w:lvlJc` is
   logical, and the renderer must not mirror it twice.
 
 ---
 
-#### FM-027 — Numbered lists, numbering formats, and Define New Number Format
+#### FM-027 - Numbered lists, numbering formats, and Define New Number Format
 **Priority:** core · **Effort:** L
 
 **Commands:** `list.toggleNumbering(styleId?)`, `list.setNumberFormat(spec)`,
@@ -3581,12 +3581,12 @@ suffix })` · **Events:** `numbering.changed`, `document.changed`
   "Number format" field must edit it with the level placeholder rendered as a token the user cannot
   break (Word's behaviour: the placeholder is inserted by a button and cannot be typed over).
 - **Number appearance**: font (`w:lvl/w:rPr/w:rFonts` + size/colour/bold), alignment
-  (`w:lvlJc`: `left|center|right` — note it is `w:lvlJc`, not `w:jc`), "Follow number with: tab /
+  (`w:lvlJc`: `left|center|right` - note it is `w:lvlJc`, not `w:jc`), "Follow number with: tab /
   space / nothing" (`w:suff`), and the number's tab position (which comes from the tab stop added by
   the level's `w:pPr/w:tabs`).
 - The dialog is **one undo entry** even though it writes `w:numFmt`, `w:lvlText`, `w:lvlJc`, `w:suff`,
   `w:start` and `w:rPr` (I2). Editing an existing list's format must affect **all paragraphs that
-  share the same `w:abstractNum`** — which is Word's behaviour and a genuine surprise ("I changed the
+  share the same `w:abstractNum`** - which is Word's behaviour and a genuine surprise ("I changed the
   format and it changed in three other places"). The library must warn in the dialog: "This changes
   every list that uses this numbering definition" with a count, and must offer "Create a new
   definition instead" which clones the abstract definition and re-points only the selected
@@ -3615,18 +3615,18 @@ suffix })` · **Events:** `numbering.changed`, `document.changed`
 
 ---
 
-#### FM-028 — Multilevel lists: levels, lvlText, restart, isLgl, promote/demote
+#### FM-028 - Multilevel lists: levels, lvlText, restart, isLgl, promote/demote
 **Priority:** core · **Effort:** L
 
 **Commands:** `list.setLevel(ilvl)`, `list.promote()`, `list.demote()`, `list.setMultilevelStyle(id)`,
 `list.setLvlRestart(ilvl, value)`, `list.setLegal(on)`, `list.setLevelText(ilvl, text, numFmt)`
 **Events:** `numbering.changed`, `document.changed`
 **OOXML:** `w:abstractNum/@w:multiLevelType` (`singleLevel|multilevel|hybridMultilevel`),
-`w:abstractNum/@w:nsid`, `@w:tmpl`, `w:lvl/@w:ilvl` (0–8), `w:lvl/@w:tplc`, `w:lvlText`,
+`w:abstractNum/@w:nsid`, `@w:tmpl`, `w:lvl/@w:ilvl` (0-8), `w:lvl/@w:tplc`, `w:lvlText`,
 `w:lvlRestart`, `w:isLgl`, `w:lvlJc`, `w:pPr`, `w:rPr`, `w:start`.
 
 **Behaviour**
-- A list has up to **9 levels** (ilvl 0–8). `w:multiLevelType` distinguishes a single-level list
+- A list has up to **9 levels** (ilvl 0-8). `w:multiLevelType` distinguishes a single-level list
   (`singleLevel`), a true outline list (`multilevel`), and Word's List Library entries
   (`hybridMultilevel`, which use a `w:tmpl` code to identify the library entry so that applying the
   same library entry twice reuses the definition).
@@ -3642,10 +3642,10 @@ suffix })` · **Events:** `numbering.changed`, `document.changed`
   decimal form (so a `lowerRoman` level under an `isLgl` parent displays as `IV.3` → `4.3`). It is a
   property of the *parent* level in practice and is exposed as "Legal numbering" with that note.
 - **Promote/demote**: Tab/Shift+Tab on a list paragraph (ED-012) and the Increase/Decrease Indent
-  buttons change `w:pPr/w:numPr/w:ilvl` by ±1, clamped to 0–8, and compensate the direct indent so
+  buttons change `w:pPr/w:numPr/w:ilvl` by ±1, clamped to 0-8, and compensate the direct indent so
   the paragraph does not shift twice. Demoting past level 8 is a no-op; demoting a paragraph whose
   definition has fewer levels **extends the definition** by cloning the last level's properties to
-  the new levels (Word's behaviour when a single-level list is demoted) — this creation is part of
+  the new levels (Word's behaviour when a single-level list is demoted) - this creation is part of
   the same undo entry.
 - Promoting a level-0 list item does **not** remove the list (Word keeps it at level 0 with the same
   indent); "remove the list" is an explicit command (FM-026).
@@ -3662,7 +3662,7 @@ suffix })` · **Events:** `numbering.changed`, `document.changed`
 - A level whose `w:lvlText` uses `%2` but whose level 2 has `w:numFmt="none"` renders the parent's
   number only; the placeholder collapses (and a diagnostic is emitted when the definition is read).
 - A list in a table cell: each cell's paragraphs keep their own `w:numPr`; promote/demote inside a
-  cell must not affect the neighbouring cells (Word's Tab moves cells, but Ctrl+Tab inserts a tab —
+  cell must not affect the neighbouring cells (Word's Tab moves cells, but Ctrl+Tab inserts a tab -
   promote/demote inside a cell is only reachable from the toolbar, which is a deliberate design
   choice to avoid the Tab conflict).
 - A paragraph with `w:ilvl` greater than the definition's last level: clamped to the last level for
@@ -3673,7 +3673,7 @@ suffix })` · **Events:** `numbering.changed`, `document.changed`
 
 ---
 
-#### FM-029 — Numbering restart, continuation, and set numbering value
+#### FM-029 - Numbering restart, continuation, and set numbering value
 **Priority:** important · **Effort:** M
 
 **Commands:** `list.restartAt(value)`, `list.continuePrevious()`, `list.setStartOverride(ilvl, value)`,
@@ -3697,7 +3697,7 @@ definition), `w:lvlOverride/w:lvl` (a full level override), `w:abstractNum/w:lvl
      is already part of a multi-paragraph list must select the whole logical list (Word selects the
      list's paragraphs) and change the start value for all of them.
 - **Continuation rule** (implicit, and the source of much confusion): two list paragraphs continue
-  each other when their `w:numId` values resolve to the same `w:num` — not merely to the same
+  each other when their `w:numId` values resolve to the same `w:num` - not merely to the same
   `w:abstractNum`. Documenting this in the reveal pane ("List identity: numId 5, definition 3,
   level 0, start 1") is required; the pane is the only way an HR manager can tell why one list
   continues another.
@@ -3726,7 +3726,7 @@ definition), `w:lvlOverride/w:lvl` (a full level override), `w:abstractNum/w:lvl
 
 ---
 
-#### FM-030 — List styles vs direct list formatting (styleLink/numStyleLink)
+#### FM-030 - List styles vs direct list formatting (styleLink/numStyleLink)
 **Priority:** important · **Effort:** L
 
 **Commands:** `style.createListStyle(definition)`, `list.applyListStyle(styleId)`,
@@ -3749,7 +3749,7 @@ style) and `w:style/w:styleLink/w:val` (a numbering style that names the abstrac
   diagnosed).
 - **`w:abstractNum/w:lvl/w:pStyle`** binds a level to a paragraph style: applying that paragraph
   style to a paragraph puts it at that level of that list. This is the mechanism behind Word's
-  Heading 1–9 being numbered when a template numbers its headings, and it must be supported (the HR
+  Heading 1-9 being numbered when a template numbers its headings, and it must be supported (the HR
   template case: "Article 1. Scope" generated from Heading 1).
 - **Precedence**, which must be implemented exactly:
   1. a **direct** `w:pPr/w:numPr` on the paragraph (including `w:numId="0"` meaning none) wins over
@@ -3766,7 +3766,7 @@ style) and `w:style/w:styleLink/w:val` (a numbering style that names the abstrac
   style changes only the numbering. Both are legitimate and the user-visible difference is exactly
   what "styles gallery" vs "numbering library" means.
 - **Detaching** (`list.detachFromListStyle`) writes the resolved numbering as a direct `w:numPr` so
-  that later edits to the list style do not affect the paragraph — Word's "no style" behaviour for
+  that later edits to the list style do not affect the paragraph - Word's "no style" behaviour for
   numbering, and the way to stop a template change from reformatting a finished contract.
 - Creating a list style writes a `w:style` of `w:type="numbering"` with the abstract definition
   referenced by `w:styleLink`, and (when the UI creates it from a selection) the levels copied from
@@ -3790,7 +3790,7 @@ style) and `w:style/w:styleLink/w:val` (a numbering style that names the abstrac
 
 ---
 
-#### FM-031 — numbering.xml lifecycle: id allocation, overrides, paste merge, cleanup, detection
+#### FM-031 - numbering.xml lifecycle: id allocation, overrides, paste merge, cleanup, detection
 **Priority:** important · **Effort:** L
 
 **Commands:** `list.cleanup()`, `list.detectListStyles()`, `list.convertIndentToRealList()`,
@@ -3843,13 +3843,13 @@ style) and `w:style/w:styleLink/w:val` (a numbering style that names the abstrac
   The count of created/merged/reused definitions must be reported through `numbering.changed` so the
   behaviour is testable and diagnosable.
 - **List detection** (`list.detectListStyles`) inspects paragraphs that *look* like lists but are not
-  (a paragraph starting with "•", "1.", "a)", "-", or "–" followed by a tab or spaces, with an
+  (a paragraph starting with "•", "1.", "a)", "-", or "-" followed by a tab or spaces, with an
   indent and no `w:numPr`) and offers conversion. The detection rules must be conservative and
   configurable (the pattern set, whether the marker must be followed by a tab, whether the indent
   must be present) because false positives on a contract's "1." in body text would be destructive.
 - `list.convertIndentToRealList` performs the conversion for the selected paragraphs: it creates (or
   reuses) a numbering definition matching the detected markers, writes `w:numPr`, and removes the
-  literal marker text from the `w:t` content — one undo entry, and the inverse must restore the
+  literal marker text from the `w:t` content - one undo entry, and the inverse must restore the
   literal markers exactly.
 - `list.stripNumberingFromIndentOnlyLists` is the reverse ("this list is fake, just keep the
   indentation"): it removes the `w:numPr` and writes a direct `w:ind` that reproduces the position,
@@ -3994,8 +3994,8 @@ against the spec without re-reading it.
 | Show-formatting-marks toggle | ED-037 |
 | Read-only and restricted-editing modes | ED-038 |
 | Headless no-DOM consumer driving the same mutations | ED-039 |
-| Character formatting | FM-001 – FM-008 |
-| Paragraph formatting | FM-009 – FM-016 |
+| Character formatting | FM-001 - FM-008 |
+| Paragraph formatting | FM-009 - FM-016 |
 | Paragraph dialog (indents, spacing, line spacing, page-break rules) | FM-015 (with FM-010, FM-011, FM-012, FM-016) |
 | Styles gallery | FM-017 |
 | Applying / modifying / creating styles | FM-018, FM-019 |

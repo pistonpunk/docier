@@ -1,4 +1,4 @@
-# 0012 — Bézier node editing scope in v1
+# 0012 - Bézier node editing scope in v1
 
 **Status:** proposed, awaiting a product decision · **Decided by:** PRODUCT OWNER · **Blocks:** `OBJ-17`,
 `OBJ-09`, `OBJ-16` (gradients)
@@ -9,12 +9,12 @@ The objects draft places freeform drawing in v1: click-to-place or drag to draw 
 the path, fill closed paths and stroke open ones, store the geometry as `a:custGeom` with
 `a:pathLst`/`a:path` (`a:moveTo`, `a:lnTo`, `a:cubicBezTo`, `a:close`) and `@w`/`@h` written equal to the
 extent in EMU so the mapping to path space is the identity. Freehand input is simplified with
-Ramer–Douglas–Peucker at a zoom-scaled EMU tolerance before conversion to cubic Béziers.
+Ramer-Douglas-Peucker at a zoom-scaled EMU tolerance before conversion to cubic Béziers.
 
 Within that, the draft distinguishes two levels and marks them differently:
 
-- **Node editing — `important`:** drag a vertex, add or remove a vertex, convert a corner to a smooth node.
-- **Bézier handle editing — `later`:** drag the control handles themselves, which is what makes a curve's
+- **Node editing - `important`:** drag a vertex, add or remove a vertex, convert a corner to a smooth node.
+- **Bézier handle editing - `later`:** drag the control handles themselves, which is what makes a curve's
   *shape* adjustable rather than only its points.
 
 The draft then states the problem plainly: "the boundary between 'node editing' and 'handle editing' is not
@@ -32,7 +32,7 @@ model is exposed.
 | Option | Tradeoff |
 |---|---|
 | Ship node editing and handle editing together in v1 | The curve editor is coherent and complete, and no user hits a wall. Cost: handle editing is a genuinely larger UI problem (two control points per node, real-time constraint solving for smooth nodes, hit targets at high zoom) and it is the part most likely to slip and delay the `core` freeform feature it lives inside. |
-| Ship node editing only, defer handles | The `important` line the draft already drew, so v1 matches the plan. Cost: a user can move a point but cannot adjust the curve between points, and the context menu must present a visibly incomplete tool — which the draft anticipates and accepts. |
+| Ship node editing only, defer handles | The `important` line the draft already drew, so v1 matches the plan. Cost: a user can move a point but cannot adjust the curve between points, and the context menu must present a visibly incomplete tool - which the draft anticipates and accepts. |
 | Ship neither in v1 (draw and edit only by deleting and redrawing) | Smallest v1, and freeform still round-trips exactly. Cost: abandons a feature the draft marked `important` and makes a drawn scribble effectively immutable, which the customer will report as a bug. |
 | Ship node editing, and expose the handle *data* read-only so the model round-trips it | v1 is coherent, and a future handle editor is additive because the model already carries handles. Cost: nothing is gained for the user in v1; the value is purely architectural. |
 
@@ -41,7 +41,7 @@ model is exposed.
 **Recommended: node editing in v1 as `important`; Bézier handle editing deferred behind an explicit scope
 decision, with the model carrying handles from day one so the editor is additive.** The path model is the
 single source of truth for both freeform shapes and `pic:spPr/a:custGeom`, and it stores full cubics with
-their control points, so deferring the handle *editor* does not mean deferring the handle *data* — a curve we
+their control points, so deferring the handle *editor* does not mean deferring the handle *data* - a curve we
 produce from a mouse or a stylus already has meaningful handles, and Word renders it correctly whether or not
 we let the user drag them.
 
@@ -64,7 +64,7 @@ handles do not**, and the round-trip path for handles is verified by fixture so 
   drawn on a cropped picture uses the same path model as "Crop to Shape", so the two features share their
   tests and their bugs.
 - Freehand simplification tolerance scales with zoom, so the same stroke drawn at two zoom levels produces
-  the same geometry only within tolerance — a fixture must pin this, because it is a determinism-adjacent
+  the same geometry only within tolerance - a fixture must pin this, because it is a determinism-adjacent
   surface (`documentHash` must not depend on the zoom the user happened to be at).
 - If the owner asks for handle editing in v1, the estimate for `OBJ-17` roughly doubles and it should be
   scheduled as its own feature rather than absorbed silently into freeform.

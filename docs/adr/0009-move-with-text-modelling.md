@@ -1,4 +1,4 @@
-# 0009 — Modelling "Move with text"
+# 0009 - Modelling "Move with text"
 
 **Status:** accepted · **Decided by:** engineering · **Blocks:** `OBJ-25`, `OBJ-23`, `OBJ-35`
 
@@ -13,7 +13,7 @@ has no direct attribute, and the draft correctly refuses to invent one and asks 
 implementation. Word derives the checkbox from the vertical reference frame: `wp:positionV/@relativeFrom`
 values `paragraph` and `line` behave as "move with text", while `page` and `margin` behave as "fixed".
 
-A second, separate checkbox exists in the table-cell case: `wp:anchor/@layoutInCell` — `"1"` (the default)
+A second, separate checkbox exists in the table-cell case: `wp:anchor/@layoutInCell` - `"1"` (the default)
 means the object moves with the cell, `"0"` means it is positioned relative to the page and does not move
 with the cell. Word calls the latter "Fix position on page". It coexists with "Move with text" and maps to a
 real attribute, so it is a distinct control, not a derivation.
@@ -22,10 +22,10 @@ real attribute, so it is a distinct control, not a derivation.
 
 | Option | Tradeoff |
 |---|---|
-| Store our own flag in a custom part or an extension attribute | The checkbox round-trips through us exactly. Cost: it is invisible to Word, so a file we save and Word re-saves loses it, and the document gains a proprietary part that other tools drop — the worst outcome for a format we claim to round-trip. |
+| Store our own flag in a custom part or an extension attribute | The checkbox round-trips through us exactly. Cost: it is invisible to Word, so a file we save and Word re-saves loses it, and the document gains a proprietary part that other tools drop - the worst outcome for a format we claim to round-trip. |
 | Derive the checkbox from `wp:positionV/@relativeFrom` on read and rewrite it on toggle | No proprietary storage, and the state is exactly what Word itself would show for the file. Cost: it is a derived view, so it cannot represent a state the frame cannot express, and a toggle must rewrite the frame without moving the object on screen. |
 | Derive on read, and refuse the toggle when the frame is ambiguous | Safer against surprise. Cost: refuses a control Word offers, for a case that is real but rare, and a disabled control with no explanation is worse than a rewrite that preserves position. |
-| Model the frame as the only state, with no checkbox concept at all | Honest and minimal. Cost: the host UI then has to re-derive the notion of "move with text" itself, so the derivation moves into every host — the same bug, multiplied. |
+| Model the frame as the only state, with no checkbox concept at all | Honest and minimal. Cost: the host UI then has to re-derive the notion of "move with text" itself, so the derivation moves into every host - the same bug, multiplied. |
 
 ## Decision
 
@@ -59,7 +59,7 @@ section break.
   `relativeFrom`) degrades to "unchecked, frame preserved", and the object does not move on toggle; this is
   reported as a diagnostic rather than silently guessed.
 - `object.anchor.moved` is emitted internally when text reflow moves the anchor, so the object layer can
-  reposition without re-anchoring — anchor maintenance is a text-engine responsibility and the object layer
+  reposition without re-anchoring - anchor maintenance is a text-engine responsibility and the object layer
   must not re-anchor on its own.
 - The feature is testable without Word for the read path, and requires Word only for the re-save direction,
   so the risk is bounded and visible.

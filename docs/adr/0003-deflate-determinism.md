@@ -1,4 +1,4 @@
-# 0003 — DEFLATE determinism
+# 0003 - DEFLATE determinism
 
 **Status:** accepted · **Decided by:** engineering · **Blocks:** `EXP-08`, `PKG-02`, the R6 determinism rule
 
@@ -21,13 +21,13 @@ graceful fallback, treating it as a performance nicety.
 | Option | Tradeoff |
 |---|---|
 | Native `CompressionStream` everywhere | Fastest, zero bundle cost, no vendored code. Cost: destroys the determinism claim, so `/ID` cannot be a content hash, cross-environment byte comparison is impossible, and the FL0 guarantee becomes a lie. |
-| Native for DOCX, pinned for PDF | DOCX output is expected to match Word's own bytes closely (Word uses its own deflate), so a pinned implementation buys less there — but it means two compression behaviours, two test matrices, and a DOCX that differs between a browser and Node, which is exactly the class of bug R6 exists to prevent. |
+| Native for DOCX, pinned for PDF | DOCX output is expected to match Word's own bytes closely (Word uses its own deflate), so a pinned implementation buys less there - but it means two compression behaviours, two test matrices, and a DOCX that differs between a browser and Node, which is exactly the class of bug R6 exists to prevent. |
 | Pinned pure-TypeScript DEFLATE everywhere on the export path | One implementation, byte-identical everywhere, no platform variance. Cost: slower than native (measurable but acceptable against the export budgets), plus one vendored dependency to pin and audit. |
-| Pinned for export, native for decompression | A read path has no determinism requirement — inflating a file we were given is not an output. Gets the fast path where it is safe. |
+| Pinned for export, native for decompression | A read path has no determinism requirement - inflating a file we were given is not an output. Gets the fast path where it is safe. |
 
 ## Decision
 
-**Pinned pure-TypeScript DEFLATE on every write path that produces bytes a caller keeps** — PDF streams,
+**Pinned pure-TypeScript DEFLATE on every write path that produces bytes a caller keeps** - PDF streams,
 DOCX zip entries, HTML with embedded assets, and any clip reading. Native `CompressionStream` is used only
 for **decompression** on the read path and for transient buffers that never leave memory as output bytes.
 

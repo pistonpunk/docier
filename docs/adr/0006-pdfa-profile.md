@@ -1,4 +1,4 @@
-# 0006 — Which PDF/A profile to target
+# 0006 - Which PDF/A profile to target
 
 **Status:** proposed, awaiting a product decision · **Decided by:** PRODUCT OWNER, with the customer's
 archiving authority · **Blocks:** `EXP-09`, and the layout pipeline if A-1b is chosen

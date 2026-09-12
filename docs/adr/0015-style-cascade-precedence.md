@@ -1,4 +1,4 @@
-# 0015 — Table-style versus paragraph-style precedence in the cascade
+# 0015 - Table-style versus paragraph-style precedence in the cascade
 
 **Status:** accepted for the structure; the exact order is pinned by fixture, per the decision below ·
 **Decided by:** engineering · **Blocks:** `LE-008`, `FM-021`, `FM-022`, `FM-016`, `NUM-01`, `STY-02`
@@ -51,8 +51,8 @@ competing with a paragraph style; and a paragraph inside a table cell with `keep
 `contextualSpacing` set at both the table-style and paragraph-style levels, taking a document that must then
 break across a page so the toggle question is answered by a page break rather than by a resolved value.
 
-The toggle set is fixed as the document layer listed it — `b`, `bCs`, `i`, `iCs`, `caps`, `smallCaps`,
-`strike`, `dstrike`, `outline`, `shadow`, `emboss`, `imprint`, `vanish`, `webHidden`, `specVanish` XOR —
+The toggle set is fixed as the document layer listed it - `b`, `bCs`, `i`, `iCs`, `caps`, `smallCaps`,
+`strike`, `dstrike`, `outline`, `shadow`, `emboss`, `imprint`, `vanish`, `webHidden`, `specVanish` XOR -
 and `keepNext`, `keepLines` and `contextualSpacing` are **overrides, not toggles**, unless the fixture shows
 Word treating them otherwise, in which case the fixture wins and this ADR is amended. The toggle rule
 matters beyond correctness: the model tracks accumulated state per layer, not a boolean, because an override

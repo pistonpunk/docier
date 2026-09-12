@@ -1,4 +1,4 @@
-# 0008 — Browser support floor
+# 0008 - Browser support floor
 
 **Status:** proposed, awaiting a product decision · **Decided by:** PRODUCT OWNER · **Blocks:** `QUA-21`,
 `NOT_SUPPORTED_BROWSER`, and the CSS and API surface the layout engine may rely on
@@ -8,13 +8,13 @@
 The API draft states a floor and justifies it: **Chromium (Chrome, Edge) current and previous major;
 Firefox current and previous; Safari 16.4+ and iOS Safari 16.4+; Android Chrome current; no IE, no legacy
 Edge, no Opera Mini.** Safari 16.4 is chosen specifically because it is the release where `Intl.Segmenter`,
-`structuredClone` and the required CSS `:has()` and container-query features are all present together — and
+`structuredClone` and the required CSS `:has()` and container-query features are all present together - and
 the layout engine leans on those CSS features for the paint layer.
 
 The editing draft states no floor at all, and the layout draft requires behaviour (`Intl.Segmenter` must
 **not** be used directly for word segmentation, because Word's word model is not the platform's) that is
 adjacent to it. So the floor exists, it is well-reasoned, and it has never been confirmed as a product
-constraint — which matters because the floor is what excludes a customer's older browser, and because a
+constraint - which matters because the floor is what excludes a customer's older browser, and because a
 mobile floor is a statement about which workflows are supported on a phone.
 
 The API draft also fixes a startup probe: the required features are `contenteditable` with a working
@@ -22,7 +22,7 @@ The API draft also fixes a startup probe: the required features are `contentedit
 `structuredClone`, async clipboard and `AbortController`; a missing item refuses to mount with
 `NOT_SUPPORTED_BROWSER` rather than failing in a confusing way later. Optional, with graceful fallback:
 `OffscreenCanvas`, the File System Access API, workers for export, `navigator.storage.persist` and
-`CompressionStream`. And `document.execCommand` is banned outright — deprecated, inconsistent across
+`CompressionStream`. And `document.execCommand` is banned outright - deprecated, inconsistent across
 browsers, and it silently rewrites undo history, which would violate the editing draft's invariant I1.
 
 ## Options
@@ -36,7 +36,7 @@ browsers, and it silently rewrites undo history, which would violate the editing
 
 ## Decision
 
-**Recommended: adopt the floor as stated** — Chromium current and previous, Firefox current and previous,
+**Recommended: adopt the floor as stated** - Chromium current and previous, Firefox current and previous,
 Safari and iOS Safari 16.4+, Android Chrome current; no IE, no legacy Edge, no Opera Mini; `execCommand`
 banned; a startup probe that refuses to mount with `NOT_SUPPORTED_BROWSER` and names the missing capability.
 Optional features degrade silently and are recorded in `getDiagnostics().browser.features`. Mobile is a
@@ -44,7 +44,7 @@ supported **viewing, filling and light-editing** target and an unsupported templ
 that is stated in the customer-facing documentation rather than only internally.
 
 **The product decision is not the engine list but its two consequences**, which only the owner can accept:
-(1) whether excluding pre-16.4 Safari is acceptable for the target customers — if a significant customer runs
+(1) whether excluding pre-16.4 Safari is acceptable for the target customers - if a significant customer runs
 an older managed browser, that is a product constraint that must be discovered now rather than at
 acceptance time; and (2) whether the mobile story above is what we are willing to tell customers, because it
 commits us to testing touch interaction and the on-screen keyboard on real devices.
@@ -56,7 +56,7 @@ re-verification of the whole visual corpus.
 ## Consequences
 
 - The layout engine's paint layer may use `:has()` and container queries, and the divergence detector runs on
-  every floor browser in CI — which is what turns the floor from a claim into a tested boundary.
+  every floor browser in CI - which is what turns the floor from a claim into a tested boundary.
 - A missing optional feature degrades rather than failing: without `OffscreenCanvas`, image compression runs
   on the main thread in chunks; without a worker, pagination runs in time slices on the main thread. Both are
   slower and both are reported.

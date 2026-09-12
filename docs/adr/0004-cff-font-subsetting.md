@@ -1,11 +1,11 @@
-# 0004 — CFF and OpenType font subsetting
+# 0004 - CFF and OpenType font subsetting
 
 **Status:** accepted · **Decided by:** engineering · **Blocks:** `EXP-04`, `EXP-05`, every PDF target
 
 ## Context
 
-Every font used in a PDF must be embedded — there is no "standard 14" reliance, and Identity-H encoding
-with a CID font and a `ToUnicode` CMap is mandatory because WinAnsi cannot represent `U+0218`–`U+021B`
+Every font used in a PDF must be embedded - there is no "standard 14" reliance, and Identity-H encoding
+with a CID font and a `ToUnicode` CMap is mandatory because WinAnsi cannot represent `U+0218`-`U+021B`
 (Ș ș Ț ț) or Cyrillic at all. Embedding the full font is correct but large: a Cyrillic-complete serif or a
 Calibri-metric font is several hundred kilobytes, and a 40-page document with three families and four styles
 pays that repeatedly in a file that is mailed to a customer.
@@ -14,7 +14,7 @@ TrueType (`glyf`-based) subsetting is well-trodden: keep the used glyphs, `.notd
 and reachable glyphs, rebuild `loca`, `glyf`, `hmtx` and `cmap`, keep `head`, `hhea`, `maxp`, `OS/2`, `name`
 and `post`, and 4-byte-align the `glyf` offsets. CFF and OpenType-with-CFF outlines are the hard case: it
 requires rewriting the CharStrings index, rebuilding the charset and the private dict, and re-indexing, and a
-subtlty broken CFF subset renders as garbage in some viewers and fine in others — the worst failure mode,
+subtlty broken CFF subset renders as garbage in some viewers and fine in others - the worst failure mode,
 because it passes a spot check.
 
 The export draft recommends embedding full CFF at first and subsetting later, with an explicit rule: do not

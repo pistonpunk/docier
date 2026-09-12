@@ -1,13 +1,13 @@
-# 0013 — Section move by dragging a heading in the navigation pane
+# 0013 - Section move by dragging a heading in the navigation pane
 
 **Status:** proposed, awaiting a product decision · **Decided by:** PRODUCT OWNER ·
-**Blocks:** `UI-30`, and the section model's move semantics (`SEC-01`–`SEC-05`)
+**Blocks:** `UI-30`, and the section model's move semantics (`SEC-01`-`SEC-05`)
 
 ## Context
 
 The objects draft specifies a navigation pane that lists headings and lets a user reorder a document by
 dragging a heading. Dragging a heading moves everything under it, which means moving a span of blocks **that
-may contain a section break** — and a section break carries `w:sectPr`: page size, margins, columns, headers
+may contain a section break** - and a section break carries `w:sectPr`: page size, margins, columns, headers
 and footers, page borders, line numbering and vertical alignment.
 
 Moving a block range across a section boundary is therefore not a pure block move. It changes which `sectPr`
@@ -19,14 +19,14 @@ v1, and the trade-off is explicitly not the spec author's to make.
 
 There is a second, quieter correctness constraint from the document layer: `w:sectPr` for the last section
 must be a body child while earlier ones live inside a paragraph's `w:pPr`. A move that relocates the final
-section's properties into the middle of the document, or vice versa, produces a file Word repairs — which the
+section's properties into the middle of the document, or vice versa, produces a file Word repairs - which the
 document layer's repair-safe rule (`EXD-03`) forbids.
 
 ## Options
 
 | Option | Tradeoff |
 |---|---|
-| Ship drag-to-move for headings, including spans that contain section breaks | The feature is genuinely useful and matches what users expect from a navigation pane. Cost: the hard case is the section-carrying one, and getting it wrong produces a file Word offers to repair — the worst failure class in the whole specification, because it is the customer's file that breaks. |
+| Ship drag-to-move for headings, including spans that contain section breaks | The feature is genuinely useful and matches what users expect from a navigation pane. Cost: the hard case is the section-carrying one, and getting it wrong produces a file Word offers to repair - the worst failure class in the whole specification, because it is the customer's file that breaks. |
 | Ship drag-to-move, but only for spans that contain **no** section break | Safe by construction and covers the common case, because most documents have one section. Cost: a document with sections gets a control that refuses to move the thing the user is dragging, which must be explained clearly at the moment of refusal, not silently disabled. |
 | Navigate-only in v1; no dragging at all | Zero risk, and `core` navigation still ships. Cost: loses an `important` feature the owner asked for, and the pane feels like a table of contents rather than an outliner. |
 | Navigate-only in v1, then a dedicated "Move section" command with a confirm step | The semantics are explicit and the user sees the consequences (page setup travels too). Cost: not what the draft's drag interaction describes, so it is a different (and arguably better) feature, and it still needs the same `sectPr` correctness proof. |
@@ -60,6 +60,6 @@ implemented and restricted, so no user forms an expectation we then refuse.
   `DocumentController` query and therefore public API surface that must exist from the start even if the
   feature that uses it ships later.
 - A future promotion is additive: the drop handling and the indicator are chrome, the validation is a model
-  query, and the corpus is a test asset — none of it requires reworking the pane.
+  query, and the corpus is a test asset - none of it requires reworking the pane.
 - If the corpus proves harder than expected, the honest outcome is a documented limitation, not a relaxable
   check; the file-repair failure mode is the one thing this specification will not trade for a feature.

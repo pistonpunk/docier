@@ -1,4 +1,4 @@
-# 0016 — Strict OOXML: support or detect-and-preserve
+# 0016 - Strict OOXML: support or detect-and-preserve
 
 **Status:** accepted · **Decided by:** engineering, with a product input on archival customers ·
 **Blocks:** `SER-04`, `MOD-01`, and the `document.ooxmlConformance` option
@@ -11,7 +11,7 @@ element-name vocabulary in places) is what some government and archival bodies r
 
 The document layer states the trade-off and leaves it open: whether the initial release supports Strict-mode
 input and output or only detects and preserves it, noting that this affects archival customers. The layout
-and editing layers are unaffected in principle — they read the model, not the dialect — but a second dialect
+and editing layers are unaffected in principle - they read the model, not the dialect - but a second dialect
 does reach into the model, because element names differ and a normalising parser is exactly what rule R3
 ("untouched bytes stay bytes") forbids doing implicitly.
 
@@ -27,7 +27,7 @@ directions.
 | Option | Tradeoff |
 |---|---|
 | Full Strict support in the initial release | Archival customers get a first-class path, and we can produce Strict output on demand. Cost: a mapping layer over the entire model, a second conformance matrix, and a new class of bug (a property that maps correctly in one direction and not the other) in the layer everything else depends on. |
-| Detect and preserve only (recommended) | Near-zero cost, no new bug class, and a Strict file opens, renders, edits and saves with its dialect intact — because untouched bytes stay bytes and touched elements are mapped on demand. Cost: a document we *edit* in Strict mode may end up with a mixture, since newly written elements are Transitional unless mapped; and we cannot claim Strict output conformance. |
+| Detect and preserve only (recommended) | Near-zero cost, no new bug class, and a Strict file opens, renders, edits and saves with its dialect intact - because untouched bytes stay bytes and touched elements are mapped on demand. Cost: a document we *edit* in Strict mode may end up with a mixture, since newly written elements are Transitional unless mapped; and we cannot claim Strict output conformance. |
 | Reject Strict input with a clear error | Simple and honest. Cost: refuses to open a file the customer is required to use, which is a product failure, and it is strictly worse than preserving because preserving already works. |
 | Detect, preserve, and map only the elements we actually write when the input was Strict | The middle path: correct output for the edited parts, no mapping for what we never touch. Cost: the mapping is still per-element work, but it is proportional to the features we implement rather than to the whole of OOXML. |
 

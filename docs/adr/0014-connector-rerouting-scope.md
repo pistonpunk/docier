@@ -1,4 +1,4 @@
-# 0014 — Connector re-routing scope
+# 0014 - Connector re-routing scope
 
 **Status:** proposed, awaiting a product decision · **Decided by:** PRODUCT OWNER ·
 **Blocks:** `OBJ-38`, `OBJ-16`, and the layout engine's exposure of connection-site geometry
@@ -10,14 +10,14 @@ a connector that re-routes stays attached at its chosen connection site. The obj
 in v1 (`OBJ-16`, `core`) as **drawn geometry that round-trips exactly**, which preserves the file and lets a
 user draw a connector, and defers live re-routing (`OBJ-38`, `later`, effort L). Its reasoning is stated and
 worth repeating: re-routing is a genuine layout-engine feature, because it needs the connection-site geometry
-of each preset and it must move connectors during the **drag preview**, not only on commit — and shipping it
+of each preset and it must move connectors during the **drag preview**, not only on commit - and shipping it
 half-done leaves connectors that visibly detach, which is worse than connectors that simply stay put.
 
 The draft also fixes the storage contract, which is what makes the deferral safe and what makes a partial
 implementation dangerous: attachment is stored as `wps:cNvCnPr/a:stCxn` and `a:endCxn` (`@id` referencing the
 shape's `wp:docPr/@id`, `@idx` the site index) **plus** the connector's own `a:xfrm` and path geometry. Both
 must stay consistent. A re-route that updates the geometry but not `stCxn`/`endCxn`, or the reverse, produces
-a file that Word re-routes differently from how we rendered it — the one outcome that is worse than not
+a file that Word re-routes differently from how we rendered it - the one outcome that is worse than not
 re-routing at all, because it makes our own preview a lie. Related rules: a connector attached to a deleted
 shape becomes free-floating and the dangling `stCxn`/`endCxn` must be **removed**, not left pointing at a
 dead id; a connector inside a group attaches within the group's coordinate space and cannot attach to a shape
@@ -34,7 +34,7 @@ in a different group; and re-routing must be a preview during a drag with no und
 
 ## Decision
 
-**Recommended: adopt the draft's position — static connectors in v1, re-routing deferred, with the
+**Recommended: adopt the draft's position - static connectors in v1, re-routing deferred, with the
 no-party-left-detached invariant enforced in v1 even though no re-routing happens.** Specifically, in v1:
 attaching or detaching via `object.connector.attach({ id, end, targetId, siteIndex })` writes `stCxn`/`endCxn`
 and keeps them consistent with the geometry at all times; deleting an attached shape **removes** the dangling
@@ -46,8 +46,8 @@ Promotion of `OBJ-38` requires the layout engine to expose connection-site geome
 has no `cxnLst`) **and** a preview path that re-routes without undo entries. Both are prerequisites, and the
 promotion is a scheduling decision, not a refinement.
 
-**This is a product decision because the draft says it is** — it declares the trade-off "not mine to make"
-— and because the question is what we tell the customer about a visible limitation. Engineering's position:
+**This is a product decision because the draft says it is** - it declares the trade-off "not mine to make"
+- and because the question is what we tell the customer about a visible limitation. Engineering's position:
 the limitation is acceptable and honest for v1, and the attachment model is already correct, so nothing is
 foreclosed; but the owner should decide whether "shapes and connectors" is a selling point of v1 (in which
 case re-routing must be scheduled with the layout-engine prerequisite named) or an incidental capability (in
@@ -57,7 +57,7 @@ that is the smaller commitment and the additive path is preserved.
 ## Consequences
 
 - Connector attachment round-trips exactly through us and through Word, because storage is the real
-  `stCxn`/`endCxn` pair plus consistent geometry — no proprietary state, no derivation.
+  `stCxn`/`endCxn` pair plus consistent geometry - no proprietary state, no derivation.
 - The dangling-`stCxn` cleanup on shape deletion is in v1 even though re-routing is not, because leaving a
   dead reference is a file-integrity bug independent of re-routing, and Word would silently drop it while we
   would not.

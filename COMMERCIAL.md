@@ -1,8 +1,8 @@
 # Commercial licence
 
-docier is dual-licensed. If the AGPL does not fit your use — because your
+docier is dual-licensed. If the AGPL does not fit your use - because your
 product is proprietary, or because you run it as part of a network service whose
-source you do not want to publish — a commercial licence is available.
+source you do not want to publish - a commercial licence is available.
 
 ## When you need one
 
@@ -31,7 +31,7 @@ to evaluate it, or to use it in development and testing.
 
 Contact the maintainer. Include what you are building, how docier would be
 distributed (bundled, hosted, or both), and roughly how many end users or
-deployments are involved — that is what the terms are usually sized against.
+deployments are involved - that is what the terms are usually sized against.
 
 ## A note on the AGPL, so the choice is informed
 

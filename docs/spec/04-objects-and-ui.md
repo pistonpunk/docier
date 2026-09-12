@@ -1,4 +1,4 @@
-# 04 — Objects and UI Chrome
+# 04 - Objects and UI Chrome
 
 **Status:** draft · **Domain:** floating/inline objects, and all user-interface chrome
 **Depends on:** `01-document-model-and-ooxml.md` (parts, relationships, EMU/twip units), `02-editing-and-text.md` (runs, selection, find/replace substrate), `03-layout-and-pagination.md` (page geometry, floats placement, line breaking)
@@ -29,13 +29,13 @@ Two properties govern every feature below:
   Conversion is centralised in one module; a conversion in the wrong direction is a bug class we
   must not create twice.
 - Percentages inside DrawingML are **1/1000 of a percent** (`a:srcRect/@l="25000"` = 25% crop,
-  `a:alphaModFix/@amt="50000"` = 50% opacity). Never store these as 0–1 floats.
+  `a:alphaModFix/@amt="50000"` = 50% opacity). Never store these as 0-1 floats.
 
 ### Priority and effort
 
-**Priority:** `core` (round-trip correctness or a stated product complaint — must ship in v1),
+**Priority:** `core` (round-trip correctness or a stated product complaint - must ship in v1),
 `important` (needed for the product to feel finished), `later` (deliberately deferred).
-**Effort:** `S` ≈ ≤3 days · `M` ≈ 1–2 weeks · `L` ≈ 3–5 weeks · `XL` ≈ 6+ weeks or more than one
+**Effort:** `S` ≈ ≤3 days · `M` ≈ 1-2 weeks · `L` ≈ 3-5 weeks · `XL` ≈ 6+ weeks or more than one
 engineer.
 
 ### Complaint traceability
@@ -85,11 +85,11 @@ and never enter the undo stack.
 The library ships chrome **and** must let a host replace any part of it. The contract:
 
 - `new Docier(container, { chrome: 'full' | 'minimal' | 'none' | ChromeSlots })`.
-  - `full` — the library renders menu bar, ribbon, ruler, status bar, context menus, dialogs,
+  - `full` - the library renders menu bar, ribbon, ruler, status bar, context menus, dialogs,
     panels, mini-toolbar.
-  - `minimal` — ruler, status bar and context menus only (for embedding in a host that has its
+  - `minimal` - ruler, status bar and context menus only (for embedding in a host that has its
     own toolbar).
-  - `none` — headless. Zero chrome DOM. Every command remains available; the host renders
+  - `none` - headless. Zero chrome DOM. Every command remains available; the host renders
     whatever it likes from the event stream.
 - `ChromeSlots` names: `menuBar`, `ribbon`, `quickAccess`, `ruler`, `statusBar`, `miniToolbar`,
   `floatingControls`, `contextMenu`, `dialogs`, `panels`, `navigationPane`, `placeholder`.
@@ -103,14 +103,14 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rule:** if a chrome feature cannot be expressed as a command + state subscription, it is
   designed wrong. There is no chrome-only document mutation anywhere in this spec.
 - Theming: all visual values come from CSS custom properties on the container
-  (`--docier-*`). The library ships **no brand palette of its own** — a framework-agnostic library
+  (`--docier-*`). The library ships **no brand palette of its own** - a framework-agnostic library
   must not impose one. A host theme overrides the property block. `--docier-density`
   (`compact` / `comfortable` / `touch`) changes hit-target and control sizes; `touch` is required
   for the tablet use case (see OBJ-06 hit targets).
 
 ---
 
-# Part A — Objects
+# Part A - Objects
 
 ## OBJ-01 · Insert image from file
 **Priority** core · **Effort** M
@@ -123,7 +123,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Natural size: the picture's intrinsic pixel dimensions are converted to EMU at the image's
     declared DPI (`pHYs` chunk in PNG, JFIF density in JPEG, default 96). If the resulting width
-    exceeds the column width, scale down to fit and **preserve the aspect ratio** — this is Word's
+    exceeds the column width, scale down to fit and **preserve the aspect ratio** - this is Word's
     behaviour and prevents the single most common "why is my image off the page" complaint.
   - Inserting inside a table cell fits to the cell content width, not the page column.
   - Multi-file insert is one undo entry, not N.
@@ -174,7 +174,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Pasting an image **over a selection** replaces the selection (Word behaviour), it does not
     insert before it.
   - Pasting a screenshot while a *shape* is selected pastes the image as the shape's fill, not as a
-    new object — Word does this and users rely on it.
+    new object - Word does this and users rely on it.
   - `paste` from the library's own clipboard (a copied object) must paste as an object, not as a
     flattened image. The internal clipboard MIME type is `application/x-docier-object+json`;
     round-tripping through it preserves the full OOXML fragment.
@@ -202,7 +202,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Animated GIF/SVG from a URL is embedded as-is (animation is preserved in the DOCX but only the
     first frame is shown if the host sets `animateMedia: false`).
 - **OOXML.** As OBJ-01. The source URL is **not** persisted. Optionally recorded in
-  `docProps/app.xml` `<Company>`-adjacent custom properties only if the host opts in — never in
+  `docProps/app.xml` `<Company>`-adjacent custom properties only if the host opts in - never in
   the drawing.
 - **Commands / events.** `object.image.insert({ source: 'url', url })` → `object.created`.
 
@@ -217,7 +217,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Inline → floating: the object is removed from its run and re-inserted as an anchor *in the same
     position in the paragraph*, so the paragraph does not reflow in a surprising way. Default wrap
-    on conversion is Square, default relativeFrom `column`/`paragraph` — matching Word.
+    on conversion is Square, default relativeFrom `column`/`paragraph` - matching Word.
   - Floating → inline: the anchor's position is discarded; the object joins the text flow at the
     anchor's offset. Its z-order and wrap settings are **retained in memory but inert**, and are
     written back if it is converted to floating again in the same session.
@@ -226,7 +226,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     runs so the text around the image does not change appearance. This is a frequent source of
     silent formatting loss.
   - Inline objects are valid in: body paragraphs, table cells, text boxes, headers/footers,
-    footnotes/endnotes, comments. Floating objects are **not** valid inside a footnote/endnote —
+    footnotes/endnotes, comments. Floating objects are **not** valid inside a footnote/endnote -
     the UI must refuse the conversion there and explain why.
   - Inline objects affect the paragraph's line height. A tall inline image in a paragraph with
     `w:spacing/@lineRule="exact"` is clipped; we must reproduce that clipping rather than
@@ -250,7 +250,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   `dragging` · `rotating`.
 - **Rules & edge cases.**
   - **Handles are constant size in device pixels regardless of zoom** (8 px visual, 12 px hit
-    radius, 20 px in `touch` density). A handle must never scale with the document — this is the
+    radius, 20 px in `touch` density). A handle must never scale with the document - this is the
     single most common way a web editor feels wrong versus Word.
   - Hit testing order at a point: rotation handle → resize handles (topmost first) → object body
     (topmost z-order first) → text anchor. Overlapping objects resolve by `relativeHeight`,
@@ -264,7 +264,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     band (Word's rule, not containment).
   - Clicking an inline object selects it as an object; the text caret is not moved. Clicking
     *beside* it places the caret. `Tab` at the start of a paragraph containing an inline object
-    moves the selection into the object (Word behaviour, and required for keyboard reachability —
+    moves the selection into the object (Word behaviour, and required for keyboard reachability -
     OBJ-37).
   - Selection frame for a rotated object is the rotated rectangle, not its axis-aligned bounds.
   - A selected object inside a table cell uses `layoutInCell` semantics for hit testing so it does
@@ -275,26 +275,26 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Commands / events.** `object.selection.set({ ids, mode: 'replace' | 'add' | 'toggle' })` →
   `object.selection.changed` (with the full resolved selection: ids, bounds, capabilities).
 
-## OBJ-07 · Resize — aspect-locked
+## OBJ-07 · Resize - aspect-locked
 **Priority** core · **Effort** M
 
 - **Behaviour.** Corner-handle drag resizes while preserving the aspect ratio. `Shift` while
   dragging an edge handle converts it to a locked resize; `Shift` while dragging a corner
-  **unlocks** it (Word's model, and the opposite of many web editors — we follow Word).
+  **unlocks** it (Word's model, and the opposite of many web editors - we follow Word).
 - **States.** idle → dragging (preview events) → committed (single undo entry). Live size readout
   shown in the status bar or a floating badge while dragging.
 - **Rules & edge cases.**
-  - Locked corner resize uses the **opposite corner as the fixed origin** — the object grows away
+  - Locked corner resize uses the **opposite corner as the fixed origin** - the object grows away
     from the anchor you are not holding. Getting this wrong makes objects "walk" across the page.
   - Minimum size 1 pt (12700 EMU) in each axis; a drag that would invert the object is clamped, not
-    flipped (flipping is OBJ-11, an explicit command — a drag must never flip).
+    flipped (flipping is OBJ-11, an explicit command - a drag must never flip).
   - Snapping applies during resize unless `Alt` is held (OBJ-30).
   - For pictures, an aspect-locked resize changes `wp:extent` only and **must not** rewrite the
-    media bytes or `a:srcRect`. Re-encoding on resize is forbidden — it destroys quality and
+    media bytes or `a:srcRect`. Re-encoding on resize is forbidden - it destroys quality and
     breaks round-trip byte equality.
   - For a **group**, the group's `a:ext` scales and every child's `a:off`/`a:ext` in the group
     child space is scaled by the same factors; the group's `a:chExt` is scaled to match. A child
-    with `a:ext` scaled non-uniformly when the group is locked is not reachable — locked group
+    with `a:ext` scaled non-uniformly when the group is locked is not reachable - locked group
     resize is always uniform.
   - A text box resized smaller than its content shows the overflow indicator (OBJ-20) rather than
     silently clipping.
@@ -307,7 +307,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Commands / events.** `object.transform.preview({ ids, extent })` (transient) →
   `object.transform.commit({ ids, extent })` → `object.changed`.
 
-## OBJ-08 · Resize — free (aspect unlocked)
+## OBJ-08 · Resize - free (aspect unlocked)
 **Priority** important · **Effort** S
 
 - **Behaviour.** Edge-handle drag resizes one axis; corner-handle drag with `Shift` resizes both
@@ -322,7 +322,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     per OBJ-20.
   - `wps:bodyPr` `normAutofit` font scale is **not** recalculated on a free resize; only
     `spAutoFit` shapes change size, and those refuse a manual resize until autofit is turned off
-    (with an explanatory notice) — matching Word.
+    (with an explanatory notice) - matching Word.
 - **OOXML.** As OBJ-07.
 - **Commands / events.** As OBJ-07, with `lockAspect: false`.
 
@@ -360,7 +360,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 
 - **Behaviour.** Drag the rotation handle; `Shift` snaps to 15° increments. Ribbon
   `Rotate > Rotate Right 90° / Rotate Left 90° / Flip Vertical / Flip Horizontal` and a numeric
-  angle field in the properties panel (0–359.9°, tenths of a degree).
+  angle field in the properties panel (0-359.9°, tenths of a degree).
 - **States.** rotating → committed. Live angle badge next to the handle.
 - **Rules & edge cases.**
   - Rotation is **clockwise positive**, matching `a:xfrm/@rot` and Word's UI.
@@ -393,7 +393,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     before `rot`). Document this in code as it is easy to get backwards.
   - Flip on a group flips the group's transform; children's own flips are unchanged.
 - **OOXML.** `a:xfrm/@flipH="1"` / `@flipV="1"`. Note the boolean form: the attribute is present
-  with `1`, absent (not `0`) in most Word output — we write `1` and omit otherwise, and accept
+  with `1`, absent (not `0`) in most Word output - we write `1` and omit otherwise, and accept
   `0`/`false` on read.
 - **Commands / events.** `object.flip({ ids, axis: 'h' | 'v' })` → `object.changed`.
 
@@ -409,7 +409,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     is flagged in the Selection pane and in the accessibility check, because the product's output
     is HR documents that may be published.
   - "Decorative" writes an **empty** `@descr` (`descr=""`), which is the OOXML idiom for
-    decorative — distinct from an absent `@descr`. Absent means "not yet described"; empty means
+    decorative - distinct from an absent `@descr`. Absent means "not yet described"; empty means
     "intentionally decorative". Do not collapse these two states.
   - The default `@name` on insert is `Picture N` / `Shape N` / `Text Box N`, monotonically
     increasing per part, never reusing a number after a delete (Word's rule; users see these names
@@ -417,7 +417,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - `@descr` is limited to 32 767 characters by the schema; we enforce the limit in the UI.
 - **OOXML.** `wp:docPr/@descr` (description), `@title`, `@name`, `@id`. Inside a group, the
   picture's own `pic:cNvPr/@descr,@name` is the effective one for the picture and `wp:docPr`
-  applies to the group — both must be written, and the UI edits whichever the selection resolves to.
+  applies to the group - both must be written, and the UI edits whichever the selection resolves to.
 - **Commands / events.** `object.describe({ ids, descr?, title?, decorative? })` →
   `object.changed`.
 
@@ -429,7 +429,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   position, and alt text**.
 - **Rules & edge cases.**
   - The old media part is removed only if no other relationship references it (images are shared
-    when a picture is copied — a naive delete corrupts the other copy). Reference counting across
+    when a picture is copied - a naive delete corrupts the other copy). Reference counting across
     `document.xml.rels`, header/footer rels, and footnote rels is required.
   - The new image's natural aspect ratio differs: we keep the existing `wp:extent` (Word keeps the
     frame and stretches) but show a "Reset Size" affordance and a one-click fix in the properties
@@ -456,7 +456,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - **Deleting cropped areas is destructive and irreversible.** It rewrites media bytes to the
     cropped region and resets `a:srcRect` to `0`. The dialog must say so in plain words, and the
     operation must be a single undo entry that restores the original media from the undo payload.
-    For a 25 MB document, holding the original media in the undo stack is expensive — the undo
+    For a 25 MB document, holding the original media in the undo stack is expensive - the undo
     entry stores the media *reference*, not a copy, and the media part is only released from the
     part store when it leaves the undo history.
   - Compression runs off the main thread (Worker + `OffscreenCanvas` where available) so the UI
@@ -468,7 +468,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - AVIF/WEBP output is `later`; the default output format is the input format.
   - The size estimate is computed from the decoded pixel dimensions before encoding; it is labelled
     as an estimate.
-- **OOXML.** No dedicated element — the operation rewrites `word/media/imageN.*` and adds a
+- **OOXML.** No dedicated element - the operation rewrites `word/media/imageN.*` and adds a
   `[Content_Types].xml` entry if the extension changed. `a:srcRect` reset to absent (or all-zero).
   Document size is the sum of all parts plus the zip container, so the report is computed from the
   actual part sizes.
@@ -490,14 +490,14 @@ The library ships chrome **and** must let a host replace any part of it. The con
     not lose the vector.
   - **EMF/WMF** cannot be rendered in a browser. We preserve the part and its `a:blip` exactly, and
     render the placeholder in UI-32's error surface with the correct extent. We never drop the
-    relationship — that would silently corrupt the file for Word users, and this product's output
+    relationship - that would silently corrupt the file for Word users, and this product's output
     is opened in Word.
   - **Duplicate media** (the same image inserted twice) must reference one part. On read, identical
     parts across relationships are de-duplicated by content hash only if the host enables
     `dedupeMedia`; by default we preserve exactly what was in the file, because some documents
     intentionally ship two parts with the same bytes.
   - Media part naming: `word/media/imageN.ext` with N chosen to avoid collisions with existing
-    names in the part (never assume the existing images are numbered 1..N — real documents have
+    names in the part (never assume the existing images are numbered 1..N - real documents have
     gaps and out-of-order names).
   - Media inside headers/footers/footnotes lives in that part's rels; the object model must resolve
     a `r:embed` **scoped to the owning part**, not globally. A global rel map is a known source of
@@ -532,10 +532,10 @@ The library ships chrome **and** must let a host replace any part of it. The con
     rather than hard-coding a colour. Hard-coding a colour is how a library ends up looking like a
     different product inside the host's documents.
   - A line/connector drawn with zero length is discarded (a zero-length line is invisible and
-    unselectable — a stuck object).
+    unselectable - a stuck object).
   - Connectors attach to shape connection sites. We store the attachment as the drawn geometry plus
     the connector's `stCxn`/`endCxn` if present; automatic re-routing when an attached shape moves
-    is deferred to OBJ-38 — until then a moved shape leaves the connector where it was, and the
+    is deferred to OBJ-38 - until then a moved shape leaves the connector where it was, and the
     spec must not pretend otherwise.
   - Gradient fills are `later`; the model round-trips `a:gradFill` losslessly on read and marks it
     read-only in the UI until the gradient editor ships.
@@ -561,11 +561,11 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Freeform geometry is stored as `a:custGeom` with `a:pathLst/a:path` and explicit
     `a:moveTo`/`a:lnTo`/`a:cubicBezTo`/`a:close`, plus `a:pathLst/@w,@h` defining the path
-    coordinate space. **The path coordinate space is independent of `a:ext`** — a common bug is to
+    coordinate space. **The path coordinate space is independent of `a:ext`** - a common bug is to
     write path coordinates in EMU when the space is declared as a different size, producing shapes
     that shrink on round-trip. We always write `@w`/`@h` equal to the extent in EMU so the mapping
     is identity, and we normalise on read.
-  - Freehand input is simplified (Ramer–Douglas–Peucker, tolerance in EMU scaled by zoom so the
+  - Freehand input is simplified (Ramer-Douglas-Peucker, tolerance in EMU scaled by zoom so the
     result is zoom-independent) before being converted to cubic Béziers. Unsimplified freehand
     produces thousands of nodes and bloats the file.
   - Node editing (drag a vertex, add/remove a vertex, convert a corner to a smooth node) is
@@ -588,18 +588,18 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **States.** drawing → textEditing → selected → formatted.
 - **Rules & edge cases.**
   - The text box's **default paragraph formatting comes from the `Default Paragraph Font` /
-    `Normal` style plus Word's built-in text-box defaults** — Word applies the host theme's body
+    `Normal` style plus Word's built-in text-box defaults** - Word applies the host theme's body
     font, not the surrounding paragraph's formatting. Inheriting the surrounding paragraph's
     formatting produces text boxes that change appearance when moved, which is wrong.
   - A text box has its own `<w:txbxContent>` body: paragraphs, runs, tables (nested tables
-    allowed), lists, fields, even inline pictures. It is **not** a rich-text `<div>` — it is a
+    allowed), lists, fields, even inline pictures. It is **not** a rich-text `<div>` - it is a
     full WordprocessingML body, and the text engine operates on it identically. Reusing the
     document's text engine rather than a browser `contenteditable` is required for Word-faithful
     layout.
   - Direction (`wps:bodyPr/@vert`: `horz`, `vert`, `vert270`, `eaVert`) and text anchoring
     (`@anchor` `t|ctr|b`, `@anchorCtr`).
   - A text box with no fill and no outline is still selectable via its border hit area (a 1 px
-    frame), and shows a dashed frame only when selected — Word behaviour. An unfilled text box
+    frame), and shows a dashed frame only when selected - Word behaviour. An unfilled text box
     must not swallow clicks meant for the text behind it *when not selected*: hit testing for an
     unfilled shape uses its **outline and text only**, not its interior. This single rule prevents
     a document becoming unclickable.
@@ -646,13 +646,13 @@ The library ships chrome **and** must let a host replace any part of it. The con
     data-loss illusion: the text is still in the file.
   - `Shrink Text on Overflow` computes `fontScale` (1000ths of a percent) and `lnSpcReduction`
     and **writes them into the file**, so Word shows the same rendered size. Computing the scale
-    but not writing it means the document looks different in Word — an unacceptable round-trip
+    but not writing it means the document looks different in Word - an unacceptable round-trip
     difference for this product.
   - The autofit computation runs against the layout engine's text measurement, must converge in a
     bounded number of iterations (binary search on scale, max 30 iterations, 0.5% tolerance), and
     must not oscillate.
   - `Resize Shape to Fit Text` makes the shape's `a:ext` follow its content, so a manual resize is
-    refused until autofit is switched off (with a notice) — Word's behaviour.
+    refused until autofit is switched off (with a notice) - Word's behaviour.
   - Changing the shape's font invalidates a cached `fontScale`. Invalidation must be explicit; a
     stale `fontScale` renders text at the wrong size forever.
 - **OOXML.** `wps:bodyPr` children: `<a:noAutofit/>` · `<a:normAutofit fontScale="…"
@@ -672,19 +672,19 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - **Grouping writes a new child coordinate space.** `wpg:grpSpPr/a:xfrm` carries `a:off`/`a:ext`
     (the group on the page) **and** `a:chOff`/`a:chExt` (the child space). Every child's `a:off`
     is re-expressed in the child space. Getting this wrong makes objects jump or shrink on the
-    first re-open in Word — the single most common grouping bug.
+    first re-open in Word - the single most common grouping bug.
   - Grouping objects with **different `relativeFrom`** values normalises all children to the
     group's space; the children's original anchors are preserved in memory so ungrouping restores
     them (Word does not restore them; we do, and document the difference as an improvement).
   - Group members may themselves be groups (`wpg:wgp` nests). Depth is unbounded by the schema but
     the UI refuses past 10 levels with a notice, and the renderer has no depth limit.
-  - A group may contain a floating-only member? No — **a group is itself one object** and has a
+  - A group may contain a floating-only member? No - **a group is itself one object** and has a
     single wrap and a single anchor. Members do not have their own wrap. The UI must not offer wrap
     controls for a child inside a group.
   - Grouping objects that span page boundaries is allowed (Word allows it) but a group whose
     children are on different pages cannot be split; we anchor the group to the paragraph of the
     topmost child and note the case in the layout spec.
-  - Ungrouping restores each child's absolute position **such that nothing moves on screen** — the
+  - Ungrouping restores each child's absolute position **such that nothing moves on screen** - the
     visual position is the invariant, and the anchor offsets are recomputed.
   - Grouping objects with different rotations bakes nothing: child `a:rot` is kept and the group's
     rotation is the identity unless the user rotates the group.
@@ -706,7 +706,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   Objects. Enabled only with 2+ objects selected (align) or 3+ (distribute).
 - **States.** The "Align to" choice persists per session and is shown as a checkmark.
 - **Rules & edge cases.**
-  - **"Align to Page/Margin/Selected Objects" is not a modality — it changes the anchor.** Aligning
+  - **"Align to Page/Margin/Selected Objects" is not a modality - it changes the anchor.** Aligning
     to page sets each object's `wp:positionH/@relativeFrom="page"` and recomputes `posOffset`;
     aligning to margin uses `relativeFrom="margin"`; aligning to selected objects uses the
     selection's bounding box and preserves each object's existing `relativeFrom`. Users must not
@@ -745,7 +745,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Changing `relativeFrom` must **preserve the on-screen position**: we read the object's
     resolved absolute position under the old reference frame, change the reference, and recompute
-    `posOffset` in the new frame. Naively rewriting only the attribute makes every object jump —
+    `posOffset` in the new frame. Naively rewriting only the attribute makes every object jump -
     the most visible possible bug in this area.
   - `character` anchors the object horizontally to the character at the anchor's run offset and is
     the only mode that makes a floating object track a specific glyph. It is what "position
@@ -762,7 +762,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     order.
 - **OOXML.** `wp:anchor/wp:positionH[@relativeFrom]/wp:posOffset|wp:align`,
   `wp:anchor/wp:positionV[@relativeFrom]/wp:posOffset|wp:align`, `wp:simplePos[@x,@y]` (written as
-  `x="0" y="0"` with `wp:anchor/@simplePos="0"` — the simple position must be present and ignored).
+  `x="0" y="0"` with `wp:anchor/@simplePos="0"` - the simple position must be present and ignored).
 - **Commands / events.** `object.position.set({ ids, horizontal, vertical })` →
   `object.changed` · `object.position.preview` during a Layout panel edit.
 
@@ -774,7 +774,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   the object is dragged near a different one.
 - **Rules & edge cases.**
   - `locked="1"` means the anchor paragraph does not change; it does **not** mean the object cannot
-    be moved. UI language must not say "lock position" — users confuse the two, and Word's own
+    be moved. UI language must not say "lock position" - users confuse the two, and Word's own
     label ("Lock anchor") is what they expect.
   - With `locked="1"`, dragging the object far from its anchor leaves the object visually detached
     from the paragraph that owns it, and moving that paragraph moves the object. This is Word
@@ -791,11 +791,11 @@ The library ships chrome **and** must let a host replace any part of it. The con
 ## OBJ-25 · Move with text
 **Priority** core · **Effort** M
 
-- **Behaviour.** The "Move with text" checkbox in Layout Options. Checked (default) — the object
-  travels with its anchor paragraph as the text reflows. Unchecked — the object stays at a fixed
+- **Behaviour.** The "Move with text" checkbox in Layout Options. Checked (default) - the object
+  travels with its anchor paragraph as the text reflows. Unchecked - the object stays at a fixed
   position on the page while the text moves.
 - **Rules & edge cases.**
-  - **Encoding note (open decision — see §5).** OOXML has no `moveWithText` attribute. Word
+  - **Encoding note (open decision - see §5).** OOXML has no `moveWithText` attribute. Word
     derives the checkbox from the vertical reference frame: `paragraph`/`line` behave as "move with
     text"; `page`/`margin` behave as fixed. We therefore model the checkbox as a **derived view**
     over `wp:positionV/@relativeFrom`, and toggling it rewrites `relativeFrom` while preserving the
@@ -803,7 +803,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     an ADR before implementation, because it is the one place in this spec where a Word UI state has
     no direct OOXML attribute.
   - Toggling to "fixed" on a paragraph that later moves to another page must leave the object on
-    the original page — verify this in tests, since it is the whole point of the feature.
+    the original page - verify this in tests, since it is the whole point of the feature.
   - Anchoring in a table cell adds a second axis: `wp:anchor/@layoutInCell="1"` means the object
     moves with the cell (default), `"0"` means it is positioned relative to the page and does not
     move when the cell moves. This is Word's "Fix position on page" for objects in tables and is a
@@ -823,7 +823,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **States.** The active preset is highlighted when the object's current properties match it
   exactly; a partial match highlights nothing and the panel shows the explicit values instead.
 - **Rules & edge cases.**
-  - Presets are **not** stored in the file — only their resolved properties are. The "which preset
+  - Presets are **not** stored in the file - only their resolved properties are. The "which preset
     is active" state is derived by matching, and the matcher must be tolerant of the ±1 EMU
     rounding that Word itself produces, or the highlight will flicker.
   - Applying a preset that changes wrapping changes the layout of surrounding text; the change must
@@ -853,19 +853,19 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - `Square` wraps to the object's bounding box; `Tight`/`Through` wrap to the shape outline
     (`wp:wrapPolygon`). For a picture, Tight uses the picture's rectangle unless wrap points have
     been edited; Word generates a polygon from the alpha channel only on explicit request. We do
-    **not** auto-generate alpha-based wrap polygons — it is slow, and it surprises users.
+    **not** auto-generate alpha-based wrap polygons - it is slow, and it surprises users.
   - `Edit Wrap Points` enters a mode where the wrap polygon vertices are draggable; the polygon is
     stored in `wp:wrapPolygon/wp:start` and `wp:lineTo` with coordinates in the
-    **wrap polygon coordinate space** (a 0–21600 grid relative to the object's extent, matching
+    **wrap polygon coordinate space** (a 0-21600 grid relative to the object's extent, matching
     `wp:wrapPolygon/@edited`). Writing those coordinates in EMU is a round-trip bug we must test
     for explicitly.
   - Text must not be laid out on top of a Square-wrapped object; the wrap distances (OBJ-28) are
     part of the exclusion rectangle. The layout engine owns this; the object layer only supplies
     geometry.
-  - An object with `wp:wrapNone` does not affect line breaking at all — no reflow on insert, which
+  - An object with `wp:wrapNone` does not affect line breaking at all - no reflow on insert, which
     is why "Behind Text" feels instant. Do not re-run layout for it.
   - `Top and Bottom` moves the whole object above or below the line, whichever side has more room
-    at the anchor — Word's rule; the object does not split text mid-line.
+    at the anchor - Word's rule; the object does not split text mid-line.
   - Wrapping is inert for objects in a text box (they wrap to the box, not the page) and for group
     children (only the group wraps).
 - **OOXML.** `wp:wrapNone` · `wp:wrapSquare[@wrapText="bothSides|largest|left|right"]/@distT,@distB,@distL,@distR`
@@ -895,7 +895,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     apply, and the order matters: the polygon defines the region, the distances expand it.
 - **OOXML.** `wp:wrapSquare/@distT,@distB,@distL,@distR` and the same on `wp:wrapTight`,
   `wp:wrapThrough`, `wp:wrapTopAndBottom`. Note the attributes are on the **wrap element**, not on
-  `wp:anchor` — but `wp:anchor` *also* carries `@distT,@distB,@distL,@distR` (the "distance from
+  `wp:anchor` - but `wp:anchor` *also* carries `@distT,@distB,@distL,@distR` (the "distance from
   text" for the anchor as a whole). Both exist; the wrap element's values win where they are
   present, and we must write both consistently to avoid Word showing different values in its dialog
   than we show.
@@ -913,16 +913,16 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - **Z-order among floating objects is `wp:anchor/@relativeHeight`**, an unsigned integer where
     **higher is in front**. Stepping forward swaps `relativeHeight` with the next-highest object
-    that **overlaps** it — not with the globally next value, which would appear to do nothing when
+    that **overlaps** it - not with the globally next value, which would appear to do nothing when
     the neighbour is elsewhere on the page. Word compares against overlapping objects; matching
     that is what makes the buttons feel like they work.
   - To front / to back is max+1 / min−1 over the overlapping set, clamped at 0 (values are
     unsigned; sending to back when a value is already 0 requires renumbering the whole overlapping
-    set downward — renumbering must be a single atomic operation, and it must not change the
+    set downward - renumbering must be a single atomic operation, and it must not change the
     relative order of any other pair).
   - `behindDoc` is **independent of `relativeHeight`**: a behind-text object is behind all text but
     still ordered against other behind-text objects. Two behind-text objects keep their relative
-    order. The UI must never imply that "Send to Back" means "behind the text" — those are different
+    order. The UI must never imply that "Send to Back" means "behind the text" - those are different
     commands and conflating them is exactly the complaint we are preventing.
   - A group's children are ordered by **document order within `wpg:wgp`**, not by `relativeHeight`.
     Bring Forward on a group child reorders the child within the group; it must not touch the
@@ -930,7 +930,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Inline objects have no z-order; the commands are disabled with a tooltip explaining that the
     object is in the text flow (and offering "Wrap Text" as the fix). A disabled button with no
     explanation is the failure mode we are avoiding.
-  - Z-order changes never affect layout (no reflow) — a pure re-render.
+  - Z-order changes never affect layout (no reflow) - a pure re-render.
 - **OOXML.** `wp:anchor/@relativeHeight` (unsigned int, higher = in front), `wp:anchor/@behindDoc`.
   Group members: document order inside `wpg:wgp`.
 - **Commands / events.** `object.zorder({ ids, op: 'forward' | 'backward' | 'front' | 'back' |
@@ -957,7 +957,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     they do not affect layout, hit testing, or printing.
   - Dragging an object out of the page is allowed (off-page positioning is legitimate for bleed);
     the page boundary shows a stronger guide when the object's edge aligns with it.
-  - Dragging an **inline** object is not a move — it re-orders the anchor within the text flow
+  - Dragging an **inline** object is not a move - it re-orders the anchor within the text flow
     (drag to reposition between characters), showing a caret rather than a move cursor. This is a
     different operation with a different visual language; do not show the move cursor.
   - Dragging a **child inside a group** moves it within the group's coordinate space and shows the
@@ -965,7 +965,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Dragging a floating object near a different paragraph moves its **anchor** to that paragraph
     unless the anchor is locked (OBJ-24). The anchor marker is shown during the drag so this is
     visible rather than mysterious.
-  - Dragging an object in a table cell must respect `layoutInCell` (OBJ-25) — with
+  - Dragging an object in a table cell must respect `layoutInCell` (OBJ-25) - with
     `layoutInCell="1"` the object cannot be dragged outside its cell without converting to
     `layoutInCell="0"`, which we offer as an explicit "Fix position on page" action instead of
     doing silently.
@@ -994,7 +994,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     must not be 40 undos.
   - Nudge uses the same snapping-disabled path as `Alt+drag`; it never snaps.
   - Numeric fields commit on blur and on `Enter`, reject invalid input by reverting and showing an
-    inline message (never silently clamping to 0 — silently turning a typed "abc" into 0 destroys
+    inline message (never silently clamping to 0 - silently turning a typed "abc" into 0 destroys
     the object's position).
   - The dialog exposes position `relativeFrom` so a user typing "2 cm from margin" can express it
     exactly (OBJ-23).
@@ -1008,7 +1008,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 
 - **Behaviour.** Right-click (or `Shift+F10` / the context-menu key) on a selected or unselected
   object opens the object context menu, which **first selects the object under the pointer** so the
-  menu's actions apply to what was clicked — Word's behaviour and the reason a context menu
+  menu's actions apply to what was clicked - Word's behaviour and the reason a context menu
   feels right.
 - **Contents** (sections separated by rules, in this order, with priority-ordered trimming when
   space is short):
@@ -1025,7 +1025,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Menu items are **generated from the same registry that drives the ribbon**, so an item cannot
     exist in one and not the other, and enablement/labels are identical. Two hand-maintained lists
     drift within a month.
-  - Items are disabled with a **reason**, not hidden, when the object type does not support them —
+  - Items are disabled with a **reason**, not hidden, when the object type does not support them -
     except items that make no sense at all for the type (e.g. `Crop` on a text box), which are
     hidden. Disabled-with-reason is shown on hover.
   - Submenus open on hover after 300 ms or immediately on click, and flip to the left when they
@@ -1035,7 +1035,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Right-clicking an **unselected** object selects it; right-clicking **inside the current
     multi-selection** keeps the multi-selection so align/distribute/group apply to all of them;
     right-clicking **outside** it selects only the object under the pointer.
-  - Right-clicking a group child does **not** enter the group — the menu applies to the group
+  - Right-clicking a group child does **not** enter the group - the menu applies to the group
     (Word behaviour), with `Ungroup` available.
   - Right-clicking a field or on an image inside a text box routes to the correct menu (UI-28).
   - Keyboard: the menu is reachable without a mouse, and its accessible name is the object type
@@ -1056,7 +1056,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   document and in the file**. Hiding is an editing convenience, not a deletion.
 - **Rules & edge cases.**
   - **Hidden state must be written to the file or it is a lie.** `wp:anchor/@hidden="1"` (or
-    `wp:inline`'s absence — inline objects cannot be hidden, so hiding an inline object converts it
+    `wp:inline`'s absence - inline objects cannot be hidden, so hiding an inline object converts it
     to floating with `hidden="1"`, and unhiding restores inline placement). Alternatively the host
     may configure `hideMode: 'session'` (hidden only in this session, nothing written to the file),
     which must then be visibly labelled in the pane, because every other editor writes it to the
@@ -1075,7 +1075,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - The pane is a chrome slot (`panels`) and is fully replaceable.
 - **OOXML.** `wp:anchor/@hidden`, `wp:docPr/@name` (rename), document order + `relativeHeight`
   (reorder). The pane's section for headers/footers reflects that those objects live in
-  `word/headerN.xml`, not `document.xml` — the pane must say so rather than appearing to show an
+  `word/headerN.xml`, not `document.xml` - the pane must say so rather than appearing to show an
   object that is not in the body.
 - **Commands / events.** `object.visible.set({ ids, visible })`, `object.rename({ id, name })`,
   `object.selection.set(...)` → `object.changed`, `object.selection.changed`.
@@ -1090,7 +1090,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Cut/copy serialises the object to the internal clipboard as the OOXML fragment **plus** its
     media parts, so pasting into another document works and pasting back is lossless. Copying must
-    deep-copy the `w:drawing` XML; a shallow copy produces two objects sharing mutable state — the
+    deep-copy the `w:drawing` XML; a shallow copy produces two objects sharing mutable state - the
     classic "editing one changes the other" bug.
   - New `wp:docPr/@id` and `@name` on paste (ids must be unique per part); rel ids re-pointed to
     newly added media parts or to existing parts when the media already exists in the target
@@ -1102,7 +1102,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Delete with multiple objects selected deletes all, as one undo entry.
   - Duplicating a floating object inherits `relativeHeight` shifted to just in front of the
     original, so the copy is visible rather than hidden behind it.
-  - Cutting an inline object and pasting into a different document must bring the media with it —
+  - Cutting an inline object and pasting into a different document must bring the media with it -
     tested explicitly, since a copied `r:embed` pointing at a missing rel is the most common
     cross-document paste corruption.
   - Paste of a `data:` URI image or an image from HTML is handled by OBJ-03's preference order.
@@ -1127,7 +1127,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - An anchor in a deleted section/header/footer takes the object with it; undo restores both.
   - Anchors are never allowed in: field instruction text, deleted (tracked) text, comment
     footnote content, or an empty paragraph immediately before a section break in a way that would
-    detach the object — each case enumerated in the text spec and tested.
+    detach the object - each case enumerated in the text spec and tested.
   - The anchor marker is chrome and must not appear in print, in the printed preview, or in the
     exported PDF.
 - **OOXML.** The position of the `w:r` containing `w:drawing/wp:anchor` within its `w:p`; no
@@ -1141,11 +1141,11 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Behaviour.** Three panel surfaces, all usable both docked in the sidebar (UI-29) and as the
   library's floating "Layout Options" popover next to the selected object (the button Word shows
   to the right of a selected object):
-  - **Layout Options** — the §OBJ-23/24/25/26/27/28 controls in four collapsed sections
+  - **Layout Options** - the §OBJ-23/24/25/26/27/28 controls in four collapsed sections
     (Position · Text Wrapping · Size · Arrange), laid out exactly as Word's Layout dialog is,
     because that layout is what users have learned.
-  - **Alt Text** — OBJ-12.
-  - **Format Object** — fill/line/effects/size/position/alt-text tabs for pictures and shapes,
+  - **Alt Text** - OBJ-12.
+  - **Format Object** - fill/line/effects/size/position/alt-text tabs for pictures and shapes,
     equivalent to Word's Format Shape task pane, including a Size section with locked/unlocked
     aspect ratio and a numeric rotation.
 - **Rules & edge cases.**
@@ -1157,7 +1157,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     hidden, so a user can see what a document contains.
   - Every panel control is a command with a live preview; `Esc` reverts the panel's pending
     previews and closes it (Word's Layout dialog has no preview, but a floating panel must, since it
-    sits over the document — and every preview must be revertible).
+    sits over the document - and every preview must be revertible).
   - Panel state (open/closed, docked/floating, scroll position) persists per session and is
     host-overridable.
   - The Size section's numeric fields accept unit-suffixed input (`1.5cm`, `0.6in`, `42pt`, `120px`)
@@ -1202,7 +1202,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **States.** free-floating connector · attached both ends · attached one end · re-routing.
 - **Rules & edge cases.**
   - **Why this is `later` and not core:** OBJ-16 ships connectors as drawn geometry that round-trips
-    exactly, which preserves the file and lets users draw a connector — the v1 requirement. Live
+    exactly, which preserves the file and lets users draw a connector - the v1 requirement. Live
     re-routing is a genuine layout-engine feature (it needs shape connection-site geometry per
     preset, and it must move connectors during the *drag preview*, not only on commit), and
     shipping it half-done would leave connectors that visibly detach, which is worse than
@@ -1227,7 +1227,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 
 ---
 
-# Part B — UI chrome
+# Part B - UI chrome
 
 ## UI-01 · Chrome mounting and slot contract
 **Priority** core · **Effort** L
@@ -1239,13 +1239,13 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **States.** `full` · `minimal` · `none` · custom slots (see §3). Mount/unmount is idempotent and
   emits `ui.chrome.mounted` / `ui.chrome.unmounted` with the slot list.
 - **Rules & edge cases.**
-  - Chrome elements are created in the container, never appended to `document.body` — except
+  - Chrome elements are created in the container, never appended to `document.body` - except
     portals (context menus, dialogs, floating panels, tooltips) which mount to a portal root that
     the host can specify (`portalRoot`), defaulting to the container. Portals outside the container
     are required for correct stacking but must be cleaned up on destroy.
   - `destroy()` removes every listener, portal, observer and worker; a leaked `ResizeObserver` on a
     destroyed editor is a known failure mode in this class of library and is tested.
-  - Chrome never reads the document model directly — it subscribes to state and dispatches commands.
+  - Chrome never reads the document model directly - it subscribes to state and dispatches commands.
     Enforceable by lint rule: chrome modules may not import the document model module.
   - The layout must not be a fixed pixel size: the canvas fills its grid area, and the chrome
     measures with `ResizeObserver` and re-lays out. `ResizeObserver` loops (chrome height change →
@@ -1267,12 +1267,12 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Tabs the host does not support are **removed**, not shipped broken. A visible `Mailings` tab
     with nothing in it is exactly the "web form" impression we are trying to avoid.
   - The backstage `Print` item shows a real print preview rendered by the layout engine at page
-    scale, with page navigation and print/page-setup controls — not a browser print dialog passthrough.
+    scale, with page navigation and print/page-setup controls - not a browser print dialog passthrough.
     `Export` offers DOCX (native), PDF (via the layout engine's own PDF writer or the host), and
     HTML (`later`).
   - Menu bar items are keyboard operable and expose `aria-keyshortcuts` for the Alt+letter tips
     (UI-07).
-  - The menu bar collapses into the ribbon's tab row on narrow widths — there is exactly one tab
+  - The menu bar collapses into the ribbon's tab row on narrow widths - there is exactly one tab
     strip in the chrome at any width, never two.
   - "Recent files" in the backstage is host-provided or absent; the library does not own storage.
 - **OOXML.** None. `Save` writes the OPC package (spec 05); `Print` uses `<w:savePreviewPicture>`-
@@ -1288,22 +1288,22 @@ The library ships chrome **and** must let a host replace any part of it. The con
   left. Every group has an optional **dialog launcher** (the small arrow in its bottom-right
   corner) opening the corresponding dialog (UI-19…UI-24).
 - **Organisation (v1 groups).**
-  - **Home** — Clipboard · Font · Paragraph · Styles · Editing
-  - **Insert** — Pages · Tables · Illustrations · Add-ins(host) · Media · Links · Header & Footer ·
+  - **Home** - Clipboard · Font · Paragraph · Styles · Editing
+  - **Insert** - Pages · Tables · Illustrations · Add-ins(host) · Media · Links · Header & Footer ·
     Text · Symbols
-  - **Draw** — Pens(host-enabled) · Convert · Insert Shapes · Shape Styles
-  - **Design** — Document Formatting · Document Elements(host) · Page Background
-  - **Layout** — Page Setup · Paragraph · Arrange
-  - **References** — Table of Contents · Footnotes · Citations(host) · Captions · Index · Table of
+  - **Draw** - Pens(host-enabled) · Convert · Insert Shapes · Shape Styles
+  - **Design** - Document Formatting · Document Elements(host) · Page Background
+  - **Layout** - Page Setup · Paragraph · Arrange
+  - **References** - Table of Contents · Footnotes · Citations(host) · Captions · Index · Table of
     Authorities
-  - **Review** — Proofing · Accessibility · Language · Comments · Tracking · Changes · Compare(host)
-  - **View** — Views · Show · Zoom · Window(host) · Macros(host)
+  - **Review** - Proofing · Accessibility · Language · Comments · Tracking · Changes · Compare(host)
+  - **View** - Views · Show · Zoom · Window(host) · Macros(host)
 - **Control vocabulary** (the whole ribbon is built from exactly these, so nothing looks like a
   web form):
   - **button**, **toggle** (pressed state, e.g. Bold), **split button** (main action + dropdown),
-    **dropdown menu**, **gallery** (visual previews, inline expanded or collapsed — used for
+    **dropdown menu**, **gallery** (visual previews, inline expanded or collapsed - used for
     Styles, Shapes, Wrap Text, Position, Table Styles, Shape Styles), **combo box** (font, size,
-    style name — editable with free text), **spinner** (numeric, with unit), **checkbox**,
+    style name - editable with free text), **spinner** (numeric, with unit), **checkbox**,
     **radio group**, **colour picker** (theme colours row + standard colours + recent + custom +
     "No Colour"), **numeric slider** (zoom, indent), **text field**.
   - Galleries render **live previews** using the real document content where feasible (Styles,
@@ -1319,7 +1319,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Keyboard: each group is a `role="toolbar"` with a **roving tabindex**; `Tab` moves between
     groups, arrow keys within; `Home`/`End` jump; `Space`/`Enter` invokes; `Down` opens a dropdown.
     Roving tabindex (not "every control is a tab stop") is required or the ribbon becomes 150 tab
-    presses — the single biggest keyboard failure of web ribbons.
+    presses - the single biggest keyboard failure of web ribbons.
   - The ribbon must be **data-driven**: a `RibbonModel` (tabs → groups → controls → command ids)
     so the host can remove, reorder or add groups, and so the same model feeds the context menus
     and the QAT.
@@ -1345,7 +1345,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   the ribbon to the previously active tab.
 - **Rules & edge cases.**
   - The tab **stack is recalled**: selecting a picture, switching to `Home`, then selecting the same
-    picture again returns to `Picture Format` — Word's behaviour; users notice immediately when it
+    picture again returns to `Picture Format` - Word's behaviour; users notice immediately when it
     is missing.
   - Multiple different object types selected simultaneously shows the tab for the **dominant type**
     (picture > shape > text box) and the operations that apply to all of them (Arrange, Size); the
@@ -1377,7 +1377,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     **reverse priority order** defined in the ribbon model (not by DOM order), so `Font` never
     disappears before `Clipboard`.
   - An expanded collapsed-ribbon must be focus-trapped only long enough to be keyboard-operable;
-    `Esc` returns focus to the document. Focus must never be trapped in the ribbon — a keyboard user
+    `Esc` returns focus to the document. Focus must never be trapped in the ribbon - a keyboard user
     who tabs into a collapsed ribbon and cannot get out has lost the document.
   - Resizing while collapsed must not thrash the overflow computation: measure once per frame.
 - **OOXML.** None.
@@ -1428,7 +1428,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Customisations persist per user; the library provides the state model and a serialisation
     format, and the host owns storage.
   - Disabled state mirrors the registry (Undo disabled with an empty stack).
-- **OOXML.** None. (Word stores QAT customisation in the user profile, not the document — we do the
+- **OOXML.** None. (Word stores QAT customisation in the user profile, not the document - we do the
   same, via host storage.)
 - **Commands / events.** `ui.qat.set({ items, position })` → `ui.chrome.state.changed`.
 
@@ -1447,7 +1447,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     appears inside `docier-page` in the DOM, that is a bug by definition.
   - The ruler reflects the **section** of the scoped page: `w:sectPr/w:pgMar` and `w:pgSz` of that
     page's section, so a document with a landscape section mid-file shows different margin markers
-    while scrolled to that section — correctly, because it is showing that page's geometry.
+    while scrolled to that section - correctly, because it is showing that page's geometry.
   - Since pages can have different widths (mixed orientation), the ruler's zero point is the scoped
     page's left page edge, and the ruler's own width matches the scoped page's width so the mapping
     from ruler x to document x stays linear and obvious.
@@ -1465,7 +1465,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - The ruler is a chrome slot (`ruler`); a host may replace it, and the library's implementation
     uses only the public contract, so it is replaceable in practice.
   - Accessibility: the ruler is `role="toolbar"` with each marker a focusable element with an
-    accessible name, value and keyboard inc/dec — a mouse-only ruler locks keyboard users out of
+    accessible name, value and keyboard inc/dec - a mouse-only ruler locks keyboard users out of
     indents and tab stops (OBJ-37's rule, applied to chrome).
 - **OOXML.** Read: `w:sectPr/w:pgSz/@w,@h,@orient`, `w:sectPr/w:pgMar/@left,@right,@gutter`,
   `w:sectPr/@w:rsid` scoping. Written by the marker commands.
@@ -1479,13 +1479,13 @@ The library ships chrome **and** must let a host replace any part of it. The con
   between `cm · mm · inch · pt · pica · px`; also settable by right-clicking the ruler (a context
   menu with unit choices and `Show ruler`).
 - **Rules & edge cases.**
-  - OOXML has **no ruler-unit setting** — Word keeps it in the user profile. We therefore keep it in
+  - OOXML has **no ruler-unit setting** - Word keeps it in the user profile. We therefore keep it in
     library settings (host-persisted), and the value is shown in the unit selector so it is never a
     mystery why a number appears in an unexpected unit.
   - Sub-unit precision: cm to 0.1 cm, inch to 1/16 in fractional or 0.1 in decimal (host option),
     pt to whole points, px to whole pixels.
   - The origin is the **page's left edge** (not the margin), and 0 is labelled at the page edge, with
-    the margin marker offset from it — Word's convention, and the reason a user can read the left
+    the margin marker offset from it - Word's convention, and the reason a user can read the left
     margin directly off the ruler.
   - Negative values are never shown; content in the gutter is shown by the gutter marker instead.
   - The unit change re-renders the ruler and all numeric fields that display ruler-unit values
@@ -1505,7 +1505,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Dragging a margin marker changes `w:pgMar` for the **scoped section only**. If the document has
     multiple sections, a confirmation affordance appears offering "This section only" /
-    "This section forward" / "Whole document" — the same choice the Page Setup dialog offers. Making
+    "This section forward" / "Whole document" - the same choice the Page Setup dialog offers. Making
     this implicit is how a user silently reformats 40 pages.
   - Live re-layout during the drag runs at a **throttled rate** (once per animation frame) and
     performs incremental layout for affected paragraphs; a full document re-layout per pointer move
@@ -1531,11 +1531,11 @@ The library ships chrome **and** must let a host replace any part of it. The con
 
 - **Behaviour.** Four markers on the horizontal ruler at the left (and one at the right), matching
   Word exactly:
-  - **First Line Indent** — the inverted triangle on top; drags `w:ind/@firstLine`.
-  - **Hanging Indent** — the triangle below it; drags `w:ind/@hanging`.
-  - **Left Indent** — the rectangle at the bottom; dragging it moves **both** the first-line and
+  - **First Line Indent** - the inverted triangle on top; drags `w:ind/@firstLine`.
+  - **Hanging Indent** - the triangle below it; drags `w:ind/@hanging`.
+  - **Left Indent** - the rectangle at the bottom; dragging it moves **both** the first-line and
     hanging markers with it.
-  - **Right Indent** — the triangle at the right edge; drags `w:ind/@right`.
+  - **Right Indent** - the triangle at the right edge; drags `w:ind/@right`.
   - **Mirror Indents** support (for facing pages) moves the left markers to the right side of the
     ruler when the scoped page is an even/verso page, per `w:ind/@start`/`@end` (the bidi-safe
     forms) when the host enables it.
@@ -1553,7 +1553,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     value with no indicator; we add the indicator because it prevents accidental flattening of a
     mixed selection, and it is a documented improvement).
   - With no selection, the marker edits the paragraph containing the caret.
-  - Markers apply to the **current list level** when the caret is in a list — Word uses independent
+  - Markers apply to the **current list level** when the caret is in a list - Word uses independent
     indents per list level; writing to `w:pPr/w:ind` instead of the numbering definition's level is
     a real and visible error. Where the indent comes from the numbering definition, the ruler shows
     the marker in a **locked style** and the drag opens "Adjust List Indents" instead of writing a
@@ -1587,7 +1587,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     locked).
   - Placement position is snapped to the ruler's minor tick unless `Alt`; the stop's position is
     measured from the **left text margin** (word convention: `w:tab/@pos` is from the left margin,
-    not the page edge) while the ruler's zero is the page edge — the difference between those two
+    not the page edge) while the ruler's zero is the page edge - the difference between those two
     origins is a classic off-by-the-margin bug. Stated here explicitly because it must be.
   - Tab stops are **relative to `w:ind/@left`**, not to the margin, in Word's model; the ruler must
     draw them at their absolute position (indent + pos) and the conversion must be exact.
@@ -1626,7 +1626,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     (the drag is tracked in EMU, then rounded once at commit). Accumulating rounding during the drag
     is what makes a marker creep away from the cursor.
   - Snapping: to the major/minor ruler ticks, to the margins, to existing indents, to the page
-    centre, and to the column boundaries — in that priority order, 6 px threshold, `Alt` to disable.
+    centre, and to the column boundaries - in that priority order, 6 px threshold, `Alt` to disable.
   - `Esc`-cancel must also revert the live layout preview, not only the marker position.
   - Dragging a margin marker over another section's text re-scopes the ruler only after commit; the
     drag must not re-scope mid-gesture (the geometry would change under the cursor).
@@ -1649,7 +1649,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   in the left margin area** (option `verticalRuler: 'always' | 'onMarginHover' | 'never'`, default
   `onMarginHover` to match current Word, with `always` for users who prefer Word 2010 behaviour).
 - **Rules & edge cases.**
-  - The vertical ruler **restarts at each page** because it measures one page's height — but it is
+  - The vertical ruler **restarts at each page** because it measures one page's height - but it is
     still a single sticky chrome element that re-scopes (UI-08). The distinction matters: one
     element, page-scoped values.
   - It stays in sync with the horizontal ruler's scoped page; both come from one
@@ -1673,10 +1673,10 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Rules & edge cases.**
   - Page number reflects the **layout engine's** pagination with the caret's page; `m` is the
     **document's** total pages (Word's status bar shows `n of m` where m is the total, not a
-    filtered view). Clicking it opens Go To (Page) — same dialog as Find's `Go To` tab.
+    filtered view). Clicking it opens Go To (Page) - same dialog as Find's `Go To` tab.
   - Word count is computed from the document model (spec 02's counting rules: CJK counted by
     character, hyphenated words as one, text boxes and footnotes included only when the checkbox is
-    on). It is **live**, not the cached value from `docProps/app.xml` — but on save we write the
+    on). It is **live**, not the cached value from `docProps/app.xml` - but on save we write the
     live statistics back into `docProps/app.xml` so Word shows the same numbers.
   - **Language** shows the proofing language at the caret, resolved through the full cascade
     (direct `w:rPr/w:lang` → character style → paragraph style → `w:docDefaults`), with the format
@@ -1690,7 +1690,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     `status.changed`. A failed autosave is surfaced here and as an event, never swallowed.
   - **View toggles** mirror the View tab's view modes and are pressed-state buttons.
   - Every status item is individually hideable by the host and by the user (the right-click context
-    menu on the status bar lists all items with checkmarks — this is a **required context menu**,
+    menu on the status bar lists all items with checkmarks - this is a **required context menu**,
     not a nice-to-have, because the owner's complaint was that right-click did nothing anywhere).
   - Items that are not applicable (words count in `read` mode is still shown; page count in a
     single-page draft view is shown as `1 of 1`) are never blank.
@@ -1706,7 +1706,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 ## UI-16 · Zoom controls and fit modes
 **Priority** core · **Effort** M
 
-- **Behaviour.** Zoom slider (10 %–500 %, logarithmic feel with 100 % at the centre detent),
+- **Behaviour.** Zoom slider (10 %-500 %, logarithmic feel with 100 % at the centre detent),
   `−`/`+` buttons, a percent label that opens the **Zoom** dialog (`Zoom to: 200/100/75/50 %` or a
   custom percent, `Many pages: 1×1 … 2×2`, `Page width`, `Text width`, `Whole page`, `Percent`), and
   `Ctrl+scroll` zooming about the pointer. Fit commands in the View tab: `Page Width`, `One Page`,
@@ -1753,7 +1753,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Font hinting differences at fractional zoom must not cause a line to wrap differently: line
     breaking measures with the document's font metrics at 100 % and scales, never by measuring the
     rendered DOM at the current zoom. DOM-measured line breaking is banned outright.
-  - Zooming while a drag is in progress is refused (or cancels the drag with a notice) — the
+  - Zooming while a drag is in progress is refused (or cancels the drag with a notice) - the
     gesture's coordinate space would change mid-gesture.
   - A single "zoom" numeric field in settings, one transform, one inverse: there must be no second
     place in the codebase that knows the zoom level except the renderer and the input mapper.
@@ -1774,7 +1774,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     `Enter` activates the default button; `Tab` never leaves; on close, focus returns to the control
     that opened it. `role="dialog"` `aria-modal="true"` with a labelled title.
   - **Unit fields accept unit suffixes** (`0.5cm`, `12pt`, `1"`, `18px`) and display the document's
-    configured unit by default; invalid input is flagged inline and blocks OK — never silently
+    configured unit by default; invalid input is flagged inline and blocks OK - never silently
     coerced (the same rule as OBJ-31).
   - Dialogs that change the document **open with a live preview** where Word has one (Font and
     Paragraph dialogs both have preview panes) and every such dialog supports "preview → OK/Cancel"
@@ -1782,7 +1782,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     including partially typed values.
   - `Apply` exists only where Word has it and commits a discrete undo entry, letting the user apply
     several times before closing.
-  - `Set as Default` writes to `w:styles/w:docDefaults/w:rPrDefault|w:pPrDefault` — a document-wide
+  - `Set as Default` writes to `w:styles/w:docDefaults/w:rPrDefault|w:pPrDefault` - a document-wide
     change that the dialog must label clearly ("Default for this document only").
   - Dialogs are host-replaceable: `dialogs` slot, with a per-dialog id (`paragraph`, `font`,
     `pageSetup`, `insertField`, `findReplace`, `tableProperties`, `tabs`, `zoom`, `wordCount`,
@@ -1804,7 +1804,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Behaviour.** A tabbed dialog exactly as Word: **Indents and Spacing** and **Line and Page
   Breaks**, with a Preview pane.
 - **Indents and Spacing tab.** General (Alignment left/centred/right/justified; Outline level
-  body text / level 1–9) · Indentation (Left, Right; Special: `(none)` / First line / Hanging with
+  body text / level 1-9) · Indentation (Left, Right; Special: `(none)` / First line / Hanging with
   a `By` value; Mirror indents checkbox) · Spacing (Before, After; "Don't add space between
   paragraphs of the same style"; Line spacing: Single / 1.5 lines / Double / At least / Exactly /
   Multiple with an `At` value) · Preview.
@@ -1814,7 +1814,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   dialog.
 - **Rules & edge cases.**
   - Every field maps 1:1 to a `w:pPr` child (see OOXML below) and unchecking a checkbox **removes**
-    the element rather than writing `w:val="0"` — the difference is visible in Word's UI, which
+    the element rather than writing `w:val="0"` - the difference is visible in Word's UI, which
     shows tri-state for inherited properties. A property inherited from a style shows as **blank**,
     not as the inherited value, with an indicator that it is inherited; typing a value writes a
     direct override. This distinction is what makes the dialog feel like Word rather than like a
@@ -1826,7 +1826,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     `w:lineRule="auto"`; `Exactly` writes `w:lineRule="exact"` and clips tall content (OBJ-05's rule).
     The dialog warns when switching to `Exactly`.
   - Outline level writes `w:outlineLvl` and interacts with the navigation pane (UI-30); setting a
-    level on a body paragraph makes it appear in the outline — the dialog says so.
+    level on a body paragraph makes it appear in the outline - the dialog says so.
   - The dialog is one undo entry (or one per `Apply`); live preview is on by default with a
     checkbox.
 - **OOXML.** `w:pPr` children: `w:jc/@val` · `w:outlineLvl/@val` · `w:ind/@left,@right,@firstLine,
@@ -1844,14 +1844,14 @@ The library ships chrome **and** must let a host replace any part of it. The con
   until text effects ship), with a Preview pane.
 - **Font tab.** Font (western / "Complex scripts" / "Asian" family lists, with theme fonts at the
   top as they appear in the font combo) · Font style (Regular/Italic/Bold/Bold Italic derived from
-  the actual family's available faces — a family without a true italic must not offer one
+  the actual family's available faces - a family without a true italic must not offer one
   misleadingly) · Size (with the same ladder of sizes as Word, including the halved sizes) · Font
   colour (theme + standard + custom) · Underline style and underline colour · Effects
   (Strikethrough, Double strikethrough, Superscript, Subscript, Small caps, All caps, Hidden) ·
   Preview of a live sample using the selected run's text · `Set As Default`.
 - **Advanced tab.** Character Spacing (Scale %, Spacing: Normal/Expanded/Condensed with a `By`
   value, Position: Normal/Raised/Lowered with a `By` value) · Kerning ("Kerning for fonts" ≥ N pt)
-  · OpenType features (Ligatures, Number spacing, Number forms, and Stylistic sets) — the OpenType
+  · OpenType features (Ligatures, Number spacing, Number forms, and Stylistic sets) - the OpenType
   section may be `later` but the model must round-trip `w14:ligatures`, `w14:numSpacing`,
   `w14:numForm`, `w14:stylisticSet`.
 - **Rules & edge cases.**
@@ -1868,7 +1868,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     input rather than clamping.
   - Underline has ~17 distinct styles in `w:u/@val`; the dialog shows them all and the renderer must
     support each (a web editor that only supports single/double underline is immediately obvious to
-    an HR user who uses dotted underline for signature lines — a core template pattern for this
+    an HR user who uses dotted underline for signature lines - a core template pattern for this
     product).
   - `Set As Default` writes `w:docDefaults/w:rPrDefault/w:rPr` and confirms explicitly.
   - The Font dialog's changes apply to the **runs in the selection**; with a caret and no selection
@@ -1886,13 +1886,13 @@ The library ships chrome **and** must let a host replace any part of it. The con
 **Priority** core · **Effort** L
 
 - **Behaviour.** Tabs: **Margins**, **Paper**, **Layout**, and (in Word) `Print Options`.
-  - **Margins** — Top, Bottom, Left, Right, Gutter, Gutter position (Left/Top), Orientation
+  - **Margins** - Top, Bottom, Left, Right, Gutter, Gutter position (Left/Top), Orientation
     (Portrait/Landscape), Pages: Multiple pages (`Normal`, `Mirror margins`, `2 pages per sheet`,
     `Book fold`), Preview, `Set As Default`, `Apply to:` (`This section`, `This point forward`,
     `Whole document`).
-  - **Paper** — Paper size (a full list including the ISO A/B series, US sizes, and `Custom size`
+  - **Paper** - Paper size (a full list including the ISO A/B series, US sizes, and `Custom size`
     with width/height fields), Paper source, Preview, `Apply to`.
-  - **Layout** — Section start (New page/Continuous/Even page/Odd page/New column), Suppress
+  - **Layout** - Section start (New page/Continuous/Even page/Odd page/New column), Suppress
     endnotes, Vertical alignment (Top/Center/Justified/Bottom), Headers and footers (Different odd
     and even, Different first page, From edge: Header/Footer), Preview, `Apply to`.
 - **Rules & edge cases.**
@@ -1906,11 +1906,11 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Changing paper size does not rescale content; margins are re-validated against the new page size
     and a warning is shown if the text area becomes impossibly narrow.
   - `Mirror margins` interacts with the ruler's inside/outside markers (UI-10) and with
-    `w:ind/@start,@end` (UI-11) — all four surfaces must agree.
+    `w:ind/@start,@end` (UI-11) - all four surfaces must agree.
   - `Set As Default` writes the section properties into the **template's** defaults
     (`w:docDefaults` cannot hold `sectPr`; Word writes it to the attached template's first
     section). We write it to the document's default section stored in library settings and state
-    plainly that it applies to new documents in this session — a documented divergence, not a
+    plainly that it applies to new documents in this session - a documented divergence, not a
     silent one.
   - Section start values map to `w:sectPr/w:type/@val` (`nextPage`, `continuous`, `evenPage`,
     `oddPage`, `nextColumn`); `Continuous` on the first section is meaningless and is disabled.
@@ -1923,7 +1923,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     (UI-10).
   - Live preview is on: the whole document re-lays-out on field change (throttled).
   - The dialog is reachable from three places (ribbon launcher in Layout > Page Setup, double-click
-    on the ruler's text area, `File > Print > Page Setup`) — all open the same dialog.
+    on the ruler's text area, `File > Print > Page Setup`) - all open the same dialog.
 - **OOXML.** `w:sectPr/w:pgSz/@w,@h,@orient,@code` · `w:sectPr/w:pgMar/@top,@right,@bottom,@left,
   @gutter,@header,@footer` · `w:sectPr/w:type/@val` · `w:sectPr/w:titlePg` ·
   `w:sectPr/w:vAlign/@val` · `w:sectPr/w:headerReference/@w:type,@r:id` ·
@@ -1965,7 +1965,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     supported in the model and the dialog refuses to edit a nested instruction with a plain grid
     (it falls back to field-code editing). Nesting depth is not limited by us but is limited by the
     editor to a sane depth with a notice.
-  - Field shading: a view option (`Never` / `Always` / `When selected` — Word's default is "When
+  - Field shading: a view option (`Never` / `Always` / `When selected` - Word's default is "When
     selected") renders fields with a grey background; the shading is chrome and never printed. The
     option is in `View` and in the field's context menu (UI-28).
   - Field results carry formatting; updating a field preserves the formatting of the result runs
@@ -1997,7 +1997,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     different formatting. The implementation searches a **flattened logical text index** with a
     mapping back to (part, paragraph, run, offset) and highlights by splitting runs at match
     boundaries **only when the document is actually modified**. Highlighting must never mutate the
-    document — a read-only find that mutates runs will dirty the document and break undo.
+    document - a read-only find that mutates runs will dirty the document and break undo.
   - Replace splits runs at boundaries and applies the replacement using the formatting of the first
     matched run unless a `Replace with` format is specified; the surrounding runs' formatting is
     untouched. Getting this wrong restyles half the paragraph on every replace.
@@ -2029,7 +2029,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   `w:br`, `w:noBreakHyphen`, `w:sym`; scoped per part (`document.xml`, `headerN.xml`, `footerN.xml`,
   `footnotes.xml`, `comments.xml`, `w:txbxContent` inside `document.xml`). Replacement writes
   `w:r`/`w:t` splits; `xml:space="preserve"` is set on any `w:t` whose text has leading or trailing
-  whitespace — omitting it silently trims the user's spaces, a classic OOXML bug.
+  whitespace - omitting it silently trims the user's spaces, a classic OOXML bug.
 - **Commands / events.** `find.start({ query, options })`, `find.next()`, `find.replaceAll({ ... })`,
   `find.goto({ what, which })` → `find.state.changed`, `find.results.changed`, and document edit
   events for replacements.
@@ -2038,16 +2038,16 @@ The library ships chrome **and** must let a host replace any part of it. The con
 **Priority** important · **Effort** L
 
 - **Behaviour.** Tabs: **Table**, **Row**, **Column**, **Cell**, **Alt Text**.
-  - **Table** — Size (Preferred width with a units dropdown: Auto/Percent/`cm`/`in`; Measure in
+  - **Table** - Size (Preferred width with a units dropdown: Auto/Percent/`cm`/`in`; Measure in
     percent/cm), Alignment (Left/Center/Right), Text wrapping (None/Around), Indent from left,
     Borders and Shading… (a sub-dialog: Borders tab with preset/settings/style/colour/width, Page
     Border tab, Shading tab with fill and patterns), Options… (Default cell margins top/bottom/
     left/right, Default cell spacing, Allow spacing between cells, Automatically resize to fit
     contents, Set as default for all tables in this document), `Alt Text`.
-  - **Row** — Size (Row height, `At least`/`Exactly`, "Allow row to break across pages"),
+  - **Row** - Size (Row height, `At least`/`Exactly`, "Allow row to break across pages"),
     Options (Repeat as header row at the top of each page).
-  - **Column** — Column width in the document's unit.
-  - **Cell** — Size (Preferred width), Vertical alignment (Top/Center/Bottom), Options (Cell margins
+  - **Column** - Column width in the document's unit.
+  - **Cell** - Size (Preferred width), Vertical alignment (Top/Center/Bottom), Options (Cell margins
     with "Same as the whole table", Wrap text, Fit text), `Borders and Shading…`.
 - **Rules & edge cases.**
   - **Table width, column widths and cell widths interact**, and OOXML's contract is: `w:tblW` is a
@@ -2059,7 +2059,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   - Setting column widths updates `w:gridCol` **and** every `w:tcPr/w:tcW` in that column, keeping
     `w:tblW` = the sum, or the table renders differently in Word.
   - "%" widths write `w:w/@w:type="pct"` where the value is **fiftieths of a percent**
-    (`2500` = 50 %) — not hundredths, not a fraction. Verified in a test; this is a notorious
+    (`2500` = 50 %) - not hundredths, not a fraction. Verified in a test; this is a notorious
     conversion.
   - `Repeat as header row` writes `w:trPr/w:tblHeader` and takes effect on the layout engine's
     continuation pages. The dialog warns that the row must be the table's first row (or a
@@ -2070,7 +2070,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     overflows a page rather than splitting, which is what Word does and what users want for
     signature blocks.
   - Cell margins (`w:tcMar`) are set per cell; "Same as the whole table" clears them so the table
-    default applies — the dialog shows the resolved value in grey so the user is not editing blind.
+    default applies - the dialog shows the resolved value in grey so the user is not editing blind.
   - Borders: per-edge style/colour/width in `w:tcBorders`/`w:tblBorders`, with the "inside/outside"
     distinction and the `w:tcBorders` per-cell overrides. A border set on the table but overridden on
     a cell must be shown as overridden, not as the table value.
@@ -2096,7 +2096,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
 - **Behaviour.** Selecting text with the pointer shows the Word mini-toolbar floating above the
   selection, containing: font family, font size, grow font / shrink font, bold, italic, underline,
   strikethrough (optional), highlight colour, font colour, format painter, and (in the second
-  layout) alignment, bullets and indents — with a `…` opening the full Font/Paragraph dialogs.
+  layout) alignment, bullets and indents - with a `…` opening the full Font/Paragraph dialogs.
 - **States.** appears after pointer selection ends (never during the drag); fades out after
   `idleTimeout` (default 4 s) of no hover and no change; suppressed entirely by
   `miniToolbar: 'off'` or by the View-tab toggle; never appears for a caret-only selection unless the
@@ -2163,7 +2163,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
   optional icon, shortcut hint, disabled-with-reason, checked/radio state), submenus (open on hover
   after 300 ms or on click), a scrollable overflow when the menu exceeds the viewport, and a
   "recently used" ordering option (`menus.adaptive: false` by default, since adaptive menus
-  annoy users — Word made them optional for that reason).
+  annoy users - Word made them optional for that reason).
 - **Invocation.** `contextmenu` event (right-click), `Shift+F10`, the dedicated context-menu key,
   a long-press (500 ms, < 10 px movement) on touch, and a two-finger tap on some trackpads. Also
   invoked programmatically for the "floating text controls" gesture (UI-26).
@@ -2177,7 +2177,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     drag** for pointer input, so a right-drag does not open it mid-gesture; the browser's native
     `contextmenu` event is always `preventDefault()`ed within the editor, or the host page's menu
     appears over ours. **`preventDefault()` on `contextmenu` everywhere the editor owns the surface**
-    — the previous attempt's "right-click does nothing" complaint is often this one missing call.
+    - the previous attempt's "right-click does nothing" complaint is often this one missing call.
   - Positioning: at the pointer, offset 2 px; flip up when there is not room below, left when there
     is not room to the right; the menu is never clipped by an ancestor (portal) and never scrolls
     the page when it opens (no `scrollIntoView` on the container).
@@ -2186,7 +2186,7 @@ The library ships chrome **and** must let a host replace any part of it. The con
     closes and returns focus to the surface, and typing a letter jumps to the next item starting
     with it.
   - Dismissal: `Esc`, a click anywhere outside, scroll, window blur, or a document change that
-    invalidates the target (if the target object is deleted by another action, the menu closes —
+    invalidates the target (if the target object is deleted by another action, the menu closes -
     never leaves a menu pointing at a dead id).
   - The menu is announced with the correct `role="menu"`/`menuitem`/`menuitemcheckbox` and a
     `aria-label` naming the surface ("Picture menu", "Table menu", "Text menu").
@@ -2208,14 +2208,14 @@ surfaces is a defect against the original complaint.** All items come from the c
 (UI-27) and are trimmed by section priority when there is not enough vertical room.
 
 - **Text (in a paragraph, selection or caret).** Cut · Copy · Paste · Paste Options ▸ (Keep Source
-  Formatting / Merge Formatting / Keep Text Only) — separator — Font… · Paragraph… · Bullets ▸ ·
-  Numbering ▸ · Styles ▸ (the styles gallery as a submenu) — separator — Synonyms ▸ · Translate ▸
-  (host-provided; hidden when unavailable) — separator — Link (`Ctrl+K`) · Comment · New Comment —
-  separator — Insert ▸ (the Insert tab's most-used groups) · Delete · Select All — separator —
+  Formatting / Merge Formatting / Keep Text Only) - separator - Font… · Paragraph… · Bullets ▸ ·
+  Numbering ▸ · Styles ▸ (the styles gallery as a submenu) - separator - Synonyms ▸ · Translate ▸
+  (host-provided; hidden when unavailable) - separator - Link (`Ctrl+K`) · Comment · New Comment -
+  separator - Insert ▸ (the Insert tab's most-used groups) · Delete · Select All - separator -
   Format Painter · Clear Formatting.
   *Load-bearing rules:* the selection under the pointer is **preserved** (right-clicking inside a
   selection keeps it; right-clicking outside moves the caret there first, matching Word); the menu
-  is not shown for a right-click on a read-only region without disabling everything — in `read`
+  is not shown for a right-click on a read-only region without disabling everything - in `read`
   mode a reduced menu (Copy · Select All · Find · Translate) is shown instead.
 - **Image.** OBJ-32's list, plus OBJ-13's Change Picture ▸ and OBJ-14's Compress Pictures, and
   `Save as Picture…` (host hook), `Insert Caption…` (later), `Size and Position…`, `Wrap Text ▸`,
@@ -2224,45 +2224,45 @@ surfaces is a defect against the original complaint.** All items come from the c
   `Shape Outline ▸`, `Shape Effects ▸`, `Edit Points` (freeform only), `Set as Default Shape`, and
   for a connector `Re-route Connector` (later).
 - **Table.** Insert ▸ (Rows Above/Below, Columns Left/Right) · Delete ▸ (Cells, Rows, Columns,
-  Table) · Select ▸ (Cell, Row, Column, Table) — separator — Merge Cells · Split Cells… ·
-  Split Table — separator — Cell Alignment ▸ (a 3×3 grid submenu with live mini-previews) ·
-  Cell Margins ▸ · Text Direction ▸ · Distribute Rows Evenly · Distribute Columns Evenly —
-  separator — Borders and Shading… · Table Properties… — separator — Repeat Header Rows ·
-  Allow Row to Break Across Pages — separator — Table Alt Text…, plus `AutoFit ▸` (Contents /
+  Table) · Select ▸ (Cell, Row, Column, Table) - separator - Merge Cells · Split Cells… ·
+  Split Table - separator - Cell Alignment ▸ (a 3×3 grid submenu with live mini-previews) ·
+  Cell Margins ▸ · Text Direction ▸ · Distribute Rows Evenly · Distribute Columns Evenly -
+  separator - Borders and Shading… · Table Properties… - separator - Repeat Header Rows ·
+  Allow Row to Break Across Pages - separator - Table Alt Text…, plus `AutoFit ▸` (Contents /
   Window / Fixed Column Width).
   *Rules:* the menu is shown only when the pointer is inside a table; the `Insert`/`Delete`
   submenus operate on the **current cell/row/column of the pointer**, which is highlighted before
   the menu opens so the target is unambiguous. Nested tables resolve to the innermost table.
 - **Field.** Update Field (`F9`) · Edit Field… · Toggle Field Codes (`Shift+F9`) · Toggle All Field
-  Codes (`Alt+F9`) — separator — Cut · Copy · Paste — separator — Font… · Paragraph… —
-  separator — Convert Field to Text (destructive; requires confirmation and is one undo entry) —
-  separator — Field Shading ▸ (Never/Always/When selected) — separator — Lock Field · Unlink Field.
+  Codes (`Alt+F9`) - separator - Cut · Copy · Paste - separator - Font… · Paragraph… -
+  separator - Convert Field to Text (destructive; requires confirmation and is one undo entry) -
+  separator - Field Shading ▸ (Never/Always/When selected) - separator - Lock Field · Unlink Field.
   *Rules:* right-clicking a field targets the whole field, not the run under the pointer; a field in
   a `w:fldSimple` and a complex field present the same menu; `Convert Field to Text` keeps the
   **result** and removes the instruction, and it is the one place where a field is deliberately
   flattened.
 - **Page background** (the empty area around/below the page, and the page's own background).
-  Paste · Select All — separator — `Page Color ▸` · `Fill Effects…` · `Watermark ▸` (Custom
-  Watermark…, Remove Watermark, a gallery) — separator — `Page Borders…` — separator — Zoom ▸
-  (the zoom presets) · `Show Ruler` · `Show Gridlines` · `Show Navigation Pane` — separator —
+  Paste · Select All - separator - `Page Color ▸` · `Fill Effects…` · `Watermark ▸` (Custom
+  Watermark…, Remove Watermark, a gallery) - separator - `Page Borders…` - separator - Zoom ▸
+  (the zoom presets) · `Show Ruler` · `Show Gridlines` · `Show Navigation Pane` - separator -
   `Paragraph…` (when the pointer is over a page but outside the text, the caret is placed at the
   nearest text position so the command has a target).
   *Rules:* right-clicking the page's own background (outside the text area but on the page) is a
   distinct surface from right-clicking the pasteboard, and both are distinct from the text menu.
-  Page colour and borders write `w:background/@w:color` and `w:sectPr/w:pgBorders` — both must
+  Page colour and borders write `w:background/@w:color` and `w:sectPr/w:pgBorders` - both must
   round-trip, and neither is printed by default (the dialog says so).
-- **Header / footer.** Edit Header / Edit Footer · Close Header and Footer — separator —
-  Insert ▸ (Page Number, Date & Time, Quick Parts, Picture, Field…) — separator — Header & Footer
-  ▸ (the built-in header/footer gallery) — separator — Different First Page · Different Odd & Even
+- **Header / footer.** Edit Header / Edit Footer · Close Header and Footer - separator -
+  Insert ▸ (Page Number, Date & Time, Quick Parts, Picture, Field…) - separator - Header & Footer
+  ▸ (the built-in header/footer gallery) - separator - Different First Page · Different Odd & Even
   Pages (checkboxes writing `w:titlePg` and `w:settings/w:evenAndOddHeaders` plus the part
-  references) — separator — Link to Previous (writes/removes `w:headerReference` so the section
-  inherits the previous section's header — the concept HR users actually need when a contract has
-  a different first page) — separator — `Show Header/Footer Boundaries` — separator — Cut · Copy ·
+  references) - separator - Link to Previous (writes/removes `w:headerReference` so the section
+  inherits the previous section's header - the concept HR users actually need when a contract has
+  a different first page) - separator - `Show Header/Footer Boundaries` - separator - Cut · Copy ·
   Paste · Select All.
   *Rules:* right-clicking inside the header/footer area targets that part (`word/headerN.xml`); the
   ruler re-scopes to the header/footer's own margins; edits to a header are ordinary text edits and
   go through the normal text commands. A header with no part yet offers "Edit Header" which
-  **creates** the part (`r:id` in `w:headerReference/@w:type="default"` plus a new part and rel) —
+  **creates** the part (`r:id` in `w:headerReference/@w:type="default"` plus a new part and rel) -
   creating structure is a real edit and must be written to the file.
 - **Also required, though not in the original list** (each is cheap once UI-27 exists and their
   absence is felt): **ruler** (units, show ruler, tabs dialog), **status bar** (item visibility
@@ -2292,9 +2292,9 @@ surfaces is a defect against the original complaint.** All items come from the c
   - Panels never take the document selection away; interacting with a panel does not blur the
     editor's selection, and the editor's commands target the last document selection. Every panel
     that shows a document range keeps its **last valid** range and shows it as inactive when the
-    selection moves — a panel that silently acts on a stale range is dangerous.
+    selection moves - a panel that silently acts on a stale range is dangerous.
   - Panel resizing uses pointer capture and a keyboard alternative (`Tab` to the splitter, arrows to
-    resize) — required for accessibility, and cheap.
+    resize) - required for accessibility, and cheap.
   - Multiple panels in the sidebar have a tabbed or stacked layout (host option
     `sidebar: 'tabs' | 'stack'`); the default is `stack` with collapsible headers, which is what
     Word's task panes do.
@@ -2303,13 +2303,13 @@ surfaces is a defect against the original complaint.** All items come from the c
   - Panels are chrome slots: `panels: { navigation: renderer | null, styles: … }`. Replacing one is
     independent of the others.
   - Panels re-render from events, never poll the model; a panel's render must be O(changed) not
-    O(document) — the Styles panel on a 400-style document must open in < 100 ms.
+    O(document) - the Styles panel on a 400-style document must open in < 100 ms.
   - Panel content inherits `--docier-*` tokens and density.
 - **OOXML.** The Properties panel reads/writes `docProps/core.xml` (`dc:title`, `dc:creator`,
   `cp:lastModifiedBy`, `dc:subject`, `cp:keywords`, `dc:description`, `cp:category`, `cp:contentStatus`,
   `dcterms:created`, `dcterms:modified`) and `docProps/custom.xml` (`property` elements with
   `fmtid`/`pid`/`name`). Writing core properties must preserve the existing `<dcterms:created>`
-  and only update `<dcterms:modified>` — resetting the created date on every save is a real and
+  and only update `<dcterms:modified>` - resetting the created date on every save is a real and
   common bug.
 - **Commands / events.** `ui.panel.open/close/setWidth({ id, ... })` → `ui.chrome.state.changed`;
   `document.properties.set({ props })` → `document.properties.changed`.
@@ -2326,7 +2326,7 @@ surfaces is a defect against the original complaint.** All items come from the c
   - The outline is built from **two** sources, and both must be read: `w:pStyle` referencing a
     heading style (whose `w:pPr/w:outlineLvl` gives the level) and a direct
     `w:pPr/w:outlineLvl` on a body-styled paragraph. A paragraph with a heading style but an
-    overridden direct `outlineLvl` of 9 (body text) is **not** in the outline — Word's rule, and the
+    overridden direct `outlineLvl` of 9 (body text) is **not** in the outline - Word's rule, and the
     reason a naive "styles named Heading*" implementation produces a wrong outline.
   - The outline must also include paragraphs whose `outlineLvl` is set without a heading style (Word
     does), and must not include paragraphs hidden with `w:vanish` or inside deleted revisions.
@@ -2334,16 +2334,16 @@ surfaces is a defect against the original complaint.** All items come from the c
     picture shows a readable placeholder; a heading with a `w:numPr` shows the computed list number
     as part of the label (Word does), since HR documents use numbered headings.
   - Dragging a heading in the pane **moves the whole section** (the heading and its content up to the
-    next heading of the same or higher level) — this is a real, very useful Word behaviour and it is
+    next heading of the same or higher level) - this is a real, very useful Word behaviour and it is
     one of the few places where a drag in chrome changes the document. It must be one undo entry
     and must carry the moved paragraphs' `sectPr` correctly (a moved section must not lose its
     section properties or the page geometry changes unexpectedly). **If this cannot be made correct
-    in v1, the pane is read-only** (click to navigate only) rather than shipping a broken move —
+    in v1, the pane is read-only** (click to navigate only) rather than shipping a broken move -
     `priority: important`, with the move itself `later` if it cannot be validated.
   - The **Pages** tab renders page thumbnails from the layout engine at a fixed small scale, lazily
     as they scroll into view, re-rendered on layout invalidation with a debounce (a thumbnail
     re-render per keystroke is a performance trap).
-  - The **Results** tab groups matches by part ("Main Document", "Header 1", "Text Box 3") — this is
+  - The **Results** tab groups matches by part ("Main Document", "Header 1", "Text Box 3") - this is
     how a user discovers that the text they cannot replace is in a text box.
   - The pane is resizable, closable, and its width and active tab persist.
   - Selecting a heading in the pane selects the heading's text in the document (so a subsequent
@@ -2355,7 +2355,7 @@ surfaces is a defect against the original complaint.** All items come from the c
   - Accessibility: this pane is the primary navigation mechanism for a screen-reader user in a long
     document; it must announce levels and the current position.
 - **OOXML.** `w:pPr/w:pStyle/@w:val` → `w:styles/w:style/w:pPr/w:outlineLvl` (style-derived level) ·
-  direct `w:pPr/w:outlineLvl/@w:val` (0–8 = levels 1–9, 9 = body text) · `w:pPr/w:numPr` for the
+  direct `w:pPr/w:outlineLvl/@w:val` (0-8 = levels 1-9, 9 = body text) · `w:pPr/w:numPr` for the
   number label · page list from the layout engine's page map (spec 03).
 - **Commands / events.** `view.navigation.set({ visible, tab })`, `navigation.goToHeading({ id })`,
   `navigation.moveSection({ fromId, toIndex })` → `view.changed`, `document.structure.changed`.
@@ -2364,29 +2364,29 @@ surfaces is a defect against the original complaint.** All items come from the c
 **Priority** important · **Effort** L
 
 - **Behaviour.** Four modes, in the status bar and the View tab:
-  - **Print Layout** — pages with margins, headers/footers, floating objects at their true position,
+  - **Print Layout** - pages with margins, headers/footers, floating objects at their true position,
     the ruler, and full pagination. The default and the one the product's documents are authored in.
-  - **Web Layout** — a single continuous column the width of the editor, no page breaks, no
+  - **Web Layout** - a single continuous column the width of the editor, no page breaks, no
     margins, no ruler, no header/footer areas; wrapping objects still float but relative to the
     column. For on-screen reading and for hosts that embed the editor in a narrow container.
-  - **Draft** — a single column of text with a simplified layout: no floating objects (they are
+  - **Draft** - a single column of text with a simplified layout: no floating objects (they are
     listed as an inline marker "▣ Picture" at the anchor), no page breaks except explicit ones
     shown as a labelled line, no headers/footers, and an optional style-area panel on the left
     showing each paragraph's style name. Optimised for editing long text on a slow machine.
-  - **Read Mode** — a paginated, read-only, chrome-minimal view: no ribbon (a slim toolbar with
+  - **Read Mode** - a paginated, read-only, chrome-minimal view: no ribbon (a slim toolbar with
     `View → Edit Document` and a find box), columns reflowed to the viewport, no rulers, no
     selection handles, and object interaction reduced to selecting for copy. Editing commands are
     disabled with a reason, and `document.protection` (`w:documentProtection/@w:edit="readOnly"`)
     forces this mode.
 - **States.** Mode changes are view state, persisted in `w:settings/w:view` (`print` · `web` ·
-  `draft` · `normal`) — note `read` has **no `w:view` value** and is not persisted (Word does not
+  `draft` · `normal`) - note `read` has **no `w:view` value** and is not persisted (Word does not
   persist it either); we persist it in host settings only.
 - **Rules & edge cases.**
   - **Layout is re-run on a mode change** because the wrapping width and pagination differ, but
-    **nothing in the document changes** — no properties are written, no dirty flag, no undo entry.
+    **nothing in the document changes** - no properties are written, no dirty flag, no undo entry.
     A view mode that dirties the document is a defect.
   - Object **editability** per mode: Print and Web allow full object editing (Web positions
-    floating objects relative to the column, which changes their rendered position — the mode's
+    floating objects relative to the column, which changes their rendered position - the mode's
     status bar tooltip says so); Draft allows selecting an object and editing its properties but
     not dragging it on the page; Read forbids all object edits.
   - Draft's inline object markers are chrome: they must never be written to the document, appear in
@@ -2410,7 +2410,7 @@ surfaces is a defect against the original complaint.** All items come from the c
 ## UI-32 · Empty, first-run and error states
 **Priority** core · **Effort** M
 
-Every state below is a designed state with defined content and a defined command path out of it —
+Every state below is a designed state with defined content and a defined command path out of it -
 not a blank rectangle and not a raw exception.
 
 - **Empty document.** A new document is `<w:body>` with one empty `<w:p>` carrying the `Normal`
@@ -2427,9 +2427,9 @@ not a blank rectangle and not a raw exception.
   chrome, are disabled by `chrome.hints: false`, and never block interaction.
 - **Loading.** A document is parsed incrementally and the first page renders before the whole
   document is laid out: a skeleton page with a progress indicator in the status bar, cancellable.
-  **The editor must never show a blank white area with no feedback** — the previous attempt's
+  **The editor must never show a blank white area with no feedback** - the previous attempt's
   perceived slowness was largely an unlabelled wait.
-- **Errors and unsupported content** — each renders an **inline, selectable, preserved placeholder**
+- **Errors and unsupported content** - each renders an **inline, selectable, preserved placeholder**
   with a specific message and an "object not rendered, saved unchanged" guarantee:
   - Unsigned/unreadable OOXML construct → "This content cannot be displayed. It will be preserved
     when you save." (with the part and element name in a details disclosure).
@@ -2438,7 +2438,7 @@ not a blank rectangle and not a raw exception.
   - EMF/WMF/TIFF that the browser cannot decode → a placeholder showing the image type and size,
     with "Open in Word to view" guidance, **preserved on save**.
   - A font referenced by the document that is not available → rendered with the fallback chain, and
-    a non-blocking notice listing the missing fonts and offering "Substitute" — degrading silently
+    a non-blocking notice listing the missing fonts and offering "Substitute" - degrading silently
     changes pagination, which is worse than a notice.
   - A corrupt or unparseable DOCX → the editor does not mount a partial document; it shows an error
     surface naming the failing part and offering the raw bytes for download. Never a partially
@@ -2539,4 +2539,4 @@ as round-tripping drawn geometry. Bezier-handle editing (OBJ-17) and the gradien
    the v1 behaviour of a connector whose shape has moved (it stays where it was drawn) is a
    deliberate, user-visible limitation rather than a bug. If the product owner considers a visibly
    detached connector unacceptable in v1, OBJ-38 must be promoted and the layout engine must expose
-   connection-site geometry earlier than planned — that trade-off is not mine to make.
+   connection-site geometry earlier than planned - that trade-off is not mine to make.

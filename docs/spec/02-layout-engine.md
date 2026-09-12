@@ -1,9 +1,9 @@
-# 02 — Layout, Pagination & Typography Engine
+# 02 - Layout, Pagination & Typography Engine
 
 | | |
 |---|---|
 | **Spec id** | `02-layout-engine` |
-| **Library** | docier — framework-agnostic TypeScript DOCX editor |
+| **Library** | docier - framework-agnostic TypeScript DOCX editor |
 | **Domain** | Layout, pagination, typography |
 | **Status** | Draft for implementation |
 | **Depends on** | `01-document-model` (OOXML ingest, normalized tree), `03-editing-commands`, `04-rendering`, `05-export` |
@@ -15,15 +15,15 @@
 ## 0. The failure this document exists to prevent
 
 A previous attempt at this product edited the document in a `contenteditable` and kept a hand-maintained
-CSS mirror of the layout engine's constants. Screen and PDF diverged continuously — unit systems disagreed,
-fonts differed, margins collapsed differently, list spacing differed — and **nothing detected it**. Bugs were
+CSS mirror of the layout engine's constants. Screen and PDF diverged continuously - unit systems disagreed,
+fonts differed, margins collapsed differently, list spacing differed - and **nothing detected it**. Bugs were
 found by users, on documents, in production.
 
 The root cause was not any single wrong constant. It was that **two layout engines existed** and there was no
 mechanism that could notice. This spec's first job is architectural: make a second layout engine
 structurally impossible, and make any residual divergence loud.
 
-Everything else in this document — line breaking, tables, floats, footnotes — is a feature catalogue that
+Everything else in this document - line breaking, tables, floats, footnotes - is a feature catalogue that
 hangs off that architecture.
 
 ---
@@ -82,7 +82,7 @@ LayoutResult = {
 Why millipoints and not twips (Word's own 1/1440") or EMU (1/914400") or px:
 
 - Twips are too coarse for glyph advances: a 12 pt DejaVu Sans `m` is 13.05 pt = 260.9 twips. Rounding every
-  glyph advance to a twip accumulates ~0.5 twip/glyph, ≈ 1.5 pt across an 80-character line — a visible,
+  glyph advance to a twip accumulates ~0.5 twip/glyph, ≈ 1.5 pt across an 80-character line - a visible,
   cascading reflow.
 - EMU is fine in precision but its scale factor to pt (12700) makes every conversion a division with no exact
   binary representation, and i32 overflows on page-height math (a 792 pt page is 10 M EMU; summing with
@@ -107,7 +107,7 @@ point (fr)     × 1000
 **Exactly once, in the renderer, in one function:**
 
 ```ts
-// src/layout/units.ts — the only place px exists in the codebase
+// src/layout/units.ts - the only place px exists in the codebase
 const CSS_PX_PER_PT = 96 / 72;
 export const toCssPx = (mp: Mp, zoom: number): number =>
   (mp / 1000) * CSS_PX_PER_PT * zoom;
@@ -133,7 +133,7 @@ invalidates a `LayoutResult`.**
   `documentHash` is identical, because zoom is not an input to the engine at all.
 - Zoom is **not** implemented as CSS `transform: scale()` on the page element. A transform would (a) re-rasterize
   or blur text depending on engine and compositing, (b) break caret/hit-test math unless every input is
-  un-transformed by hand — i.e. a second coordinate system, which is the thing we have banned, and (c) break
+  un-transformed by hand - i.e. a second coordinate system, which is the thing we have banned, and (c) break
   `position: fixed` overlays and native scroll into-view. Pinch-zoom may show a **transient** CSS transform
   preview for smoothness, but on settle the renderer recomputes at the new `zoom` and drops the transform.
   Layout is cached, so a zoom change is a re-paint of visible pages only.
@@ -163,16 +163,16 @@ unsatisfying answer: **the browser's line breaking cannot happen**, so it cannot
 The realistic causes of a real disagreement are all *measurement* bugs, and all are caught at measure time or
 detect time, in this order of likelihood:
 
-1. **Font substitution** — the DOCX names `Times New Roman`, the machine lacks it, the browser silently picks
+1. **Font substitution** - the DOCX names `Times New Roman`, the machine lacks it, the browser silently picks
    something else. Prevented by the font registry (§1.8): the engine resolves every DOCX font name to a
    concrete bundled font *before* measuring, records the substitution, and reports it. The renderer emits the
    resolved family, not the DOCX name.
-2. **Missing glyphs** — a character absent from the resolved font. Detected during shaping (`.notdef`
+2. **Missing glyphs** - a character absent from the resolved font. Detected during shaping (`.notdef`
    coverage check) and raised as `MissingGlyph`, never silently tofu'd with a different font's advance.
-3. **Kerning / feature mismatch** — `w:kern` above threshold, or a browser applying `liga`/`kern` we didn't.
+3. **Kerning / feature mismatch** - `w:kern` above threshold, or a browser applying `liga`/`kern` we didn't.
    The renderer pins `font-kerning`, `font-variant-ligatures` and `font-feature-settings` to the engine's
    shaping configuration, and shaping is done by the engine from the font binary, not by `measureText`.
-4. **Sub-pixel rounding** — the only irreducible residue; bounded per run, and the detector's tolerance.
+4. **Sub-pixel rounding** - the only irreducible residue; bounded per run, and the detector's tolerance.
 
 ### 1.7 What CSS is allowed to do
 
@@ -201,7 +201,7 @@ The engine measures and the browser paints **the same bytes**, or nothing is gua
 - A DOCX-embedded font (`w:embedRegular`/`w:embedBold`/`w:embedItalic` inside `w:fontTable`) is extracted and
   registered; obfuscated (`w:fontKey`, the 32-byte XOR header) fonts are de-obfuscated.
 - The host application may register additional fonts. The registry is an **input to the layout engine and part
-  of `documentHash`** — a font change invalidates layout, a zoom change does not.
+  of `documentHash`** - a font change invalidates layout, a zoom change does not.
 - Unresolvable font names resolve through an explicit, configurable substitution table (e.g.
   `Times New Roman → Liberation Serif`), never through browser fallback. Every substitution is a diagnostic.
 - The presentation layer (`--doc-font`) and the layout engine read the same registry. There is no second font
@@ -213,21 +213,21 @@ The engine measures and the browser paints **the same bytes**, or nothing is gua
 
 Layout is a **deterministic, topologically ordered pipeline of 15 passes**, with **four bounded fixed-point
 loops** where Word itself has circular dependencies. Every pass is a pure function of the model plus the
-outputs of the passes it depends on. Passes are individually cacheable and individually invalidatable — that
+outputs of the passes it depends on. Passes are individually cacheable and individually invalidatable - that
 is what makes incremental relayout (LE-064) possible.
 
 ### 2.1 The passes
 
 | # | Pass | Consumes | Produces | Depends on |
 |---|---|---|---|---|
-| **P0** | **Ingest & style resolution** | OOXML tree, styles part, theme, numbering, settings | Normalized tree with *flat, fully resolved* property bags; no style indirection remains | — |
+| **P0** | **Ingest & style resolution** | OOXML tree, styles part, theme, numbering, settings | Normalized tree with *flat, fully resolved* property bags; no style indirection remains | - |
 | **P1** | **Sectioning & page setup** | P0 | Ordered sections: page size, orientation, margins, gutter, columns, header/footer refs, page borders, `vAlign`, line-numbering config, per-section block ranges | P0 |
 | **P2** | **Font resolution & metrics** | P0, P1, font registry, embedded fonts | Concrete font per character run; `FontMetrics` (ascent, descent, lineGap, capHeight, advances, kern pairs) parsed from the binaries | P0, P1 |
 | **P3** | **Shaping & inline atomization** | P0, P2 | `InlineAtom[]` per paragraph: glyph clusters with advances, plus tabs, breaks, inline drawings, note refs, field results. Every atom has a measured `xAdvance` in mp | P2 |
 | **P4** | **Bidi & paragraph direction** | P0, P3 | Per-atom Unicode bidi level; paragraph base direction; logical→visual run order (applied at line assembly) | P3 |
-| **P5** | **Intrinsic width measurement** | P3, P4 | Per block: `minWidth` (widest unbreakable unit) and `preferredWidth` (unwrapped). No line breaking — pure shaping arithmetic | P3, P4 |
+| **P5** | **Intrinsic width measurement** | P3, P4 | Per block: `minWidth` (widest unbreakable unit) and `preferredWidth` (unwrapped). No line breaking - pure shaping arithmetic | P3, P4 |
 | **P6** | **Table column resolution** | P5 (recursively), P1 | Every table's grid resolved to concrete column widths in mp; cell content boxes fixed | P5 |
-| **P7** | **Header/footer layout** | P3–P6 applied to each header/footer story, P1 | Per (section × page-kind) header/footer fragments + **stack heights** | P3–P6 |
+| **P7** | **Header/footer layout** | P3-P6 applied to each header/footer story, P1 | Per (section × page-kind) header/footer fragments + **stack heights** | P3-P6 |
 | **P8** | **Content box resolution** | P1, P7 | Body content box **per page kind** (first / even / odd): top and bottom displaced by actual header/footer heights | P7 |
 | **P9** | **Line breaking** | P3, P4, P5, P8; **loop L1** with P10 | `LineFragment`s: atom ranges, break positions, line widths, caret stops | P8 |
 | **P9a** | *provisional break* (no float exclusions) | | | |
@@ -237,9 +237,9 @@ is what makes incremental relayout (LE-064) possible.
 | **P11** | **Line assembly** | P9, P10 | Baseline y per line; line advance from line-height rules; inter-atom x positions in visual order; per-line ascent/descent | P9c |
 | **P12** | **Justification** | P11 | Final x positions with distributed space; exact right-edge landing; alignment per line | P11 |
 | **P13** | **Block flow & pagination** | P11, P12, P5, P6; **loop with P14** | Vertical machine: paragraph spacing, keeps, widow/orphan, page/column breaks, table row placement and row splitting, footnote reservation. Assigns every fragment to a page + region | P12 |
-| **P14** | **Footnote/endnote placement** *(loop L2)* | P13, P3–P12 applied to note stories | Note-area fragments per page; displaced body lines when the note area overflows | P13 |
+| **P14** | **Footnote/endnote placement** *(loop L2)* | P13, P3-P12 applied to note stories | Note-area fragments per page; displaced body lines when the note area overflows | P13 |
 | **P15** | **Section balancing & break types** | P13, P14 | Column balancing for continuous sections, even/odd-page forcing, section-level vertical alignment | P14 |
-| **P16** | **Page-count convergence** *(loop L3)* | P7, P13–P15 | Header/footer heights and field widths re-resolved against the real page count | P15 |
+| **P16** | **Page-count convergence** *(loop L3)* | P7, P13-P15 | Header/footer heights and field widths re-resolved against the real page count | P15 |
 | **P17** | **Finalization** | all | Immutable `LayoutResult`, indices, diagnostics, hash, per-page dirty diff vs the previous version | all |
 
 ### 2.2 Why this order (the dependency edges that force it)
@@ -272,7 +272,7 @@ Edges that are non-obvious and must not be "optimized" away:
    limits, not on width resolution failure.
 4. **Headers (P7) before the content box (P8) before body line breaking (P9).** A header taller than its
    margin area displaces the body's top edge, so the body's available width is not knowable until the header
-   is laid out. Header height is content-dependent and **page-kind-dependent** — first-page and even-page
+   is laid out. Header height is content-dependent and **page-kind-dependent** - first-page and even-page
    headers can have different heights, so the content box is computed **per page kind**, not per section.
    This is a real Word behaviour and a common source of "we're one line off" bugs.
 5. **Anchored floats (P10) inside the breaking pass (P9).** A square-wrapped image shrinks the lines beside
@@ -281,7 +281,7 @@ Edges that are non-obvious and must not be "optimized" away:
    to *line* or *paragraph* can move; anchors relative to *page*, *margin* or *column* have positions
    independent of text and are resolved before the provisional break.
 6. **Justification (P12) after line assembly (P11).** Justification distributes space *within* the line's
-   already-chosen atom range. It can never change the range — a justified line that would overflow is a
+   already-chosen atom range. It can never change the range - a justified line that would overflow is a
    line-breaking bug, not a justification bug.
 7. **Pagination (P13) after justification (P12).** Pagination consumes *heights*, and heights come from
    assembled lines. Justification does not change height, so P12 and P13 could theoretically be swapped; they
@@ -305,19 +305,19 @@ emits a diagnostic and freezes its last state rather than freezing the editor.
 |---|---|---|---|
 | **L1** Float exclusions | P9a ⇄ P10 ⇄ P9c | Provisional break → place anchors → compute exclusion bands → re-break only paragraphs whose line bands intersect a band. Max 3 iterations; anchor positions freeze after iteration 2 | Place floats at their final iteration positions, keep the last break, emit `FLOAT_UNSTABLE` with the offending anchor ids |
 | **L2** Footnote displacement | P13 ⇄ P14 | Lay out body → place notes for the page → if body+notes exceed the content height, move the minimum number of body lines (carrying their notes) to the next page. Max 4 iterations per page | Accept overflow onto the following page's note area with a continuation separator (Word does this too), emit `NOTE_OVERFLOW` |
-| **L3** Page-count/header | P16 ⇄ P7/P13 | If any header/footer field width or auto-sized element depends on the page count, re-run P7→P15 with the new count. Max 3 iterations | Use the last iteration, emit `PAGECOUNT_UNSTABLE` (Word's own "1 of 1 until you print" behaviour) — this is a real Word-observable state, not a bug |
+| **L3** Page-count/header | P16 ⇄ P7/P13 | If any header/footer field width or auto-sized element depends on the page count, re-run P7→P15 with the new count. Max 3 iterations | Use the last iteration, emit `PAGECOUNT_UNSTABLE` (Word's own "1 of 1 until you print" behaviour) - this is a real Word-observable state, not a bug |
 | **L4** Incremental resync | LE-064 | Not a layout loop but a scheduling loop: re-run the dirty suffix until a page whose fragment set is identical to the previous version is reached | Stop at the document end; re-publish the whole tail |
 
 ### 2.4 Pass cost and what a single keystroke re-runs
 
 | Scenario | Passes re-run |
 |---|---|
-| Type one character in a paragraph | P3 (one paragraph) → P9 (one paragraph) → P11–P12 (one paragraph). Then, asynchronously: P13 from that point, P14–P17 as needed |
+| Type one character in a paragraph | P3 (one paragraph) → P9 (one paragraph) → P11-P12 (one paragraph). Then, asynchronously: P13 from that point, P14-P17 as needed |
 | Change a run's bold | P3 → P9 → P11 → P12 for the paragraph, then forward pagination |
-| Change a cell's text | P5 → P6 for the table → P9–P12 for the cell → P13 row heights |
+| Change a cell's text | P5 → P6 for the table → P9-P12 for the cell → P13 row heights |
 | Change page margins | P7 → P8 → everything |
 | Change a font in the registry | P2 → everything |
-| Change the header text | P3–P7 (header story) → P8 → P9 forward (content box changed) → everything below |
+| Change the header text | P3-P7 (header story) → P8 → P9 forward (content box changed) → everything below |
 
 The invariant that protects typing latency: **paragraph-local relayout is synchronous and always
 correct; pagination is asynchronous and eventually consistent** (LE-064).
@@ -326,16 +326,16 @@ correct; pagination is asynchronous and eventually consistent** (LE-064).
 
 ## 3. Feature catalogue
 
-Field legend — **Pass**: pipeline pass from §2. **OOXML**: the element/attribute that carries the behaviour.
+Field legend - **Pass**: pipeline pass from §2. **OOXML**: the element/attribute that carries the behaviour.
 **Pri**: `core` (blocks the MVP / is required for Word fidelity on ordinary HR documents) · `important`
 (needed for real documents, ships shortly after) · `later` (rare in the target corpus, or explicitly out of
-the first release). **Effort**: S (< 1 week) · M (1–3 weeks) · L (3–6 weeks) · XL (> 6 weeks).
+the first release). **Effort**: S (< 1 week) · M (1-3 weeks) · L (3-6 weeks) · XL (> 6 weeks).
 
 ### A. Truth model and guardrails
 
 ---
 
-**LE-001 — Millipoint coordinate system and determinism contract**
+**LE-001 - Millipoint coordinate system and determinism contract**
 **Pass** all · **OOXML** all measurement attributes · **Pri** core · **Effort** S
 
 - Every geometric value in `LayoutResult` is an integer `Mp` (1/1000 pt). Floats are permitted only inside
@@ -349,11 +349,11 @@ the first release). **Effort**: S (< 1 week) · M (1–3 weeks) · L (3–6 week
   `documentHash` excludes zoom, viewport size, `devicePixelRatio`, selection and locale; `documentHash`
   includes the font registry, the compat flags, and every resolved style.
 - Edge cases: negative indents produce negative `Mp`; i32 is sufficient for any page up to 100 000 pt; no
-  `Infinity`/`NaN` may appear in a result — a producing pass must throw instead.
+  `Infinity`/`NaN` may appear in a result - a producing pass must throw instead.
 
 ---
 
-**LE-002 — The DOM renders from the layout result (no browser flow)**
+**LE-002 - The DOM renders from the layout result (no browser flow)**
 **Pass** P17 / renderer · **OOXML** n/a · **Pri** core · **Effort** M
 
 - The page surface is built as: page container (`position: relative`, explicit `width`/`height` from
@@ -373,20 +373,20 @@ the first release). **Effort**: S (< 1 week) · M (1–3 weeks) · L (3–6 week
 
 ---
 
-**LE-003 — Paint-only CSS contract, enforced by lint**
+**LE-003 - Paint-only CSS contract, enforced by lint**
 **Pass** renderer · **OOXML** n/a · **Pri** core · **Effort** S
 
 - The allowed property list of §1.7 is codified in `stylelint` config for `src/render/**`. Forbidden:
   `text-align`, `text-indent`, `float`, `letter-spacing`, `word-spacing`, `hyphens`, `white-space` other than
   `pre`, `margin`, `padding`, `width: auto`, `line-height: normal`, and all layout containers.
 - An ESLint `no-restricted-syntax` rule forbids arithmetic on layout numbers outside `units.ts` (the
-  `/1000`, `/750`, `*0.75` family) — this is what prevents a second unit system from being reintroduced.
+  `/1000`, `/750`, `*0.75` family) - this is what prevents a second unit system from being reintroduced.
 - A repository test scans the renderer package for these patterns and fails the build. Removing the check is
   a spec violation, not a refactor.
 
 ---
 
-**LE-004 — Zoom as a pure paint scale (type scales with the page)**
+**LE-004 - Zoom as a pure paint scale (type scales with the page)**
 **Pass** renderer · **OOXML** n/a · **Pri** core · **Effort** S
 
 - Zoom is one scalar passed to `toCssPx` for geometry **and** `font-size`, so glyphs scale with the page and
@@ -399,11 +399,11 @@ the first release). **Effort**: S (< 1 week) · M (1–3 weeks) · L (3–6 week
   transform math.
 - Edge case: at very small zoom, `toCssPx` may yield sub-pixel box sizes; boxes are never rounded to whole px
   (rounding positions is how a 1 px accumulation across a page appears), only the browser's compositor
-  rounding applies, and it applies to each box independently — no accumulation.
+  rounding applies, and it applies to each box independently - no accumulation.
 
 ---
 
-**LE-005 — Divergence detector (dev + CI)**
+**LE-005 - Divergence detector (dev + CI)**
 **Pass** P17 + renderer · **OOXML** n/a · **Pri** core · **Effort** M
 
 The direct answer to "nothing detected it".
@@ -422,7 +422,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-006 — PDF parity by construction**
+**LE-006 - PDF parity by construction**
 **Pass** P17 / export · **OOXML** n/a · **Pri** core · **Effort** M
 
 - The PDF writer receives the same `LayoutResult` object the DOM renderer received. It never re-shapes, never
@@ -436,7 +436,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-007 — Engine-derived caret, selection and hit testing**
+**LE-007 - Engine-derived caret, selection and hit testing**
 **Pass** P9/P11 + services · **OOXML** n/a · **Pri** core · **Effort** M
 
 - Caret stops are produced by the line breaker (LE-023): for every inter-atom boundary, a stop with x (from
@@ -458,7 +458,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-008 — Style resolution to flat property bags**
+**LE-008 - Style resolution to flat property bags**
 **Pass** P0 · **OOXML** `w:styles`, `w:docDefaults`, `w:latentStyles`, `w:basedOn`, `w:link`,
 `w:tblStylePr`, `w:pPr`, `w:rPr`, `w:theme` · **Pri** core · **Effort** L
 
@@ -483,7 +483,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-009 — Settings and compatibility flags that change layout**
+**LE-009 - Settings and compatibility flags that change layout**
 **Pass** P0 · **OOXML** `w:settings` · **Pri** core · **Effort** M
 
 - Consumed: `w:defaultTabStop` (twips), `w:autoHyphenation`, `w:hyphenationZone`, `w:consecutiveHyphenLimit`,
@@ -500,32 +500,32 @@ The direct answer to "nothing detected it".
   listed in a single `UNSUPPORTED_COMPAT` table with a diagnostic when present, so the omissions are explicit
   rather than accidental.
 - Edge case: `w:suppressTopSpacing` at the top of a page removes a paragraph's space-before only for the
-  first paragraph of the body — not for the first paragraph after a page break in the middle of a document
+  first paragraph of the body - not for the first paragraph after a page break in the middle of a document
   unless `suppressSpBfAfterPgBrk` is set. These two flags are separate and commonly confused.
 
 ---
 
-**LE-010 — Romanian and Russian text normalization (layout-visible)**
+**LE-010 - Romanian and Russian text normalization (layout-visible)**
 **Pass** P0 · **OOXML** `w:lang`, `w:rFonts` · **Pri** core · **Effort** S
 
 - **Romanian**: normalize the legacy cedilla forms U+015F/U+0163 (ş ţ) to the correct comma-below U+0219/U+021B
   (ș ț) at ingest **only when the resolved language is `ro-*` and the character is not part of a protected
   token**, recording the change as a `NormalizationNote`. This is invisible to layout only if the font
-  covers both; DejaVu Sans does, so width is identical, but the rendered glyph differs — hence the note and
+  covers both; DejaVu Sans does, so width is identical, but the rendered glyph differs - hence the note and
   a report to the host app so the tokenizer's output can be fixed at source rather than at every save.
 - **Russian**: preserve `ё`/`Ё` exactly as authored (never fold to е); hyphenation and case operations are
   `ё`-aware. Record `w:lang w:val="ru-RU"` for hyphenation dictionary selection.
 - Script itemization for mixed Cyrillic/Latin runs: a Cyrillic character inside a run whose `w:rFonts`
   `w:cs` differs from `w:ascii` resolves against `w:cs`; without this, a font that covers Latin but not
-  Cyrillic produces tofu on every Russian document — and with browser fallback, produces *a different width*,
+  Cyrillic produces tofu on every Russian document - and with browser fallback, produces *a different width*,
   which is worse.
 - Edge cases: NBSP (U+00A0) and word joiner (U+2060) used inside Romanian/Russian phrases must survive
-  normalization untouched (they are line-break control, not text — see LE-024); a token placeholder from the
+  normalization untouched (they are line-break control, not text - see LE-024); a token placeholder from the
   tokenization module is a single unbreakable atom and is never normalized.
 
 ---
 
-**LE-011 — Numbering and list geometry resolution**
+**LE-011 - Numbering and list geometry resolution**
 **Pass** P0 (consumed by P3, P9) · **OOXML** `w:numbering`, `w:abstractNum`, `w:lvl`,
 `w:lvlOverride`, `w:numPr`, `w:numFmt`, `w:lvlText`, `w:lvlJc`, `w:suff`, `w:startOverride` · **Pri** core ·
 **Effort** L
@@ -534,14 +534,14 @@ The direct answer to "nothing detected it".
   previous implementation got wrong ("list spacing differed").
 - Resolve per level: `w:ind` on the level's `w:pPr` gives the number's x (left/hanging) and the text's x;
   `w:lvlJc` (left/center/right) positions the number within the gap; `w:suff` (tab/space/nothing) determines
-  what follows the number — `tab` advances to the next tab stop **after** the hanging indent position, which
+  what follows the number - `tab` advances to the next tab stop **after** the hanging indent position, which
   is the classic "why is my list text 0.25 in off" bug.
 - `w:lvlText` is assembled from `%1`..`%9` placeholders with per-level `w:numFmt` (decimal, lowerLetter,
   upperRoman, bullet with a literal character, `ro`/`ru` locale-aware formats), producing a **numbered run**
   that occupies real width and is measured like any other text.
 - Numbering restarts: `w:startOverride` on `w:num`, `w:lvlRestart`, and the implicit restart when a
   higher-level counter increments. A wrong counter value changes the number's digit count, which changes a
-  hanging-indent list's text start — layout is affected, so counter resolution belongs in P0, not in a
+  hanging-indent list's text start - layout is affected, so counter resolution belongs in P0, not in a
   separate "numbering module" consultable later.
 - Bullets are characters from a symbol font (Symbol/Wingdings). The font registry maps them to a bundled
   glyph source (LE-013), because a missing bullet glyph is the single most common all-documents-are-wrong
@@ -549,7 +549,7 @@ The direct answer to "nothing detected it".
 - Edge cases: a paragraph with `w:numPr` referencing a missing `w:numId` (fall back to no numbering,
   diagnostic); `w:numId=0` means "no numbering"; a list item inside a table cell continues the numbering of
   the surrounding list unless `w:lvlRestart` says otherwise; 9-level nesting depth limit; a numbered list
-  whose number is wider than its hanging indent overlaps the text (Word does not clip it — mirror that).
+  whose number is wider than its hanging indent overlaps the text (Word does not clip it - mirror that).
 
 ---
 
@@ -557,7 +557,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-012 — Font registry and deterministic resolution**
+**LE-012 - Font registry and deterministic resolution**
 **Pass** P2 · **OOXML** `w:fontTable`, `w:rFonts`, `w:theme`, `w:altName`, `w:panose1`, `w:charset`,
 `w:family` · **Pri** core · **Effort** M
 
@@ -576,7 +576,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-013 — Embedded and obfuscated fonts**
+**LE-013 - Embedded and obfuscated fonts**
 **Pass** P2 · **OOXML** `w:embedRegular`, `w:embedBold`, `w:embedItalic`, `w:embedBoldItalic`,
 `w:fontKey`, `w:embedTrueType`/`w:embedSystemFonts` in `w:settings` · **Pri** important · **Effort** M
 
@@ -587,13 +587,13 @@ The direct answer to "nothing detected it".
   emit a diagnostic. This is a legal posture, not a technical one, and it must be explicit.
 - Fonts referenced but not embedded resolve through LE-012.
 - Edge cases: an embedded font that fails to parse falls back with a diagnostic rather than throwing; a
-  subsetted embedded font (`w:subsetted="1"`) has no complete `cmap` — treat it as display-only and prefer a
+  subsetted embedded font (`w:subsetted="1"`) has no complete `cmap` - treat it as display-only and prefer a
   bundled substitute for measurement if the substitute's metrics are within tolerance, otherwise use it and
   flag the risk.
 
 ---
 
-**LE-014 — Metric extraction from the font binary**
+**LE-014 - Metric extraction from the font binary**
 **Pass** P2 · **OOXML** n/a (font tables) · **Pri** core · **Effort** L
 
 - Parse the sfnt directly: `head.unitsPerEm`, `hhea`(ascent, descent, lineGap, numberOfHMetrics), `hmtx`
@@ -615,15 +615,15 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-015 — Shaping, kerning and ligatures**
+**LE-015 - Shaping, kerning and ligatures**
 **Pass** P3 · **OOXML** `w:kern`, `w:rFonts` · **Pri** core · **Effort** L
 
-- Shaping is done by the engine from the font binary — **not** by `CanvasRenderingContext2D.measureText`.
+- Shaping is done by the engine from the font binary - **not** by `CanvasRenderingContext2D.measureText`.
   `measureText` results differ across engines and platforms, cannot run in a worker without an
   `OffscreenCanvas` font-loading dance, and cannot run in Node for golden tests. All three matter.
 - Default feature set: `kern` **off** unless `w:kern w:val` is set *and* the font size ≥ the threshold (Word's
   documented behaviour), `liga`/`clig`/`dlig` **off** (Word does not enable discretionary ligatures), `calt`
-  on, `smcp` off (small caps are synthesised — LE-017), `tnum`/`pnum` per `w:rFonts`-adjacent settings if
+  on, `smcp` off (small caps are synthesised - LE-017), `tnum`/`pnum` per `w:rFonts`-adjacent settings if
   present.
 - Kerning pairs come from `kern` format 0 and, when present, `GPOS` PairPos format 1/2 for the scripts in
   scope. Since ro/ru/en are all simple alphabetic scripts, this is tractable; complex-script shaping
@@ -637,7 +637,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-016 — Measurement and shaping cache**
+**LE-016 - Measurement and shaping cache**
 **Pass** P3 · **OOXML** n/a · **Pri** core · **Effort** M
 
 - Two-level cache. **Shaping cache**: key `(fontFileHash, text, fontSizeMp, featuresHash)` →
@@ -653,7 +653,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-017 — Run metric properties: spacing, scale, position, caps, hidden, vertAlign**
+**LE-017 - Run metric properties: spacing, scale, position, caps, hidden, vertAlign**
 **Pass** P3 · **OOXML** `w:spacing`, `w:w`, `w:position`, `w:caps`, `w:smallCaps`, `w:vanish`,
 `w:vertAlign`, `w:fitText` · **Pri** core · **Effort** M
 
@@ -663,7 +663,7 @@ The direct answer to "nothing detected it".
 - `w:position` (half-points, may be negative) raises/lowers the glyph baseline without changing the line
   height and **without** changing advances (Word's raised text can extend the line box only in specific
   cases; we mirror the common case: no height change).
-- `w:smallCaps` synthesises small caps at the font's `smcp` if available, else at a **scaled font size** —
+- `w:smallCaps` synthesises small caps at the font's `smcp` if available, else at a **scaled font size** -
   the scale factor is a fixed 0.8 with the real cap height from `OS/2.sCapHeight` used to correct the
   baseline, rather than scaling from the font size alone. `w:caps` uppercases via full Unicode case mapping
   (locale-aware, which matters for `i`→`İ` in Turkish documents but not ro/ru; the mapping is
@@ -672,7 +672,7 @@ The direct answer to "nothing detected it".
   Hidden text that is *shown* (an editor preference) is a render-time flag, and when enabled it is laid out
   like normal text and emits a different `documentHash` dimension for the flag.
 - `w:vertAlign` superscript/subscript: scale by the font's own `OS/2` superscript metrics when present, else
-  the conventional 0.65 scale with a raised baseline — and the resulting advance must be used, because
+  the conventional 0.65 scale with a raised baseline - and the resulting advance must be used, because
   superscript footnote references change line widths.
 - `w:fitText` (fit a run to a given width by scaling): supported by measuring then applying a per-run scale
   factor; `w:fitText w:id` ties the runs together to one scale computed from their combined width.
@@ -686,20 +686,20 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-018 — Inline atomization (run → atoms)**
+**LE-018 - Inline atomization (run → atoms)**
 **Pass** P3 · **OOXML** `w:r`, `w:t`, `w:tab`, `w:br`, `w:cr`, `w:noBreakHyphen`, `w:softHyphen`,
 `w:sym`, `w:drawing`, `w:pict`, `w:object`, `w:footnoteReference`, `w:fldChar`, `w:instrText`,
 `w:oMath`, `w:ruby` · **Pri** core · **Effort** M
 
 - The output is a flat, ordered `InlineAtom[]` per paragraph. Atom kinds: `Cluster` (glyph cluster with
   advance), `Tab`, `Break` (line), `ColumnBreak`, `PageBreak`, `Symbol` (from `w:sym`, which names a font by
-  `w:font` and a code point — resolved like any other font), `InlineDrawing`, `NoteRef`, `FieldMarker`,
+  `w:font` and a code point - resolved like any other font), `InlineDrawing`, `NoteRef`, `FieldMarker`,
   `MathBox`, `Ruby`, `FldResult`.
 - `w:cr` and `w:br` are both hard line breaks; `w:br w:type="page"` is a page break; `"column"` is a column
   break; `"textWrapping"` (the default) is a line break. A hard break **ends a line unconditionally** and
   the resulting lines are not justified (unless `w:jc="distribute"`).
 - `w:noBreakHyphen` is a non-breaking hyphen (it is a break *inhibitor*), `w:softHyphen` is a
-  discretionary break that renders as a hyphen **only** when taken — the classic implementation bug is
+  discretionary break that renders as a hyphen **only** when taken - the classic implementation bug is
   rendering it always.
 - Every atom carries its source range so a caret stop maps back to a model position (LE-007).
 - Edge cases: a paragraph whose only content is an inline drawing (the line height comes from the object);
@@ -709,7 +709,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-019 — Bidirectional text (UAX #9)**
+**LE-019 - Bidirectional text (UAX #9)**
 **Pass** P4 · **OOXML** `w:bidi`, `w:rtl` (rPr), `w:lang w:bidi`, `w:rtlGutter` · **Pri** important ·
 **Effort** L
 
@@ -723,15 +723,15 @@ The direct answer to "nothing detected it".
 - Mirrored characters (parentheses, brackets, `<`, `>`) are resolved via the `Bidi_Mirrored` property, not
   by a hardcoded table.
 - Numbers keep LTR order inside RTL text, and a leading minus/plus attaches to the number (bidi class
-  handling of `ET`/`EN` — the "‎-5" vs "5-" bug).
+  handling of `ET`/`EN` - the "‎-5" vs "5-" bug).
 - Edge cases: `w:rtl` on `w:rPr` inside a bidi paragraph (level override); a table cell whose paragraph is
-  RTL inside an LTR table (`w:bidiVisual` governs the *table's* column order, not the cell's text — two
+  RTL inside an LTR table (`w:bidiVisual` governs the *table's* column order, not the cell's text - two
   independent switches, commonly conflated); tab stops in an RTL paragraph mirror about the right margin
   (LE-024).
 
 ---
 
-**LE-020 — RTL/LTR mirroring of layout properties**
+**LE-020 - RTL/LTR mirroring of layout properties**
 **Pass** P4 (applied in P6, P9, P11, P13) · **OOXML** `w:bidi`, `w:mirrorIndents`, `w:bidiVisual`,
 `w:lvlJc`, `w:tab w:val="start"|"end"`, `w:jc` · **Pri** important · **Effort** M
 
@@ -749,14 +749,14 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-021 — Fields whose result occupies space**
+**LE-021 - Fields whose result occupies space**
 **Pass** P3 (+ P16 for page-count fields) · **OOXML** `w:fldSimple`, `w:fldChar`, `w:instrText`,
 `w:fldLock`, `w:dirty` · **Pri** core · **Effort** M
 
 - Layout never parses field instructions. It lays out the **cached result** (runs between `separate` and
   `end`), which is what Word itself displays before a field update. A field with no cached result (a
   never-opened document) renders as a zero-width placeholder flagged `FieldNoResult` for the host app to
-  resolve — we never guess a value, because a guessed value changes line widths silently.
+  resolve - we never guess a value, because a guessed value changes line widths silently.
 - Fields the layout engine resolves itself, because they are page-dependent: `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `SECTION`. Their widths feed loop L3 (LE-060).
 - A field's result can contain formatting, breaks or even a drawing and is laid out as ordinary atoms
@@ -764,26 +764,26 @@ The direct answer to "nothing detected it".
 - `w:fldChar` results that are locked or dirty are still laid out from the cached result; "dirty" affects
   only whether the editing side recomputes, never geometry.
 - Edge cases: unbalanced `begin`/`end` (recover, diagnostic); a `w:fldChar` split across runs/paragraphs
-  (a field can span a paragraph boundary — the cached result then spans paragraphs and must be laid out as
+  (a field can span a paragraph boundary - the cached result then spans paragraphs and must be laid out as
   such, which is why field state lives in the story, not in a paragraph); `w:instrText` containing a
   quoted string with an escaped quote.
 
 ---
 
-**LE-022 — Notes and other out-of-line stories as inline references**
+**LE-022 - Notes and other out-of-line stories as inline references**
 **Pass** P3 (ref) / P13-adjacent · **OOXML** `w:footnoteReference`, `w:endnoteReference`,
 `w:annotationRef`, `w:commentReference`, `w:footnoteRef` (in note text) · **Pri** core · **Effort** S
 
 - A note reference is an inline atom whose width comes from the formatted reference mark (superscript by
-  default, size from the reference's `w:rPr` — usually the `FootnoteReference` character style). It is a
+  default, size from the reference's `w:rPr` - usually the `FootnoteReference` character style). It is a
   real, measured, breakable-adjacent atom: a footnote reference is a common cause of "one line too many".
 - The note's *body* is a separate story laid out in the note area (LE-061); the reference atom and the note
-  body are linked by id, and moving a reference moves its note — which is why the note belongs to the
+  body are linked by id, and moving a reference moves its note - which is why the note belongs to the
   paragraph and the paragraph's page, not to the page directly.
 - Comment references (`w:commentReference`) render a small mark whose size comes from the same style chain,
   and their ranges are exported for the comment overlay.
 - Edge cases: a reference inside a table cell whose row is split (the note belongs to the page where the
-  reference's fragment lands, which the pagination pass must decide before notes are placed — hence loop
+  reference's fragment lands, which the pagination pass must decide before notes are placed - hence loop
   L2); a footnote reference inside a footnote (Word forbids it; we lay it out but emit a diagnostic);
   endnote references are numbered in a separate sequence from footnotes.
 
@@ -793,7 +793,7 @@ The direct answer to "nothing detected it".
 
 ---
 
-**LE-023 — Greedy line breaking (the decision), Word-faithful**
+**LE-023 - Greedy line breaking (the decision), Word-faithful**
 **Pass** P9 · **OOXML** `w:jc`, `w:wordWrap`, `w:overflowPunct`, `w:kinsoku` · **Pri** core · **Effort** L
 
 **Decision: greedy (first-fit) breaking is the only breaker used for the editing surface and for the
@@ -820,15 +820,15 @@ Rules of the greedy breaker (all Word-observable):
   paragraph loses words to the next line one time in twenty.
 - A hard break (`w:br`, `w:cr`) ends the line unconditionally; a paragraph's final line always ends at the
   paragraph mark.
-- `w:wordWrap w:val="false"` (allow Latin text to break at any character — a CJK-oriented setting) and
+- `w:wordWrap w:val="false"` (allow Latin text to break at any character - a CJK-oriented setting) and
   `w:overflowPunct` are honoured; `w:overflowPunct` allows punctuation to hang past the right margin
   instead of being pushed down.
-- The breaker emits caret stops as a by-product (LE-007) — it is the only pass that knows all break
+- The breaker emits caret stops as a by-product (LE-007) - it is the only pass that knows all break
   positions.
 
 ---
 
-**LE-024 — Break opportunities per language, and non-breaking constructs**
+**LE-024 - Break opportunities per language, and non-breaking constructs**
 **Pass** P9 · **OOXML** `w:noBreakHyphen`, `w:softHyphen`, `w:tab`, `w:compat` flags · **Pri** core ·
 **Effort** M
 
@@ -838,7 +838,7 @@ Rules of the greedy breaker (all Word-observable):
   attached to a number.
 - **Inhibitors:** NBSP (U+00A0), narrow NBSP (U+202F), word joiner (U+2060), ZWNJ (U+200C), and the
   non-breaking hyphen (`w:noBreakHyphen`, U+2011) all forbid a break at their position. Romanian and Russian
-  text routinely uses NBSP to keep short prepositions and initials on the same line — a breaker that treats
+  text routinely uses NBSP to keep short prepositions and initials on the same line - a breaker that treats
   NBSP as a plain space produces visibly wrong line endings on exactly our target documents.
 - **Discretionary:** `w:softHyphen` (U+00AD) and ZWSP (U+200B) create opportunities that render nothing
   unless taken. A soft hyphen that becomes a break renders as a visible hyphen **at the line end only**.
@@ -849,22 +849,22 @@ Rules of the greedy breaker (all Word-observable):
   before the tab. This is a documented fidelity risk and a golden-test case.
 - Edge cases: a run of 50 spaces (kept, breakable, collapsed at line end); a zero-width cluster at a break
   position; a soft hyphen at the very start of a line (never taken); `w:t` elements split mid-word across
-  runs (breaking works on atoms, so a run boundary is invisible — this is a correctness requirement, not an
+  runs (breaking works on atoms, so a run boundary is invisible - this is a correctness requirement, not an
   optimization).
 
 ---
 
-**LE-025 — Hyphenation for Romanian, Russian and English**
+**LE-025 - Hyphenation for Romanian, Russian and English**
 **Pass** P9 · **OOXML** `w:suppressAutoHyphens`, `w:autoHyphenation`, `w:hyphenationZone`,
 `w:consecutiveHyphenLimit`, `w:doNotHyphenateCaps`, `w:lang` · **Pri** important · **Effort** L
 
 - Dictionary-driven hyphenation using Liang's pattern algorithm over hyphenation patterns bundled with the
   library: `ro` (Romanian patterns), `ru` (Russian), `en-US`/`en-GB`. Pattern sets are permissively licensed
-  (TeX `hyph-utf8` / hunspell hyphenation dictionaries) and shipped as compact tries, ~100–300 KB total for
+  (TeX `hyph-utf8` / hunspell hyphenation dictionaries) and shipped as compact tries, ~100-300 KB total for
   the three languages.
 - Word-equivalent controls: `w:autoHyphenation` enables it for the document; `w:suppressAutoHyphens` disables
   it per paragraph; `w:hyphenationZone` (twips) makes the breaker hyphenate only when the resulting rag would
-  otherwise exceed the zone — this is the weird one and must be implemented as written, or hyphenation
+  otherwise exceed the zone - this is the weird one and must be implemented as written, or hyphenation
   breaks lines Word would not; `w:consecutiveHyphenLimit` caps consecutive hyphenated lines (default 2 in
   Word when unset); `w:doNotHyphenateCaps` skips words in full caps.
 - Language selection is per-run via `w:lang w:val`, not per document. Mixed ro/ru documents hyphenate each
@@ -876,16 +876,16 @@ Rules of the greedy breaker (all Word-observable):
   cedilla/comma-below normalization (LE-010) happens before hyphenation so patterns match.
 - Left-hyphen minimum: Word will hyphenate leaving 2 characters before the hyphen; enforce the same
   (a 1-character fragment is never produced, hyphenated or not).
-- Edge cases: a hyphenated word inside a table cell, in a header, in a footnote (all supported — the
+- Edge cases: a hyphenated word inside a table cell, in a header, in a footnote (all supported - the
   hyphenator is a pure function of text + language); a word longer than the line (breaks at the minimum
-  fragment, overflowing only if even that fails — Word overflows too); hyphenation interacting with
+  fragment, overflowing only if even that fails - Word overflows too); hyphenation interacting with
   justification (a hyphenated line is stretched like any other).
-- **Priority note**: hyphenation off by default unless the document enables it — matching Word — so the
+- **Priority note**: hyphenation off by default unless the document enables it - matching Word - so the
   common HR document is unaffected and the fidelity surface stays small.
 
 ---
 
-**LE-026 — Justification: space distribution and exact edge landing**
+**LE-026 - Justification: space distribution and exact edge landing**
 **Pass** P12 · **OOXML** `w:jc`, `w:spacing`, `w:adjustRightInd`, `w:snapToGrid` · **Pri** core ·
 **Effort** M
 
@@ -904,15 +904,15 @@ Rules of the greedy breaker (all Word-observable):
   line containing a tab are; an inline drawing is an unbreakable atom whose surrounding space stretches
   normally.
 - `w:adjustRightInd` and grid snapping can pull the right edge off the margin when `w:docGrid` is active
-  (LE-031) — the grid wins over justification.
+  (LE-031) - the grid wins over justification.
 - Edge cases: a line with **zero** space atoms (a single long word, or a line of one drawing) cannot be
-  justified — it is set ragged (Word does the same) and, if it overflows, overflows; a line inside a table
+  justified - it is set ragged (Word does the same) and, if it overflows, overflows; a line inside a table
   cell justifies against the **cell's** content width, not the page's; a line ending with a trailing space
   run collapses that run before distributing.
 
 ---
 
-**LE-027 — Drop caps (exclusion-based)**
+**LE-027 - Drop caps (exclusion-based)**
 **Pass** P9/P10 (exclusion) + P11 · **OOXML** `w:framePr w:dropCap="drop"|"margin"`, `w:lines`,
 `w:wrap`, `w:vAnchor`, `w:hAnchor` · **Pri** important · **Effort** M
 
@@ -929,7 +929,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-028 — Kashida justification (Arabic) — deferred**
+**LE-028 - Kashida justification (Arabic) - deferred**
 **Pass** P12 · **OOXML** `w:jc="lowKashida"|"mediumKashida"|"highKashida"` · **Pri** later · **Effort** M
 
 - Arabic-script documents justify by elongating connections (kashida) rather than only adding word space.
@@ -941,7 +941,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-029 — East Asian line breaking (kinsoku) — deferred**
+**LE-029 - East Asian line breaking (kinsoku) - deferred**
 **Pass** P9 · **OOXML** `w:kinsoku`, `w:overflowPunct`, `w:topLinePunct`, `w:autoSpaceDE`,
 `w:autoSpaceDN`, `w:wordWrap` · **Pri** later · **Effort** M
 
@@ -952,12 +952,12 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-030 — Trailing/leading whitespace and empty-line semantics**
+**LE-030 - Trailing/leading whitespace and empty-line semantics**
 **Pass** P9 · **OOXML** `w:p` with no runs, `w:r` with only `w:t` spaces, `w:sectPr` in `w:pPr` · **Pri** core ·
 **Effort** S
 
 - An empty paragraph produces exactly one line whose height is the paragraph mark's font line height (not
-  zero, and not the paragraph's `w:spacing w:line` if that is smaller — Word uses `max(line, fontHeight)`
+  zero, and not the paragraph's `w:spacing w:line` if that is smaller - Word uses `max(line, fontHeight)`
   for an empty paragraph with `auto` spacing).
 - Leading and trailing spaces on an empty-but-for-spaces paragraph are preserved (they are why the line is
   not empty) but collapse at a soft break.
@@ -970,7 +970,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-031 — Deterministic behaviour when a constraint cannot be satisfied**
+**LE-031 - Deterministic behaviour when a constraint cannot be satisfied**
 **Pass** P13 · **OOXML** `w:keepLines`, `w:keepNext`, `w:widowControl`, `w:cantSplit` · **Pri** core ·
 **Effort** M
 
@@ -991,7 +991,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-032 — Widow and orphan control**
+**LE-032 - Widow and orphan control**
 **Pass** P13 · **OOXML** `w:widowControl` (default **on**) · **Pri** core · **Effort** M
 
 - With `w:widowControl` on: a page break may not leave fewer than **2 lines** of a paragraph on either side.
@@ -1003,14 +1003,14 @@ Rules of the greedy breaker (all Word-observable):
 - `w:widowControl w:val="false"` disables it for the paragraph; the document default comes from
   `docDefaults`/the Normal style and is **on** in every Word-generated document.
 - Interaction with `keepLines`: if all lines must be together, widow control is trivially satisfied.
-- Edge cases: a paragraph with exactly 2 lines where the second line does not fit (both lines move — the
+- Edge cases: a paragraph with exactly 2 lines where the second line does not fit (both lines move - the
   whole paragraph moves if it fits, otherwise the split happens anyway with a diagnostic); widow control
   across a column break (applies per column, not per page); widow control interacting with a following
-  table's header row (the header row moves with at least one body row — LE-050).
+  table's header row (the header row moves with at least one body row - LE-050).
 
 ---
 
-**LE-033 — Keep-with-next and keep-lines-together**
+**LE-033 - Keep-with-next and keep-lines-together**
 **Pass** P13 · **OOXML** `w:keepNext`, `w:keepLines` · **Pri** core · **Effort** M
 
 - `w:keepNext` keeps a paragraph with the **next** paragraph, requiring at least the next paragraph's first
@@ -1024,13 +1024,13 @@ Rules of the greedy breaker (all Word-observable):
   generated documents, so this pass ships with a golden test for the "heading + 3-paragraph chain at a page
   boundary" case.
 - Edge cases: `keepNext` on the last paragraph of a document (no-op); `keepNext` on the last row of a table
-  (keeps the table with the following paragraph, honoured by pulling the last row down — Word's behaviour);
+  (keeps the table with the following paragraph, honoured by pulling the last row down - Word's behaviour);
   `keepNext` combined with an explicit `w:pageBreakBefore` on the following paragraph (the break wins, and
-  the keep becomes vacuous — a diagnostic is emitted for the contradiction).
+  the keep becomes vacuous - a diagnostic is emitted for the contradiction).
 
 ---
 
-**LE-034 — Page-break-before / page-break-after and hard breaks**
+**LE-034 - Page-break-before / page-break-after and hard breaks**
 **Pass** P13 · **OOXML** `w:pageBreakBefore`, `w:br w:type="page"`, `w:sectPr` break types · **Pri** core ·
 **Effort** S
 
@@ -1038,13 +1038,13 @@ Rules of the greedy breaker (all Word-observable):
   paragraph of a document or of a section's first page (Word suppresses a break that would create an empty
   leading page).
 - A `w:br w:type="page"` hard break ends the current line and the current page; content after it starts at the
-  top of the next page's content box (respecting the new page's header/even-odd differences — which means
+  top of the next page's content box (respecting the new page's header/even-odd differences - which means
   the content box for the *next* page kind must be known, hence P8's per-page-kind boxes).
 - The paragraph containing a page break has its `w:spacing w:before` suppressed if
   `w:compat/w:suppressSpBfAfterPgBrk` is set, else honoured; this is a real difference between documents
   produced by different Word versions.
-- Edge cases: two consecutive page breaks (one blank page — Word renders it, so we do); a page break inside a
-  table cell (breaks the page, not the row — the row splits at that point); a page break at the very end of
+- Edge cases: two consecutive page breaks (one blank page - Word renders it, so we do); a page break inside a
+  table cell (breaks the page, not the row - the row splits at that point); a page break at the very end of
   a document (does not create a trailing blank page in Word; must not here either).
 
 ---
@@ -1053,7 +1053,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-035 — Line height: auto, atLeast, exact, and multiple spacing**
+**LE-035 - Line height: auto, atLeast, exact, and multiple spacing**
 **Pass** P11 · **OOXML** `w:spacing w:line`, `w:spacing w:lineRule`, `w:snapToGrid`, `w:docGrid` ·
 **Pri** core · **Effort** M
 
@@ -1063,7 +1063,7 @@ Rules of the greedy breaker (all Word-observable):
 - `w:lineRule="exact"`: the line is exactly `w:line` tall; taller content **overflows** and is not clipped
   (Word lets it overlap the next line). The line's baseline is positioned from the font's ascent clipped to
   the exact height, which is why exact-spaced lines with big fonts overlap in Word and must overlap here.
-- The line box is `max(content ascent+descent, line height from the rule)` — a large inline image or a
+- The line box is `max(content ascent+descent, line height from the rule)` - a large inline image or a
   superscript in a small line grows the line (for `auto`/`atLeast`), which is exactly how a document
   "grows" when an image is pasted in, and it is the reason line height cannot be computed from the paragraph
   style alone.
@@ -1075,7 +1075,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-036 — Paragraph spacing before/after, auto-spacing, contextual spacing**
+**LE-036 - Paragraph spacing before/after, auto-spacing, contextual spacing**
 **Pass** P13 · **OOXML** `w:spacing w:before`, `w:after`, `w:beforeLines`, `w:afterLines`,
 `w:beforeAutospacing`, `w:afterAutospacing`, `w:contextualSpacing`, `w:compat` suppress flags · **Pri** core ·
 **Effort** M
@@ -1099,7 +1099,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-037 — Grid snapping and document grid**
+**LE-037 - Grid snapping and document grid**
 **Pass** P11 · **OOXML** `w:docGrid w:type`, `w:linePitch`, `w:charSpace`, `w:snapToGrid`,
 `w:compat` grid flags · **Pri** later · **Effort** M
 
@@ -1111,12 +1111,12 @@ Rules of the greedy breaker (all Word-observable):
 - `w:charSpace` adds character grid pitch, which interacts with justification (`w:adjustRightInd`) and is the
   reason a CJK template's Latin text can look oddly spaced in Word.
 - Marked `later` because the target corpus (ro/ru HR documents authored in Word default settings) rarely
-  carries a document grid — but it is implemented as a separate, additive step in P11 so that turning it on
+  carries a document grid - but it is implemented as a separate, additive step in P11 so that turning it on
   cannot disturb the non-grid path.
 
 ---
 
-**LE-038 — Paragraph borders**
+**LE-038 - Paragraph borders**
 **Pass** P11/P13 · **OOXML** `w:pBdr` (`w:top`, `w:left`, `w:bottom`, `w:right`, `w:between`, `w:bar`),
 `w:sz` (eighths of a point), `w:space` (points), `w:val` (line style), `w:color`, `w:themeColor` ·
 **Pri** important · **Effort** L
@@ -1124,7 +1124,7 @@ Rules of the greedy breaker (all Word-observable):
 - Border geometry: `w:sz` → mp (×125); `w:space` is the offset in **points** from the text edge to the
   border, added to the paragraph's box. The border is drawn **inside** the indented text area (from the left
   indent to the right indent, extended by `w:space` on each side).
-- **Collision between adjacent paragraphs:** Word merges identical borders — two consecutive paragraphs with
+- **Collision between adjacent paragraphs:** Word merges identical borders - two consecutive paragraphs with
   identical `w:pBdr` render as one box with the `w:between` (if specified) as an internal separator; with
   *different* borders, both boxes are drawn and the space between them is the sum of the two `w:space`
   values plus the spacing. `w:bar` draws a vertical rule at the left of the paragraph without participating
@@ -1133,7 +1133,7 @@ Rules of the greedy breaker (all Word-observable):
   only on the first fragment and the bottom only on the last. `w:between` is drawn between fragments on the
   same page only.
 - Line styles (`w:val`): single, double, dotted, dashed, dashDot, dotDash, triple, thinThickSmallGap,
-  wave, doubleWave — rendered as vector primitives in both targets (the PDF writer draws the same primitives,
+  wave, doubleWave - rendered as vector primitives in both targets (the PDF writer draws the same primitives,
   LE-006). Dash patterns are defined in absolute units, not scaled to the border width.
 - Edge cases: a border wider than the text area (clamp and diagnose); `w:sz="0"` (no line); a border on an
   empty paragraph (the box is drawn around the single empty line); borders in an RTL paragraph mirrored
@@ -1141,23 +1141,23 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-039 — Paragraph and run shading**
+**LE-039 - Paragraph and run shading**
 **Pass** P11 (paragraph) / P3-P12 (run) · **OOXML** `w:shd w:val`, `w:fill`, `w:color`,
 `w:themeFill`, `w:themeFillTint`, `w:themeFillShade`, `w:pPr/w:shd`, `w:rPr/w:shd` · **Pri** important ·
 **Effort** M
 
 - `w:val="clear"` fills with `w:fill`; the patterned values (`pct10`, `diagStripe`, …) fill with an
-  alpha-blended `w:fill` over `w:color` at a defined ratio — implemented as a 2-colour blend at paint time
+  alpha-blended `w:fill` over `w:color` at a defined ratio - implemented as a 2-colour blend at paint time
   (a `BoxFragment` with a blend descriptor) so no pattern bitmaps are needed.
 - Paragraph shading spans the paragraph's **indented** text area, extends the full height of every line it
   covers including the line box (not just the glyphs), and continues across page breaks on both fragments.
-  It does **not** include the space-before/after unless Word includes it — it does not; the shaded box is
+  It does **not** include the space-before/after unless Word includes it - it does not; the shaded box is
   the line stack, and getting this wrong produces the "shading has gaps at the paragraph junction" artifact.
 - Run shading spans the run's glyphs only, splits across line and page breaks, excludes trailing spaces at a
   soft break, and is drawn **behind** the text (a separate box fragment ordered before the run fragments).
 - Theme colours resolve through the theme's colour scheme with tint/shade applied in HLS, matching Word's
   transformation (this is why `<w:themeFillTint="BF">` must not be treated as a plain hex).
-- Edge cases: shading applied to the paragraph mark only (`w:rPr` on `w:pPr`) — Word shades the paragraph
+- Edge cases: shading applied to the paragraph mark only (`w:rPr` on `w:pPr`) - Word shades the paragraph
   mark's line, which visually extends the previous paragraph's shading; a run shaded across a page break;
   shading inside a table cell (cell shading paints first, run shading on top).
 
@@ -1167,7 +1167,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-040 — The vertical machine (block flow)**
+**LE-040 - The vertical machine (block flow)**
 **Pass** P13 · **OOXML** `w:p`, `w:tbl`, `w:sectPr` · **Pri** core · **Effort** L
 
 - One state machine consumes the ordered block list for a section and produces page/column assignments:
@@ -1188,12 +1188,12 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-041 — Section breaks and break types**
+**LE-041 - Section breaks and break types**
 **Pass** P13/P15 · **OOXML** `w:sectPr` (`w:type` = nextPage/continuous/evenPage/oddPage,
 `w:pgSz`, `w:pgMar`, `w:cols`, `w:titlePg`, `w:paperSrc`, `w:pgNumType`) · **Pri** core · **Effort** L
 
 - `nextPage`: content after the break starts on a new page using the new section's page setup.
-- `continuous`: content continues on the same page, but the new section's **page setup** applies — with
+- `continuous`: content continues on the same page, but the new section's **page setup** applies - with
   Word's documented exception that a continuous break that changes page size or orientation forces a page
   break anyway (a very common real-world template with one landscape page; getting this wrong makes a
   contract's attachment land in the wrong orientation).
@@ -1202,16 +1202,16 @@ Rules of the greedy breaker (all Word-observable):
   counted by `NUMPAGES`).
 - Margin and page-size changes take effect immediately at the section boundary; the gutter and mirror margins
   (LE-020) alternate per page.
-- `w:pgNumType w:start` restarts page numbering for the section — this affects the `PAGE` field's *value*
+- `w:pgNumType w:start` restarts page numbering for the section - this affects the `PAGE` field's *value*
   and thus its width and thus loop L3.
-- Edge cases: a section break at the very end of the body (the body-level `w:sectPr` — the final section);
+- Edge cases: a section break at the very end of the body (the body-level `w:sectPr` - the final section);
   multiple consecutive section breaks (a deliberately blank page); a section with `w:cols` and a
   `w:sectPr` change mid-document; a `w:sectPr` inside `w:pPr` on a table row (invalid, ignored with a
   diagnostic).
 
 ---
 
-**LE-042 — Columns and column balancing**
+**LE-042 - Columns and column balancing**
 **Pass** P15 (balance) / P13 (flow) · **OOXML** `w:cols`, `w:col w:w`, `w:space`, `w:equalWidth`,
 `w:sep`, `w:br w:type="column"` · **Pri** important · **Effort** L
 
@@ -1222,30 +1222,30 @@ Rules of the greedy breaker (all Word-observable):
   unbounded single strip to obtain the total height, then distribute into `ceil(total / columnCount)`-tall
   columns. Explicit `w:br w:type="column"` forces a column advance and resets balancing for what follows.
   A section ending in a `nextPage` break is **not** balanced (its last page simply ends).
-- Ordering constraint: balancing needs the total height, so it runs after the vertical machine — this is the
+- Ordering constraint: balancing needs the total height, so it runs after the vertical machine - this is the
   P15 edge in §2.2 and cannot be moved earlier without a throwaway layout.
 - Edge cases: a column count of 0 or 1; a column narrower than the widest unbreakable word (overflow, Word
   overflows); a table wider than a column (the table's columns are resolved against the column width, which
-  can make a table narrower than in the source document — Word does this too, and it is why tables in
+  can make a table narrower than in the source document - Word does this too, and it is why tables in
   columns look different); footnotes in a multi-column section are placed at the bottom of the **column** by
   default (`w:footnotePr w:pos`), which is a real Word behaviour and a common surprise.
 
 ---
 
-**LE-043 — Section vertical alignment of content**
+**LE-043 - Section vertical alignment of content**
 **Pass** P15 · **OOXML** `w:vAlign` (top/center/both/bottom) · **Pri** later · **Effort** S
 
 - `w:vAlign` shifts the section's content within the content box: `center` centres the content block,
   `bottom` pushes it to the bottom, `both` justifies the inter-paragraph spacing to fill the page.
 - Applied per **section** at P15, after pagination, as a translation of every fragment on the affected pages
-  — which is why it must run last and must invalidate caret geometry (LE-007 recomputes from fragments).
+  - which is why it must run last and must invalidate caret geometry (LE-007 recomputes from fragments).
 - Edge cases: a section spanning multiple pages (`vAlign` applies to each page independently, and for
   `both` distributes per page); `vAlign` with a footnote area (the area is excluded from the centring);
-  `vAlign` interacting with the header displacement (LE-059) — the content box is the displaced one.
+  `vAlign` interacting with the header displacement (LE-059) - the content box is the displaced one.
 
 ---
 
-**LE-044 — Line numbering**
+**LE-044 - Line numbering**
 **Pass** P13 · **OOXML** `w:lnNumType` (`w:countBy`, `w:start`, `w:restart`, `w:distance`),
 `w:suppressLineNumbers` · **Pri** later · **Effort** M
 
@@ -1253,7 +1253,7 @@ Rules of the greedy breaker (all Word-observable):
   text, and are **outside** the content box (they do not shrink line width; a too-small margin makes them
   overlap the text exactly as Word does).
 - `w:countBy="5"` numbers every 5th line; `w:restart="page"|"section"|"continuous"`; `w:start`.
-- Only body text lines are counted — not header/footer lines, not table lines, not footnote lines, and not
+- Only body text lines are counted - not header/footer lines, not table lines, not footnote lines, and not
   lines in a paragraph with `w:suppressLineNumbers`.
 - Marked `later`: it appears in legal/contract templates (a plausible HR case for numbered clauses) but is
   absent from the MVP corpus.
@@ -1262,7 +1262,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-045 — Table grid resolution and column widths**
+**LE-045 - Table grid resolution and column widths**
 **Pass** P6 · **OOXML** `w:tblGrid`, `w:gridCol w:w`, `w:tblW`, `w:tblLayout w:type` (fixed/autofit),
 `w:tcW`, `w:tblInd`, `w:jc` · **Pri** core · **Effort** XL
 
@@ -1272,41 +1272,41 @@ Rules of the greedy breaker (all Word-observable):
 - **Autofit** (`type="autofit"`, the Word default): the algorithm is a min/preferred distribution:
   1. Compute each column's **preferred width** = the max unwrapped content width of its cells, and its
      **minimum width** = the widest unbreakable unit (the longest word, the widest inline object, the min
-     width of a nested table) — both come from P5 and are the reason P5 exists as its own pass.
+     width of a nested table) - both come from P5 and are the reason P5 exists as its own pass.
   2. Preferred widths are scaled down to fit the available width, proportionally, but **never below** each
      column's minimum.
   3. Columns that hit their minimum are frozen; the remaining deficit is redistributed over the unfrozen
      columns; iterate to a fixed point (bounded at `columnCount` iterations).
   4. If the sum of minima exceeds the available width, the table overflows the content width (Word lets it
      overflow; we do too, with a diagnostic).
-- `w:tblW` with `w:type="pct"` (fiftieths of a percent — **not** the same scale as `a:srcRect`, see LE-057)
+- `w:tblW` with `w:type="pct"` (fiftieths of a percent - **not** the same scale as `a:srcRect`, see LE-057)
   sets the target total; `w:type="auto"` uses the preferred total clamped to the available width;
   `w:type="dxa"` is an absolute width, honoured even if it exceeds the content width.
 - `w:tblInd` indents the table from the left margin (and from the right in an RTL table, LE-020);
   `w:jc` on `w:tblPr` (left/center/right) aligns the table within the content width and is applied **after**
-  column widths are known — a table narrower than the content width is positioned by `w:jc`, not stretched.
+  column widths are known - a table narrower than the content width is positioned by `w:jc`, not stretched.
 - Edge cases: a missing `w:tblGrid` (derive from the first row's cells, diagnostic); more `w:gridCol` than
   cells or vice versa (reconcile to the maximum, diagnostic); a nested table's width contributing to its
   parent cell's minimum; a table inside a table inside a cell (each nesting level re-enters P6 with a
-  narrower available width — depth-limited to Word's nesting limit, with a diagnostic beyond it).
+  narrower available width - depth-limited to Word's nesting limit, with a diagnostic beyond it).
 
 ---
 
-**LE-046 — Cell measurement and recursive cell layout**
+**LE-046 - Cell measurement and recursive cell layout**
 **Pass** P6 (widths) / P13 (heights) · **OOXML** `w:tc`, `w:tcPr`, `w:gridSpan`, `w:vMerge`,
 `w:tcMar`, `w:textDirection`, `w:hideMark` · **Pri** core · **Effort** L
 
 - A cell's content box = column width (or the span of columns for `w:gridSpan > 1`) − `w:tcMar`
   (per-cell margins, falling back to `w:tblCellMar`, falling back to the default 0.08 in left/right) −
-  borders on each edge (border widths **do** consume space, half the border on each side of the grid line —
+  borders on each edge (border widths **do** consume space, half the border on each side of the grid line -
   a consistently missed detail that shifts every table's text by a fraction of a point).
-- Cell content is laid out by **re-entering the block pipeline** (P9–P13) with the cell's content box as the
-  constraint. The cell layout uses the same line breaker, the same justification, the same keeps — there is
+- Cell content is laid out by **re-entering the block pipeline** (P9-P13) with the cell's content box as the
+  constraint. The cell layout uses the same line breaker, the same justification, the same keeps - there is
   no separate "simple" path for table text, which is exactly where the previous implementation diverged.
 - Row height = `max(cell content height for each cell in the row, w:trHeight)`, where a `vMerge` continuation
   cell inherits the height of its merged region rather than contributing its own.
 - `w:textDirection` (`lrTb`, `tbRl`, `btLr`, `lrTbV`, `tbRlV`): `tbRl`/`btLr` rotate the cell's content box
-  by 90°, swapping the width/height constraints — the line breaker receives a rotated box and the fragments
+  by 90°, swapping the width/height constraints - the line breaker receives a rotated box and the fragments
   carry a paint-only rotation (LE-002). Simplified vertical text (`w:textDirection` on a multi-line cell with
   `w:tcPr` rotation) is supported; full CJK vertical layout is `later`.
 - `w:hideMark` affects the paragraph mark's visibility inside the cell, not its height contribution.
@@ -1316,7 +1316,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-047 — Cell and table borders with conflict resolution**
+**LE-047 - Cell and table borders with conflict resolution**
 **Pass** P6/P13 (geometry) · **OOXML** `w:tblBorders`, `w:tcBorders`, `w:tblCellSpacing`,
 `w:tcBorders` (`w:start`/`w:end`/`w:top`/`w:bottom`/`w:insideH`/`w:insideV`/`w:tl2br`/`w:tr2bl`),
 `w:cnfStyle`, `w:tblStylePr` · **Pri** core · **Effort** L
@@ -1327,7 +1327,7 @@ Rules of the greedy breaker (all Word-observable):
 - **Adjacent-cell conflict:** when two neighbouring cells specify different borders, Word resolves by
   "heavier wins" (larger `w:sz`), then by "line style beats none", then by the later-specified cell in
   document order. The rule is implemented once, in a single `resolveBorder(edgeA, edgeB)` function, and used
-  for table borders, paragraph borders and page borders — three implementations of this rule is how
+  for table borders, paragraph borders and page borders - three implementations of this rule is how
   renderers drift.
 - Border widths consume layout space (half on each side of the grid line, LE-046), so border resolution must
   happen **before** cell content layout, not at paint time. Diagonal borders (`w:tl2br`, `w:tr2bl`) are paint
@@ -1335,26 +1335,26 @@ Rules of the greedy breaker (all Word-observable):
 - `w:tblCellSpacing` (cell padding as a table-level gap) is supported: it pushes cells apart and inserts a
   background gap; the classic Word artefact of a 0.5 pt white gap between cells.
 - Edge cases: a table with borders only on the outside (`w:tblBorders` with insideH/V `none`); a cell with
-  `w:tcBorders` overriding only the bottom; borders on a table split across pages (the split edge is open —
+  `w:tcBorders` overriding only the bottom; borders on a table split across pages (the split edge is open -
   no border is drawn at the page break unless the row's own borders demand it, and the continuation row's top
   border is drawn); borders under a repeated header row (the header's bottom border is repeated).
 
 ---
 
-**LE-048 — Row heights, row splitting across pages, cantSplit**
+**LE-048 - Row heights, row splitting across pages, cantSplit**
 **Pass** P13 · **OOXML** `w:trHeight w:val`, `w:hRule` (auto/atLeast/exact), `w:cantSplit`,
 `w:tblHeader` · **Pri** core · **Effort** L
 
 - Row height: `auto` = content height; `atLeast` = max(content, `w:val`); `exact` = exactly `w:val` with
-  content **clipped** (Word clips table cell overflow at the row height — unlike paragraph line spacing,
+  content **clipped** (Word clips table cell overflow at the row height - unlike paragraph line spacing,
   where it overflows).
 - **Splitting:** a row that does not fit in the remaining page space splits **only if** it is allowed to
   (`w:cantSplit` absent) **and** it can produce at least one line on each side. The split point is the
   boundary after the last line that fits, computed across all cells simultaneously: the split height is the
-  maximum of the per-cell "lines that fit" heights, and shorter cells are padded — this is the rule that
+  maximum of the per-cell "lines that fit" heights, and shorter cells are padded - this is the rule that
   makes a split table look correct rather than ragged.
 - `w:cantSplit` moves the whole row to the next page. If the row is taller than a full page's content box,
-  Word splits it anyway (it has no choice) — we mirror that with a `ROW_UNSPLITTABLE` diagnostic.
+  Word splits it anyway (it has no choice) - we mirror that with a `ROW_UNSPLITTABLE` diagnostic.
 - A row split across a page break: cell borders are drawn on the split edges per LE-047; cell shading
   continues on both fragments; a cell's text is clipped to its fragment (no repeated text).
 - Row height for a row containing a `vMerge` continuation cell is driven by the merged region's total, not by
@@ -1366,7 +1366,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-049 — Merged cells: gridSpan and vMerge**
+**LE-049 - Merged cells: gridSpan and vMerge**
 **Pass** P6/P13 · **OOXML** `w:gridSpan`, `w:vMerge w:val="restart"|"continue"`, `w:hMerge`
 (Horizontals are `w:gridSpan` in WordprocessingML; legacy `w:hMerge` is mapped to it) · **Pri** core ·
 **Effort** L
@@ -1374,7 +1374,7 @@ Rules of the greedy breaker (all Word-observable):
 - `w:gridSpan` merges N grid columns into one cell whose width is the sum of the spanned columns plus the
   interior grid lines' border widths. The grid is authoritative: a `w:gridSpan` that does not match the
   following rows is reconciled to the maximum, with a diagnostic.
-- `w:vMerge` — `restart` begins a region, `continue` extends it. Horisontal (`gridSpan`) and vertical merges
+- `w:vMerge` - `restart` begins a region, `continue` extends it. Horisontal (`gridSpan`) and vertical merges
   compose. Cell **order in the XML** counts only cells that are actually present: a continuation cell is
   present and empty, and its content (if any) is ignored per the schema.
 - A vertical merge region is laid out as **one content box** spanning the region's rows: the content is laid
@@ -1390,7 +1390,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-050 — Repeated header rows**
+**LE-050 - Repeated header rows**
 **Pass** P13 · **OOXML** `w:tblHeader` · **Pri** core · **Effort** M
 
 - Rows with `w:tblHeader` are repeated at the top of every page the table continues onto, in the same order
@@ -1405,16 +1405,16 @@ Rules of the greedy breaker (all Word-observable):
   header's height remaining (the header block and at least one body row must fit together, else the whole
   group moves).
 - Repeated header content is laid out once and copied as fragments (its layout does not depend on the page).
-- Edge cases: a header row containing a footnote reference (the note is placed on the first page only —
+- Edge cases: a header row containing a footnote reference (the note is placed on the first page only -
   Word's behaviour, and a genuine fidelity corner); a header row with `w:cantSplit`; a table whose header is
   repeated on 40 pages (fragment reuse, not re-layout, for performance).
 
 ---
 
-**LE-051 — Nested tables**
+**LE-051 - Nested tables**
 **Pass** P6/P13 (recursive) · **OOXML** `w:tbl` inside `w:tc` · **Pri** important · **Effort** M
 
-- Nesting re-enters P5 → P6 → P9–P13 with the parent cell's content box as the constraint, at arbitrary
+- Nesting re-enters P5 → P6 → P9-P13 with the parent cell's content box as the constraint, at arbitrary
   depth (Word's practical limit; we cap at 20 with a diagnostic beyond).
 - A nested table contributes to its parent cell's minimum and preferred widths (its min width is the sum of
   its columns' minima, its preferred is its resolved total width), which feeds the parent's autofit.
@@ -1422,12 +1422,12 @@ Rules of the greedy breaker (all Word-observable):
   parent row splits; repeated header rows work inside nested tables too.
 - Edge cases: a nested table wider than its cell (overflow, Word overflows); a nested table inside a
   `vMerge` region; a nested table in a cell of a row that splits (the split propagates into the nested
-  table's rows — the split point is the minimum across all nesting levels, which is where a naive
+  table's rows - the split point is the minimum across all nesting levels, which is where a naive
   implementation produces text overlapping a border).
 
 ---
 
-**LE-052 — Floating tables (tblpPr) and table positioning**
+**LE-052 - Floating tables (tblpPr) and table positioning**
 **Pass** P10/P13 · **OOXML** `w:tblpPr` (`w:vertAnchor`, `w:horzAnchor`, `w:tblpX`, `w:tblpY`,
 `w:tblpXSpec`, `w:tblpYSpec`, `w:leftFromText`, `w:rightFromText`, `w:topFromText`, `w:bottomFromText`),
 `w:tblOverlap` · **Pri** later · **Effort** L
@@ -1436,7 +1436,7 @@ Rules of the greedy breaker (all Word-observable):
   the same anchor resolution as drawings (LE-056) and the same exclusion bands (LE-058), so a floated table
   displaces text exactly as a floated image does.
 - `w:tblOverlap` (`never`/`overlap`) controls whether two floating tables may overlap; `never` requires the
-  placement pass to push a table down past an overlapping one — a bounded loop within P10.
+  placement pass to push a table down past an overlapping one - a bounded loop within P10.
 - Marked `later`: floating tables appear in marketing-style documents, not in the HR contract corpus, but
   they are common enough in templates imported from the wild to be worth keeping on the roadmap with the
   machinery already shared.
@@ -1449,7 +1449,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-053 — Image measurement: intrinsic size, EMU, cropping, fill and rotation**
+**LE-053 - Image measurement: intrinsic size, EMU, cropping, fill and rotation**
 **Pass** P6/P10 · **OOXML** `wp:extent`, `wp:effectExtent`, `a:xfrm`, `a:ext`, `a:srcRect`,
 `a:stretch`/`a:fillRect`, `pic:spPr`, `w:drawing`, `w:pict`/`v:shape` (VML), `v:imagedata` · **Pri** core ·
 **Effort** L
@@ -1458,29 +1458,29 @@ Rules of the greedy breaker (all Word-observable):
   The extent (not the image's pixel size, not its intrinsic resolution) determines the box on the page.
 - If `wp:extent` is missing or zero (hand-written OOXML and some generators), the intrinsic size is derived
   from the image's pixel dimensions and DPI (from the PNG `pHYs` chunk / JPEG JFIF density / EXIF), falling
-  back to 96 DPI — and the aspect ratio is preserved from the intrinsic size.
+  back to 96 DPI - and the aspect ratio is preserved from the intrinsic size.
 - `a:srcRect` (`l`, `t`, `r`, `b`) crops in **thousandths of a percent** (a different scale from table
-  `pct`, which is fiftieths of a percent — normalised at ingest into fractions, and the single most common
+  `pct`, which is fiftieths of a percent - normalised at ingest into fractions, and the single most common
   silent image bug). Cropping changes the **source rect**, not the destination extent: the remaining image is
-  stretched into the same box, and the resulting effective aspect ratio is *not* preserved — Word stretches.
+  stretched into the same box, and the resulting effective aspect ratio is *not* preserved - Word stretches.
   Both behaviours are implemented, distinguished by whether the author used `srcRect` with `a:stretch`.
 - `a:fillRect` with `a:stretch` (crop-to-fill) stretches uniformly with clipping, preserving aspect ratio.
 - Rotation (`a:xfrm rot`, in 1/60000 degree) and flip (`flipH`/`flipV`) are **paint-only** transforms around
-  the box centre and do **not** change layout — the box stays axis-aligned, which is Word's behaviour
+  the box centre and do **not** change layout - the box stays axis-aligned, which is Word's behaviour
   (rotated images overlap text rather than reflowing it).
 - `wp:effectExtent` (shadow/glow bleed) expands the painted area but not the layout box.
 - VML (`w:pict`/`v:shape`/`v:imagedata`) is the legacy path and is fully supported for reading, because
   real-world DOCX from older Word and from third-party generators is full of it; it is mapped into the same
-  drawing model at ingest, including `v:shape` `style="width:...;height:..."` (in pt or in px — both occur,
+  drawing model at ingest, including `v:shape` `style="width:...;height:..."` (in pt or in px - both occur,
   and the px form is a documented fidelity risk).
 - Edge cases: an image whose `wp:extent` disagrees with `a:ext` (the drawing extent wins, diagnostic); a
-  linked-not-embedded image (`r:link` with no embedded part) — a placeholder box at the extent with a
-  diagnostic, never a network fetch; a missing image part (same); SVG (`a:blip` with an SVG extension) —
+  linked-not-embedded image (`r:link` with no embedded part) - a placeholder box at the extent with a
+  diagnostic, never a network fetch; a missing image part (same); SVG (`a:blip` with an SVG extension) -
   sized from `wp:extent`, rasterised at paint time; an image inside a header or a footnote.
 
 ---
 
-**LE-054 — Inline vs anchored drawings, and the block-level drawing paragraph**
+**LE-054 - Inline vs anchored drawings, and the block-level drawing paragraph**
 **Pass** P3/P10 · **OOXML** `wp:inline`, `wp:anchor` (`wp:simplePos`, `wp:positionH`, `wp:positionV`,
 `wp:relativeHeight`, `wp:behindDoc`, `wp:allowOverlap`, `wp:layoutInCell`, `wp:wrap*`, `wp:docPr`) ·
 **Pri** core · **Effort** L
@@ -1501,44 +1501,44 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-055 — Wrap modes: square, tight, through, top-and-bottom, none, behind, in front**
+**LE-055 - Wrap modes: square, tight, through, top-and-bottom, none, behind, in front**
 **Pass** P10 · **OOXML** `wp:wrapSquare w:wrapText`, `wp:wrapTight`, `wp:wrapThrough`,
 `wp:wrapTopAndBottom`, `wp:wrapNone`, `wp:behindDoc`, `wp:distT/distB/distL/distR`,
 `wp:wrapPolygon` · **Pri** important · **Effort** XL
 
-- **`wrapSquare`** — the object's box (expanded by `distL/distR/distT/distB`) excludes text on both sides, or
+- **`wrapSquare`** - the object's box (expanded by `distL/distR/distT/distB`) excludes text on both sides, or
   only on the side given by `w:wrapText` (`bothSides`, `left`, `right`, `largest`). Lines whose vertical band
   intersects the object's band are shortened; lines that begin above or end below it are full width.
-  `largest` chooses, per paragraph, the side with more available space — which requires evaluating the
+  `largest` chooses, per paragraph, the side with more available space - which requires evaluating the
   paragraph both ways, so it is the slowest mode and is implemented last within this feature.
-- **`wrapTight`** — exclusion follows `wp:wrapPolygon` (a polygon in the object's coordinate space, scaled to
+- **`wrapTight`** - exclusion follows `wp:wrapPolygon` (a polygon in the object's coordinate space, scaled to
   the display box), so text may occupy the empty corner around an irregular shape. Implemented as per-line
   band intersection against the polygon, which is what Word approximates. A tight wrap with no polygon falls
   back to the bounding box (square).
-- **`wrapThrough`** — same geometry as tight, but text is additionally allowed **over** the object where the
+- **`wrapThrough`** - same geometry as tight, but text is additionally allowed **over** the object where the
   polygon permits; the difference from tight is that through-wrapped text may sit on top of the image's
   transparent regions. Layout-wise it is identical to tight; paint-wise the object may be behind.
-- **`wrapTopAndBottom`** — the object's band is empty of text: all lines below it start under `distB`. No
+- **`wrapTopAndBottom`** - the object's band is empty of text: all lines below it start under `distB`. No
   line is shortened; the object pushes the following content down (and, if it is anchored to a line inside a
-  paragraph, it splits that paragraph around itself — the paragraph's lines above are laid out full width,
+  paragraph, it splits that paragraph around itself - the paragraph's lines above are laid out full width,
   the lines below start after the object).
-- **`wrapNone`** — the object floats over/under the text and displaces nothing. `wp:behindDoc="1"` puts it
+- **`wrapNone`** - the object floats over/under the text and displaces nothing. `wp:behindDoc="1"` puts it
   behind the text, otherwise in front.
 - **Front/behind and z-order:** `wp:relativeHeight` orders objects; painting order is: all `behindDoc`
   objects ascending by `relativeHeight`, then the text and its shading, then non-`behindDoc` objects
   ascending. Objects with equal `relativeHeight` paint in document order. `wp:allowOverlap="0"` requests
-  non-overlapping placement — Word treats it as advisory; we implement it as a bounded push-down in P10 and
+  non-overlapping placement - Word treats it as advisory; we implement it as a bounded push-down in P10 and
   report when it cannot be satisfied.
-- Edge cases: a square-wrapped object wider than the content box (exclusion band leaves zero width — the
+- Edge cases: a square-wrapped object wider than the content box (exclusion band leaves zero width - the
   lines beside it become zero-width and are re-pushed below; Word's behaviour is to push text below the
-  object when the remaining width is less than one character — that threshold is a constant in the engine and
+  object when the remaining width is less than one character - that threshold is a constant in the engine and
   a golden-test case); an object anchored in a footnote overriding into the body (clipped to the note area,
   Word clips); a top-and-bottom object taller than the page (comment/diagnostic, it repeats on each page in
   Word, which we mirror by placing it once and reporting).
 
 ---
 
-**LE-056 — Anchoring, relative-from and float placement**
+**LE-056 - Anchoring, relative-from and float placement**
 **Pass** P10 · **OOXML** `wp:positionH/wp:positionV` (`wp:relativeFrom`, `wp:align`, `wp:posOffset`),
 `wp:simplePos`, `w:framePr`, `wp:anchor` on a shape · **Pri** important · **Effort** L
 
@@ -1556,26 +1556,26 @@ Rules of the greedy breaker (all Word-observable):
   and the renderer must clip at the page edge only for export, not for the on-screen page surface (where
   Word shows it, greyed, in the margin).
 - Edge cases: a negative `posOffset`; `relativeFrom="character"` inside an RTL run; an object anchored to a
-  paragraph that has moved to another page since the last layout (re-resolved every pass — never cached
+  paragraph that has moved to another page since the last layout (re-resolved every pass - never cached
   across a pagination change).
 
 ---
 
-**LE-057 — Text boxes and legacy frames**
+**LE-057 - Text boxes and legacy frames**
 **Pass** P6/P10/P13 (recursive) · **OOXML** `w:txbxContent`, `wps:txbx`, `wps:bodyPr`
 (`autofit`, `vertOverflow`, `horzOverflow`, `anchor`, `anchorCtr`, `spAutoFit`, `wrap`),
 `v:textbox`, `w:framePr`, `w:framePr w:hRule` · **Pri** important · **Effort** L
 
-- A text box is a **story**: layout runs the full pipeline (P3–P12) on its content with the box's content box
+- A text box is a **story**: layout runs the full pipeline (P3-P12) on its content with the box's content box
   as the constraint. Its content can contain its own floats, tables and footnotes (footnotes in a text box
-  are forbidden by Word — diagnostic, note placed at the end).
+  are forbidden by Word - diagnostic, note placed at the end).
 - `wps:bodyPr autofit` (`spAutoFit`) sizes the box to the content **after** layout, which makes the box's
-  height — and therefore the text it wraps — depend on its own content: a bounded inner fixed point inside
+  height - and therefore the text it wraps - depend on its own content: a bounded inner fixed point inside
   P10 (max 2 iterations; content height rarely changes when the box grows because the width is fixed and
   wrapping is width-driven, so this converges immediately in practice).
 - Vertical anchoring (`anchor=t|ctr|b`) and `anchorCtr` position the content inside the box; overflow
   (`vertOverflow=overflow|clip|ellipsis`) is honoured (clip and ellipsis both handled at paint time from the
-  full layout, which still requires laying out the overflowing lines — clipping is a paint operation, not a
+  full layout, which still requires laying out the overflowing lines - clipping is a paint operation, not a
   layout one, so the layout result contains everything).
 - `w:framePr` (legacy Word frames, still produced by some generators) is mapped to the same anchored-box model
   with drop-cap support (LE-027) and `w:framePr w:wrap` (`around`/`auto`/`none`/`notBeside`/`through`/`tight`)
@@ -1590,7 +1590,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-058 — Exclusion areas as one shared mechanism**
+**LE-058 - Exclusion areas as one shared mechanism**
 **Pass** P10 · **OOXML** derived · **Pri** core · **Effort** M
 
 - A single model serves every construct that removes horizontal space from a line: square/tight/through
@@ -1605,11 +1605,11 @@ Rules of the greedy breaker (all Word-observable):
 - Edge cases: two overlapping bands on the same side (deepest wins, i.e. the larger inset); a band that
   removes the entire width (line becomes zero-width and is pushed below the band, LE-055); a band that starts
   mid-line (the line's band is computed from its **whole** height, so a band starting midway down a line
-  shortens the entire line — which is what Word does).
+  shortens the entire line - which is what Word does).
 
 ---
 
-**LE-059 — Headers and footers: regions, page kinds, and height displacement**
+**LE-059 - Headers and footers: regions, page kinds, and height displacement**
 **Pass** P7/P8 · **OOXML** `w:headerReference`, `w:footerReference`, `w:titlePg`,
 `w:headerReference w:type="first"|"default"|"even"`, `w:header w:type`, `w:pgMar w:header`, `w:footer`,
 `w:settings/evenAndOddHeaders`, `w:header w:type="even"` · **Pri** core · **Effort** L
@@ -1617,7 +1617,7 @@ Rules of the greedy breaker (all Word-observable):
 - Per section, up to six regions: first/default/even × header/footer, resolved in the order first (if
   `w:titlePg`) → even/odd (if `evenAndOddHeaders`) → default. A missing region inherits from the **previous
   section** of the same kind (Word's inheritance rule: a section with no `w:headerReference` of a kind
-  continues the previous section's of that kind) — and a section that "ends" inheritance must do it with an
+  continues the previous section's of that kind) - and a section that "ends" inheritance must do it with an
   explicit empty header part, which is a real and commonly mis-implemented distinction.
 - **Height displacement:** the header is laid out in the area starting `w:pgMar w:header` below the page
   edge. If `headerDistance + headerHeight > topMargin`, the body's content box top is displaced downward by
@@ -1625,37 +1625,37 @@ Rules of the greedy breaker (all Word-observable):
   This is why the content box is a **per-page-kind** value (LE-008/P8) and why header layout must precede
   body pagination.
 - A header containing a `PAGE`/`NUMPAGES` field whose width varies with the page number (1 vs 10 vs 100)
-  changes the header height only if it wraps — but it changes *the field's own width*, which feeds L3.
+  changes the header height only if it wraps - but it changes *the field's own width*, which feeds L3.
 - Headers and footers are **stories**: they support tables, images, borders, columns, and their own
   paragraphs, with all the same passes. They cannot contain footnotes or section breaks (diagnostic).
 - Edge cases: a header whose content is taller than the whole page (Word lets it push the body off the page;
   we clamp the content box to a minimum of one line and emit a diagnostic); a different first-page header on
-  a section that begins mid-page (a continuous section break does not get a first page — the `first` kind
+  a section that begins mid-page (a continuous section break does not get a first page - the `first` kind
   applies only to the section's actual first page); the footer on a page forced by an `evenPage` break.
 
 ---
 
-**LE-060 — Page numbering and page-count-dependent fields (loop L3)**
+**LE-060 - Page numbering and page-count-dependent fields (loop L3)**
 **Pass** P16 · **OOXML** `w:pgNumType w:fmt`, `w:start`, `w:pgNumType w:chapStyle`, `PAGE`, `NUMPAGES`,
 `SECTIONPAGES`, `SECTION` · **Pri** important · **Effort** M
 
 - Field values are computed by the layout engine (it is the only component that knows page counts) and
   written into the `FldResult` atoms for the header/footer stories. Number formats: decimal, upper/lower
-  Roman, upper/lower letter, and Romanian/Russian decimal forms (which are plain decimal) — `w:pgNumType
+  Roman, upper/lower letter, and Romanian/Russian decimal forms (which are plain decimal) - `w:pgNumType
   w:fmt` drives it.
 - `w:pgNumType w:start` restarts numbering at the section boundary; `SECTIONPAGES` counts the pages of the
-  current section; `NUMPAGES` counts the document's pages (the sections' pages, and — matching Word —
+  current section; `NUMPAGES` counts the document's pages (the sections' pages, and - matching Word -
   including blank pages inserted by even/odd breaks).
 - **Convergence (L3):** a `NUMPAGES` field's digit count can change the header's height, which changes the
   content box, which changes pagination, which changes the page count. Re-run P7→P15 with the new count, max
   3 iterations; freeze and diagnose otherwise.
 - Edge cases: a document where page count oscillates (9↔10 pages because the header grows by one line at 10)
-  — the freeze rule must be deterministic (accept the **larger** count on oscillation, matching Word's
+  - the freeze rule must be deterministic (accept the **larger** count on oscillation, matching Word's
   conservative behaviour); `PAGE` in a footnote; a field in a header on a page that is otherwise blank.
 
 ---
 
-**LE-061 — Footnotes: numbering, area, displacement**
+**LE-061 - Footnotes: numbering, area, displacement**
 **Pass** P14 (loop L2) · **OOXML** `w:footnotePr` (`w:pos`, `w:numFmt`, `w:numStart`, `w:numRestart`,
 `w:numSpacing`), `w:footnote w:type`, `w:footnoteReference`, `w:footnoteRef`,
 `w:separator`/`w:continuationSeparator`, `w:footnoteLayoutLikeWW8` (compat) · **Pri** important ·
@@ -1666,28 +1666,28 @@ Rules of the greedy breaker (all Word-observable):
   is another reason notes are placed after the vertical machine, not during it.
 - **Area position** `w:pos`: `pageBottom` (default), `beneathText` (immediately under the body text),
   `sectEnd` (end of section), `docEnd`. `beneathText` in particular means the note area moves with the text,
-  which changes how many lines fit — a genuine circularity handled by loop L2.
+  which changes how many lines fit - a genuine circularity handled by loop L2.
 - **Area sizing:** the note area holds the notes referenced on that page, each a full paragraph story with
   the footnote text's own styles (usually 10 pt with single spacing and a smaller line height). The area's
   height = sum of note heights + separator + spacing between notes.
 - **Displacement (L2):** if body content + note area exceeds the content box, the **minimum number of body
   lines** moves to the next page, and **their notes move with them**; the note area is recomputed. Bounded at
   4 iterations per page; on exhaustion, overflow with `NOTE_OVERFLOW`. Notes taller than an entire page
-  split across pages' note areas with the continuation separator — mirroring Word, which does exactly this.
+  split across pages' note areas with the continuation separator - mirroring Word, which does exactly this.
 - Separator (`w:separator`, default a short horizontal rule at the left of the note area, ~2 in wide) and
   `w:continuationSeparator` (a full-width rule) are laid out as blocks in the note story with their own
   geometry.
 - Notes are **laid out once** and reused across iterations where possible (their width does not change), so
   L2's cost is dominated by the body re-flow.
-- Edge cases: a note reference on the last line of a page whose note would not fit (the line moves — the
+- Edge cases: a note reference on the last line of a page whose note would not fit (the line moves - the
   most common footnote-fidelity case); three notes on one page referencing the same footnote (one note
-  instance — a reference may repeat with `w:footnoteRef` custom marks); a footnote inside a table cell
+  instance - a reference may repeat with `w:footnoteRef` custom marks); a footnote inside a table cell
   (placed in the page's note area, not the cell's); a note in a document with a two-column section
-  (`w:pos=pageBottom` puts the area at the bottom of the **column** in Word — implemented and golden-tested).
+  (`w:pos=pageBottom` puts the area at the bottom of the **column** in Word - implemented and golden-tested).
 
 ---
 
-**LE-062 — Endnotes, separators and note conversions**
+**LE-062 - Endnotes, separators and note conversions**
 **Pass** P14 · **OOXML** `w:endnotePr`, `w:endnote`, `w:endnoteReference`,
 `w:footnotePr/w:numRestart`, `w:endnotePr w:pos` (sectEnd/docEnd) · **Pri** later · **Effort** M
 
@@ -1706,7 +1706,7 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-063 — Layout tree, fingerprints and invalidation**
+**LE-063 - Layout tree, fingerprints and invalidation**
 **Pass** all · **OOXML** n/a · **Pri** core · **Effort** L
 
 - A `LayoutNode` tree mirrors the model (story → section → block → paragraph/table → row → cell → line) and
@@ -1719,13 +1719,13 @@ Rules of the greedy breaker (all Word-observable):
 - `documentHash` is a Merkle hash over the fingerprint tree, so a whole-document layout result is comparable
   across processes and runs (golden tests, worker/main-thread agreement, divergence detection).
 - Edge cases: a fingerprint must include the **page-kind content box** (a header change invalidates body
-  nodes on some page kinds but not others — modelled by including the content box, which varies per kind,
+  nodes on some page kinds but not others - modelled by including the content box, which varies per kind,
   so only the affected kinds' subtrees go dirty); an edit inside a cell invalidates the table's width pass
   only if the content's min/preferred width changed (checked cheaply from the shaped cache).
 
 ---
 
-**LE-064 — Incremental relayout: rewind, re-run, resync**
+**LE-064 - Incremental relayout: rewind, re-run, resync**
 **Pass** L4 · **OOXML** n/a · **Pri** core · **Effort** XL
 
 - Algorithm for an edit at document position `p`:
@@ -1734,36 +1734,36 @@ Rules of the greedy breaker (all Word-observable):
   2. **Rewind point:** the last fragment boundary before `p` at which the vertical state (page, cursorY,
      column, active floats, active notes, previous paragraph style) is identical to the previous layout's.
      Typically the start of the current paragraph, or the current page.
-  3. **Re-run forward** from the rewind point through P13 (and P14–P17 as needed), in a worker, in time
+  3. **Re-run forward** from the rewind point through P13 (and P14-P17 as needed), in a worker, in time
      slices.
   4. **Resync:** stop as soon as a page's fragment set is **structurally identical** to the previous layout's
      (same fragment ids, same coordinates, same page). Everything after that page is reused by reference.
-     Because pagination is quantized to page height, resync typically happens within 1–2 pages.
+     Because pagination is quantized to page height, resync typically happens within 1-2 pages.
   5. **Publish:** swap in the new `LayoutResult` atomically. No intermediate state is ever painted.
 - Structural sharing makes the publish cheap: unchanged pages are the *same objects*, so the renderer diffs by
   identity and repaints only changed pages.
 - Caret stability: the caret is a document position, not a pixel, and its pixel geometry is re-derived from
-  the new result — so a reflow never moves the caret. A selection is likewise re-derived.
+  the new result - so a reflow never moves the caret. A selection is likewise re-derived.
 - Edge cases: an edit that changes the page count (everything below the rewind point re-runs, but resync
   still applies); an edit that changes a **style** (a wider blast radius; the rewind point degrades to the
   section start); an undo/redo (the previous result is cached by `documentHash`, so a redo is often a cache
   hit); an edit during an in-flight layout (the in-flight run is cancelled and restarted from the newer
-  rewind point — never queued, so a fast typist cannot build a backlog).
+  rewind point - never queued, so a fast typist cannot build a backlog).
 
 ---
 
-**LE-065 — Typing latency budget and worker scheduling**
+**LE-065 - Typing latency budget and worker scheduling**
 **Pass** L4 · **OOXML** n/a · **Pri** core · **Effort** L
 
 - Budget: the synchronous paragraph-local path must complete in **< 4 ms** for a typical paragraph
   (measured as p95 over a corpus of 200 real paragraphs) so that typing stays under one frame at 60 Hz.
 - The worker runs P13+ with slices of ~6 ms, yielding between slices, prioritising: (1) the visible
   viewport and one page beyond, (2) pages above the viewport, (3) the remainder. A page not yet repaginated
-  after a change is painted from the previous result **with its pagination marked provisional** — and the
+  after a change is painted from the previous result **with its pagination marked provisional** - and the
   scroll container's total height uses the previous page count, so the scrollbar never jumps mid-typing.
 - The engine is host-agnostic and must run in: the main thread (small documents, tests), a Web Worker (the
   default in browsers), and Node (golden tests, server-side PDF). All three produce identical results
-  (LE-001) — asserted by a test that runs the same corpus in all three.
+  (LE-001) - asserted by a test that runs the same corpus in all three.
 - A document below a size threshold (configurable, default ~50 pages and no floats) runs entirely
   synchronously, because the worker round-trip costs more than the layout.
 - Edge cases: a worker that fails to start (fall back to the main thread, diagnostic, no crash); a document
@@ -1772,30 +1772,30 @@ Rules of the greedy breaker (all Word-observable):
 
 ---
 
-**LE-066 — Page virtualization and painting**
+**LE-066 - Page virtualization and painting**
 **Pass** renderer · **OOXML** n/a · **Pri** important · **Effort** M
 
 - Only pages intersecting the viewport (±1 page) are rendered to DOM. Non-rendered pages are placeholder
   elements with the exact size from `LayoutResult`, so scroll geometry and scrollbar are exact and stable.
 - The DOM for a page is rebuilt only when that page's fragment identity changes (LE-064 structural sharing).
 - Selection, caret and the find-highlight overlay are separate absolutely positioned layers above the page
-  surfaces, built from fragment rects and repainted independently of page content — so a caret blink never
+  surfaces, built from fragment rects and repainted independently of page content - so a caret blink never
   touches the document DOM.
 - Edge cases: scrolling fast produces out-of-order render requests (resolve by page index, drop stale
   responses); a page taller than the viewport (rendered whole, because sub-page virtualization costs more
   than it saves for ≤ A3); printing from the browser (a `@media print` path that renders all pages and
-  applies a page-sized transform — the print path is a convenience, the PDF export is the real target).
+  applies a page-sized transform - the print path is a convenience, the PDF export is the real target).
 
 ---
 
-**LE-067 — Fidelity harness: golden corpus, divergence tests, Word comparison**
+**LE-067 - Fidelity harness: golden corpus, divergence tests, Word comparison**
 **Pass** all · **OOXML** n/a · **Pri** core · **Effort** L
 
 - **Corpus** of real DOCX documents (anonymised HR contracts, orders, letters, in ro/ru/en) plus synthetic
   cases for every feature above, stored with expected `LayoutResult` hashes and, for a subset, a
   human-verified golden PDF.
 - **Golden tests** assert on the `LayoutResult`: line break positions, page breaks, line counts per page,
-  table column widths, float boxes, note areas. Not on screenshots — screenshots are the last line of
+  table column widths, float boxes, note areas. Not on screenshots - screenshots are the last line of
   defence, not the first, because they are hard to diff and impossible to attribute.
 - **Word comparison**: for each corpus document, a reference PDF produced by Word (checked in, with the
   Word version recorded) is compared to our PDF on page count, per-page line count, and the y of the first
@@ -1806,7 +1806,7 @@ Rules of the greedy breaker (all Word-observable):
   cross-engine page counts and line breaks must be identical.
 - **Property tests:** right-edge landing of justified lines is exact for every line in the corpus; every
   fragment's geometry is inside its page; every fragment's document position maps to exactly one caret
-  stop; every atom is covered by exactly one fragment (no gaps, no double coverage) — the invariants in
+  stop; every atom is covered by exactly one fragment (no gaps, no double coverage) - the invariants in
   §4.
 
 ---
@@ -1841,7 +1841,7 @@ CaretStop         { docPos, x, baselineY, level, affinity: 'upstream'|'downstrea
 3. Every model position in a story maps to **exactly one** caret stop, and every caret stop maps to a valid
    model position.
 4. Every inline atom is covered by exactly one fragment.
-5. Sum over pages of content is the document: no block is dropped, no block is duplicated — except repeated
+5. Sum over pages of content is the document: no block is dropped, no block is duplicated - except repeated
    table header rows, which are marked `repeat: true`.
 6. A justified line's right edge equals the content-box right edge exactly (mp), within the line's own
    indents.
@@ -1855,7 +1855,7 @@ CaretStop         { docPos, x, baselineY, level, affinity: 'upstream'|'downstrea
 
 ## 5. Explicit non-goals (v1)
 
-- **Complex-script shaping** (Arabic, Indic, Khmer, Thai) — the `Shaper` interface accommodates a
+- **Complex-script shaping** (Arabic, Indic, Khmer, Thai) - the `Shaper` interface accommodates a
   HarfBuzz-wasm backend; the kashida justification and CJK kinsoku rules (LE-028, LE-029) are specified but
   deferred.
 - **Math layout** (`w:oMath`): rendered as an opaque box with the cached `w:oMathPara` image if present,
@@ -1875,13 +1875,13 @@ CaretStop         { docPos, x, baselineY, level, affinity: 'upstream'|'downstrea
 
 | Priority | Features | Why |
 |---|---|---|
-| **core** (45) | LE-001 – LE-012, LE-014 – LE-018, LE-021 – LE-024, LE-026, LE-030 – LE-036, LE-040, LE-041, LE-045 – LE-050, LE-053, LE-054, LE-058, LE-059, LE-063 – LE-065, LE-067 | Everything an HR contract needs: the truth model, text, spacing, keeps, pages, tables, images, headers, incremental typing, and the detector that proves the screen matches the PDF |
-| **important** (15) | LE-013, LE-019, LE-020, LE-025, LE-027, LE-038, LE-039, LE-042, LE-051, LE-055 – LE-057, LE-060, LE-061, LE-066 | Embedded fonts, bidi, hyphenation, borders/shading, columns, wrap modes, text boxes, footnotes, virtualization |
+| **core** (45) | LE-001 - LE-012, LE-014 - LE-018, LE-021 - LE-024, LE-026, LE-030 - LE-036, LE-040, LE-041, LE-045 - LE-050, LE-053, LE-054, LE-058, LE-059, LE-063 - LE-065, LE-067 | Everything an HR contract needs: the truth model, text, spacing, keeps, pages, tables, images, headers, incremental typing, and the detector that proves the screen matches the PDF |
+| **important** (15) | LE-013, LE-019, LE-020, LE-025, LE-027, LE-038, LE-039, LE-042, LE-051, LE-055 - LE-057, LE-060, LE-061, LE-066 | Embedded fonts, bidi, hyphenation, borders/shading, columns, wrap modes, text boxes, footnotes, virtualization |
 | **later** (7) | LE-028, LE-029, LE-037, LE-043, LE-044, LE-052, LE-062 | Deferred by corpus frequency, with the interfaces in place so they are additive rather than structural |
 
-**Sizing**, using this document's own effort definition (S < 1 week, M 1–3 weeks, L 3–6 weeks, XL > 6 weeks)
-mapped to 0.2 / 0.5 / 1.1 / 3 engineer-months: **core ≈ 36, important ≈ 16, later ≈ 4 engineer-months** —
-roughly 55 in total, i.e. two to three engineers for a year to the full catalogue, and the M1–M4 milestones
+**Sizing**, using this document's own effort definition (S < 1 week, M 1-3 weeks, L 3-6 weeks, XL > 6 weeks)
+mapped to 0.2 / 0.5 / 1.1 / 3 engineer-months: **core ≈ 36, important ≈ 16, later ≈ 4 engineer-months** -
+roughly 55 in total, i.e. two to three engineers for a year to the full catalogue, and the M1-M4 milestones
 (§7) are the honest MVP. Layout engines are the most reliably underestimated component in document software,
 so these are floors, not commitments.
 
@@ -1891,17 +1891,17 @@ retro-fitting invalidation onto a pipeline that was not designed for it means re
 
 ## 7. Suggested build order (milestones)
 
-1. **M1 — Truth model.** LE-001..LE-007: units, `LayoutResult`, renderer contract, zoom, divergence
+1. **M1 - Truth model.** LE-001..LE-007: units, `LayoutResult`, renderer contract, zoom, divergence
    detector. No feature is worth building before the guardrail exists.
-2. **M2 — Text to a page.** LE-008, LE-009, LE-012, LE-014, LE-015, LE-017, LE-018, LE-021, LE-023,
+2. **M2 - Text to a page.** LE-008, LE-009, LE-012, LE-014, LE-015, LE-017, LE-018, LE-021, LE-023,
    LE-024, LE-026, LE-035, LE-036, and LE-040 for a single section. Deliverable: a paragraph lays out
    identically on screen and in PDF, and the detector says so.
-3. **M3 — Real documents.** LE-011 (numbering), LE-030, LE-031, LE-032, LE-033, LE-034, LE-041,
+3. **M3 - Real documents.** LE-011 (numbering), LE-030, LE-031, LE-032, LE-033, LE-034, LE-041,
    LE-045..LE-050 (tables), LE-053, LE-054, LE-058, LE-059. Deliverable: a real HR contract renders
    page-for-page against Word.
-4. **M4 — Incremental.** LE-063, LE-064, LE-065, LE-066. Deliverable: typing at 60 Hz on a 100-page
+4. **M4 - Incremental.** LE-063, LE-064, LE-065, LE-066. Deliverable: typing at 60 Hz on a 100-page
    document. (Designed in M1, delivered here.)
-5. **M5 — Fidelity depth.** LE-010, LE-013, LE-016, LE-019, LE-020, LE-022, LE-025, LE-027, LE-038, LE-039,
+5. **M5 - Fidelity depth.** LE-010, LE-013, LE-016, LE-019, LE-020, LE-022, LE-025, LE-027, LE-038, LE-039,
    LE-042, LE-051, LE-055..LE-057, LE-060..LE-062, LE-067. Deliverable: the corpus passes with zero
    unexplained differences. The `later` features (LE-028, LE-029, LE-037, LE-043, LE-044, LE-052) follow,
    each additive by construction.

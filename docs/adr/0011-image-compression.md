@@ -1,4 +1,4 @@
-# 0011 — Where image compression runs, and its defaults
+# 0011 - Where image compression runs, and its defaults
 
 **Status:** accepted for the mechanism; **proposed, awaiting a product decision** for the defaults ·
 **Decided by:** engineering (mechanism) and PRODUCT OWNER (quality, PPI ladder, codec matrix) ·
@@ -25,8 +25,8 @@ are skipped and reported rather than being silently converted to a lossy format.
 
 | Option | Tradeoff |
 |---|---|
-| In-browser only (`OffscreenCanvas` + workers) | No server, works offline, no data leaves the machine — which matters for a contract containing personal data. Cost: codec availability differs by browser (WebP is broad, AVIF is not), quality tuning is per-engine and therefore non-deterministic, and a 40-image document is a real CPU burst even on a worker. |
-| Host-provided endpoint only | Best quality and codec control, and the server can do batch work. Cost: requires a server, breaks the offline claim, and sends document images to a third party — a compliance question for the customer, not a technical one. |
+| In-browser only (`OffscreenCanvas` + workers) | No server, works offline, no data leaves the machine - which matters for a contract containing personal data. Cost: codec availability differs by browser (WebP is broad, AVIF is not), quality tuning is per-engine and therefore non-deterministic, and a 40-image document is a real CPU burst even on a worker. |
+| Host-provided endpoint only | Best quality and codec control, and the server can do batch work. Cost: requires a server, breaks the offline claim, and sends document images to a third party - a compliance question for the customer, not a technical one. |
 | In-browser by default, with an injected host endpoint and an explicit policy | Offline by default, escalatable when a host wants server-side quality or batch throughput. Cost: two code paths, so the test matrix doubles and the defaults must be expressible in both. |
 | Defer compression entirely to v2 (insert at original size) | Removes a whole risk area from v1. Cost: a 12 MP phone photo in a contract is a 4 MB DOCX, which the customer will notice immediately; the draft has this as `core`. |
 
