@@ -12,6 +12,8 @@ import type { PdfLoss } from './types.js';
 
 export const PAINTED_ATOM_KINDS: ReadonlySet<AtomKind> = new Set<AtomKind>(['word', 'space', 'symbol']);
 
+const ADVANCE_MODEL_TOLERANCE = 20;
+
 export interface Segment {
   readonly x: Mp;
   readonly width: Mp;
@@ -116,10 +118,21 @@ export const paintRun = (run: LineRun, paint: RunPaint, context: RunPaintContext
         paint.characterScale,
         paint.characterSpacing,
         paint.family,
+        paint,
         measurer,
         slot.font,
       );
       slot.record(atom.text);
+      if (plan.modelDeltaPerMille > ADVANCE_MODEL_TOLERANCE) {
+        const detail = `${paint.family} (advances from the ${plan.unitsSource})`;
+        if (!losses.some((loss) => loss.code === 'advanceModelMismatch' && loss.detail === detail)) {
+          losses.push({
+            code: 'advanceModelMismatch',
+            message: `the layout measured "${atom.text}" with advances that differ from ${paint.family} by ${plan.modelDeltaPerMille}/1000 em`,
+            detail: `${detail}; text is drawn at the measured position, so its glyphs are crowded or spread against the slot they were given`,
+          });
+        }
+      }
       if (plan.mismatch) {
         losses.push({
           code: 'metricMismatch',

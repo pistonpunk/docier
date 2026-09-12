@@ -36,7 +36,7 @@ export const countWords = (handle: EditorHandle): number => {
   if (session === undefined) return 0;
   let total = 0;
   for (const span of session.index.paragraphs) {
-    const text = blockText(session.index, span);
+    const text = blockText(span);
     for (const run of wordRuns(text)) {
       if (run.word) total += 1;
     }

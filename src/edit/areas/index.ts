@@ -4,6 +4,7 @@ import { numberingCommands } from './numbering.js';
 import { pageCommands } from './page.js';
 import { paragraphCommands } from './paragraph.js';
 import { proofCommands } from './proof.js';
+import { regionCommands } from './region.js';
 import { styleCommands } from './style.js';
 import { installAll } from './support.js';
 import { tableCommands } from './table.js';
@@ -16,6 +17,7 @@ export { pageCommands } from './page.js';
 export { paragraphCommands } from './paragraph.js';
 export { styleCommands } from './style.js';
 export { proofCommands } from './proof.js';
+export { regionCommands } from './region.js';
 export { insertCommands } from './insert.js';
 export { numberingCommands } from './numbering.js';
 export { tableCommands } from './table.js';
@@ -29,6 +31,7 @@ export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, 
   ...insertCommands(host),
   ...numberingCommands(host),
   ...tableCommands(host),
+  ...regionCommands(host),
   ...unsupportedCommands(host),
 ];
 

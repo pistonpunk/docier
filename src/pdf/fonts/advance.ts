@@ -1,6 +1,6 @@
 import type { Mp } from '../../units/index.js';
 import { mp, roundHalfEven } from '../../units/index.js';
-import type { TextMeasurer } from '../../measure/index.js';
+import type { ClusterStyle, TextMeasurer } from '../../measure/index.js';
 import { clusterLength } from '../../measure/index.js';
 import type { Sfnt } from './sfnt.js';
 
@@ -106,12 +106,13 @@ export interface ClusterUnits {
 export const unitsOf = (
   text: string,
   family: string,
+  style: ClusterStyle,
   measurer: TextMeasurer | undefined,
   font: Sfnt,
 ): ClusterUnits => {
   const clusters = clustersOf(text);
   if (measurer !== undefined && measurer.has(family)) {
-    const measured = measurer.clusters(family, text);
+    const measured = measurer.clusters(family, text, style);
     if (measured.length === clusters.length) {
       return { units: measured.map((measured) => measured.advance), source: 'measurer' };
     }
@@ -129,11 +130,28 @@ export const unitsOf = (
   };
 };
 
+const PER_MILLE = 1000;
+
+export const inkUnitsOf = (text: string, font: Sfnt): readonly number[] => {
+  const unitsPerEm = font.head.unitsPerEm;
+  if (unitsPerEm === 0) return clustersOf(text).map(() => 0);
+  const widths = font.advanceWidths();
+  return clustersOf(text).map((cluster) => {
+    let total = 0;
+    for (const character of cluster) {
+      total += widths[font.glyphFor(character.codePointAt(0) ?? 0)] ?? 0;
+    }
+    return Math.round((total * PER_MILLE) / unitsPerEm);
+  });
+};
+
 export interface AdvancePlan {
   readonly glyphs: readonly number[];
   readonly adjustments: readonly number[];
   readonly unitsSource: 'measurer' | 'font';
   readonly engineTotal: Mp;
+  readonly inkTotal: Mp;
+  readonly modelDeltaPerMille: number;
   readonly mismatch: boolean;
 }
 
@@ -151,10 +169,11 @@ export const planAdvance = (
   characterScale: number,
   characterSpacing: Mp,
   family: string,
+  style: ClusterStyle,
   measurer: TextMeasurer | undefined,
   font: Sfnt,
 ): AdvancePlan => {
-  const { units, source } = unitsOf(text, family, measurer, font);
+  const { units, source } = unitsOf(text, family, style, measurer, font);
   const offsets = offsetsOf(units, size, unitsPerEm, characterScale, characterSpacing);
   const clusters = clustersOf(text);
   const glyphs: number[] = [];
@@ -165,18 +184,33 @@ export const planAdvance = (
     boundaries.push(glyphs.length - 1);
   }
   const fontSize = size / 1000;
-  const natural = unitsPerEm === 0 ? 0 : size * characterScale / (unitsPerEm * 100);
+  const ink = inkUnitsOf(text, font);
+  const perMille = (size * characterScale) / (PER_MILLE * 100);
   for (let index = 0; index < clusters.length; index += 1) {
     const at = boundaries[index];
     if (at === undefined || at < 0) continue;
     const engineAdvance = (offsets[index + 1] ?? mp(0)) - (offsets[index] ?? mp(0));
-    const naturalAdvance = (units[index] ?? 0) * natural;
-    adjustments[at] = (adjustments[at] ?? 0) + textSpaceAdjustment((engineAdvance - naturalAdvance) / 1000, fontSize);
+    const inkAdvance = (ink[index] ?? 0) * perMille;
+    adjustments[at] = (adjustments[at] ?? 0) + textSpaceAdjustment((engineAdvance - inkAdvance) / 1000, fontSize);
   }
   const engineTotal = offsets[offsets.length - 1] ?? mp(0);
   const last = adjustments.length - 1;
   if (last >= 0 && engineTotal !== target) {
     adjustments[last] = (adjustments[last] ?? 0) + textSpaceAdjustment((target - engineTotal) / 1000, fontSize);
   }
-  return { glyphs, adjustments, unitsSource: source, engineTotal, mismatch: engineTotal !== target };
+  let inkPerMille = 0;
+  for (const value of ink) inkPerMille += value;
+  let measurerPerMille = 0;
+  if (unitsPerEm !== 0) {
+    for (const value of units) measurerPerMille += (value * PER_MILLE) / unitsPerEm;
+  }
+  return {
+    glyphs,
+    adjustments,
+    unitsSource: source,
+    engineTotal,
+    inkTotal: mp(Math.round(inkPerMille * perMille)),
+    modelDeltaPerMille: Math.round(Math.abs(measurerPerMille - inkPerMille)),
+    mismatch: engineTotal !== target,
+  };
 };

@@ -165,7 +165,7 @@ export const layoutRegion = (request: RegionRequest): RegionLayout => {
       split: 'whole',
       cell: undefined,
       lineIdStart: lineId,
-      collect: false,
+      collect: true,
     });
     lineId = result.nextLineId;
     blocks.push(result.fragment);

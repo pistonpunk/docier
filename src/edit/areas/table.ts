@@ -25,7 +25,7 @@ import {
   tableDepthAllowed,
   tableOf,
 } from '../tables.js';
-import { areaCommand, changedBy, documentSection } from './support.js';
+import { areaCommand, caretInRegion, changedBy, documentSection } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
 const NOT_ALIGNED: LocalizedString =
@@ -44,6 +44,8 @@ const BAD_SHAPE: LocalizedString = 'This build creates tables of 1 to 63 rows an
 const TOO_DEEP: LocalizedString =
   `This build nests tables at most ${String(MAX_TABLE_DEPTH)} levels deep, and the caret is already at that depth`;
 const NO_PARAGRAPH: LocalizedString = 'Place the caret in a paragraph to insert a table';
+const REGION_TABLE: LocalizedString =
+  'This build lays out no table inside a header or footer, so it cannot insert one there';
 
 interface CellTarget {
   readonly slot: ParagraphSlot;
@@ -243,6 +245,7 @@ const propertiesReason = (args: TablePropertiesArgs | undefined): LocalizedStrin
 const placeableIn = (host: AreaHost): LocalizedString | undefined => {
   const resolved = host.session.resolve(host.selection.focus);
   if (resolved === undefined) return NO_PARAGRAPH;
+  if (caretInRegion(host)) return REGION_TABLE;
   if (!tableDepthAllowed(resolved.slot.element)) return TOO_DEEP;
   return undefined;
 };

@@ -55,12 +55,27 @@ export const forEachSlot = (
 ): boolean => {
   const range = rangeOfSelection(host.selection);
   let changed = false;
-  for (const slot of host.session.slots()) {
-    if ((slot.end as number) <= (range.start as number)) continue;
-    if ((slot.start as number) > (range.end as number)) break;
-    if (visit(slot)) changed = true;
-  }
-  return changed;
+  const regions = host.session.changeRegions(() => {
+    for (const slot of host.session.slots()) {
+      if ((slot.end as number) <= (range.start as number)) continue;
+      if ((slot.start as number) > (range.end as number)) break;
+      if (visit(slot)) changed = true;
+    }
+  });
+  return changed || regions;
+};
+
+export const writingAt = (host: AreaHost, write: () => boolean): boolean => {
+  let changed = false;
+  const regions = host.session.changeRegions(() => {
+    changed = write();
+  });
+  return changed || regions;
+};
+
+export const caretInRegion = (host: AreaHost): boolean => {
+  const story = host.session.index.storyAt(host.selection.focus);
+  return story !== undefined && story.kind !== 'body';
 };
 
 export type AreaOutcome = boolean | typeof NOOP;
@@ -84,7 +99,8 @@ export interface AreaSpec<A> {
 
 export const areaCommand = <A>(host: AreaHost, spec: AreaSpec<A>): CommandDefinition<A, void> => {
   const invalidation = spec.invalidation ?? BODY_INVALIDATION;
-  const mutates = spec.chrome !== true;
+  const chrome = spec.chrome === true;
+  const mutates = !chrome;
   const allowed = (args: A | undefined): boolean =>
     host.loaded &&
     (!mutates || host.editable) &&
@@ -117,6 +133,7 @@ export const areaCommand = <A>(host: AreaHost, spec: AreaSpec<A>): CommandDefini
       if (!allowed(args)) throw new CancelledChangeError(refusal(args));
       const run = spec.run;
       if (run === undefined || run(host, args, ctx) !== true) return NOOP;
+      if (chrome) return undefined;
       ctx.mutate(() => ({
         value: undefined,
         changed: true,

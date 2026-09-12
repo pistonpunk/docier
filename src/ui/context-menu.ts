@@ -13,7 +13,7 @@ const SELECTOR_BY_SURFACE: readonly (readonly [ContextSurface, string])[] = [
   ['ruler', '[data-docier-part="ruler"]'],
   ['statusBar', '[data-docier-part="status"]'],
   ['ribbon', '[data-docier-part="ribbon"]'],
-  ['headerFooter', '[data-docier-page-kind="header"],[data-docier-page-kind="footer"]'],
+  ['headerFooter', `[${ATTR.header}],[${ATTR.footer}]`],
   ['table', `[${ATTR.table}]`],
   ['image', 'img,[data-docier-image]'],
   ['field', '[data-docier-token],[data-docier-field]'],

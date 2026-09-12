@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>docier — live demo</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231c1c1c'/%3E%3Crect x='7' y='7' width='18' height='18' rx='2' fill='%23b6f000'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="appbar">
+        <div class="brand">
+          <span class="mark"></span>
+          <span class="name">docier</span>
+          <span class="tag">live demo</span>
+        </div>
+        <div class="actions">
+          <label class="btn">
+            Open .docx
+            <input id="open-file" type="file" accept=".docx,.docm" hidden />
+          </label>
+          <button id="load-sample" class="btn" type="button">Sample document</button>
+          <button id="load-contract" class="btn" type="button">contract.docx (fixture)</button>
+          <button id="export-pdf" class="btn btn-primary" type="button">Export PDF</button>
+          <button id="save-docx" class="btn" type="button">Save .docx</button>
+        </div>
+      </header>
+
+      <main class="stage">
+        <div id="editor-host"></div>
+      </main>
+
+      <aside id="diagnostics" class="diagnostics" aria-label="Diagnostics">
+        <div class="diagnostics-head">
+          <h2>Diagnostics</h2>
+          <span id="diagnostics-count" class="pill pill-ok">0</span>
+          <button id="diagnostics-clear" class="btn btn-small" type="button">Clear</button>
+          <button id="diagnostics-toggle" class="btn btn-small" type="button">Collapse</button>
+        </div>
+        <ol id="diagnostics-list" class="diagnostics-list"></ol>
+      </aside>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

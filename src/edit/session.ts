@@ -1,16 +1,20 @@
-import type { CellRef, DocPos, DocRange, LayoutResult } from '../layout/index.js';
-import { layoutDocument } from '../layout/index.js';
+import type { CellRef, DocPos, DocRange, LayoutResult, StoryId } from '../layout/index.js';
+import { docPos, layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
 import type { XmlElement, XmlNode } from '../ooxml/xml/index.js';
 import { serializeXmlNode } from '../ooxml/xml/index.js';
 import { cloneNode } from '../ooxml/xml/tree.js';
 import type { Relationship } from '../ooxml/relationships.js';
-import type { DocumentModel } from '../model/index.js';
+import type { DocumentModel, Story } from '../model/index.js';
 import { Paragraph, childElements, wAttr } from '../model/index.js';
 import type { PositionIndex, ParagraphSpan } from './positions.js';
 import { blockText, buildPositionIndex } from './positions.js';
 import type { SlotContainer } from './containers.js';
-import { BODY_CONTAINER, collectContainers, containerKeyOf } from './containers.js';
+import {
+  collectContainers,
+  collectRegionContainers,
+  groupKeyOf,
+} from './containers.js';
 import type { ParagraphFormatPatch, RunFormatPatch } from './mutation.js';
 import {
   applyRunPatchToProperties,
@@ -38,6 +42,7 @@ export interface ParagraphSlot {
   readonly textEnd: DocPos;
   readonly end: DocPos;
   readonly length: number;
+  readonly story: StoryId;
   readonly container: string;
   readonly cell: CellRef | undefined;
 }
@@ -47,11 +52,19 @@ export interface NumberingSnapshot {
   readonly root: XmlElement | undefined;
 }
 
+export interface RegionSnapshot {
+  readonly partName: string;
+  readonly root: XmlElement;
+}
+
 export interface EditSnapshot {
   readonly body: readonly XmlNode[];
   readonly relationships: readonly Relationship[];
   readonly numbering: NumberingSnapshot;
+  readonly regions: readonly RegionSnapshot[];
 }
+
+export type Crossing = 'none' | 'story' | 'container';
 
 export interface ResolvedPosition {
   readonly slot: ParagraphSlot;
@@ -71,6 +84,7 @@ export interface EditSession {
   textOf(range: DocRange): string;
   textRange(range: DocRange): TextRange;
   spansContainers(range: DocRange): boolean;
+  crossing(range: DocRange): Crossing;
   relayout(): LayoutResult;
   markChanged(): void;
   insertText(range: DocRange, text: string, patch?: RunFormatPatch): boolean;
@@ -86,6 +100,9 @@ export interface EditSession {
   snapshot(): EditSnapshot;
   restore(snapshot: EditSnapshot): void;
   changeNumbering(write: () => unknown): boolean;
+  changeRegions(write: () => unknown): boolean;
+  rememberBodyPosition(pos: DocPos): void;
+  rememberedBodyPosition(): DocPos;
   readonly layoutOptions: LayoutOptions;
 }
 
@@ -155,6 +172,60 @@ const restoreNumbering = (model: DocumentModel, snapshot: NumberingSnapshot): bo
   return serializeXmlNode(numbering.element) !== before;
 };
 
+const regionStoriesOf = (model: DocumentModel): readonly Story[] =>
+  model.stories().filter((story) => story.isHeaderFooter);
+
+const captureRegions = (model: DocumentModel): readonly RegionSnapshot[] =>
+  regionStoriesOf(model).map((story) => ({
+    partName: story.partName,
+    root: cloneElement(story.element),
+  }));
+
+const sameNodeAt = (left: XmlNode, right: XmlNode): boolean =>
+  left.kind === right.kind && serializeXmlNode(left) === serializeXmlNode(right);
+
+const applyRegionChildren = (model: DocumentModel, live: XmlElement, wanted: XmlElement): void => {
+  const current = live.children;
+  const next: XmlNode[] = [];
+  let at = 0;
+  for (; at < wanted.children.length; at += 1) {
+    const child = wanted.children[at];
+    if (child === undefined) continue;
+    const existing = current[at];
+    if (existing !== undefined && sameNodeAt(existing, child)) {
+      next.push(existing);
+      continue;
+    }
+    if (existing !== undefined && existing.kind === 'element') {
+      model.context.forgetSubtree(existing);
+    }
+    next.push(cloneNode(child));
+  }
+  for (; at < current.length; at += 1) {
+    const extra = current[at];
+    if (extra !== undefined && extra.kind === 'element') model.context.forgetSubtree(extra);
+  }
+  live.children = next;
+  for (const child of next) child.parent = live;
+  live.selfClosing = wanted.selfClosing;
+};
+
+const restoreRegions = (model: DocumentModel, snapshot: readonly RegionSnapshot[]): boolean => {
+  const byPart = new Map(snapshot.map((entry) => [entry.partName, entry]));
+  let changed = false;
+  for (const story of regionStoriesOf(model)) {
+    const entry = byPart.get(story.partName);
+    if (entry === undefined) continue;
+    const before = serializeXmlNode(story.element);
+    applyRegionChildren(model, story.element, entry.root);
+    if (serializeXmlNode(story.element) !== before) {
+      model.context.forgetSubtree(story.element);
+      changed = true;
+    }
+  }
+  return changed;
+};
+
 const relationshipsOf = (model: DocumentModel): readonly Relationship[] =>
   model.package.getRelationships(model.package.mainDocumentPartName);
 
@@ -183,6 +254,7 @@ const restoreRelationships = (
 interface SlotPair {
   readonly element: XmlElement;
   readonly span: ParagraphSpan;
+  readonly story: StoryId;
   readonly container: string;
   readonly cell: CellRef | undefined;
 }
@@ -198,7 +270,7 @@ const pairContainers = (
 ): PairedSlots => {
   const groups = new Map<string, ParagraphSpan[]>();
   for (const span of spans) {
-    const key = span.cell === undefined ? BODY_CONTAINER : containerKeyOf(span.cell);
+    const key = groupKeyOf(span.story, span.cell);
     const list = groups.get(key);
     if (list === undefined) groups.set(key, [span]);
     else list.push(span);
@@ -207,7 +279,7 @@ const pairContainers = (
   let aligned = true;
   let used = 0;
   for (const container of containers) {
-    const list = groups.get(container.key) ?? [];
+    const list = groups.get(container.group) ?? [];
     if (list.length !== container.paragraphs.length) aligned = false;
     const shared = Math.min(container.paragraphs.length, list.length);
     used += shared;
@@ -215,7 +287,13 @@ const pairContainers = (
       const element = container.paragraphs[at];
       const span = list[at];
       if (element === undefined || span === undefined) continue;
-      entries.push({ element, span, container: container.key, cell: container.cell });
+      entries.push({
+        element,
+        span,
+        story: container.story,
+        container: container.key,
+        cell: container.cell,
+      });
     }
   }
   if (used !== spans.length) aligned = false;
@@ -234,6 +312,10 @@ export const createEditSession = (
   let revisionCounter = 0;
   let numberingCapture: NumberingSnapshot = { name: undefined, root: undefined };
   let numberingStale = true;
+  let regionCapture: readonly RegionSnapshot[] = [];
+  let regionsStale = true;
+  const bodyStoryId: StoryId = model.body().id;
+  let bodyPosition: DocPos | undefined = undefined;
 
   const numberedCapture = (): NumberingSnapshot => {
     if (numberingStale) {
@@ -243,8 +325,22 @@ export const createEditSession = (
     return numberingCapture;
   };
 
+  const capturedRegions = (): readonly RegionSnapshot[] => {
+    if (regionsStale) {
+      regionCapture = captureRegions(model);
+      regionsStale = false;
+    }
+    return regionCapture;
+  };
+
+  const regionStoryIds = (): readonly StoryId[] =>
+    index.stories.filter((story) => story.id !== bodyStoryId).map((story) => story.id);
+
   const buildSlots = (): readonly ParagraphSlot[] => {
-    const containers = collectContainers(model);
+    const containers = [
+      ...collectContainers(model),
+      ...collectRegionContainers(model, regionStoryIds()),
+    ];
     const paired = pairContainers(containers, index.paragraphs);
     const slots: ParagraphSlot[] = [];
     for (const entry of paired.entries) {
@@ -257,6 +353,7 @@ export const createEditSession = (
         textEnd: span.textEnd,
         end: span.end,
         length: (span.textEnd as number) - (span.start as number),
+        story: entry.story,
         container: entry.container,
         cell: entry.cell,
       });
@@ -300,22 +397,31 @@ export const createEditSession = (
     return { first, last };
   };
 
-  const spansContainers = (range: DocRange): boolean => {
+  const crossing = (range: DocRange): Crossing => {
     const bounds = splitBoundaries(range);
-    if (bounds === undefined) return false;
-    const container = bounds.first.slot.container;
-    if (bounds.last.slot.container !== container) return true;
+    if (bounds === undefined) return 'none';
+    const first = bounds.first.slot;
+    if (bounds.last.slot.story !== first.story) return 'story';
+    if (bounds.last.slot.container !== first.container) return 'container';
     for (const slot of slots()) {
       if ((slot.end as number) <= (range.start as number)) continue;
       if ((slot.start as number) >= (range.end as number)) break;
-      if (slot.container !== container) return true;
+      if (slot.story !== first.story) return 'story';
+      if (slot.container !== first.container) return 'container';
     }
-    return false;
+    return 'none';
   };
+
+  const spansContainers = (range: DocRange): boolean => crossing(range) !== 'none';
 
   const markChanged = (): void => {
     cachedSlots = undefined;
     revisionCounter += 1;
+  };
+
+  const markMutated = (story: StoryId): void => {
+    if (story !== bodyStoryId) regionsStale = true;
+    markChanged();
   };
 
   const relayout = (): LayoutResult => {
@@ -348,7 +454,7 @@ export const createEditSession = (
       for (const slot of slots()) {
         if ((slot.end as number) <= (range.start as number)) continue;
         if ((slot.start as number) >= (range.end as number)) break;
-        const body = blockText(index, slot.span);
+        const body = blockText(slot.span);
         const from = Math.max(0, (range.start as number) - (slot.start as number));
         const to = Math.min(body.length, Math.max(from, (range.end as number) - (slot.start as number)));
         parts.push(body.slice(from, to));
@@ -360,11 +466,11 @@ export const createEditSession = (
       const positionOf = (pos: DocPos, affinity: TextAffinity): TextPosition => {
         const target = resolve(pos);
         if (target === undefined) {
-          return { story: 'body', paragraphId: '', offset: 0, affinity };
+          return { story: bodyStoryId, paragraphId: '', offset: 0, affinity };
         }
         const paragraph = Paragraph.of(model.context, target.slot.element);
         return {
-          story: 'body',
+          story: target.slot.story,
           paragraphId: String(paragraph.id),
           offset: target.offset,
           affinity,
@@ -379,18 +485,19 @@ export const createEditSession = (
     markChanged,
     layoutOptions,
     spansContainers,
+    crossing,
     insertText: (range, text, patch) => {
       const target = resolve(range.start);
       if (target === undefined || text === '') return false;
       const changed = insertTextAt(model, target.slot.element, target.offset, text, patch);
-      if (changed) markChanged();
+      if (changed) markMutated(target.slot.story);
       return changed;
     },
     insertBreak: (range, kind = 'line') => {
       const target = resolve(range.start);
       if (target === undefined) return false;
       const changed = insertBreakAt(model, target.slot.element, target.offset, kind);
-      if (changed) markChanged();
+      if (changed) markMutated(target.slot.story);
       return changed;
     },
     deleteRange: (range) => {
@@ -428,7 +535,7 @@ export const createEditSession = (
               const merged = joinParagraphInto(model, first.slot.element, last.slot.element);
               return tail || head || bridged.length > 0 || merged;
             })();
-      if (changed) markChanged();
+      if (changed) markMutated(first.slot.story);
       return changed;
     },
     splitAt: (pos) => {
@@ -436,7 +543,7 @@ export const createEditSession = (
       if (target === undefined) return false;
       const created = splitParagraphAt(model, target.slot.element, target.offset);
       if (created === undefined) return false;
-      markChanged();
+      markMutated(target.slot.story);
       return true;
     },
     joinAt: (pos) => {
@@ -445,7 +552,7 @@ export const createEditSession = (
       const next = slots()[target.slot.index + 1];
       if (next === undefined || next.container !== target.slot.container) return false;
       const changed = joinParagraphInto(model, target.slot.element, next.element);
-      if (changed) markChanged();
+      if (changed) markMutated(target.slot.story);
       return changed;
     },
     joinWithPrevious: (pos) => {
@@ -454,17 +561,17 @@ export const createEditSession = (
       const previous = slots()[target.slot.index - 1];
       if (previous === undefined || previous.container !== target.slot.container) return false;
       const changed = joinParagraphInto(model, previous.element, target.slot.element);
-      if (changed) markChanged();
+      if (changed) markMutated(target.slot.story);
       return changed;
     },
     applyRunFormat: (range, patch) => {
       const changed = applyRunFormatAcross(model, slots(), range, patch, 'patch');
-      if (changed) markChanged();
+      if (changed) markMutated(storyTouchedBy(slots(), range));
       return changed;
     },
     clearRunFormatting: (range) => {
       const changed = applyRunFormatAcross(model, slots(), range, {}, 'clear');
-      if (changed) markChanged();
+      if (changed) markMutated(storyTouchedBy(slots(), range));
       return changed;
     },
     applyParagraphFormat: (range, patch) => {
@@ -472,20 +579,21 @@ export const createEditSession = (
         setParagraphProperties(slot.element, patch);
         return true;
       });
-      if (changed) markChanged();
+      if (changed) markMutated(storyTouchedBy(slots(), range));
       return changed;
     },
     clearParagraphFormatting: (range) => {
       const changed = forEachParagraph(slots(), range, (slot) =>
         clearParagraphProperties(slot.element),
       );
-      if (changed) markChanged();
+      if (changed) markMutated(storyTouchedBy(slots(), range));
       return changed;
     },
     snapshot: (): EditSnapshot => ({
       body: model.body().element.children.map((child) => cloneNode(child)),
       relationships: [...relationshipsOf(model)],
       numbering: numberedCapture(),
+      regions: capturedRegions(),
     }),
     restore: (snapshot) => {
       const body = model.body().element;
@@ -497,6 +605,7 @@ export const createEditSession = (
         model.invalidateNumbering();
         numberingStale = true;
       }
+      if (restoreRegions(model, snapshot.regions)) regionsStale = true;
       model.context.forgetSubtree(body);
       markChanged();
     },
@@ -511,9 +620,40 @@ export const createEditSession = (
       numberingStale = true;
       return true;
     },
+    changeRegions: (write) => {
+      const stories = regionStoriesOf(model);
+      const before = stories.map((story) => serializeXmlNode(story.element));
+      write();
+      let changed = false;
+      for (let at = 0; at < stories.length; at += 1) {
+        const story = stories[at];
+        if (story === undefined) continue;
+        if (serializeXmlNode(story.element) !== before[at]) changed = true;
+      }
+      if (changed) regionsStale = true;
+      return changed;
+    },
+    rememberBodyPosition: (pos) => {
+      const span = index.storySpan(bodyStoryId);
+      if (span === undefined || pos < span.start || pos > span.end) return;
+      bodyPosition = pos;
+    },
+    rememberedBodyPosition: () => {
+      const span = index.storySpan(bodyStoryId);
+      if (span === undefined) return index.documentStart;
+      if (bodyPosition === undefined) return span.start;
+      return docPos(Math.max(span.start, Math.min(span.end, bodyPosition)));
+    },
   };
 
   return session;
+};
+
+const storyTouchedBy = (slots: readonly ParagraphSlot[], range: DocRange): StoryId => {
+  for (const slot of slots) {
+    if (touchedBy(slot, range)) return slot.story;
+  }
+  return slots[0]?.story ?? 'body';
 };
 
 const touchedBy = (slot: ParagraphSlot, range: DocRange): boolean =>

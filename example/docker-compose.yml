@@ -1,0 +1,21 @@
+services:
+  docier:
+    build:
+      context: /home/daniel/work/docier
+      dockerfile: example/Dockerfile
+    image: docier-demo
+    container_name: docier
+    restart: always
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.docier.rule=Host(`editor.pistonpunk.com`)"
+      - "traefik.http.routers.docier.entrypoints=websecure"
+      - "traefik.http.routers.docier.tls.certresolver=myresolver"
+      - "traefik.http.services.docier.loadbalancer.server.port=80"
+
+networks:
+  web:
+    external: true

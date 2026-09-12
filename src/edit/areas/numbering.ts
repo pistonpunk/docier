@@ -60,10 +60,13 @@ const mutateList = (
   if (elements.length === 0) return false;
   const model = host.session.model;
   let bodyChanged = false;
-  const partChanged = host.session.changeNumbering(() => {
-    bodyChanged = write(model);
+  let partChanged = false;
+  const regionsChanged = host.session.changeRegions(() => {
+    partChanged = host.session.changeNumbering(() => {
+      bodyChanged = write(model);
+    });
   });
-  return bodyChanged || partChanged;
+  return bodyChanged || partChanged || regionsChanged;
 };
 
 const listSpec = (

@@ -407,7 +407,7 @@ export const clearSelectionRange = (host: EditActionHost): ActionResult => {
 };
 
 export const selectAllAction = (host: EditActionHost): ActionResult => {
-  const next = selectAll(host.session.index);
+  const next = selectAll(host.session.index, host.selection.focus);
   if (selectionEquals(next, host.selection)) return NO_CHANGE;
   return selectionAction(next, 'set');
 };

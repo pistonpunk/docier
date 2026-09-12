@@ -7,13 +7,18 @@ export interface MeasuredCluster {
   readonly glyph: boolean;
 }
 
+export interface ClusterStyle {
+  readonly bold: boolean;
+  readonly italic: boolean;
+}
+
 export interface TextMeasurer {
   readonly id: string;
   readonly fallbackFamily: string;
   has(family: string): boolean;
   metrics(family: string): FontMetrics;
   faceId(family: string): string;
-  clusters(family: string, text: string): readonly MeasuredCluster[];
+  clusters(family: string, text: string, style?: ClusterStyle): readonly MeasuredCluster[];
 }
 
 export const isCombiningMark = (codePoint: number): boolean =>
@@ -65,8 +70,13 @@ export const segmentClusters = (
   return clusters;
 };
 
-export const measureUnits = (measurer: TextMeasurer, family: string, text: string): number => {
+export const measureUnits = (
+  measurer: TextMeasurer,
+  family: string,
+  text: string,
+  style?: ClusterStyle,
+): number => {
   let total = 0;
-  for (const cluster of measurer.clusters(family, text)) total += cluster.advance;
+  for (const cluster of measurer.clusters(family, text, style)) total += cluster.advance;
   return total;
 };

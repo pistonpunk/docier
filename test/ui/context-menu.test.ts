@@ -2,13 +2,18 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ATTR } from '../../src/render/dom.js';
 import { SURFACE_LABEL_KEYS } from '../../src/ui/context-menu.js';
 import { CONTEXT_SURFACES } from '../../src/ui/types.js';
+import { PAGE } from '../layout/support.js';
 import { BORDERS, FIXED, cell, grid, para, row, table } from '../layout/table-support.js';
+import type { DocxSpec } from '../model/support.js';
+import { headerRelationship, headerXml } from '../model/support.js';
 import {
   bodyOf,
   chromeOf,
+  chromeOfDocx,
   contextMenuEvent,
   disposeChromes,
   longBody,
+  menuItemByText,
   menuItems,
   menus,
   paragraphText,
@@ -59,6 +64,20 @@ describe('surface menus', () => {
   });
 });
 
+const headerSpec = (): DocxSpec => ({
+  body: `${paragraphText('hello')}${PAGE.replace(
+    '</w:sectPr>',
+    '<w:headerReference w:type="default" r:id="rIdH1"/></w:sectPr>',
+  )}`,
+  headers: [headerXml(paragraphText('Head'))],
+  documentRelationships: [headerRelationship('rIdH1', 'header1.xml')],
+});
+
+const itemFor = (command: string, root: ParentNode = document): HTMLElement | undefined =>
+  [...root.querySelectorAll<HTMLElement>('[data-docier-id]')].find(
+    (item) => item.getAttribute('data-docier-id') === `docier.command.${command}`,
+  );
+
 describe('right-click routing', () => {
   const rightClick = (target: Element): void => {
     const event = contextMenuEvent(target, 12, 34);
@@ -101,6 +120,33 @@ describe('right-click routing', () => {
     rightClick(token);
     expect(chrome.contextMenus!.current).toBe('field');
     expect(menus()[0]?.getAttribute('aria-label')).toBe('Field menu');
+  });
+
+  it('routes a right-click inside a header to the header and footer menu', async () => {
+    const { handle, chrome } = await chromeOfDocx(headerSpec());
+    const region = handle.element.querySelector(`[${ATTR.header}]`);
+    expect(region).not.toBeNull();
+    rightClick(region!);
+    expect(chrome.contextMenus!.current).toBe('headerFooter');
+    expect(menus()[0]?.getAttribute('aria-label')).toBe('Header and footer menu');
+    expect(menuItemByText('Edit Header')).toBeDefined();
+    const enter = itemFor('insert.header');
+    expect(enter, 'the header entry').toBeDefined();
+    expect(enter!.getAttribute('aria-disabled')).not.toBe('true');
+    const close = itemFor('insert.closeHeaderFooter');
+    expect(close, 'the close entry').toBeDefined();
+    expect(close!.getAttribute('aria-disabled')).toBe('true');
+    expect(close!.getAttribute('aria-description') ?? '').toContain('not in a header');
+    const footer = itemFor('insert.footer');
+    expect(footer!.getAttribute('aria-disabled')).toBe('true');
+    expect(footer!.getAttribute('aria-description') ?? '').toContain('no footer');
+    const entered = await chrome.context.commands.execute('docier.command.insert.header');
+    expect(entered.status).toBe('ok');
+    chrome.contextMenus!.close();
+    rightClick(region!);
+    expect(chrome.contextMenus!.current).toBe('headerFooter');
+    const closeAgain = itemFor('insert.closeHeaderFooter');
+    expect(closeAgain!.getAttribute('aria-disabled')).not.toBe('true');
   });
 
   it('routes a right-click on the page background to the page menu', async () => {

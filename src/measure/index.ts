@@ -11,7 +11,7 @@ export {
   scaleUnits,
 } from './metrics.js';
 
-export type { MeasuredCluster, TextMeasurer } from './measurer.js';
+export type { ClusterStyle, MeasuredCluster, TextMeasurer } from './measurer.js';
 export {
   clusterLength,
   isCombiningMark,

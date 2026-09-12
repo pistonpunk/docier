@@ -1,0 +1,7 @@
+.git
+node_modules
+dist
+*.tsbuildinfo
+example/node_modules
+example/dist
+example/public/fonts

@@ -3,7 +3,7 @@ import type { XmlElement } from '../../ooxml/xml/index.js';
 import { R_NAMESPACE, xml } from '../../ooxml/index.js';
 import { createWElement, setWAttr } from '../../model/index.js';
 import { appendRun, insertContainerAt, insertRunChildAt } from './content.js';
-import { areaCommand } from './support.js';
+import { areaCommand, writingAt } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
 const HYPERLINK_RELATIONSHIP = `${R_NAMESPACE}/hyperlink`;
@@ -27,10 +27,20 @@ export interface FieldArgs {
 
 const DEFAULT_SYMBOL_FONT = 'Segoe UI Symbol';
 
-const caretOf = (host: AreaHost): { readonly element: XmlElement; readonly offset: number } | undefined => {
+interface CaretTarget {
+  readonly element: XmlElement;
+  readonly offset: number;
+  readonly partName: string | undefined;
+}
+
+const caretOf = (host: AreaHost): CaretTarget | undefined => {
   const target = host.session.resolve(host.selection.focus);
   if (target === undefined) return undefined;
-  return { element: target.slot.element, offset: target.offset };
+  return {
+    element: target.slot.element,
+    offset: target.offset,
+    partName: host.session.model.story(target.slot.story)?.partName,
+  };
 };
 
 const hexOf = (args: SymbolArgs): string | undefined => {
@@ -53,23 +63,25 @@ const symbolSpec: AreaSpec<SymbolArgs> = {
     const hex = hexOf(args);
     const target = caretOf(active);
     if (hex === undefined || target === undefined) return false;
-    return insertRunChildAt(active.session.model, target.element, target.offset, (run) => {
-      const symbol = createWElement(run, 'sym');
-      setWAttr(symbol, 'font', args.font ?? DEFAULT_SYMBOL_FONT);
-      setWAttr(symbol, 'char', hex);
-      run.children.push(symbol);
-    });
+    return writingAt(active, () =>
+      insertRunChildAt(active.session.model, target.element, target.offset, (run) => {
+        const symbol = createWElement(run, 'sym');
+        setWAttr(symbol, 'font', args.font ?? DEFAULT_SYMBOL_FONT);
+        setWAttr(symbol, 'char', hex);
+        run.children.push(symbol);
+      }),
+    );
   },
 };
 
-const relationshipFor = (host: AreaHost, url: string): string => {
+const relationshipFor = (host: AreaHost, url: string, partName: string | undefined): string => {
   const pkg = host.session.model.package;
-  const partName = pkg.mainDocumentPartName;
+  const owner = partName ?? pkg.mainDocumentPartName;
   const existing = pkg
-    .getRelationships(partName, HYPERLINK_RELATIONSHIP)
+    .getRelationships(owner, HYPERLINK_RELATIONSHIP)
     .find((relationship) => relationship.target === url && relationship.targetMode === 'External');
   if (existing !== undefined) return existing.id;
-  return pkg.addRelationship(partName, {
+  return pkg.addRelationship(owner, {
     type: HYPERLINK_RELATIONSHIP,
     target: url,
     targetMode: 'External',
@@ -87,17 +99,19 @@ const linkSpec: AreaSpec<LinkArgs> = {
     const url = args.url;
     const target = caretOf(active);
     if (url === undefined || url === '' || target === undefined) return false;
-    const relationshipId = relationshipFor(active, url);
-    return insertContainerAt(
-      active.session.model,
-      target.element,
-      target.offset,
-      'hyperlink',
-      (container) => {
-        xml.setAttribute(container, 'id', relationshipId, 'r', R_NAMESPACE);
-        if (args.tooltip !== undefined) setWAttr(container, 'tooltip', args.tooltip);
-        appendRun(container, args.text ?? url);
-      },
+    const relationshipId = relationshipFor(active, url, target.partName);
+    return writingAt(active, () =>
+      insertContainerAt(
+        active.session.model,
+        target.element,
+        target.offset,
+        'hyperlink',
+        (container) => {
+          xml.setAttribute(container, 'id', relationshipId, 'r', R_NAMESPACE);
+          if (args.tooltip !== undefined) setWAttr(container, 'tooltip', args.tooltip);
+          appendRun(container, args.text ?? url);
+        },
+      ),
     );
   },
 };
@@ -114,10 +128,12 @@ const fieldSpec = (id: string, label: string, instruction: string): AreaSpec<Fie
     const text =
       args.instruction ??
       (format === undefined || format === '' ? instruction : `${instruction} \\@ "${format}"`);
-    return insertContainerAt(active.session.model, target.element, target.offset, 'fldSimple', (container) => {
-      setWAttr(container, 'instr', text);
-      setWAttr(container, 'dirty', 'true');
-    });
+    return writingAt(active, () =>
+      insertContainerAt(active.session.model, target.element, target.offset, 'fldSimple', (container) => {
+        setWAttr(container, 'instr', text);
+        setWAttr(container, 'dirty', 'true');
+      }),
+    );
   },
 });
 

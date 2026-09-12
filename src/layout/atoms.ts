@@ -188,7 +188,7 @@ export const atomize = (
       }
 
       const rendered = renderText(item.text, capitalise);
-      const clusters = options.measurer.clusters(face.family, rendered.text);
+      const clusters = options.measurer.clusters(face.family, rendered.text, face);
       let covered = 0;
       let pendingText: string[] = [];
       let pendingUnits: number[] = [];
@@ -331,4 +331,4 @@ export const atomize = (
 };
 
 const hyphenAdvance = (measurer: TextMeasurer, face: FontFace): number =>
-  measurer.clusters(face.family, HYPHEN_TEXT)[0]?.advance ?? 0;
+  measurer.clusters(face.family, HYPHEN_TEXT, face)[0]?.advance ?? 0;

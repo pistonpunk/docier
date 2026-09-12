@@ -28,6 +28,7 @@ export const themeStyles = (): string =>
 export const renderStyles = (): string => `${themeStyles()}
 .docier-chrome{display:grid;grid-template-rows:auto auto 1fr auto;min-height:0;width:100%;height:100%;box-sizing:border-box;font-family:var(--docier-ui-font);font-size:var(--docier-ui-font-size);color:var(--docier-text);background:var(--docier-surface)}
 .docier-chrome *,.docier-chrome *::before,.docier-chrome *::after{box-sizing:border-box}
+.docier-chrome [hidden]{display:none}
 .docier-chrome-menubar{display:flex;align-items:stretch;flex-wrap:nowrap;background:var(--docier-surface-raised);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
 .docier-tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:thin}
 .docier-tab{appearance:none;border:0;background:transparent;color:var(--docier-text);font:inherit;height:var(--docier-control-height);padding:0 calc(var(--docier-gap) * 2.5);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}

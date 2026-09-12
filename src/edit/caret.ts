@@ -1,4 +1,4 @@
-import type { DocPos, PageFragment } from '../layout/index.js';
+import type { DocPos, PageFragment, StoryId } from '../layout/index.js';
 import type { TextAffinity } from '../api/types.js';
 import { docPos } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
@@ -150,11 +150,14 @@ export interface VerticalMove {
   readonly goalX: Mp;
 }
 
-const verticalLines = (index: PositionIndex): readonly LineEntry[] => {
+const NO_STORY: StoryId = '';
+
+const verticalLines = (index: PositionIndex, story: StoryId): readonly LineEntry[] => {
   const pages = new Map<string, number>();
   const out: LineEntry[] = [];
   for (const line of index.lines) {
     if (line.box.height === 0) continue;
+    if (story !== NO_STORY && line.story !== story) continue;
     const key = `${String(line.blockId)}:${String(line.start)}:${String(line.end)}`;
     const seen = pages.get(key);
     if (seen !== undefined && seen !== line.page) continue;
@@ -174,9 +177,10 @@ const verticalFrom = (
   const line = index.lineAt(index.clamp(pos), affinity);
   if (line === undefined) return undefined;
   const x = goalX ?? index.stopAt(index.clamp(pos), affinity)?.x ?? mp(0);
-  const lines = verticalLines(index);
+  const lines = verticalLines(index, line.story);
   const at = lines.findIndex(
-    (entry) => entry.blockId === line.blockId && entry.lineId === line.lineId,
+    (entry) =>
+      entry.blockId === line.blockId && (entry.start as number) === (line.start as number),
   );
   const target = at < 0 ? undefined : lines[at + delta];
   if (target === undefined) return undefined;

@@ -1,0 +1,19 @@
+{
+  "name": "docier-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Live demo host for the docier editor: mounts the editor, its chrome and the PDF export path.",
+  "scripts": {
+    "prepare-assets": "node scripts/prepare-assets.mjs",
+    "sample": "node scripts/make-sample-docx.mjs",
+    "dev": "npm run prepare-assets && vite",
+    "build": "npm run prepare-assets && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 8080"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12"
+  }
+}

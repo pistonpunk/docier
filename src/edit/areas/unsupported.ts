@@ -15,7 +15,7 @@ const NO_OBJECT_SELECTION =
 const NO_DRAWING =
   'This build cannot author drawing content: the editing layer cannot create media parts or w:drawing runs';
 const NO_PART = (part: string): string =>
-  `This build cannot create a ${part} part from the editing layer, and the undo history covers only the document body`;
+  `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const HOST_OWNED = (action: string): string =>
   `The host application owns ${action} in this build; the editor exposes no ${action} backend`;
 
@@ -34,7 +34,7 @@ const REFUSALS: readonly Refusal[] = [
     id: 'docier.command.doc.setWatermark',
     label: 'Watermark',
     category: 'doc',
-    reason: NO_PART('header'),
+    reason: 'A watermark is a shape drawn inside a header part, and this build cannot author drawing content',
   },
   {
     id: 'docier.command.doc.setLineNumbers',
@@ -79,14 +79,6 @@ const REFUSALS: readonly Refusal[] = [
   },
 
   { id: 'docier.command.insert.textBox', label: 'Text box', category: 'insert', reason: NO_DRAWING },
-  { id: 'docier.command.insert.header', label: 'Header', category: 'insert', reason: NO_PART('header') },
-  { id: 'docier.command.insert.footer', label: 'Footer', category: 'insert', reason: NO_PART('footer') },
-  {
-    id: 'docier.command.insert.closeHeaderFooter',
-    label: 'Close header and footer',
-    category: 'insert',
-    reason: 'This build never opens a header or footer, so there is none to close',
-  },
   { id: 'docier.command.insert.footnote', label: 'Footnote', category: 'insert', reason: NO_PART('footnotes') },
   { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },
   {

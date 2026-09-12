@@ -10,6 +10,8 @@ export interface FontFace {
   readonly family: string;
   readonly faceId: string;
   readonly size: Mp;
+  readonly bold: boolean;
+  readonly italic: boolean;
   readonly unitsPerEm: number;
   readonly metrics: ScaledFontMetrics;
   readonly lineBox: LineBox;
@@ -56,7 +58,9 @@ export class FontResolver {
   face(format: RunFormat, spacing: LineSpacing): FontFace {
     const family = this.resolvedFamily(format.requestedFamily);
     const shift = shiftOf(format);
-    const key = `${format.requestedFamily}|${family}|${format.size}|${spacing.rule}|${
+    const key = `${format.requestedFamily}|${family}|${format.bold ? 'b' : ''}${
+      format.italic ? 'i' : ''
+    }|${format.size}|${spacing.rule}|${
       spacing.rule === 'auto' ? spacing.multiple240 : spacing.height
     }|${shift}`;
     const cached = this.cache.get(key);
@@ -75,6 +79,8 @@ export class FontResolver {
       family,
       faceId: this.measurer.faceId(family),
       size: format.size,
+      bold: format.bold,
+      italic: format.italic,
       unitsPerEm: metrics.unitsPerEm,
       metrics,
       lineBox: lineBoxOf(metrics, spacing),

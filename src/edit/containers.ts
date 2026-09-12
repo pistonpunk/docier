@@ -1,13 +1,16 @@
-import type { CellRef } from '../layout/index.js';
+import type { CellRef, StoryId } from '../layout/index.js';
 import type { BlockNode, DocumentModel, Table, TableCell } from '../model/index.js';
 import { ContentControl } from '../model/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
 import { MAX_TABLE_DEPTH } from '../layout/table-ingest.js';
 
 export const BODY_CONTAINER = 'body';
+export const REGION_CONTAINER_PREFIX = 'region:';
 
 export interface SlotContainer {
   readonly key: string;
+  readonly group: string;
+  readonly story: StoryId;
   readonly cell: CellRef | undefined;
   readonly paragraphs: readonly XmlElement[];
 }
@@ -15,14 +18,53 @@ export interface SlotContainer {
 export const containerKeyOf = (cell: CellRef): string =>
   `${String(cell.table)}:${String(cell.row)}:${String(cell.column)}`;
 
+export const groupKeyOf = (story: StoryId, cell: CellRef | undefined): string =>
+  cell === undefined ? story : `${story}|${containerKeyOf(cell)}`;
+
+const regionKeyOf = (story: StoryId): string => `${REGION_CONTAINER_PREFIX}${story}`;
+
 interface Pending {
+  readonly key: string;
+  readonly story: StoryId;
   readonly cell: CellRef | undefined;
   readonly paragraphs: XmlElement[];
 }
 
 const isContinuation = (cell: TableCell): boolean => cell.isVerticalContinuation;
 
+const paragraphContainers = (
+  story: StoryId,
+  key: string,
+  root: readonly BlockNode[],
+): readonly SlotContainer[] => {
+  const paragraphs: XmlElement[] = [];
+  const walk = (blocks: readonly BlockNode[]): void => {
+    for (const block of blocks) {
+      if (block.blockKind === 'paragraph') {
+        paragraphs.push(block.element);
+        continue;
+      }
+      if (block.blockKind === 'contentControl') {
+        walk((block as ContentControl).blocks());
+      }
+    }
+  };
+  walk(root);
+  if (paragraphs.length === 0) return [];
+  return [
+    {
+      key,
+      group: groupKeyOf(story, undefined),
+      story,
+      cell: undefined,
+      paragraphs,
+    },
+  ];
+};
+
 export const collectContainers = (model: DocumentModel): readonly SlotContainer[] => {
+  const body = model.body();
+  const story = body.id;
   const order: string[] = [];
   const byKey = new Map<string, Pending>();
   let tableOrdinal = 0;
@@ -30,7 +72,7 @@ export const collectContainers = (model: DocumentModel): readonly SlotContainer[
   const containerFor = (key: string, cell: CellRef | undefined): Pending => {
     const found = byKey.get(key);
     if (found !== undefined) return found;
-    const created: Pending = { cell, paragraphs: [] };
+    const created: Pending = { key, story, cell, paragraphs: [] };
     byKey.set(key, created);
     order.push(key);
     return created;
@@ -73,13 +115,29 @@ export const collectContainers = (model: DocumentModel): readonly SlotContainer[
     }
   };
 
-  walkBlocks(model.body().blocks(), BODY_CONTAINER, undefined, 0);
+  walkBlocks(body.blocks(), BODY_CONTAINER, undefined, 0);
   return order.map((key) => {
     const pending = byKey.get(key);
+    const cell = pending?.cell;
     return {
       key,
-      cell: pending?.cell,
+      group: groupKeyOf(story, cell),
+      story,
+      cell,
       paragraphs: pending === undefined ? [] : [...pending.paragraphs],
     };
   });
+};
+
+export const collectRegionContainers = (
+  model: DocumentModel,
+  stories: readonly StoryId[],
+): readonly SlotContainer[] => {
+  const out: SlotContainer[] = [];
+  for (const id of stories) {
+    const story = model.story(id);
+    if (story === undefined || story.id === model.body().id) continue;
+    out.push(...paragraphContainers(story.id, regionKeyOf(story.id), story.blocks()));
+  }
+  return out;
 };

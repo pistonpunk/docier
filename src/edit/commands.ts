@@ -88,12 +88,18 @@ const NO_DOCUMENT: LocalizedString = 'No document is loaded';
 const READ_ONLY: LocalizedString = 'The document is read-only';
 const CROSSES_CELLS: LocalizedString =
   'The selection crosses a cell boundary; this build edits one cell at a time';
+const CROSSES_STORY: LocalizedString =
+  'The selection crosses between the body and a header or footer; this build edits one story at a time';
 const CELL_EDGE_BACKWARD: LocalizedString =
   'The caret is at the start of this cell; this build does not delete into the content before it';
 const CELL_EDGE_FORWARD: LocalizedString =
   'The caret is at the end of this cell; this build does not delete into the content after it';
 const OUT_OF_CELL: LocalizedString =
   'The paragraph below is outside this cell; this build edits one cell at a time';
+const STORY_EDGE_BACKWARD: LocalizedString =
+  'The caret is at the start of this header, footer or body; this build does not delete into the story before it';
+const STORY_EDGE_FORWARD: LocalizedString =
+  'The caret is at the end of this header, footer or body; this build does not delete into the story after it';
 
 const loadedOnly = (host: EditCommandHost): boolean => host.loaded;
 const editableOnly = (host: EditCommandHost): boolean => host.loaded && host.editable;
@@ -110,8 +116,14 @@ const hasFollowingParagraph = (host: EditCommandHost): boolean => {
 const editReason = (host: EditCommandHost): LocalizedString =>
   host.loaded ? READ_ONLY : NO_DOCUMENT;
 
-const withinOneContainer = (host: EditCommandHost): boolean =>
-  !host.session.spansContainers(rangeAsDocRange(host.selection));
+const crossingReason = (host: EditCommandHost): LocalizedString | undefined => {
+  const crossing = host.session.crossing(rangeAsDocRange(host.selection));
+  if (crossing === 'story') return CROSSES_STORY;
+  if (crossing === 'container') return CROSSES_CELLS;
+  return undefined;
+};
+
+const withinOneContainer = (host: EditCommandHost): boolean => crossingReason(host) === undefined;
 
 const editableInside = (host: EditCommandHost): boolean =>
   editableOnly(host) && withinOneContainer(host);
@@ -121,7 +133,7 @@ const edgeReason = (
   direction: 'backward' | 'forward',
 ): LocalizedString | undefined => {
   const target = host.session.resolve(host.selection.focus);
-  if (target === undefined || target.slot.cell === undefined) return undefined;
+  if (target === undefined) return undefined;
   const list = host.session.slots();
   const slot = target.slot;
   const neighbour =
@@ -130,6 +142,9 @@ const edgeReason = (
     return undefined;
   }
   if (neighbour === undefined || neighbour.container === slot.container) return undefined;
+  if (slot.cell === undefined) {
+    return direction === 'backward' ? STORY_EDGE_BACKWARD : STORY_EDGE_FORWARD;
+  }
   return direction === 'backward' ? CELL_EDGE_BACKWARD : CELL_EDGE_FORWARD;
 };
 
@@ -137,7 +152,8 @@ const deleteReason =
   (direction: 'backward' | 'forward') =>
   (host: EditCommandHost): LocalizedString => {
     if (host.loaded && host.editable) {
-      if (!withinOneContainer(host)) return CROSSES_CELLS;
+      const crossing = crossingReason(host);
+      if (crossing !== undefined) return crossing;
       const edge = edgeReason(host, direction);
       if (edge !== undefined) return edge;
     }
@@ -148,7 +164,7 @@ const atCellEdge = (direction: 'backward' | 'forward') => (host: EditCommandHost
   edgeReason(host, direction) === undefined;
 
 const editReasonInside = (host: EditCommandHost): LocalizedString =>
-  host.loaded && host.editable && !withinOneContainer(host) ? CROSSES_CELLS : editReason(host);
+  (host.loaded && host.editable ? crossingReason(host) : undefined) ?? editReason(host);
 
 const record = <A>(
   host: EditCommandHost,
@@ -382,7 +398,8 @@ export const installEditCommands = (
       enabledIn: (h) => editableInside(h) && hasFollowingParagraph(h),
       reason: (h) => {
         if (!h.loaded) return NO_DOCUMENT;
-        if (h.editable && !withinOneContainer(h)) return CROSSES_CELLS;
+        const crossing = h.editable ? crossingReason(h) : undefined;
+        if (crossing !== undefined) return crossing;
         return h.session.resolve(h.selection.focus)?.slot.cell === undefined
           ? 'There is no paragraph below to merge with'
           : OUT_OF_CELL;
@@ -439,7 +456,8 @@ export const installEditCommands = (
       enabledIn: (h) => editableInside(h) && hasSelection(h),
       reason: (h) => {
         if (!h.loaded) return NO_DOCUMENT;
-        if (h.editable && !withinOneContainer(h)) return CROSSES_CELLS;
+        const crossing = h.editable ? crossingReason(h) : undefined;
+        if (crossing !== undefined) return crossing;
         return 'Select the text to delete';
       },
       code: 'EMPTY_SELECTION',

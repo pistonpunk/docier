@@ -43,7 +43,7 @@ const prefixAtom = (
 ): Atom | undefined => {
   if (text === '') return undefined;
   const face = context.fonts.face(numbering.format, paragraph.format.spacing);
-  const clusters = context.measurer.clusters(face.family, text);
+  const clusters = context.measurer.clusters(face.family, text, face);
   const units: number[] = [];
   const lengths: number[] = [];
   for (const cluster of clusters) {

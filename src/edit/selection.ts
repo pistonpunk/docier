@@ -116,8 +116,11 @@ export const extendTo = (
 export const selectRange = (index: PositionIndex, range: DocRange): EditSelection =>
   selectionOf(clamp(index, range.start), clamp(index, range.end), 'downstream');
 
-export const selectAll = (index: PositionIndex): EditSelection =>
-  selectionOf(index.documentStart, index.documentEnd, 'downstream');
+export const selectAll = (index: PositionIndex, pos?: DocPos): EditSelection => {
+  const story = pos === undefined ? undefined : index.storyAt(pos);
+  if (story === undefined) return selectionOf(index.documentStart, index.documentEnd, 'downstream');
+  return selectionOf(story.start, story.end, 'downstream');
+};
 
 export const clearSelection = (index: PositionIndex): EditSelection => caretSelection(index.documentStart, 'downstream');
 

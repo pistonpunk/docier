@@ -20,6 +20,7 @@ import { extractFragment, fragmentFromPlain } from './fragment.js';
 import { htmlOfFragment } from './html-export.js';
 import { importHtml } from './html-import.js';
 import { insertFragment } from './insert.js';
+import type { InsertOptions, InsertResult } from './insert.js';
 import { plainTextOfNodes } from './text.js';
 import { readFromData, writeSystemClipboardText, writeToData } from './transfer.js';
 import type { ClipboardBuffer, ClipboardRead } from './transfer.js';
@@ -158,6 +159,17 @@ const commit = (
   if (selection !== undefined) host.setSelection(selection, 'input', undefined);
 };
 
+const insertInto = (
+  host: ClipboardCommandHost,
+  options: Omit<InsertOptions, 'model' | 'session'>,
+): InsertResult => {
+  let result: InsertResult = { changed: false, caret: undefined, degraded: [] };
+  host.session.changeRegions(() => {
+    result = insertFragment({ model: host.session.model, session: host.session, ...options });
+  });
+  return result;
+};
+
 const chooseFragment = (
   host: ClipboardCommandHost,
   args: ClipboardCommandArgs,
@@ -202,9 +214,7 @@ const applyPaste = (
     host.announceDegraded(chosen.degraded);
     return false;
   }
-  const result = insertFragment({
-    model: host.session.model,
-    session: host.session,
+  const result = insertInto(host, {
     at: args.at ?? rangeAsDocRange(host.selection).start,
     mode,
     fragment: chosen.fragment,
@@ -327,13 +337,7 @@ const runMove = (
       destination = docPos((to as number) - ((from.end as number) - (from.start as number)));
     }
   }
-  const result = insertFragment({
-    model: host.session.model,
-    session: host.session,
-    at: destination,
-    mode: 'keepSource',
-    fragment,
-  });
+  const result = insertInto(host, { at: destination, mode: 'keepSource', fragment });
   if (!result.changed) return NOOP;
   const degraded = [...fragment.degraded, ...result.degraded];
   if (degraded.length > 0) host.announceDegraded(degraded);

@@ -200,7 +200,8 @@ describe('deliberately unavailable commands', () => {
       'Place the caret inside a table',
     );
     expect(reasonOf(handle, 'docier.command.object.insertImage')).toContain('drawing content');
-    expect(reasonOf(handle, 'docier.command.insert.header')).toContain('undo history');
+    expect(reasonOf(handle, 'docier.command.insert.header')).toContain('no header');
+    expect(reasonOf(handle, 'docier.command.insert.closeHeaderFooter')).toContain('not in a header');
     expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');
     expect(reasonOf(handle, 'docier.command.theme.setColors')).toContain('theme part');
     expect(reasonOf(handle, 'docier.command.doc.save')).toContain('host application');

@@ -1,8 +1,12 @@
 import type { EditorHandle } from '../../src/api/editor.js';
+import { createEditor } from '../../src/api/editor.js';
 import type { EditorConfigPatch } from '../../src/api/types.js';
 import { mountChrome } from '../../src/ui/chrome.js';
 import type { ChromeHandle, ChromeOptions } from '../../src/ui/chrome.js';
+import type { DocxSpec } from '../model/support.js';
+import { openModel } from '../model/support.js';
 import { editorWith, bodyOf, disposeEditors } from '../api/support.js';
+import { mountPoint, track } from '../edit/support.js';
 import { PAGE, paragraphText, WRAP_TEXT } from '../edit/support.js';
 
 export { bodyOf, editorWith, PAGE, paragraphText, WRAP_TEXT };
@@ -21,6 +25,17 @@ export const chromeOf = async (
   config?: EditorConfigPatch,
 ): Promise<{ readonly handle: EditorHandle; readonly chrome: ChromeHandle }> => {
   const handle = await editorWith(body, config);
+  const chrome = mountChrome(handle, { mode: 'full', ...options });
+  chromes.push(chrome);
+  return { handle, chrome };
+};
+
+export const chromeOfDocx = async (
+  spec: DocxSpec,
+  options?: ChromeOptions,
+): Promise<{ readonly handle: EditorHandle; readonly chrome: ChromeHandle }> => {
+  const model = await openModel(spec);
+  const handle = track(createEditor(mountPoint(), undefined, { document: model }));
   const chrome = mountChrome(handle, { mode: 'full', ...options });
   chromes.push(chrome);
   return { handle, chrome };

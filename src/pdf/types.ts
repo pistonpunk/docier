@@ -61,6 +61,7 @@ export type PdfLossCode =
   | 'cffEmbeddedInFull'
   | 'metricSourceMismatch'
   | 'metricMismatch'
+  | 'advanceModelMismatch'
   | 'missingGlyph'
   | 'textNotDrawn'
   | 'missingImage'
