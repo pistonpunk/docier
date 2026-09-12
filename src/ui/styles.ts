@@ -44,9 +44,10 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-tab[aria-selected="true"]{background:var(--docier-surface-command);border-bottom-color:transparent;font-weight:400;color:var(--docier-text)}
 .docier-tab[data-docier-contextual="true"]{color:var(--docier-accent)}
 .docier-tab:focus-visible,.docier-control:focus-visible,.docier-menu-item:focus-visible,.docier-ruler-marker:focus-visible,.docier-status-item:focus-visible,.docier-tab:focus-visible{outline:2px solid var(--docier-focus-ring);outline-offset:-1px}
-.docier-ribbon{display:flex;grid-area:ribbon;overflow:hidden;container-type:inline-size;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);min-height:var(--docier-ribbon-height)}
+.docier-ribbon{display:flex;position:relative;grid-area:ribbon;overflow:hidden;container-type:inline-size;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);min-height:var(--docier-ribbon-height)}
 .docier-ribbon[data-docier-collapsed="collapsed"]{position:absolute;top:0;inset-inline:0;z-index:11;box-shadow:var(--docier-shadow-2);border-bottom:1px solid var(--docier-border)}
 .docier-ribbon[data-docier-collapsed="hidden"]{display:none}
+.docier-ribbon-toggle{position:absolute;top:2px;inset-inline-end:4px;min-width:20px;min-height:20px;line-height:1;color:var(--docier-text-muted);z-index:2}
 .docier-ribbon[data-docier-collapsed="collapsed"] .docier-group-label{display:none}
 .docier-chrome .docier-ribbon{--docier-control-height:26px;--docier-gap:3px}
 .docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:4px 6px;width:100%}

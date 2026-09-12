@@ -353,6 +353,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
       'aria-pressed',
       context.state.collapse === 'expanded' ? 'true' : 'false',
     );
+    setText(collapseButton, context.state.collapse === 'collapsed' ? '\u2303' : '\u2304');
     applyTab();
     applyKeyTips();
     applyBackstage();

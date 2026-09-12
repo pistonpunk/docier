@@ -273,7 +273,7 @@ describe('ribbon layout rules', () => {
   });
 
   it('hides the overflow of the ribbon rather than the page', () => {
-    expect(css).toContain('.docier-ribbon{display:flex;grid-area:ribbon;overflow:hidden');
+    expect(css).toContain('.docier-ribbon{display:flex;position:relative;grid-area:ribbon;overflow:hidden');
   });
 });
 
