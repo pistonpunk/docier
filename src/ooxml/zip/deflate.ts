@@ -3,10 +3,20 @@ import { DocierError } from '../errors.js';
 
 export const RAW_DEFLATE_FORMAT = 'deflate-raw';
 
+export const DEFLATE_LEVEL = 6;
+
+export type DeflateFlavour = 'pinned' | 'native';
+
 export interface DeflateBackend {
   readonly name: string;
+  readonly flavour: DeflateFlavour;
   readonly deflateRaw: (data: Uint8Array) => Promise<Uint8Array>;
   readonly inflateRaw: (data: Uint8Array) => Promise<Uint8Array>;
+}
+
+export interface DeflateResolution {
+  readonly backend: DeflateBackend;
+  readonly deterministic: boolean;
 }
 
 interface DeflateStreamLike {
@@ -82,6 +92,7 @@ export const createPlatformDeflateBackend = (): DeflateBackend | undefined => {
   if (!hasPlatformDeflateSupport()) return undefined;
   return {
     name: 'CompressionStream',
+    flavour: 'native',
     deflateRaw: (data) =>
       runStream(
         (format) => new Compressor(format),
@@ -112,4 +123,20 @@ export const getDeflateBackend = (): DeflateBackend => {
     throw noBackend('neither CompressionStream nor DecompressionStream accepts deflate-raw');
   }
   return backend;
+};
+
+let pinnedBackend: DeflateBackend | undefined;
+
+export const setPinnedDeflateBackend = (backend: DeflateBackend | undefined): void => {
+  pinnedBackend = backend;
+};
+
+export const getPinnedDeflateBackend = (): DeflateBackend | undefined => pinnedBackend;
+
+export const resolveDeflateBackend = (flavour: DeflateFlavour = 'pinned'): DeflateResolution => {
+  if (flavour === 'pinned' && pinnedBackend !== undefined) {
+    return { backend: pinnedBackend, deterministic: pinnedBackend.flavour === 'pinned' };
+  }
+  const platform = getDeflateBackend();
+  return { backend: platform, deterministic: platform.flavour === 'pinned' };
 };

@@ -16,11 +16,6 @@ export const HALF_POINTS_PER_POINT = 2;
 export const EIGHTH_POINTS_PER_POINT = 8;
 export const PERCENT_FIFTIETHS_PER_PERCENT = 50;
 
-/**
- * Exact integer ratio for emu -> mp: `emu * EMU_TO_MP_NUM / EMU_TO_MP_DEN`.
- * Derived from 1000/12700 reduced by 100. Keeping both terms integers avoids
- * introducing a division by a non-representable constant.
- */
 export const EMU_TO_MP_NUM = 10;
 export const EMU_TO_MP_DEN = 127;
 

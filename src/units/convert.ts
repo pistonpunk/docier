@@ -59,8 +59,8 @@ export const percentFiftiethToRatio = (value: PercentFiftieth): number =>
 export const ratioToPercentFiftieth = (value: number): PercentFiftieth =>
   percentFiftieth(roundHalfEven(value * PERCENT_FIFTIETHS_PER_PERCENT * 100));
 
-export const EMU_TO_MP_EXACT_LIMIT = Number.MAX_SAFE_INTEGER / EMU_TO_MP_NUM;
-export const MP_TO_EMU_EXACT_LIMIT = Number.MAX_SAFE_INTEGER / EMU_TO_MP_DEN;
+export const EMU_TO_MP_EXACT_LIMIT = Math.floor(Number.MAX_SAFE_INTEGER / EMU_TO_MP_NUM);
+export const MP_TO_EMU_EXACT_LIMIT = Math.floor(Number.MAX_SAFE_INTEGER / EMU_TO_MP_DEN);
 
 export const isExactEmuToTwip = (value: Emu): boolean => value % EMU_PER_TWIP === 0;
 export const isExactEmuToMp = (value: Emu): boolean => (value * EMU_TO_MP_NUM) % EMU_TO_MP_DEN === 0;

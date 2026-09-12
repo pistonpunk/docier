@@ -30,13 +30,17 @@ export {
   ZIP_UINT32_SENTINEL,
 } from './types.js';
 
-export type { DeflateBackend } from './deflate.js';
+export type { DeflateBackend, DeflateFlavour, DeflateResolution } from './deflate.js';
 
 export {
+  DEFLATE_LEVEL,
   RAW_DEFLATE_FORMAT,
   createPlatformDeflateBackend,
   getDeflateBackend,
+  getPinnedDeflateBackend,
   hasPlatformDeflateSupport,
+  resolveDeflateBackend,
+  setPinnedDeflateBackend,
 } from './deflate.js';
 
 export type { ReadZipEntryOptions, ZipReadOptions } from './read.js';

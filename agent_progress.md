@@ -60,25 +60,36 @@ it no longer blocks any implementation work. **No product decisions remain open.
 
 ---
 
-## Blocker — read before planning any work
+## Build and verification — corrected 2026-09-12
 
-**There is no Node, npm or Docker in this environment.** I cannot build, typecheck or run tests here.
-Verification is limited to reading code and to CI you run. This breaks the "verify immediately" step of
-the micro-iteration loop, so the loop is adapted below rather than skipped.
+**Node v22.22.1 and npm 9.2.0 are available** at `/usr/bin/node` and `/usr/bin/npm`. An earlier claim in
+this file that they were absent was wrong; it was never re-checked and it shaped far too much for how long
+it stood. The only part of that claim that held is Docker — the socket is permission-denied.
 
-**Consequences:**
-- Every commit is unverified at the time it is made.
-- A single type error fails the build later, so strict settings are enforced by discipline, not by the compiler.
-- Pushing to GitHub does not run anything unless we add CI.
+**What this means for the loop: it runs as written.** Verify after every change, locally:
 
-**Mitigation, in order of preference:**
-1. Add `.github/workflows/ci.yml` running `npm ci && npm run typecheck && npm run build && npm test` on push.
-   I cannot read the result myself (no `gh`, no API token) — **you would have to relay failures**, or grant a token.
-2. You run `npm run typecheck` locally in `/home/daniel/work/docier` and paste failures.
-3. Failing both, work proceeds blind and bugs surface in review — the situation that produced the
-   layout mess in the previous attempt.
+```
+cd /home/daniel/work/docier
+npx tsc --noEmit -p tsconfig.json     # typecheck, currently exit 0
+npm run build                          # emit
+```
 
-**Do not silently proceed as though code is verified.** State plainly what is and is not checked.
+CI runs the same thing on every push (`.github/workflows/ci.yml`), and the GitHub token now in the session
+lets me read the run result and the failing log myself, so failures get fixed without a round trip through
+Daniel.
+
+**Do not describe work as unverifiable without having just tried to verify it.**
+
+### Lesson, recorded because it cost a lot
+
+The frontend editor (`hr-portal-frontend`) was developed for an entire session under the belief that
+nothing could be compiled or run. It was stated to Daniel repeatedly, a blocker section was written around
+it, and several bugs that a single `tsc` run would have caught were found late or by hand. A Node compile
+cache dated three days before that session shows Node was in use on this machine the whole time.
+
+The failure was not the bad check. It was never re-checking, and letting a claim about the environment
+become a premise rather than a hypothesis. **Re-verify environment assumptions whenever they start to
+constrain what can be done.**
 
 ---
 
@@ -86,8 +97,8 @@ the micro-iteration loop, so the loop is adapted below rather than skipped.
 
 | Date | Item | Status |
 |---|---|---|
-| 2026-09-12 | No Node/npm/Docker in the sandbox | **OPEN — structural** |
-| 2026-09-12 | CI workflow not yet added | OPEN |
+| 2026-09-12 | ~~No Node/npm in the sandbox~~ — **corrected: Node 22.22.1 and npm 9.2.0 are present.** Only Docker is denied. | **RESOLVED** |
+| 2026-09-12 | CI added; GitHub token now lets me read run results and logs directly | **RESOLVED** |
 | 2026-09-12 | Hyphenation/dictionary licensing for ro/ru | OPEN — product call |
 | 2026-09-12 | PDF/A profile for RO/RU archiving | OPEN — product call |
 

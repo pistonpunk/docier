@@ -232,6 +232,26 @@ export const setAttribute = (
   return attribute;
 };
 
+export const declareNamespace = (element: XmlElement, prefix: string, uri: string): XmlAttribute => {
+  const localName = prefix === '' ? 'xmlns' : prefix;
+  const attributePrefix = prefix === '' ? '' : 'xmlns';
+  const index = element.attributes.findIndex(
+    (attribute) =>
+      attribute.uri === XMLNS_NAMESPACE &&
+      attribute.prefix === attributePrefix &&
+      attribute.localName === localName,
+  );
+  const existing = index < 0 ? undefined : element.attributes[index];
+  const attribute =
+    existing ?? createAttribute(localName, uri, attributePrefix, XMLNS_NAMESPACE);
+  attribute.value = uri;
+  if (existing === undefined) element.attributes.push(attribute);
+  const binding = element.namespaceBindings.findIndex((entry) => entry.prefix === prefix);
+  if (binding < 0) element.namespaceBindings.push({ prefix, uri });
+  else element.namespaceBindings[binding] = { prefix, uri };
+  return attribute;
+};
+
 export const removeAttribute = (
   element: XmlElement,
   namespace: string,

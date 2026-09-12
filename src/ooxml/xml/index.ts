@@ -25,6 +25,7 @@ export {
   createElement,
   createProcessingInstruction,
   createText,
+  declareNamespace,
   elementName,
   findAttributeByName,
   findChild,

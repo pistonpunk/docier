@@ -388,7 +388,7 @@ export const readZipEntry = async (
   if (entry.uncompressedSize > maxPartBytes) {
     throw new DocierError(
       `Part "${entry.name}" inflates to ${entry.uncompressedSize} bytes, above the configured limit of ${maxPartBytes}`,
-      { code: 'DOCUMENT_TOO_LARGE', cause: undefined },
+      { code: 'DOCUMENT_TOO_LARGE' },
     );
   }
   if ((entry.flags & ZIP_FLAG_ENCRYPTED) !== 0) {

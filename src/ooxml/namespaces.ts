@@ -96,6 +96,7 @@ export const CONFORMANCE_NAMESPACE_MAP: Readonly<Record<string, string>> = {
 };
 
 export const RELATIONSHIP_TYPE_OFFICE_DOCUMENT = `${R_NAMESPACE}/officeDocument`;
+export const RELATIONSHIP_TYPE_IMAGE = `${R_NAMESPACE}/image`;
 export const RELATIONSHIP_TYPE_CORE_PROPERTIES = `${PACKAGE_RELATIONSHIPS_NAMESPACE}/metadata/core-properties`;
 export const RELATIONSHIP_TYPE_THUMBNAIL = `${PACKAGE_RELATIONSHIPS_NAMESPACE}/metadata/thumbnail`;
 export const RELATIONSHIP_TYPE_DIGITAL_SIGNATURE = `${PACKAGE_RELATIONSHIPS_NAMESPACE}/digital-signature/signature`;
@@ -126,7 +127,7 @@ export const RELATIONSHIP_TYPES: Readonly<Record<string, string>> = {
   people: `${R_NAMESPACE}/people`,
   header: `${R_NAMESPACE}/header`,
   footer: `${R_NAMESPACE}/footer`,
-  image: `${R_NAMESPACE}/image`,
+  image: RELATIONSHIP_TYPE_IMAGE,
   chart: `${R_NAMESPACE}/chart`,
   oleObject: `${R_NAMESPACE}/oleObject`,
   package: `${R_NAMESPACE}/package`,

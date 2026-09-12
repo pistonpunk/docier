@@ -4,28 +4,18 @@ export type Brand<TValue, TUnit extends string> = TValue & {
   readonly [unitBrand]: TUnit;
 };
 
-/**
- * Integer millipoints (1 mp = 1/1000 pt). The layout engine's internal unit (spec 02 §1.3).
- * All geometry is i32-range.
- */
 export type Mp = Brand<number, 'mp'>;
 
-/** English Metric Units: 914400 per inch, 12700 per point. OOXML DrawingML geometry. */
 export type Emu = Brand<number, 'emu'>;
 
-/** Twentieths of a point: 1440 per inch, 20 per point. OOXML WordprocessingML length unit. */
 export type Twip = Brand<number, 'twip'>;
 
-/** Points: 72 per inch. May be fractional. */
 export type Point = Brand<number, 'point'>;
 
-/** Half-points: the unit of `w:sz`, `w:szCs`, `w:position`. */
 export type HalfPoint = Brand<number, 'halfPoint'>;
 
-/** Eighths of a point: the unit of `w:sz` inside `w:pBdr` / `w:tcBorders`. */
 export type EighthPoint = Brand<number, 'eighthPoint'>;
 
-/** Fiftieths of a percent: the unit of `w:type="pct"` widths (`w:w="5000"` = 100%). */
 export type PercentFiftieth = Brand<number, 'percentFiftieth'>;
 
 export const mp = (value: number): Mp => value as Mp;

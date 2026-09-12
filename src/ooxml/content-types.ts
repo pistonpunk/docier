@@ -1,14 +1,16 @@
 import { decodeUtf8 } from './bytes.js';
 import { DocierError } from './errors.js';
 import { CONTENT_TYPES_NAMESPACE } from './namespaces.js';
-import type { XmlDocument, XmlNode } from './xml/index.js';
+import type { XmlAttribute, XmlDocument, XmlElement, XmlNode } from './xml/index.js';
 import {
   createAttribute,
   createDeclaration,
   createDocument,
   createElement,
+  declareNamespace,
   getAttributeValue,
   hasXmlErrors,
+  namespaceDeclarationPrefix,
   parseXmlBytes,
   rootElement,
   serializeXmlBytes,
@@ -101,6 +103,16 @@ export interface ContentTypeDiagnostic {
   readonly name: string;
 }
 
+const preservedRootAttributes = (root: XmlElement | undefined): XmlAttribute[] => {
+  if (root === undefined) return [];
+  const kept: XmlAttribute[] = [];
+  for (const attribute of root.attributes) {
+    if (namespaceDeclarationPrefix(attribute) === '') continue;
+    kept.push({ ...attribute });
+  }
+  return kept;
+};
+
 const compareStrings = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 const compareExtensions = (a: string, b: string): number =>
@@ -110,17 +122,20 @@ export class ContentTypes {
   readonly defaults: ContentTypeDefault[];
   readonly overrides: ContentTypeOverride[];
   readonly diagnostics: ContentTypeDiagnostic[];
+  private readonly rootAttributes: XmlAttribute[];
   private dirtyFlag: boolean;
 
   private constructor(
     defaults: ContentTypeDefault[],
     overrides: ContentTypeOverride[],
     diagnostics: ContentTypeDiagnostic[],
+    rootAttributes: XmlAttribute[],
     dirty: boolean,
   ) {
     this.defaults = defaults;
     this.overrides = overrides;
     this.diagnostics = diagnostics;
+    this.rootAttributes = rootAttributes;
     this.dirtyFlag = dirty;
   }
 
@@ -130,6 +145,7 @@ export class ContentTypes {
         extension,
         contentType,
       })),
+      [],
       [],
       [],
       true,
@@ -207,7 +223,13 @@ export class ContentTypes {
         overrides.push({ partName: normalised, contentType });
       }
     }
-    return new ContentTypes(defaults, overrides, diagnostics, false);
+    return new ContentTypes(
+      defaults,
+      overrides,
+      diagnostics,
+      preservedRootAttributes(root),
+      false,
+    );
   }
 
   get dirty(): boolean {
@@ -304,7 +326,7 @@ export class ContentTypes {
       if (override === undefined) continue;
       const extension = extensionOf(partName);
       if (extension === '') continue;
-      const key = `${extension.toLowerCase()} ${override.contentType}`;
+      const key = `${extension.toLowerCase()}\u0000${override.contentType}`;
       const entry = counts.get(key);
       if (entry === undefined) {
         counts.set(key, { extension, contentType: override.contentType, count: 1 });
@@ -330,6 +352,8 @@ export class ContentTypes {
     const document = createDocument(createDeclaration('UTF-8', 'yes'));
     const root = createElement('Types', '', CONTENT_TYPES_NAMESPACE);
     root.selfClosing = false;
+    for (const attribute of this.rootAttributes) root.attributes.push({ ...attribute });
+    declareNamespace(root, '', CONTENT_TYPES_NAMESPACE);
     const children: XmlNode[] = [];
     const defaults = [...this.defaults].sort((a, b) => compareExtensions(a.extension, b.extension));
     const overrides = [...this.overrides].sort((a, b) => compareStrings(a.partName, b.partName));
