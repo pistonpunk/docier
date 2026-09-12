@@ -1,5 +1,6 @@
 import type { CommandDescriptor, CommandRegistry } from '../api/types.js';
 import { isDisabled, markPart, make, setText } from './dom.js';
+import { iconFor } from './icons.js';
 import type { UI18n } from './i18n.js';
 import { shortcutHint } from './keyboard.js';
 import type { UiNode } from './menu-model.js';
@@ -13,6 +14,7 @@ export interface ResolverOptions {
   readonly descriptors: () => DescriptorIndex;
   readonly actions?: readonly ChromeActionName[];
   readonly isActive?: ((spec: ControlSpec) => boolean) | undefined;
+  readonly readValue?: ((valueKey: string | undefined) => string | undefined) | undefined;
 }
 
 export const createResolver = (
@@ -29,7 +31,12 @@ export const createResolver = (
     registered: false,
     description: undefined,
   });
-  return (spec) => {
+  const carriesArgs = (spec: ControlSpec): boolean =>
+    typeof spec.args === 'object' && spec.args !== null;
+
+  const suppliesValue = (spec: ControlSpec): boolean => spec.valueKey !== undefined;
+
+  const resolve = (spec: ControlSpec): ResolvedControl => {
     const label = spec.labelKey === undefined ? '' : options.i18n.text(spec.labelKey);
     const keytip = spec.keytip;
     const submenu = spec.submenu === true;
@@ -38,17 +45,21 @@ export const createResolver = (
       const commandLabel =
         label === '' && descriptor !== undefined ? options.i18n.label(descriptor.label) : label;
       if (descriptor !== undefined) {
-        const reason =
-          descriptor.enabled || descriptor.disabledReason === undefined
-            ? undefined
-            : options.i18n.label(descriptor.disabledReason);
+        const byArgs = carriesArgs(spec) || suppliesValue(spec);
+        const enabled = byArgs
+          ? options.commands.isEnabled(spec.command, spec.args)
+          : descriptor.enabled;
+        const refusal = byArgs
+          ? options.commands.disabledReason(spec.command, spec.args)
+          : descriptor.disabledReason;
+        const reason = enabled || refusal === undefined ? undefined : options.i18n.label(refusal);
         return {
           id: spec.command,
           label: commandLabel,
           hint: shortcutHint(descriptor.bindings) ?? keytip,
-          enabled: descriptor.enabled,
-          active: descriptor.active,
-          reason: descriptor.enabled ? undefined : (reason ?? options.i18n.text('ui.reason.unavailable')),
+          enabled,
+          active: byArgs ? options.commands.isActive(spec.command, spec.args) : descriptor.active,
+          reason: enabled ? undefined : (reason ?? options.i18n.text('ui.reason.unavailable')),
           registered: true,
           description:
             descriptor.description === undefined
@@ -104,6 +115,13 @@ export const createResolver = (
       description: undefined,
     };
   };
+
+  return (spec) => {
+    const resolved = resolve(spec);
+    if (spec.valueKey === undefined) return resolved;
+    const value = options.readValue?.(spec.valueKey);
+    return value === undefined ? resolved : { ...resolved, value };
+  };
 };
 
 export const specOf = (node: UiNode): ControlSpec => ({
@@ -114,6 +132,8 @@ export const specOf = (node: UiNode): ControlSpec => ({
   keytip: node.keytip,
   options: node.options,
   submenu: node.kind === 'menu',
+  valueKey: node.valueKey,
+  valueArg: node.valueArg,
 });
 
 export const tooltipFor = (resolved: ResolvedControl): string => {
@@ -155,6 +175,12 @@ export const applyResolved = (
     element.removeAttribute('aria-description');
   }
   element.setAttribute('data-docier-enabled', resolved.enabled ? 'true' : 'false');
+  const field = element.querySelector('input');
+  if (field !== null) {
+    field.readOnly = !resolved.enabled;
+    if (resolved.enabled) field.removeAttribute('aria-disabled');
+    else field.setAttribute('aria-disabled', 'true');
+  }
 };
 
 export const activate = (context: ChromeContext, node: UiNode): boolean => {
@@ -187,10 +213,19 @@ const optionsFor = (node: UiNode, context: ChromeContext): string => {
   return listId;
 };
 
+export const applyValue = (element: HTMLElement, resolved: ResolvedControl): void => {
+  if (resolved.value === undefined) return;
+  const input = element.querySelector<HTMLInputElement>('input');
+  if (input === null || input === element.ownerDocument.activeElement) return;
+  if (input.value !== resolved.value) input.value = resolved.value;
+};
+
 export interface ControlRenderOptions {
   readonly role?: string;
   readonly item?: boolean;
   readonly showShortcut?: boolean;
+  readonly icon?: boolean;
+  readonly onItem?: ((element: HTMLElement, node: UiNode) => void) | undefined;
 }
 
 export const createControl = (
@@ -212,6 +247,16 @@ export const createControl = (
     element.setAttribute('type', 'button');
     element.setAttribute('data-docier-kind', 'menu');
     element.setAttribute('data-docier-id', node.id);
+    if (!item) {
+      const glyph = iconFor(node);
+      if (glyph !== undefined) {
+        element.classList.add('docier-control-has-icon');
+        const icon = make('span', 'docier-control-icon');
+        icon.setAttribute('aria-hidden', 'true');
+        icon.innerHTML = glyph;
+        element.insertBefore(icon, element.firstChild);
+      }
+    }
     applyResolved(element, resolved, role);
     return element;
   }
@@ -238,20 +283,27 @@ export const createControl = (
     input.setAttribute('aria-label', resolved.label);
     input.setAttribute('aria-autocomplete', 'list');
     input.setAttribute('list', optionsFor(node, context));
-    if (node.value !== undefined) input.value = node.value;
+    const initial = resolved.value ?? node.value;
+    if (initial !== undefined) input.value = initial;
     if (!resolved.enabled) input.setAttribute('aria-disabled', 'true');
     input.readOnly = !resolved.enabled;
     if (resolved.hint !== undefined) input.setAttribute('title', `${resolved.label} (${resolved.hint})`);
     input.addEventListener('change', () => {
-      if (!resolved.enabled) return;
-      const key = node.valueKey ?? 'value';
-      const raw = node.valueKey === 'sizePoints' ? Number(input.value) : input.value;
-      const args = { ...(typeof node.args === 'object' && node.args !== null ? node.args : {}), [key]: raw };
+      if (!context.describe(specOf(node)).enabled) return;
+      const isSize = node.valueKey === 'sizePoints';
+      const key = node.valueArg ?? node.valueKey ?? 'value';
+      let value: string | number = input.value;
+      if (isSize) {
+        const points = Number(input.value);
+        if (!Number.isFinite(points) || points <= 0) return;
+        value = Math.round(points * 2);
+      }
+      const args = { ...(typeof node.args === 'object' && node.args !== null ? node.args : {}), [key]: value };
       if (node.command !== undefined) {
         void context.commands.execute(node.command, args, { source: 'ui' });
         return;
       }
-      context.run('openDialog', { dialog: node.id, value: raw });
+      context.run('openDialog', { dialog: node.id, value });
     });
     wrapper.appendChild(input);
     wrapper.setAttribute('role', 'group');
@@ -265,7 +317,11 @@ export const createControl = (
     markPart(list, 'gallery');
     list.setAttribute('role', 'group');
     list.setAttribute('aria-label', resolved.label);
-    for (const entry of node.items ?? []) list.appendChild(createControl(context, entry, { role: 'button' }));
+    for (const entry of node.items ?? []) {
+      const item = createControl(context, entry, { role: 'button' });
+      renderOptions?.onItem?.(item, entry);
+      list.appendChild(item);
+    }
     return list;
   }
 
@@ -278,6 +334,16 @@ export const createControl = (
 
   const label = make('span', 'docier-control-label');
   setText(label, resolved.label);
+
+  const glyph = item || renderOptions?.icon === false ? undefined : iconFor(node);
+  if (glyph !== undefined) {
+    element.classList.add('docier-control-iconic');
+    const icon = make('span', 'docier-control-icon');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = glyph;
+    element.appendChild(icon);
+  }
+
   element.appendChild(label);
 
   if (item) {

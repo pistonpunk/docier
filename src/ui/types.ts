@@ -102,6 +102,8 @@ export interface ControlSpec {
   readonly keytip?: string | undefined;
   readonly options?: readonly ControlOption[] | undefined;
   readonly submenu?: boolean | undefined;
+  readonly valueKey?: string | undefined;
+  readonly valueArg?: string | undefined;
 }
 
 export interface ControlOption {
@@ -119,6 +121,7 @@ export interface ResolvedControl {
   readonly reason: string | undefined;
   readonly registered: boolean;
   readonly description: string | undefined;
+  readonly value?: string | undefined;
 }
 
 export interface ChromeContext {

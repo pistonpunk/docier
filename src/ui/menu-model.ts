@@ -28,6 +28,7 @@ export interface UiNode {
   readonly wide?: boolean | undefined;
   readonly value?: string | undefined;
   readonly valueKey?: string | undefined;
+  readonly valueArg?: string | undefined;
 }
 
 export interface UiGroup {
@@ -65,6 +66,7 @@ const node = (kind: UiNodeKind, init: Partial<UiNode> & { readonly labelKey: str
     wide: init.wide,
     value: init.value,
     valueKey: init.valueKey,
+    valueArg: init.valueArg,
   };
   return base;};
 
@@ -210,6 +212,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             command: command('format.setFontFamily'),
             options: FONT_FAMILIES,
             valueKey: 'family',
+            valueArg: 'fontFamily',
             keytip: 'FF',
             action: 'openDialog',
             actionArgs: { dialog: command('format.setFontFamily') },
@@ -219,6 +222,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             command: command('format.setFontSize'),
             options: FONT_SIZES,
             valueKey: 'sizePoints',
+            valueArg: 'sizeHalfPoints',
             keytip: 'FS',
             action: 'openDialog',
             actionArgs: { dialog: command('format.setFontSize') },
@@ -304,7 +308,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
               action: 'openDialog',
               actionArgs: { dialog: command('numbering.multilevel') },
             }),
-          ]),
+          ], { id: 'docier.command.numbering.bullets' }),
           button({
             labelKey: 'ui.control.indentDecrease',
             command: command('format.decreaseIndent'),
@@ -367,7 +371,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
               action: 'openDialog',
               actionArgs: { dialog: command('format.setSpaceBefore') },
             }),
-          ]),
+          ], { id: 'docier.command.format.setLineSpacing' }),
         ],
       },
       {
@@ -1022,6 +1026,7 @@ export const FLOATING_CONTROLS: readonly UiNode[] = [
     command: command('format.setFontFamily'),
     options: FONT_FAMILIES,
     valueKey: 'family',
+    valueArg: 'fontFamily',
     action: 'openDialog',
     actionArgs: { dialog: command('format.setFontFamily') },
   }),
@@ -1030,6 +1035,7 @@ export const FLOATING_CONTROLS: readonly UiNode[] = [
     command: command('format.setFontSize'),
     options: FONT_SIZES,
     valueKey: 'sizePoints',
+    valueArg: 'sizeHalfPoints',
     action: 'openDialog',
     actionArgs: { dialog: command('format.setFontSize') },
   }),
