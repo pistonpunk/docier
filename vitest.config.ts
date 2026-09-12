@@ -15,7 +15,13 @@ export default defineConfig({
           ...shared,
           name: 'node',
           include: ['test/**/*.test.ts'],
-          exclude: ['test/render/**', 'test/edit/**', 'test/api/**', 'test/ui/**'],
+          exclude: [
+            'test/tokens/dom/**',
+            'test/render/**',
+            'test/edit/**',
+            'test/api/**',
+            'test/ui/**',
+          ],
           environment: 'node',
         },
       },
@@ -24,6 +30,7 @@ export default defineConfig({
           ...shared,
           name: 'dom',
           include: [
+            'test/tokens/dom/**/*.test.ts',
             'test/render/**/*.test.ts',
             'test/edit/**/*.test.ts',
             'test/api/**/*.test.ts',

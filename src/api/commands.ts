@@ -273,6 +273,25 @@ export const createCommandRegistry = (env: CommandEnvironment): CommandRegistry 
         },
       };
     },
+    replace: <A, R>(definition: CommandDefinition<A, R>): Disposable => {
+      if (!isArea(definition.id)) {
+        throw new DocierError({
+          code: 'CONFIG_INVALID',
+          detail: `The command id ${definition.id} is not in the docier.command. namespace`,
+          context: { instanceId: env.instanceId, operation: 'replace' },
+        });
+      }
+      const inserted = definition as unknown as CommandDefinition<never, unknown>;
+      const displaced = definitions.get(definition.id);
+      definitions.set(definition.id, inserted);
+      return {
+        dispose: () => {
+          if (definitions.get(definition.id) !== inserted) return;
+          if (displaced === undefined) definitions.delete(definition.id);
+          else definitions.set(definition.id, displaced);
+        },
+      };
+    },
     get: (id) => definitions.get(id),
     list: (filter?: CommandFilter) => {
       const out: CommandDescriptor[] = [];

@@ -244,6 +244,7 @@ export interface ExecuteOptions {
 
 export interface CommandRegistry {
   register<A, R>(definition: CommandDefinition<A, R>): Disposable;
+  replace<A, R>(definition: CommandDefinition<A, R>): Disposable;
   get(id: string): CommandDefinition<never, unknown> | undefined;
   list(filter?: CommandFilter): readonly CommandDescriptor[];
   execute<A, R>(id: string, args?: A, options?: ExecuteOptions): Promise<CommandResult<R>>;
