@@ -3,7 +3,7 @@ import type { DocPos } from '../../layout/index.js';
 import type { Mp } from '../../units/index.js';
 import { mpToTwip, twip } from '../../units/index.js';
 import type { Table, TableCell } from '../../model/index.js';
-import { isWElement, propertyOf } from '../../model/index.js';
+import { isWElement, propertyOf, setWAttr } from '../../model/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { caretSelection, rangeAsDocRange } from '../selection.js';
 import type { ParagraphSlot } from '../session.js';
@@ -35,6 +35,7 @@ const NO_SELECTION: LocalizedString = 'Select the cells to merge and try again';
 const ONE_TABLE: LocalizedString = 'The selection starts and ends in different tables';
 const RECTANGLE: LocalizedString =
   'This build merges cells along one row or one column; a block of rows and columns is not merged';
+const BAD_WIDTH: LocalizedString = 'A column needs a width of at least 6 points';
 const NOT_MERGED: LocalizedString =
   'The cell under the caret is not merged, so there is nothing to split';
 const LAST_ROW: LocalizedString = 'This table has a single row; delete the table instead';
@@ -471,6 +472,61 @@ const setPropertiesSpec: AreaSpec<TablePropertiesArgs> = {
   },
 };
 
+export interface ColumnWidthArgs {
+  readonly column?: number;
+  readonly widthTwips?: number;
+}
+
+const MIN_COLUMN_TWIPS = 120;
+
+const setColumnWidthSpec: AreaSpec<ColumnWidthArgs> = {
+  id: 'docier.command.table.setColumnWidth',
+  label: 'Column width',
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host, args) =>
+    host.session.aligned &&
+    targetAt(host) !== undefined &&
+    widthSettable(targetAt(host), args),
+  reason: (host, args) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    const target = targetAt(host);
+    if (target === undefined) return PLACE_CARET;
+    return widthSettable(target, args) ? NEEDS_PROPERTY : BAD_WIDTH;
+  },
+  run: (host, args) => {
+    const target = targetAt(host);
+    if (target === undefined || !widthSettable(target, args)) return false;
+    const table = target.table;
+    const column = args.column ?? target.column;
+    const requested = Math.max(MIN_COLUMN_TWIPS, Math.floor(args.widthTwips ?? 0));
+    const changed = changedBy([table.element], () => {
+      const grid = table.gridColumns()[column];
+      if (grid !== undefined) setWAttr(grid.element, 'w', String(requested));
+      for (const row of table.rows()) {
+        const cell = row.spanAt(column)?.cell;
+        if (cell === undefined) continue;
+        const properties = cell.properties;
+        properties.width.type = 'dxa';
+        properties.width.twips = twip(requested);
+      }
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(table.element);
+    return true;
+  },
+};
+
+const widthSettable = (target: CellTarget | undefined, args: ColumnWidthArgs | undefined): boolean => {
+  if (target === undefined || args === undefined) return false;
+  const width = args.widthTwips;
+  if (width === undefined || !Number.isFinite(width) || Math.floor(width) < MIN_COLUMN_TWIPS) {
+    return false;
+  }
+  const column = args.column ?? target.column;
+  return column >= 0 && column < target.table.columnCount;
+};
+
 export const tableCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<InsertTableArgs>(host, insertTableSpec),
   areaCommand<RowArgs>(
@@ -499,5 +555,6 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<CountArgs>(host, mergeSpec),
   areaCommand<CountArgs>(host, splitSpec),
   areaCommand<TablePropertiesArgs>(host, setPropertiesSpec),
+  areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
   areaCommand<CountArgs>(host, deleteSpec),
 ];
