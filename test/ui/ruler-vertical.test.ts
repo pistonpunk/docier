@@ -345,13 +345,21 @@ describe('vertical ruler with no document', () => {
     expect(handleFor(ruler, 'margin-top').getAttribute('aria-valuenow')).toBe('0');
   });
 
-  it('hides and shows with the ruler state', async () => {
+  it('shows only while the host says so, and only with the ruler state', async () => {
     const { chrome, ruler } = await fixture();
+    expect(ruler.element.hidden).toBe(true);
+
+    ruler.setShown(true);
     expect(ruler.element.hidden).toBe(false);
+
     chrome.setRulerVisible(false);
     expect(ruler.element.hidden).toBe(true);
+
     chrome.setRulerVisible(true);
     expect(ruler.element.hidden).toBe(false);
+
+    ruler.setShown(false);
+    expect(ruler.element.hidden).toBe(true);
   });
 
   it('stops dragging once disposed', async () => {

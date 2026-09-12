@@ -534,6 +534,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         },
       });
       styleStore.add(verticalRuler);
+      verticalRuler.setShown(false);
     }
 
     if (enabled('statusBar')) {
@@ -693,12 +694,29 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     ruler?.refresh();
     verticalRuler?.refresh();
   };
+
+  const MARGIN_REACH_PX = 56;
+
+  const trackVerticalRuler = (): void => {
+    if (verticalRuler === undefined) return;
+    const canvas = root.querySelector<HTMLElement>('.docier-canvas');
+    if (canvas === null) return;
+    const nearMargin = (event: PointerEvent): boolean =>
+      event.clientX - canvas.getBoundingClientRect().left <= MARGIN_REACH_PX;
+    canvas.addEventListener('pointermove', (event) => {
+      verticalRuler.setShown(nearMargin(event));
+    });
+    canvas.addEventListener('pointerleave', () => {
+      verticalRuler.setShown(false);
+    });
+  };
   const ownerWindow = handle.root.ownerDocument.defaultView;
   const ownerDocument = handle.root.ownerDocument;
   ownerWindow?.addEventListener('resize', viewportChanged);
   ownerDocument.addEventListener('scroll', viewportChanged, true);
 
   applyThemeMode();
+  trackVerticalRuler();
 
   if (mode !== 'none') sync();
 

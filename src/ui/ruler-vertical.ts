@@ -17,6 +17,7 @@ export interface VerticalRulerOptions {
 }
 
 export interface VerticalRulerHandle extends Disposable {
+  setShown(next: boolean): void;
   readonly element: HTMLElement;
   readonly markers: readonly HTMLElement[];
   readonly lines: readonly HTMLElement[];
@@ -257,9 +258,19 @@ export const createVerticalRuler = (options: VerticalRulerOptions): VerticalRule
     }
   };
 
+  let shown = false;
+
+  const visible = (): boolean => shown;
+
+  const setShown = (next: boolean): void => {
+    if (shown === next) return;
+    shown = next;
+    refresh();
+  };
+
   const refresh = (): void => {
     const current = options.metrics();
-    element.hidden = !context.state.rulerVisible || current === undefined;
+    element.hidden = !context.state.rulerVisible || current === undefined || !visible();
     if (current === undefined) return;
 
     const page = current.page;
@@ -447,6 +458,7 @@ export const createVerticalRuler = (options: VerticalRulerOptions): VerticalRule
     ticks,
     textArea,
     refresh,
+    setShown,
     dispose: () => {
       abandonDrag?.();
       store.dispose();
