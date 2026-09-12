@@ -123,7 +123,7 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
-  padding: 12px;
+  padding: 12px 12px 0;
   overflow: hidden;
 }
 
@@ -131,7 +131,8 @@ body {
   height: 100%;
   min-height: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
   background: var(--panel);
   overflow: hidden;
 }
@@ -158,14 +159,30 @@ body {
 }
 
 .diagnostics[data-collapsed='true'] {
-  width: auto;
-  max-width: 80%;
+  width: 40px;
+  max-width: 40px;
 }
 
 .diagnostics[data-collapsed='true'] .diagnostics-list,
 .diagnostics[data-collapsed='true'] .diagnostics-head h2,
 .diagnostics[data-collapsed='true'] .diagnostics-clear {
   display: none;
+}
+
+.diagnostics[data-collapsed='true'] .diagnostics-head {
+  flex-direction: column;
+  padding: 8px 2px;
+  gap: 8px;
+}
+
+.diagnostics[data-collapsed='true'] #diagnostics-toggle {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  padding: 10px 4px;
+}
+
+.diagnostics[data-collapsed='true'] .pill {
+  padding: 2px 5px;
 }
 
 .splitter {
@@ -213,6 +230,16 @@ body {
     max-height: 45vh;
     border-left: 0;
     border-top: 1px solid var(--line);
+  }
+
+  .diagnostics[data-collapsed='true'] .diagnostics-head {
+    flex-direction: row;
+    padding: 10px 12px;
+  }
+
+  .diagnostics[data-collapsed='true'] #diagnostics-toggle {
+    writing-mode: horizontal-tb;
+    padding: 3px 8px;
   }
 
   .splitter {

@@ -20,7 +20,7 @@ import type {
   ZoomMode,
 } from './types.js';
 import type { PaintScale } from './scale.js';
-import { paintScale } from './scale.js';
+import { formatNumber, formatPx, paintScale } from './scale.js';
 import { ATTR, frameOf, geometryAt } from './dom.js';
 import { fontShorthand, runFontSpec } from './style.js';
 import { BORDER_SIDES, edgeBandOf, shadingColorOf } from './decoration.js';
@@ -63,6 +63,7 @@ export interface LayoutDivergence {
   readonly runIndex: number;
   readonly docPos: number | undefined;
   readonly engineWidthMp: number;
+  readonly engineWidthPx: number;
   readonly renderedWidthPx: number;
   readonly deltaPx: number;
   readonly tolerancePx: number;
@@ -71,9 +72,49 @@ export interface LayoutDivergence {
   readonly text: string;
 }
 
+export type DivergenceSkipReason =
+  | 'runWithoutPaint'
+  | 'hiddenRun'
+  | 'objectRun'
+  | 'unreadableBox'
+  | 'unreadableFontSize'
+  | 'segmentCountMismatch'
+  | 'segmentedRunAdvance'
+  | 'smallCapsAdvance'
+  | 'controlCharacterAdvance'
+  | 'noTextMeasurer'
+  | 'unmeasurableText'
+  | 'unreadableObjectBox'
+  | 'pageLayerMissing'
+  | 'unreadablePageLayer'
+  | 'unreadablePageOrigin'
+  | 'unreadablePage';
+
+export type DivergenceSkipSeverity = 'info' | 'warning';
+
+const SKIP_SEVERITY: Record<DivergenceSkipReason, DivergenceSkipSeverity> = {
+  runWithoutPaint: 'warning',
+  hiddenRun: 'info',
+  objectRun: 'info',
+  unreadableBox: 'warning',
+  unreadableFontSize: 'warning',
+  segmentCountMismatch: 'warning',
+  segmentedRunAdvance: 'info',
+  smallCapsAdvance: 'info',
+  controlCharacterAdvance: 'info',
+  noTextMeasurer: 'warning',
+  unmeasurableText: 'warning',
+  unreadableObjectBox: 'warning',
+  pageLayerMissing: 'warning',
+  unreadablePageLayer: 'warning',
+  unreadablePageOrigin: 'warning',
+  unreadablePage: 'warning',
+};
+
 export interface DivergenceSkip {
-  readonly reason: string;
+  readonly reason: DivergenceSkipReason;
   readonly count: number;
+  readonly severity: DivergenceSkipSeverity;
 }
 
 export interface DivergenceChecked {
@@ -89,6 +130,7 @@ export interface DivergenceChecked {
 
 export interface DivergenceReport {
   readonly ok: boolean;
+  readonly complete: boolean;
   readonly documentHash: string;
   readonly version: number;
   readonly zoom: number;
@@ -221,8 +263,10 @@ const rectMessage = (label: string, expected: RectStyle, actual: MeasuredRect): 
 
 export const formatDivergence = (divergence: LayoutDivergence): string =>
   `[${divergence.kind}] page ${divergence.page} line ${divergence.lineId} run ${divergence.runIndex}: ` +
-  `${divergence.message} (engine ${divergence.engineWidthMp} mp, rendered ${divergence.renderedWidthPx} px, ` +
-  `delta ${divergence.deltaPx} px, font ${divergence.resolvedFontFamily}, hash ${divergence.documentHash})`;
+  `${divergence.message} (engine ${divergence.engineWidthMp} mp = ${formatNumber(divergence.engineWidthPx)} px, ` +
+  `rendered ${formatNumber(divergence.renderedWidthPx)} px, delta ${formatNumber(divergence.deltaPx)} px over ` +
+  `${formatNumber(divergence.tolerancePx)} px tolerance, font ${divergence.resolvedFontFamily}, ` +
+  `hash ${divergence.documentHash})`;
 
 interface DivergenceDraft {
   readonly kind: DivergenceKind;
@@ -247,7 +291,7 @@ export const detectDivergence = (
   const maxDivergences = options.maxDivergences ?? DEFAULT_MAX_DIVERGENCES;
   const scale: PaintScale = paintScale(rendered.zoom);
   const browserAvailable = hasLayoutEngine();
-  const authoritative = options.rectOf !== undefined || browserAvailable;
+  const readableRects = options.rectOf !== undefined || browserAvailable;
   const rectFactor = rendered.zoomMode === 'transform' ? rendered.zoom : 1;
   const rectOf: RectSource =
     options.rectOf ?? (browserAvailable ? browserRectSource() : styleRectSource(rectFactor));
@@ -255,7 +299,7 @@ export const detectDivergence = (
     options.measureText ?? (options.rectOf !== undefined ? undefined : canvasTextMeasurer());
 
   const divergences: LayoutDivergence[] = [];
-  const skipCounts = new Map<string, number>();
+  const skipCounts = new Map<DivergenceSkipReason, number>();
   let boxes = 0;
   let runs = 0;
   let lines = 0;
@@ -264,7 +308,7 @@ export const detectDivergence = (
   let decorations = 0;
   let objects = 0;
 
-  const skip = (reason: string): void => {
+  const skip = (reason: DivergenceSkipReason): void => {
     skipCounts.set(reason, (skipCounts.get(reason) ?? 0) + 1);
   };
 
@@ -273,6 +317,7 @@ export const detectDivergence = (
     divergences.push({
       ...draft,
       documentHash: result.documentHash,
+      engineWidthPx: scale.px(mp(draft.engineWidthMp)),
       deltaPx,
       tolerancePx,
       fontFileHash: undefined,
@@ -313,7 +358,6 @@ export const detectDivergence = (
         ...baseDraft(-1, -1, -1, -1),
         kind: 'pageCount',
         message: `painted ${sheets.length} page sheets for ${result.pages.length} page fragments`,
-        renderedWidthPx: sheets.length,
       },
       0,
     );
@@ -329,15 +373,15 @@ export const detectDivergence = (
     if (segmented) {
       return (
         `painted boxes (${painted
-          .map((rect) => `${rect.left}+${rect.width}`)
+          .map((rect) => `left ${rect.left}px width ${rect.width}px`)
           .join(', ')}) do not sit on the engine atom boundaries of a run the engine places at ` +
-        `left ${engineLeftPx} top ${engineTopPx} width ${engineWidthPx}`
+        `left ${engineLeftPx}px top ${engineTopPx}px width ${engineWidthPx}px`
       );
     }
     const rect = painted[0];
     return (
-      `painted box (left ${rect?.left ?? 0} top ${rect?.top ?? 0} width ${rect?.width ?? 0}) does not ` +
-      `match the engine (left ${engineLeftPx} top ${engineTopPx} width ${engineWidthPx})`
+      `painted box (left ${rect?.left ?? 0}px top ${rect?.top ?? 0}px width ${rect?.width ?? 0}px) does not ` +
+      `match the engine (left ${engineLeftPx}px top ${engineTopPx}px width ${engineWidthPx}px)`
     );
   };
 
@@ -767,16 +811,19 @@ export const detectDivergence = (
     }
     const widthDelta = Math.abs(sheetRect.width - scale.px(page.page.width));
     const heightDelta = Math.abs(sheetRect.height - scale.px(page.page.height));
-    if (widthDelta > 0 || heightDelta > 0) {
+    const sizeDelta = Math.max(widthDelta, heightDelta);
+    if (sizeDelta > tolerancePx) {
       push(
         {
           ...baseDraft(page.index, -1, -1, -1),
           kind: 'pageSize',
-          message: `page sheet is ${sheetRect.width}x${sheetRect.height} px, engine says ${scale.px(page.page.width)}x${scale.px(page.page.height)} px`,
+          message:
+            `page sheet is ${formatPx(sheetRect.width)}x${formatPx(sheetRect.height)} where the engine lays it ` +
+            `out at ${formatPx(scale.px(page.page.width))}x${formatPx(scale.px(page.page.height))}`,
           engineWidthMp: page.page.width,
           renderedWidthPx: sheetRect.width,
         },
-        Math.max(widthDelta, heightDelta),
+        sizeDelta,
       );
     }
     for (const block of page.blocks) {
@@ -826,32 +873,57 @@ export const detectDivergence = (
     );
   }
 
+  const skipped: readonly DivergenceSkip[] = Array.from(skipCounts, ([reason, count]) => ({
+    reason,
+    count,
+    severity: SKIP_SEVERITY[reason],
+  }));
+  const complete = skipped.every((entry) => entry.severity === 'info');
+
   return {
-    ok: divergences.length === 0,
+    ok: divergences.length === 0 && complete,
+    complete,
     documentHash: result.documentHash,
     version: result.version,
     zoom: rendered.zoom,
     zoomMode: rendered.zoomMode,
     tolerancePx,
-    rectSource: authoritative ? 'browser' : 'style',
-    authoritative,
+    rectSource: readableRects ? 'browser' : 'style',
+    authoritative: readableRects && complete,
     checked: { pages: sheets.length, lines, runs, boxes, advances, fonts, decorations, objects },
-    skipped: Array.from(skipCounts, ([reason, count]) => ({ reason, count })),
+    skipped,
     divergences,
     gaps: RESULT_GAPS,
   };
 };
 
+const unrunChecks = (report: DivergenceReport): string =>
+  report.skipped
+    .filter((entry) => entry.severity === 'warning')
+    .map((entry) => `${entry.reason} x${String(entry.count)}`)
+    .join(', ');
+
 export const assertNoDivergence = (
   report: DivergenceReport,
   options: { readonly requireAuthoritative?: boolean } = {},
 ): void => {
+  const unrun = unrunChecks(report);
   if (options.requireAuthoritative === true && !report.authoritative) {
-    throw new Error('the divergence detector ran without browser layout; the check is not authoritative');
+    if (report.rectSource !== 'browser') {
+      throw new Error('the divergence detector ran without browser layout; the check is not authoritative');
+    }
+    throw new Error(
+      `the divergence detector could not run every check (${unrun}); the report is not authoritative`,
+    );
   }
-  if (report.ok) return;
-  throw new Error(
-    `layout diverged from the LayoutResult in ${report.divergences.length} place(s):\n` +
-      report.divergences.map(formatDivergence).join('\n'),
-  );
+  if (report.divergences.length > 0) {
+    const listed = report.divergences.map(formatDivergence).join('\n');
+    const note = report.complete ? '' : `\nthe detector could not run: ${unrun}`;
+    throw new Error(
+      `layout diverged from the LayoutResult in ${report.divergences.length} place(s):\n${listed}${note}`,
+    );
+  }
+  if (!report.complete) {
+    throw new Error(`the divergence detector could not run every check: ${unrun}`);
+  }
 };

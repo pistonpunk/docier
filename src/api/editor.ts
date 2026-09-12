@@ -1,4 +1,4 @@
-import type { DocPos, LayoutResult } from '../layout/index.js';
+import type { DocPos, LayoutOptions, LayoutResult } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
 import type { XmlNode } from '../ooxml/xml/index.js';
 import { DocxPackage } from '../ooxml/package.js';
@@ -683,13 +683,16 @@ export const createEditor = (
         for (const hook of active.commitHooks) hook();
         return { affectedRanges: [], invalidation: active.invalidation };
       }
+      let layoutMs: number | undefined;
       if (changed) {
         bus.bus.emit('docier:render:layoutstart', {
           ...envelope(),
           transactionId: active.id,
           invalidation: active.invalidation,
         });
+        const layoutStarted = performance.now();
         relayout();
+        layoutMs = performance.now() - layoutStarted;
         revision += 1;
       }
       let resolved: EditSelection | undefined = undefined;
@@ -720,7 +723,8 @@ export const createEditor = (
           ...historyState(),
         });
       }
-      if (resolved !== undefined && !selectionEquals(previousSelection, resolved)) {
+      const selectionMoved = resolved !== undefined && !selectionEquals(previousSelection, resolved);
+      if (selectionMoved) {
         bus.bus.emit('docier:selection:change', {
           ...envelope(),
           transactionId: active.id,
@@ -735,9 +739,11 @@ export const createEditor = (
           ...envelope(),
           transactionId: active.id,
           result: activeSession.layout,
-          durationMs: 0,
+          durationMs: layoutMs ?? 0,
           pages: activeSession.layout.pages.length,
         });
+      } else if (selectionMoved) {
+        input?.refresh();
       }
       for (const hook of active.commitHooks) hook();
       return { affectedRanges: active.ranges, invalidation: active.invalidation };
@@ -929,14 +935,26 @@ export const createEditor = (
     renderedDocument = undefined;
   };
 
-  const mountDocument = (loaded: DocumentModel): void => {
-    model = loaded;
-    const created = createEditSession(loaded, {});
+  const layoutOptions = (): LayoutOptions => {
+    const measurer = settings.layout.measurer;
+    return measurer === undefined ? {} : { measurer };
+  };
+
+  const mountSession = (): void => {
+    if (model === undefined) return;
+    input?.dispose();
+    input = undefined;
+    const created = createEditSession(model, layoutOptions());
     session = created;
     selection = caretSelection(created.index.documentStart, 'downstream');
     revision += 1;
     paint();
     input = attachInput(inputHost);
+  };
+
+  const mountDocument = (loaded: DocumentModel): void => {
+    model = loaded;
+    mountSession();
     state = 'ready';
     bus.bus.emit('docier:ready', { ...envelope(), state });
   };
@@ -1055,7 +1073,8 @@ export const createEditor = (
       for (const [name, value] of Object.entries(settings.theme.vars)) {
         root.style.setProperty(name, value);
       }
-      if (session !== undefined) paint();
+      if (applied.applyReport.applied.includes('layout.measurer')) mountSession();
+      else if (session !== undefined) paint();
       bus.bus.emit('docier:configchange', {
         ...envelope(),
         keys: applied.applyReport.applied,

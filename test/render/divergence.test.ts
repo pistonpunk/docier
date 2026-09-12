@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LayoutResult } from '../../src/layout/index.js';
 import { mp, toCssPx } from '../../src/units/index.js';
-import type { TextAdvanceMeasurer } from '../../src/render/index.js';
+import type { RectSource } from '../../src/render/index.js';
 import {
   ATTR,
   DEFAULT_TOLERANCE_PX,
@@ -11,6 +11,7 @@ import {
   edgeBandOf,
   formatDivergence,
   renderDocument,
+  styleRectSource,
 } from '../../src/render/index.js';
 import {
   BORDERS,
@@ -24,6 +25,7 @@ import {
   imageSource,
   layoutOf,
   localPx,
+  measurerOf,
   para,
   paragraphText,
   px,
@@ -52,25 +54,6 @@ const runCount = (result: LayoutResult): number =>
     0,
   );
 
-const measurerOf = (result: LayoutResult, deltaPx = 0): TextAdvanceMeasurer => {
-  const widths = new Map<string, number>();
-  for (const page of result.pages) {
-    for (const block of page.blocks) {
-      for (const line of block.lines) {
-        for (const run of line.runs) {
-          if (!widths.has(run.text)) widths.set(run.text, toCssPx(run.width, 1));
-        }
-      }
-    }
-  }
-  return {
-    measure: (text) => {
-      const width = widths.get(text);
-      return width === undefined ? undefined : width + deltaPx;
-    },
-  };
-};
-
 const shiftLeft = (node: HTMLElement, deltaPx: number): void => {
   node.style.setProperty('left', `${String(Number.parseFloat(node.style.left) + deltaPx)}px`);
 };
@@ -79,6 +62,33 @@ const paragraphs = (count: number, text: string): string =>
   Array.from({ length: count }, () => paragraphText(text)).join('');
 
 const manyParagraphs = (): string => paragraphs(30, 'aaaa bbbb');
+
+const A4_WIDTH_MP = 595300;
+const A4_HEIGHT_MP = 841900;
+
+const a4Body = (blocks: string): string =>
+  `${blocks}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>` +
+  `<w:pgMar w:top="500" w:right="1000" w:bottom="500" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/>` +
+  `</w:sectPr>`;
+
+const browserSheetRect = (): RectSource => {
+  const read = styleRectSource(1);
+  const snap = (value: number): number => Math.floor(value * 64) / 64;
+  return (element) => {
+    const rect = read(element);
+    if (rect === undefined) return undefined;
+    return { left: rect.left, top: rect.top, width: snap(rect.width), height: snap(rect.height) };
+  };
+};
+
+const resizedSheet = (deltaPx: number): RectSource => {
+  const read = styleRectSource(1);
+  return (element) => {
+    const rect = read(element);
+    if (rect === undefined || !element.hasAttribute(ATTR.page)) return rect;
+    return { ...rect, width: rect.width + deltaPx };
+  };
+};
 
 describe('layout divergence detection', () => {
   it('reports a clean render as matching the layout result', async () => {
@@ -151,6 +161,10 @@ describe('layout divergence detection', () => {
     const size = report.divergences.find((divergence) => divergence.kind === 'pageSize');
     expect(size?.deltaPx).toBe(10);
     expect(size?.tolerancePx).toBe(DEFAULT_TOLERANCE_PX);
+    expect(size?.engineWidthPx).toBeCloseTo(toCssPx(mp(size?.engineWidthMp ?? 0), 1), 4);
+    const count = report.divergences.find((divergence) => divergence.kind === 'pageCount');
+    expect(count?.renderedWidthPx).toBe(0);
+    expect(count?.message).toContain(`page sheets for ${String(result.pages.length)} page fragments`);
   });
 
   it('reports a font whose advance disagrees with the engine measurement', async () => {
@@ -165,6 +179,10 @@ describe('layout divergence detection', () => {
       4,
     );
     expect(divergence?.resolvedFontFamily).toBe(result.paint[0]?.family);
+    expect(divergence?.engineWidthPx).toBeCloseTo(toCssPx(mp(divergence?.engineWidthMp ?? 0), 1), 4);
+    const line = formatDivergence(divergence!);
+    expect(line).toContain(' mp = ');
+    expect(line).toContain(' px over 0.5 px tolerance');
     const blunt = detectDivergence(result, rendered, {
       measureText: measurerOf(result, 2),
       tolerancePx: 3,
@@ -194,15 +212,91 @@ describe('layout divergence detection', () => {
     const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
     expect(report.ok).toBe(true);
     expect(report.checked.advances).toBe(0);
-    expect(report.skipped).toContainEqual({ reason: 'segmentedRunAdvance', count: 1 });
+    expect(report.skipped).toContainEqual({ reason: 'segmentedRunAdvance', count: 1, severity: 'info' });
     const plain = await layoutOf(bodyOf(paragraphText('hello world')));
     const plainTarget = host();
     const plainRendered = renderDocument(plain, plainTarget);
     const unmeasurable = detectDivergence(plain, plainRendered, {
       measureText: { measure: () => undefined },
     });
-    expect(unmeasurable.ok).toBe(true);
-    expect(unmeasurable.skipped).toContainEqual({ reason: 'unmeasurableText', count: 1 });
+    expect(unmeasurable.divergences).toEqual([]);
+    expect(unmeasurable.ok).toBe(false);
+    expect(unmeasurable.complete).toBe(false);
+    expect(unmeasurable.skipped).toContainEqual({ reason: 'unmeasurableText', count: 1, severity: 'warning' });
+  });
+
+  it('says so when there is no text measurer to run the width checks with', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('hello world')));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const report = detectDivergence(result, rendered);
+    expect(report.divergences).toEqual([]);
+    expect(report.checked.advances).toBe(0);
+    expect(report.checked.runs).toBe(runCount(result));
+    expect(report.ok).toBe(false);
+    expect(report.complete).toBe(false);
+    expect(report.authoritative).toBe(false);
+    expect(report.skipped).toContainEqual({
+      reason: 'noTextMeasurer',
+      count: runCount(result),
+      severity: 'warning',
+    });
+    expect(() => assertNoDivergence(report)).toThrow(/could not run every check/);
+    expect(() => assertNoDivergence(report, { requireAuthoritative: true })).toThrow(
+      /without browser layout/,
+    );
+    const browserRects = detectDivergence(result, rendered, { rectOf: styleRectSource(1) });
+    expect(browserRects.divergences).toEqual([]);
+    expect(browserRects.rectSource).toBe('browser');
+    expect(browserRects.authoritative).toBe(false);
+    expect(() => assertNoDivergence(browserRects, { requireAuthoritative: true })).toThrow(
+      /could not run every check \(noTextMeasurer/,
+    );
+  });
+
+  it('accepts an A4 page the browser rounds onto its own pixel grid', async () => {
+    const result = await layoutOf(a4Body(paragraphText('hello world')));
+    const page = result.pages[0];
+    expect(page?.page.width).toBe(A4_WIDTH_MP);
+    expect(page?.page.height).toBe(A4_HEIGHT_MP);
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const sheet = pageSheets(target)[0] as HTMLElement;
+    const browser = browserSheetRect()(sheet);
+    expect(browser?.width).toBe(793.71875);
+    expect(browser?.height).toBe(1122.53125);
+    const report = detectDivergence(result, rendered, {
+      measureText: measurerOf(result),
+      rectOf: browserSheetRect(),
+    });
+    expect(report.divergences.filter((divergence) => divergence.kind === 'pageSize')).toEqual([]);
+    expect(report.divergences).toEqual([]);
+    expect(report.ok).toBe(true);
+    expect(report.authoritative).toBe(true);
+  });
+
+  it('reports an A4 sheet that is genuinely the wrong size', async () => {
+    const result = await layoutOf(a4Body(paragraphText('hello world')));
+    const target = host();
+    const rendered = renderDocument(result, target);
+    const wrong = detectDivergence(result, rendered, {
+      measureText: measurerOf(result),
+      rectOf: resizedSheet(0.6),
+    });
+    const sizes = wrong.divergences.filter((divergence) => divergence.kind === 'pageSize');
+    expect(sizes.length).toBe(1);
+    expect(sizes[0]?.deltaPx).toBeCloseTo(0.6, 4);
+    expect(sizes[0]?.engineWidthMp).toBe(A4_WIDTH_MP);
+    expect(sizes[0]?.engineWidthPx).toBeCloseTo(793.7333, 3);
+    expect(sizes[0]?.tolerancePx).toBe(DEFAULT_TOLERANCE_PX);
+    expect(sizes[0]?.message).toContain('794.3333px');
+    expect(sizes[0]?.message).toContain('793.7333px');
+    const within = detectDivergence(result, rendered, {
+      measureText: measurerOf(result),
+      rectOf: resizedSheet(0.4),
+    });
+    expect(within.divergences.filter((divergence) => divergence.kind === 'pageSize')).toEqual([]);
+    expect(within.divergences).toEqual([]);
   });
 
   it('runs from the renderer itself when the host asks for it', async () => {

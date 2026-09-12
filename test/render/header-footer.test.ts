@@ -18,7 +18,7 @@ import {
   headerXml,
   openModel,
 } from '../model/support.js';
-import { host } from './support.js';
+import { host, measurerOf } from './support.js';
 
 const PAGE_TWIPS = 3000;
 const MARGIN_TWIPS = 1000;
@@ -116,9 +116,11 @@ describe('the DOM painter draws the header and the footer', () => {
     const result = await resultWith();
     const target = host();
     const rendered = renderDocument(result, target);
-    const report = detectDivergence(result, rendered);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
     assertNoDivergence(report);
     expect(report.ok).toBe(true);
+    expect(report.complete).toBe(true);
+    expect(report.skipped).toEqual([]);
     expect(report.divergences).toEqual([]);
   });
 
@@ -130,7 +132,7 @@ describe('the DOM painter draws the header and the footer', () => {
     expect(node).not.toBeNull();
     if (node === null) return;
     node.style.setProperty('top', `${String(Number.parseFloat(node.style.top) + 12)}px`);
-    const report = detectDivergence(result, rendered);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
     expect(report.ok).toBe(false);
     expect(report.divergences.every((divergence) => divergence.deltaPx !== 0)).toBe(true);
   });
@@ -139,7 +141,7 @@ describe('the DOM painter draws the header and the footer', () => {
     const result = await resultWith();
     const target = host();
     const rendered = renderDocument(result, target);
-    const report = detectDivergence(result, rendered);
+    const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
     const regionLines = result.pages.reduce(
       (total, page) =>
         total +

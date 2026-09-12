@@ -120,6 +120,8 @@ export type {
   DivergenceKind,
   DivergenceReport,
   DivergenceSkip,
+  DivergenceSkipReason,
+  DivergenceSkipSeverity,
   LayoutDivergence,
 } from './divergence.js';
 export {

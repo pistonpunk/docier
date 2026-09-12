@@ -1,6 +1,27 @@
 import { formatPx } from '../../src/render/index.js';
-import type { RenderImageSource } from '../../src/render/index.js';
+import type { RenderImageSource, TextAdvanceMeasurer } from '../../src/render/index.js';
+import type { LayoutResult } from '../../src/layout/index.js';
 import { mp, toCssPx } from '../../src/units/index.js';
+
+export const measurerOf = (result: LayoutResult, deltaPx = 0): TextAdvanceMeasurer => {
+  const widths = new Map<string, number>();
+  for (const page of result.pages) {
+    const blocks = [...page.blocks, ...(page.header?.blocks ?? []), ...(page.footer?.blocks ?? [])];
+    for (const block of blocks) {
+      for (const line of block.lines) {
+        for (const run of line.runs) {
+          if (!widths.has(run.text)) widths.set(run.text, toCssPx(run.width, 1));
+        }
+      }
+    }
+  }
+  return {
+    measure: (text) => {
+      const width = widths.get(text);
+      return width === undefined ? undefined : width + deltaPx;
+    },
+  };
+};
 
 export {
   A_ADVANCE_AT_10PT,
