@@ -23,6 +23,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js"
+    },
+    "./layout": {
+      "types": "./dist/layout/index.d.ts",
+      "import": "./dist/layout/index.js"
+    },
+    "./measure": {
+      "types": "./dist/measure/index.d.ts",
+      "import": "./dist/measure/index.js"
+    },
     "./pdf": {
       "types": "./dist/pdf/index.d.ts",
       "import": "./dist/pdf/index.js"
@@ -36,10 +48,11 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "COMMERCIAL.md"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && node scripts/emit-css.mjs",
     "typecheck": "tsc -b --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "vitest run",
