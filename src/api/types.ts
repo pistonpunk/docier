@@ -392,6 +392,20 @@ export interface IssuesChange extends EventEnvelope {
   readonly warnings: number;
 }
 
+export interface ClipboardDegradationInfo {
+  readonly reason: string;
+  readonly detail?: string | undefined;
+}
+
+export interface ClipboardCopied extends EventEnvelope {
+  readonly flavours: readonly string[];
+  readonly degraded: readonly ClipboardDegradationInfo[];
+}
+
+export interface ClipboardDegraded extends EventEnvelope {
+  readonly entries: readonly ClipboardDegradationInfo[];
+}
+
 export interface DocierEventMap extends EventMap {
   'docier:ready': ReadyEvent;
   'docier:command:beforeexecute': CommandBeforeExecute;
@@ -404,6 +418,8 @@ export interface DocierEventMap extends EventMap {
   'docier:issues:change': IssuesChange;
   'docier:render:layoutstart': LayoutStart;
   'docier:render:layoutend': LayoutEnd;
+  'docier:clipboard:copied': ClipboardCopied;
+  'docier:clipboard:degraded': ClipboardDegraded;
   'docier:configchange': ConfigChange;
   'docier:error': DocierErrorEvent;
 }

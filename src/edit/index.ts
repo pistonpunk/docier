@@ -30,3 +30,47 @@ export { attachInput } from './input.js';
 export type { MarkState, ParagraphMarks, RunMarks } from './inspect.js';
 export { marksAt, marksFrom, paragraphMarksAt } from './inspect.js';
 export type { ParagraphFormatPatch, RunFormatPatch } from './mutation.js';
+export type {
+  ClipboardCommandArgs,
+  ClipboardCommandHost,
+  MoveRangeArgs,
+} from './clipboard/commands.js';
+export { clipboardCommandIds, installClipboardCommands } from './clipboard/commands.js';
+export type { ClipboardBuffer, ClipboardRead } from './clipboard/transfer.js';
+export {
+  createClipboardBuffer,
+  readFromData,
+  writeSystemClipboardText,
+  writeToData,
+} from './clipboard/transfer.js';
+export type { ExtractOptions } from './clipboard/fragment.js';
+export {
+  decodeFragment,
+  encodeFragment,
+  extractFragment,
+  fragmentFromPlain,
+} from './clipboard/fragment.js';
+export type { InsertOptions, InsertResult } from './clipboard/insert.js';
+export { insertFragment } from './clipboard/insert.js';
+export { importHtml } from './clipboard/html-import.js';
+export { htmlOfFragment } from './clipboard/html-export.js';
+export { plainTextOfNodes } from './clipboard/text.js';
+export type {
+  ClipboardDataLike,
+  ClipboardDegradation,
+  ClipboardFlavour,
+  ClipboardFragment,
+  ClipboardPayload,
+  HtmlPolicy,
+  PasteMode,
+} from './clipboard/types.js';
+export {
+  DEFAULT_HTML_POLICY,
+  FRAGMENT_FORMAT,
+  FRAGMENT_MIME,
+  HTML_MIME,
+  PLAIN_MIME,
+  emptyPayload,
+  hasContent,
+  payloadFlavours,
+} from './clipboard/types.js';

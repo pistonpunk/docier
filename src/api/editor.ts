@@ -14,9 +14,14 @@ import type { EditSelection, SelectionReason } from '../edit/selection.js';
 import { caretSelection, selectionEquals, selectionOf, snapshotOf } from '../edit/selection.js';
 import { caretGeometryOf } from '../edit/caret.js';
 import { installEditCommands } from '../edit/commands.js';
-import type { EditCommandHost, HistoryOutcome } from '../edit/commands.js';
+import type { HistoryOutcome } from '../edit/commands.js';
 import { attachInput } from '../edit/input.js';
 import type { InputHandle, InputHost } from '../edit/input.js';
+import { installClipboardCommands } from '../edit/clipboard/commands.js';
+import type { ClipboardCommandHost } from '../edit/clipboard/commands.js';
+import { createClipboardBuffer } from '../edit/clipboard/transfer.js';
+import { DEFAULT_HTML_POLICY } from '../edit/clipboard/types.js';
+import type { ClipboardDegradation, ClipboardFlavour } from '../edit/clipboard/types.js';
 import { CancelledChangeError, createCommandRegistry } from './commands.js';
 import type {
   CommandEnvironment,
@@ -275,6 +280,20 @@ export const createEditor = (
     coalesceWindowMs: settings.editing.coalesceWindowMs,
   });
 
+  const clipboardBuffer = createClipboardBuffer();
+
+  const announceDegraded = (entries: readonly ClipboardDegradation[]): void => {
+    if (entries.length === 0) return;
+    bus.bus.emit('docier:clipboard:degraded', {
+      ...envelope(),
+      entries: entries.map((entry) =>
+        entry.detail === undefined
+          ? { reason: entry.reason }
+          : { reason: entry.reason, detail: entry.detail },
+      ),
+    });
+  };
+
   const root = owner.createElement('div');
   root.className = 'docier-editor';
   root.setAttribute('data-docier-instance', instanceId);
@@ -367,7 +386,28 @@ export const createEditor = (
     input?.refresh();
   };
 
-  const host: EditCommandHost = {
+  const host: ClipboardCommandHost = {
+    buffer: clipboardBuffer,
+    htmlPolicy: DEFAULT_HTML_POLICY,
+    get documentId(): string {
+      return settings.document.docId;
+    },
+    announceCopied: (
+      flavours: readonly ClipboardFlavour[],
+      degraded: readonly ClipboardDegradation[],
+    ): void => {
+      bus.bus.emit('docier:clipboard:copied', {
+        ...envelope(),
+        flavours: [...flavours],
+        degraded: degraded.map((entry) =>
+          entry.detail === undefined
+            ? { reason: entry.reason }
+            : { reason: entry.reason, detail: entry.detail },
+        ),
+      });
+      announceDegraded(degraded);
+    },
+    announceDegraded,
     get session(): EditSession {
       return requireSession('command');
     },
@@ -729,7 +769,10 @@ export const createEditor = (
   };
 
   const registry = createCommandRegistry(environment);
-  const disposables = installEditCommands(registry, host);
+  const disposables = [
+    ...installEditCommands(registry, host),
+    ...installClipboardCommands(registry, host),
+  ];
 
   const openTransaction = (
     name: string,

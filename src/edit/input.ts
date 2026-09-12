@@ -1,4 +1,4 @@
-import type { DocPos, PageFragment } from '../layout/index.js';
+import type { DocPos, DocRange, PageFragment } from '../layout/index.js';
 import type { CaretGeometry, CommandRegistry, TextAffinity } from '../api/types.js';
 import { ATTR } from '../render/dom.js';
 import { mp, toCssPx } from '../units/index.js';
@@ -8,7 +8,8 @@ import { caretGeometryOf, clientToPage, hitTestPage, pageToViewport, stopsOfLine
 import type { SheetOffset } from './caret.js';
 import type { EditSession } from './session.js';
 import type { EditSelection } from './selection.js';
-import { endOf, isCollapsed, startOf } from './selection.js';
+import { endOf, isCollapsed, rangeAsDocRange, startOf } from './selection.js';
+import type { ClipboardDataLike } from './clipboard/types.js';
 
 export interface InputHost {
   readonly root: HTMLElement;
@@ -24,6 +25,33 @@ export interface InputHandle {
   focus(): void;
   dispose(): void;
 }
+
+interface ClipboardEventLike {
+  readonly clipboardData?: ClipboardDataLike | undefined;
+}
+
+interface DataTransferEventLike {
+  readonly dataTransfer?: ClipboardDataLike | undefined;
+  readonly clientX?: number | undefined;
+  readonly clientY?: number | undefined;
+}
+
+const DRAG_THRESHOLD_PX = 4;
+
+const clipboardDataOf = (event: Event): ClipboardDataLike | undefined =>
+  (event as unknown as ClipboardEventLike).clipboardData;
+
+const dataTransferOf = (event: Event): ClipboardDataLike | undefined =>
+  (event as unknown as DataTransferEventLike).dataTransfer;
+
+const clientPointOf = (
+  event: Event,
+): { readonly x: number; readonly y: number } | undefined => {
+  const like = event as unknown as DataTransferEventLike;
+  if (typeof like.clientX !== 'number' || typeof like.clientY !== 'number') return undefined;
+  if (!Number.isFinite(like.clientX) || !Number.isFinite(like.clientY)) return undefined;
+  return { x: like.clientX, y: like.clientY };
+};
 
 interface KeyRule {
   readonly key: string;
@@ -62,6 +90,7 @@ const KEY_RULES: readonly KeyRule[] = [
   { key: 'b', ctrl: true, command: `${PREFIX}format.bold` },
   { key: 'i', ctrl: true, command: `${PREFIX}format.italic` },
   { key: 'u', ctrl: true, command: `${PREFIX}format.underline` },
+  { key: 'v', ctrl: true, shift: true, command: `${PREFIX}clipboard.pastePlain` },
   { key: 'z', ctrl: true, command: `${PREFIX}history.undo` },
   { key: 'z', ctrl: true, shift: true, command: `${PREFIX}history.redo` },
   { key: 'y', ctrl: true, command: `${PREFIX}history.redo` },
@@ -301,9 +330,28 @@ export const attachInput = (host: InputHost): InputHandle => {
   };
 
   let dragging = false;
+  let armed: { readonly from: DocRange; readonly x: number; readonly y: number } | undefined =
+    undefined;
+  let dragSource: DocRange | undefined = undefined;
+  let dropPos: DocPos | undefined = undefined;
 
   const run = (command: string, args?: unknown): void => {
     void host.commands.execute(command, args);
+  };
+
+  const releasePointer = (): void => {
+    dragging = false;
+    armed = undefined;
+    dragSource = undefined;
+    dropPos = undefined;
+    owner.removeEventListener('pointermove', onPointerMove);
+    owner.removeEventListener('pointerup', onPointerUp);
+  };
+
+  const inSelection = (pos: DocPos): boolean => {
+    if (isCollapsed(host.selection)) return false;
+    const range = rangeAsDocRange(host.selection);
+    return (pos as number) > (range.start as number) && (pos as number) < (range.end as number);
   };
 
   const onPointerDown = (event: PointerEvent): void => {
@@ -311,8 +359,13 @@ export const attachInput = (host: InputHost): InputHandle => {
     if (hit === undefined) return;
     event.preventDefault();
     composer.focus({ preventScroll: true });
-    if (event.shiftKey) run(`${PREFIX}selection.extendTo`, { pos: hit.pos });
-    else run(`${PREFIX}selection.setCaret`, { pos: hit.pos });
+    if (!event.shiftKey && inSelection(hit.pos)) {
+      armed = { from: rangeAsDocRange(host.selection), x: event.clientX, y: event.clientY };
+    } else if (event.shiftKey) {
+      run(`${PREFIX}selection.extendTo`, { pos: hit.pos });
+    } else {
+      run(`${PREFIX}selection.setCaret`, { pos: hit.pos });
+    }
     dragging = true;
     owner.addEventListener('pointermove', onPointerMove);
     owner.addEventListener('pointerup', onPointerUp);
@@ -320,20 +373,71 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const onPointerMove = (event: PointerEvent): void => {
     if (!dragging) return;
+    if (armed !== undefined && dragSource === undefined) {
+      const travelled =
+        Math.abs(event.clientX - armed.x) + Math.abs(event.clientY - armed.y);
+      if (travelled < DRAG_THRESHOLD_PX) return;
+      dragSource = armed.from;
+      armed = undefined;
+    }
+    if (dragSource !== undefined) {
+      event.preventDefault();
+      const hit = hitTest(event.clientX, event.clientY);
+      if (hit !== undefined) dropPos = hit.pos;
+      return;
+    }
     const hit = hitTest(event.clientX, event.clientY);
     if (hit === undefined) return;
     event.preventDefault();
     run(`${PREFIX}selection.extendTo`, { pos: hit.pos });
   };
 
-  const onPointerUp = (): void => {
-    dragging = false;
-    owner.removeEventListener('pointermove', onPointerMove);
-    owner.removeEventListener('pointerup', onPointerUp);
+  const onPointerUp = (event: PointerEvent): void => {
+    const source = dragSource;
+    const target = dropPos;
+    const copy = event.ctrlKey || event.altKey || event.metaKey;
+    releasePointer();
+    if (source === undefined || target === undefined) return;
+    run(`${PREFIX}clipboard.moveRange`, { from: source, to: target, copy });
+  };
+
+  const onCopy = (event: Event): void => {
+    event.preventDefault();
+    run(`${PREFIX}clipboard.copy`, { data: clipboardDataOf(event) });
+  };
+
+  const onCut = (event: Event): void => {
+    event.preventDefault();
+    run(`${PREFIX}clipboard.cut`, { data: clipboardDataOf(event) });
+  };
+
+  const onDragStart = (event: Event): void => {
+    const data = dataTransferOf(event);
+    if (data === undefined) return;
+    run(`${PREFIX}clipboard.copy`, { data });
+  };
+
+  const onDragOver = (event: Event): void => {
+    if (dataTransferOf(event) === undefined) return;
+    event.preventDefault();
+  };
+
+  const onDropEvent = (event: Event): void => {
+    const data = dataTransferOf(event);
+    if (data === undefined) return;
+    event.preventDefault();
+    const point = clientPointOf(event);
+    const hit = point === undefined ? undefined : hitTest(point.x, point.y);
+    run(`${PREFIX}clipboard.paste`, hit === undefined ? { data } : { data, at: hit.pos });
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.isComposing) return;
+    if (event.key === 'Escape' && (dragSource !== undefined || armed !== undefined)) {
+      event.preventDefault();
+      releasePointer();
+      return;
+    }
     const mac = isMacPlatform();
     for (const rule of KEY_RULES) {
       if (!matchesRule(rule, event, mac)) continue;
@@ -364,10 +468,7 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const onPaste = (event: ClipboardEvent): void => {
     event.preventDefault();
-  };
-
-  const onDrop = (event: DragEvent): void => {
-    event.preventDefault();
+    run(`${PREFIX}clipboard.paste`, { data: clipboardDataOf(event) });
   };
 
   host.rendered.addEventListener('pointerdown', onPointerDown);
@@ -375,7 +476,11 @@ export const attachInput = (host: InputHost): InputHandle => {
   composer.addEventListener('beforeinput', onBeforeInput);
   composer.addEventListener('compositionend', onCompositionEnd);
   composer.addEventListener('paste', onPaste);
-  composer.addEventListener('drop', onDrop);
+  composer.addEventListener('copy', onCopy);
+  composer.addEventListener('cut', onCut);
+  host.rendered.addEventListener('dragstart', onDragStart);
+  host.rendered.addEventListener('dragover', onDragOver);
+  host.rendered.addEventListener('drop', onDropEvent);
 
   paintCaret();
   paintSelection();
@@ -394,7 +499,11 @@ export const attachInput = (host: InputHost): InputHandle => {
       composer.removeEventListener('beforeinput', onBeforeInput);
       composer.removeEventListener('compositionend', onCompositionEnd);
       composer.removeEventListener('paste', onPaste);
-      composer.removeEventListener('drop', onDrop);
+      composer.removeEventListener('copy', onCopy);
+      composer.removeEventListener('cut', onCut);
+      host.rendered.removeEventListener('dragstart', onDragStart);
+      host.rendered.removeEventListener('dragover', onDragOver);
+      host.rendered.removeEventListener('drop', onDropEvent);
       owner.removeEventListener('pointermove', onPointerMove);
       owner.removeEventListener('pointerup', onPointerUp);
       overlay.remove();
