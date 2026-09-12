@@ -1,0 +1,184 @@
+import type {
+  BlockFragment,
+  CellFragment,
+  LayoutResult,
+  PageFragment,
+  RowFragment,
+  TableFragment,
+} from '../layout/index.js';
+import type { Frame, ResolvedRenderOptions } from './types.js';
+import type { PaintScale } from './scale.js';
+import { applyStyle, positionStyle } from './style.js';
+import { ATTR, box, frameOf, geometryAt, stamp } from './dom.js';
+import { paintBorders, paintShading } from './decoration.js';
+import { paintLine } from './runs.js';
+import { appendSlotContent } from './registry.js';
+
+export interface PagePaintContext {
+  readonly result: LayoutResult;
+  readonly scale: PaintScale;
+  readonly options: ResolvedRenderOptions;
+}
+
+const blocksById = (page: PageFragment): ReadonlyMap<number, BlockFragment> => {
+  const map = new Map<number, BlockFragment>();
+  for (const block of page.blocks) map.set(block.id, block);
+  return map;
+};
+
+export const paintBlock = (
+  parent: HTMLElement,
+  block: BlockFragment,
+  frame: Frame,
+  context: PagePaintContext,
+): HTMLElement => {
+  const node = box('docier-block');
+  stamp(node, { [ATTR.block]: String(block.id) });
+  applyStyle(node, positionStyle(geometryAt(block.box, frame, context.scale)));
+  const inner = frameOf(block.box);
+  for (const line of block.lines) {
+    paintLine(node, { line, paints: context.result.paint, frame: inner, scale: context.scale });
+  }
+  parent.appendChild(node);
+  return node;
+};
+
+const paintCell = (
+  parent: HTMLElement,
+  cell: CellFragment,
+  blocks: ReadonlyMap<number, BlockFragment>,
+  frame: Frame,
+  context: PagePaintContext,
+): HTMLElement => {
+  const node = box('docier-cell');
+  stamp(node, { [ATTR.cell]: String(cell.column) });
+  applyStyle(node, positionStyle(geometryAt(cell.box, frame, context.scale)));
+  const inner = frameOf(cell.box);
+  paintShading(node, cell.shading, cell.box, inner, context.scale);
+  paintBorders(node, cell.borders, cell.box, inner, context.scale);
+  const clip = cell.clip;
+  if (clip === undefined) {
+    for (const id of cell.blocks) {
+      const block = blocks.get(id);
+      if (block !== undefined) paintBlock(node, block, inner, context);
+    }
+  } else {
+    const clipped = box('docier-cell-content');
+    applyStyle(
+      clipped,
+      positionStyle(geometryAt(clip, inner, context.scale), { overflow: 'hidden' }),
+    );
+    const clipFrame = frameOf(clip);
+    for (const id of cell.blocks) {
+      const block = blocks.get(id);
+      if (block !== undefined) paintBlock(clipped, block, clipFrame, context);
+    }
+    node.appendChild(clipped);
+  }
+  parent.appendChild(node);
+  return node;
+};
+
+const paintRow = (
+  parent: HTMLElement,
+  row: RowFragment,
+  blocks: ReadonlyMap<number, BlockFragment>,
+  frame: Frame,
+  context: PagePaintContext,
+): HTMLElement => {
+  const node = box('docier-row');
+  stamp(node, { [ATTR.row]: String(row.row) });
+  applyStyle(node, positionStyle(geometryAt(row.box, frame, context.scale)));
+  const inner = frameOf(row.box);
+  for (const cell of row.cells) paintCell(node, cell, blocks, inner, context);
+  parent.appendChild(node);
+  return node;
+};
+
+export const paintTable = (
+  parent: HTMLElement,
+  table: TableFragment,
+  blocks: ReadonlyMap<number, BlockFragment>,
+  frame: Frame,
+  context: PagePaintContext,
+): HTMLElement => {
+  const node = box('docier-table');
+  stamp(node, { [ATTR.table]: String(table.table) });
+  applyStyle(node, positionStyle(geometryAt(table.box, frame, context.scale)));
+  paintShading(node, table.shading, table.box, frame, context.scale);
+  const tableFrame = frameOf(table.box);
+  for (const row of table.rows) paintRow(node, row, blocks, tableFrame, context);
+  parent.appendChild(node);
+  return node;
+};
+
+export const paintPage = (
+  sheet: HTMLElement,
+  page: PageFragment,
+  context: PagePaintContext,
+): void => {
+  const frame: Frame = { dx: page.page.x, dy: page.page.y };
+  const blocks = blocksById(page);
+  for (const block of page.blocks) {
+    if (block.cell === undefined) paintBlock(sheet, block, frame, context);
+  }
+  for (const table of page.tables) paintTable(sheet, table, blocks, frame, context);
+};
+
+export const paintOverlay = (
+  sheet: HTMLElement,
+  page: PageFragment,
+  context: PagePaintContext,
+): HTMLElement | undefined => {
+  const registry = context.options.renderers;
+  if (registry === undefined) return undefined;
+  const layer = box('docier-overlay');
+  stamp(layer, { [ATTR.overlay]: String(page.index) });
+  applyStyle(
+    layer,
+    positionStyle(
+      { left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) },
+      { 'pointer-events': 'none' },
+    ),
+  );
+  const rendered = registry.renderOverlays({
+    result: context.result,
+    page,
+    container: layer,
+    scale: context.scale,
+  });
+  if (rendered.length === 0) return undefined;
+  for (const content of rendered) appendSlotContent(layer, content);
+  sheet.appendChild(layer);
+  return layer;
+};
+
+export const paintPageSheet = (
+  parent: HTMLElement,
+  page: PageFragment,
+  top: number,
+  context: PagePaintContext,
+): HTMLElement => {
+  const sheet = box('docier-page');
+  stamp(sheet, { [ATTR.page]: String(page.index), [ATTR.pageKind]: page.kind });
+  const extra: Record<string, string> = {
+    'background-color': context.options.pageBackground,
+  };
+  if (context.options.pageShadow) extra['box-shadow'] = '0 1px 4px rgba(0,0,0,0.25)';
+  applyStyle(
+    sheet,
+    positionStyle(
+      {
+        left: 0,
+        top,
+        width: context.scale.px(page.page.width),
+        height: context.scale.px(page.page.height),
+      },
+      extra,
+    ),
+  );
+  paintPage(sheet, page, context);
+  paintOverlay(sheet, page, context);
+  parent.appendChild(sheet);
+  return sheet;
+};
