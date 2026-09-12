@@ -13,7 +13,7 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-accent': '#1f6feb',
   '--docier-accent-text': '#ffffff',
   '--docier-accent-soft': 'rgba(31, 111, 235, 0.14)',
-  '--docier-selection': 'rgba(31, 111, 235, 0.24)',
+  '--docier-selection': 'rgba(31, 111, 235, 0.34)',
   '--docier-guide': '#c2410c',
   '--docier-error': '#b3261e',
   '--docier-warning': '#8a5a00',

@@ -197,10 +197,11 @@ const isMacPlatform = (): boolean =>
 
 const matchesRule = (rule: KeyRule, event: KeyboardEvent, mac: boolean): boolean => {
   const primary = mac ? event.metaKey : event.ctrlKey;
+  const shift = rule.movement === true ? true : (rule.shift ?? false) === event.shiftKey;
   return (
     rule.key === event.key &&
     (rule.ctrl ?? false) === primary &&
-    (rule.shift ?? false) === event.shiftKey &&
+    shift &&
     (rule.alt ?? false) === event.altKey &&
     (rule.meta ?? false) === (!mac && event.metaKey)
   );
@@ -411,7 +412,7 @@ export const attachInput = (host: InputHost): InputHandle => {
         top: `${String(corner.top)}px`,
         width: `${String(Math.max(0, toCssPx(mp(to - from), zoom)))}px`,
         height: `${String(toCssPx(line.box.height, zoom))}px`,
-        'background-color': 'rgba(70, 130, 220, 0.28)',
+        'background-color': 'var(--docier-selection, rgba(31, 111, 235, 0.34))',
       });
       selectionLayer.appendChild(box);
     }

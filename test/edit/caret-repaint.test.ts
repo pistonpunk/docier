@@ -83,3 +83,52 @@ describe('the painted caret follows the selection', () => {
     expect(bands?.childElementCount).toBeGreaterThan(0);
   });
 });
+
+describe('selecting from the keyboard', () => {
+  const composerOf = (handle: EditorHandle): HTMLElement => {
+    const composer = handle.root.querySelector<HTMLElement>('.docier-input');
+    if (composer === null) throw new Error('the composer is not mounted');
+    return composer;
+  };
+
+  const press = (handle: EditorHandle, key: string, shiftKey = false): void => {
+    composerOf(handle).dispatchEvent(
+      new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true }),
+    );
+  };
+
+  const bands = (handle: EditorHandle): number =>
+    handle.root.querySelector('.docier-overlay')?.firstElementChild?.childElementCount ?? 0;
+
+  it('extends the selection with shift and a movement key', async () => {
+    const handle = await editorOf(bodyOf(paragraphText(LINE)));
+    await setCaret(handle, sameLineStart(handle) as number);
+    expect(bands(handle)).toBe(0);
+
+    press(handle, 'ArrowRight', true);
+    await handle.whenReady();
+    expect(handle.selection.focus).toBeGreaterThan(handle.selection.anchor);
+
+    press(handle, 'ArrowRight', true);
+    await handle.whenReady();
+    expect(handle.selection.focus).toBe((handle.selection.anchor as number) + 2);
+  });
+
+  it('paints the selection it just extended', async () => {
+    const handle = await editorOf(bodyOf(paragraphText(LINE)));
+    await setCaret(handle, sameLineStart(handle) as number);
+    for (let index = 0; index < 4; index += 1) {
+      press(handle, 'ArrowRight', true);
+      await handle.whenReady();
+    }
+    expect(bands(handle)).toBeGreaterThan(0);
+  });
+
+  it('still moves without extending when shift is not held', async () => {
+    const handle = await editorOf(bodyOf(paragraphText(LINE)));
+    await setCaret(handle, sameLineStart(handle) as number);
+    press(handle, 'ArrowRight');
+    await handle.whenReady();
+    expect(handle.selection.focus).toBe(handle.selection.anchor);
+  });
+});
