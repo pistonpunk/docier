@@ -196,3 +196,33 @@ so they are not lost:
 - Several insert commands are refused with an explicit reason rather than
   failing: image, footnote, header, link, symbol, text box, table of contents
   and comments.
+
+### What the large-button pass needs, measured
+
+Phase 2's last item is large buttons, and the ribbon cannot come down to Word's
+84px until it is done. The measurement that says why, taken on the Home tab at a
+1214px ribbon:
+
+    Clipboard  122px  2 rows
+    Font       427px  3 rows   <- drives the height
+    Paragraph  380px  2 rows
+    Styles     146px  4 rows   <- also drives the height
+    Editing     77px  2 rows
+
+Two rows of controls is 54px, which with the group label and the panel padding
+fits 84px comfortably, so two rows is the target. The Font group's third row is
+not caused by the node order: the two combos are already first in `nodes`, and
+they still wrap onto a row of their own, leaving three buttons isolated on a
+third row beneath them:
+
+    row 1  10 items, widths 122 64 28 28 28 28 28 28 28 28  (410px)
+    row 2   2 items, widths 110 52                            (162px)  <- the combos
+    row 3   3 items, widths 28 28 28                           (84px)
+
+So the cause is in how the combo wrappers take part in the flex line breaking,
+not in the order of the nodes. Start there: the wrappers are column flex boxes
+with their own min-height, and they are the only controls in the group whose
+intrinsic width is over 100px. The Styles gallery's four rows want the same
+treatment: eight tiles in a 146px column is two columns by four, and Word shows
+them as one row of preview tiles, which needs the gallery to be the group that
+grows (it already is) and the tiles to be wider than they are tall.
