@@ -195,7 +195,10 @@ describe('deliberately unavailable commands', () => {
 
   it('explains the half-implemented areas in terms of the model they need', async () => {
     const handle = await editorOf(FIXTURE);
-    expect(reasonOf(handle, 'docier.command.insert.table')).toContain('caret cannot be placed');
+    expect(handle.commands.isEnabled('docier.command.insert.table')).toBe(true);
+    expect(reasonOf(handle, 'docier.command.table.insertRowsBelow')).toContain(
+      'Place the caret inside a table',
+    );
     expect(reasonOf(handle, 'docier.command.object.insertImage')).toContain('drawing content');
     expect(reasonOf(handle, 'docier.command.insert.header')).toContain('undo history');
     expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');

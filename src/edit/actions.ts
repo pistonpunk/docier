@@ -105,7 +105,7 @@ export const insertText = (host: EditActionHost, text: string): ActionResult => 
   const session = host.session;
   const range = rangeAt(host);
   const at = range.start;
-  if (!isCollapsed(host.selection)) session.deleteRange(range);
+  if (!isCollapsed(host.selection) && !session.deleteRange(range)) return NO_CHANGE;
   if (!session.insertText({ start: at, end: at }, text)) return NO_CHANGE;
   const after = docPos((at as number) + text.length);
   return rangeAction(session, { start: at, end: after }, caretSelection(after, 'downstream'), 'input');
@@ -119,7 +119,7 @@ export const insertBreak = (
   const session = host.session;
   const range = rangeAt(host);
   const at = range.start;
-  if (!isCollapsed(host.selection)) session.deleteRange(range);
+  if (!isCollapsed(host.selection) && !session.deleteRange(range)) return NO_CHANGE;
   if (!session.insertBreak({ start: at, end: at }, kind)) return NO_CHANGE;
   const after = docPos((at as number) + 1);
   return rangeAction(
@@ -173,7 +173,7 @@ export const deleteCharacter = (
   const slot = target.slot;
   if (target.offset === 0) {
     const previous = session.slots()[slot.index - 1];
-    if (previous === undefined) return NO_CHANGE;
+    if (previous === undefined || previous.container !== slot.container) return NO_CHANGE;
     if (!session.joinWithPrevious(slot.start)) return NO_CHANGE;
     return joinResult(session, previous.start, previous.textEnd, slot.end);
   }
@@ -219,7 +219,7 @@ export const splitParagraph = (host: EditActionHost): ActionResult => {
   const session = host.session;
   const range = rangeAt(host);
   const at = range.start;
-  if (!isCollapsed(host.selection)) session.deleteRange(range);
+  if (!isCollapsed(host.selection) && !session.deleteRange(range)) return NO_CHANGE;
   if (!session.splitAt(at)) return NO_CHANGE;
   const after = docPos((at as number) + 1);
   return rangeAction(
@@ -242,7 +242,7 @@ export const joinParagraph = (host: EditActionHost): ActionResult => {
   const target = session.resolve(range.start);
   if (target === undefined) return NO_CHANGE;
   const next = session.slots()[target.slot.index + 1];
-  if (next === undefined) return NO_CHANGE;
+  if (next === undefined || next.container !== target.slot.container) return NO_CHANGE;
   if (!session.joinAt(range.start)) return NO_CHANGE;
   return rangeAction(
     session,

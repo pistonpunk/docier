@@ -11,7 +11,6 @@ import type { StylesPart } from './styles-part.js';
 export type RunCascadeLevelId =
   | 'docDefaults'
   | 'tableStyle'
-  | 'numbering'
   | 'paragraphStyle'
   | 'paragraphMark'
   | 'characterStyle'
@@ -26,11 +25,33 @@ export interface RunCascadeLevel {
 export const RUN_CASCADE: readonly RunCascadeLevel[] = [
   { id: 'docDefaults', layer: 'docDefaults', absoluteToggles: false },
   { id: 'tableStyle', layer: 'tableStyle', absoluteToggles: false },
-  { id: 'numbering', layer: 'numbering', absoluteToggles: false },
   { id: 'paragraphStyle', layer: 'paragraphStyle', absoluteToggles: false },
   { id: 'paragraphMark', layer: 'paragraphMark', absoluteToggles: false },
   { id: 'characterStyle', layer: 'characterStyle', absoluteToggles: false },
   { id: 'run', layer: 'run', absoluteToggles: true },
+];
+
+export type NumberRunCascadeLevelId =
+  | 'docDefaults'
+  | 'tableStyle'
+  | 'paragraphStyle'
+  | 'paragraphMark'
+  | 'characterStyle'
+  | 'numbering';
+
+export interface NumberRunCascadeLevel {
+  readonly id: NumberRunCascadeLevelId;
+  readonly layer: CascadeLayer;
+  readonly absoluteToggles: boolean;
+}
+
+export const NUMBER_RUN_CASCADE: readonly NumberRunCascadeLevel[] = [
+  { id: 'docDefaults', layer: 'docDefaults', absoluteToggles: false },
+  { id: 'tableStyle', layer: 'tableStyle', absoluteToggles: false },
+  { id: 'paragraphStyle', layer: 'paragraphStyle', absoluteToggles: false },
+  { id: 'paragraphMark', layer: 'paragraphMark', absoluteToggles: false },
+  { id: 'characterStyle', layer: 'characterStyle', absoluteToggles: false },
+  { id: 'numbering', layer: 'numbering', absoluteToggles: true },
 ];
 
 export type ParagraphCascadeLevelId =
@@ -305,6 +326,12 @@ export interface ParagraphResolutionInput {
   readonly numbering: NumberingContext | undefined;
 }
 
+export interface NumberingRunResolutionInput {
+  readonly paragraphProperties: XmlElement | undefined;
+  readonly tableStyle: TableStyleContext | undefined;
+  readonly numbering: NumberingContext;
+}
+
 const directStyleId = (
   properties: XmlElement | undefined,
   localName: string,
@@ -351,6 +378,7 @@ export class StyleResolver {
   private readonly styles: StylesPart | undefined;
   private readonly runCache = new Map<XmlElement, ResolutionBucket>();
   private readonly paragraphCache = new Map<XmlElement, ResolutionBucket>();
+  private readonly numberingRunCache = new Map<XmlElement, ResolutionBucket>();
   private cachedRevision = -1;
 
   constructor(styles: StylesPart | undefined) {
@@ -364,6 +392,7 @@ export class StyleResolver {
   invalidate(): void {
     this.runCache.clear();
     this.paragraphCache.clear();
+    this.numberingRunCache.clear();
     this.cachedRevision = -1;
   }
 
@@ -421,6 +450,21 @@ export class StyleResolver {
     if (key === undefined) return this.computeParagraph(input);
     return this.cached(this.paragraphCache, key, contentKey(key), signature, () =>
       this.computeParagraph(input),
+    );
+  }
+
+  resolveNumberingRun(input: NumberingRunResolutionInput): ResolvedProperties {
+    this.sync();
+    const key = input.numbering.level.runPropertiesElement;
+    const signature = contextKey(
+      [directStyleId(input.paragraphProperties, 'pStyle') ?? ''],
+      input.tableStyle,
+      input.numbering,
+    );
+    if (key === undefined) return this.computeNumberingRun(input);
+    const content = `${contentKey(key)} ${contentKey(input.paragraphProperties)}`;
+    return this.cached(this.numberingRunCache, key, content, signature, () =>
+      this.computeNumberingRun(input),
     );
   }
 
@@ -511,16 +555,25 @@ export class StyleResolver {
   private applyNumbering(
     resolved: ResolvedProperties,
     numbering: NumberingContext | undefined,
-    runLevel: boolean,
   ): void {
     if (numbering === undefined) return;
-    const element = runLevel
-      ? numbering.level.runPropertiesElement
-      : numbering.level.paragraphPropertiesElement;
-    resolved.apply(entriesOf(element), {
+    resolved.apply(entriesOf(numbering.level.paragraphPropertiesElement), {
       layer: 'numbering',
       numId: numbering.numId,
       ilvl: numbering.ilvl,
+    });
+  }
+
+  private applyNumberingRunProperties(
+    resolved: ResolvedProperties,
+    numbering: NumberingContext | undefined,
+  ): void {
+    if (numbering === undefined) return;
+    resolved.apply(entriesOf(numbering.level.runPropertiesElement), {
+      layer: 'numbering',
+      numId: numbering.numId,
+      ilvl: numbering.ilvl,
+      absoluteToggles: true,
     });
   }
 
@@ -539,9 +592,6 @@ export class StyleResolver {
           break;
         case 'tableStyle':
           this.applyTableStyle(resolved, input.tableStyle, true);
-          break;
-        case 'numbering':
-          this.applyNumbering(resolved, input.numbering, true);
           break;
         case 'paragraphStyle':
           if (paragraphStyleId !== undefined) {
@@ -569,6 +619,45 @@ export class StyleResolver {
     return resolved;
   }
 
+  private computeNumberingRun(input: NumberingRunResolutionInput): ResolvedProperties {
+    const resolved = new ResolvedProperties();
+    const paragraphStyleId = directStyleId(input.paragraphProperties, 'pStyle');
+    const characterStyleId = directStyleId(input.numbering.level.runPropertiesElement, 'rStyle');
+    const paragraphMark =
+      input.paragraphProperties === undefined
+        ? undefined
+        : findOrderedChild(input.paragraphProperties, 'rPr');
+    for (const level of NUMBER_RUN_CASCADE) {
+      switch (level.id) {
+        case 'docDefaults':
+          resolved.apply(entriesOf(this.defaultsRun()), { layer: level.layer });
+          break;
+        case 'tableStyle':
+          this.applyTableStyle(resolved, input.tableStyle, true);
+          break;
+        case 'paragraphStyle':
+          if (paragraphStyleId !== undefined) {
+            this.applyParagraphStyleRunProperties(resolved, paragraphStyleId, level.layer);
+          }
+          break;
+        case 'paragraphMark':
+          resolved.apply(entriesOf(paragraphMark), { layer: level.layer });
+          break;
+        case 'characterStyle':
+          if (characterStyleId !== undefined) {
+            this.applyCharacterStyleRunProperties(resolved, characterStyleId, level.layer);
+          }
+          break;
+        case 'numbering':
+          this.applyNumberingRunProperties(resolved, input.numbering);
+          break;
+        default:
+          break;
+      }
+    }
+    return resolved;
+  }
+
   private computeParagraph(input: ParagraphResolutionInput): ResolvedProperties {
     const resolved = new ResolvedProperties();
     const paragraphStyleId = directStyleId(input.paragraphProperties, 'pStyle');
@@ -581,7 +670,7 @@ export class StyleResolver {
           this.applyTableStyle(resolved, input.tableStyle, false);
           break;
         case 'numbering':
-          this.applyNumbering(resolved, input.numbering, false);
+          this.applyNumbering(resolved, input.numbering);
           break;
         case 'paragraphStyle':
           if (paragraphStyleId !== undefined) {

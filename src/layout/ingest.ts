@@ -310,7 +310,7 @@ const resolveNumbering = (
     });
   }
   const format = runFormatOf(
-    model.resolveRunProperties(paragraph, level.runPropertiesElement),
+    model.resolveNumberingRunProperties(paragraph, context),
     options.defaultFontFamily,
   );
   return {

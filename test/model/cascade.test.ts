@@ -247,7 +247,7 @@ describe('toggle properties', () => {
 });
 
 describe('numbering layer', () => {
-  it('applies the numbering level below the paragraph style', async () => {
+  it('keeps the numbering level run properties out of the paragraph body', async () => {
     const model = await openModel({
       body: '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>a</w:t></w:r></w:p>',
       styles: BASE_STYLES,
@@ -257,12 +257,59 @@ describe('numbering layer', () => {
     const paragraph = model.paragraphs()[0];
     if (paragraph === undefined) throw new Error('no paragraph');
     const resolved = model.resolveRunProperties(paragraph, firstRunProperties(paragraph));
-    expect(resolved.size).toBe(30);
-    expect(resolved.color).toBe('008000');
-    expect(resolved.describe('sz')).toBe('numbering:1/0');
+    expect(resolved.size).toBe(20);
+    expect(resolved.color).toBe('111111');
+    expect(resolved.describe('sz')).toBe('docDefaults');
+    expect(resolved.describe('color')).toBe('docDefaults');
     const block = model.resolveParagraphProperties(paragraph);
     expect(block.indentStart).toBe(720);
     expect(block.describe('ind', 'left')).toBe('numbering:1/0');
+  });
+
+  it('sizes the number prefix and not the body text', async () => {
+    const model = await openModel({
+      body: '<w:p><w:pPr><w:pStyle w:val="Base"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>a</w:t></w:r></w:p>',
+      styles: BASE_STYLES,
+      numbering: BASE_NUMBERING,
+      documentRelationships: [stylesRelationship(), numberingRelationship()],
+    });
+    const paragraph = model.paragraphs()[0];
+    if (paragraph === undefined) throw new Error('no paragraph');
+    const context = model.numberingFor(paragraph.properties.element);
+    if (context === undefined) throw new Error('no numbering context');
+    const number = model.resolveNumberingRunProperties(paragraph, context);
+    const body = model.resolveRunProperties(paragraph, firstRunProperties(paragraph));
+    expect(number.size).toBe(30);
+    expect(number.color).toBe('008000');
+    expect(number.describe('sz')).toBe('numbering:1/0');
+    expect(number.describe('color')).toBe('numbering:1/0');
+    expect(body.size).toBe(22);
+    expect(body.color).toBe('222222');
+    expect(body.describe('sz')).toBe('style:Normal');
+    expect(body.describe('color')).toBe('style:Base');
+    expect(body.describe('sz')).not.toBe(number.describe('sz'));
+  });
+
+  it('falls back to the paragraph style for number properties the level omits', async () => {
+    const model = await openModel({
+      body: '<w:p><w:pPr><w:pStyle w:val="Base"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>a</w:t></w:r></w:p>',
+      styles: BASE_STYLES,
+      numbering: numberingXml(
+        '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:rPr><w:color w:val="008000"/></w:rPr></w:lvl></w:abstractNum>' +
+          '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>',
+      ),
+      documentRelationships: [stylesRelationship(), numberingRelationship()],
+    });
+    const paragraph = model.paragraphs()[0];
+    if (paragraph === undefined) throw new Error('no paragraph');
+    const context = model.numberingFor(paragraph.properties.element);
+    if (context === undefined) throw new Error('no numbering context');
+    const number = model.resolveNumberingRunProperties(paragraph, context);
+    expect(number.size).toBe(22);
+    expect(number.describe('sz')).toBe('style:Normal');
+    expect(number.color).toBe('008000');
+    expect(number.describe('color')).toBe('numbering:1/0');
+    expect(number.bold).toBe(true);
   });
 
   it('lets a paragraph style override the numbering level', async () => {

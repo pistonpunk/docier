@@ -14,7 +14,7 @@ import type { DocPos } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
 import type { TextAffinity } from '../api/types.js';
 import type { EditSelection, SelectionReason } from './selection.js';
-import { selectionOf } from './selection.js';
+import { rangeAsDocRange, selectionOf } from './selection.js';
 import type { EditSession } from './session.js';
 import type { ActionResult } from './actions.js';
 import {
@@ -86,6 +86,14 @@ const CONTAINER_INVALIDATION: LayoutInvalidation = { kind: 'container', story: '
 
 const NO_DOCUMENT: LocalizedString = 'No document is loaded';
 const READ_ONLY: LocalizedString = 'The document is read-only';
+const CROSSES_CELLS: LocalizedString =
+  'The selection crosses a cell boundary; this build edits one cell at a time';
+const CELL_EDGE_BACKWARD: LocalizedString =
+  'The caret is at the start of this cell; this build does not delete into the content before it';
+const CELL_EDGE_FORWARD: LocalizedString =
+  'The caret is at the end of this cell; this build does not delete into the content after it';
+const OUT_OF_CELL: LocalizedString =
+  'The paragraph below is outside this cell; this build edits one cell at a time';
 
 const loadedOnly = (host: EditCommandHost): boolean => host.loaded;
 const editableOnly = (host: EditCommandHost): boolean => host.loaded && host.editable;
@@ -95,11 +103,52 @@ const hasSelection = (host: EditCommandHost): boolean =>
 const hasFollowingParagraph = (host: EditCommandHost): boolean => {
   const target = host.session.resolve(host.selection.focus);
   if (target === undefined) return false;
-  return host.session.slots()[target.slot.index + 1] !== undefined;
+  const next = host.session.slots()[target.slot.index + 1];
+  return next !== undefined && next.container === target.slot.container;
 };
 
 const editReason = (host: EditCommandHost): LocalizedString =>
   host.loaded ? READ_ONLY : NO_DOCUMENT;
+
+const withinOneContainer = (host: EditCommandHost): boolean =>
+  !host.session.spansContainers(rangeAsDocRange(host.selection));
+
+const editableInside = (host: EditCommandHost): boolean =>
+  editableOnly(host) && withinOneContainer(host);
+
+const edgeReason = (
+  host: EditCommandHost,
+  direction: 'backward' | 'forward',
+): LocalizedString | undefined => {
+  const target = host.session.resolve(host.selection.focus);
+  if (target === undefined || target.slot.cell === undefined) return undefined;
+  const list = host.session.slots();
+  const slot = target.slot;
+  const neighbour =
+    direction === 'backward' ? list[slot.index - 1] : list[slot.index + 1];
+  if (direction === 'backward' ? target.offset !== 0 : target.offset !== slot.length) {
+    return undefined;
+  }
+  if (neighbour === undefined || neighbour.container === slot.container) return undefined;
+  return direction === 'backward' ? CELL_EDGE_BACKWARD : CELL_EDGE_FORWARD;
+};
+
+const deleteReason =
+  (direction: 'backward' | 'forward') =>
+  (host: EditCommandHost): LocalizedString => {
+    if (host.loaded && host.editable) {
+      if (!withinOneContainer(host)) return CROSSES_CELLS;
+      const edge = edgeReason(host, direction);
+      if (edge !== undefined) return edge;
+    }
+    return editReason(host);
+  };
+
+const atCellEdge = (direction: 'backward' | 'forward') => (host: EditCommandHost): boolean =>
+  edgeReason(host, direction) === undefined;
+
+const editReasonInside = (host: EditCommandHost): LocalizedString =>
+  host.loaded && host.editable && !withinOneContainer(host) ? CROSSES_CELLS : editReason(host);
 
 const record = <A>(
   host: EditCommandHost,
@@ -280,8 +329,8 @@ export const installEditCommands = (
       label: 'Type text',
       area: 'edit',
       run: (h, args) => given(args.text, (text) => insertText(h, text)),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: editableInside,
+      reason: editReasonInside,
       code: 'READ_ONLY',
     }),
     mutating(host, {
@@ -289,8 +338,8 @@ export const installEditCommands = (
       label: 'Insert a line break',
       area: 'edit',
       run: (h) => insertBreak(h, 'line'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: editableInside,
+      reason: editReasonInside,
       code: 'READ_ONLY',
       bindings: [{ key: 'Enter', shift: true }],
     }),
@@ -299,8 +348,8 @@ export const installEditCommands = (
       label: 'Insert a page break',
       area: 'edit',
       run: (h) => insertBreak(h, 'page'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: editableInside,
+      reason: editReasonInside,
       code: 'READ_ONLY',
       repeatable: true,
       bindings: [CTRL('Enter')],
@@ -310,8 +359,8 @@ export const installEditCommands = (
       label: 'Insert a column break',
       area: 'edit',
       run: (h) => insertBreak(h, 'column'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: editableInside,
+      reason: editReasonInside,
       code: 'READ_ONLY',
       bindings: [CTRL_SHIFT('Enter')],
     }),
@@ -320,8 +369,8 @@ export const installEditCommands = (
       label: 'Start a new paragraph',
       area: 'edit',
       run: (h) => splitParagraph(h),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: editableInside,
+      reason: editReasonInside,
       code: 'READ_ONLY',
       bindings: [{ key: 'Enter' }],
     }),
@@ -330,8 +379,14 @@ export const installEditCommands = (
       label: 'Merge with the paragraph below',
       area: 'edit',
       run: (h) => joinParagraph(h),
-      enabledIn: (h) => editableOnly(h) && hasFollowingParagraph(h),
-      reason: (h) => (h.loaded ? 'There is no paragraph below to merge with' : NO_DOCUMENT),
+      enabledIn: (h) => editableInside(h) && hasFollowingParagraph(h),
+      reason: (h) => {
+        if (!h.loaded) return NO_DOCUMENT;
+        if (h.editable && !withinOneContainer(h)) return CROSSES_CELLS;
+        return h.session.resolve(h.selection.focus)?.slot.cell === undefined
+          ? 'There is no paragraph below to merge with'
+          : OUT_OF_CELL;
+      },
       code: 'DOCUMENT_BOUNDARY',
     }),
     mutating(host, {
@@ -339,8 +394,8 @@ export const installEditCommands = (
       label: 'Delete backwards',
       area: 'edit',
       run: (h) => deleteCharacter(h, 'backward'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: (h) => editableInside(h) && atCellEdge('backward')(h),
+      reason: deleteReason('backward'),
       code: 'READ_ONLY',
       bindings: [{ key: 'Backspace' }],
     }),
@@ -349,8 +404,8 @@ export const installEditCommands = (
       label: 'Delete forwards',
       area: 'edit',
       run: (h) => deleteCharacter(h, 'forward'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: (h) => editableInside(h) && atCellEdge('forward')(h),
+      reason: deleteReason('forward'),
       code: 'READ_ONLY',
       bindings: [{ key: 'Delete' }],
     }),
@@ -359,8 +414,8 @@ export const installEditCommands = (
       label: 'Delete the previous word',
       area: 'edit',
       run: (h) => deleteWord(h, 'backward'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: (h) => editableInside(h) && atCellEdge('backward')(h),
+      reason: deleteReason('backward'),
       code: 'READ_ONLY',
       bindings: [CTRL('Backspace')],
     }),
@@ -369,8 +424,8 @@ export const installEditCommands = (
       label: 'Delete the next word',
       area: 'edit',
       run: (h) => deleteWord(h, 'forward'),
-      enabledIn: editableOnly,
-      reason: editReason,
+      enabledIn: (h) => editableInside(h) && atCellEdge('forward')(h),
+      reason: deleteReason('forward'),
       code: 'READ_ONLY',
       bindings: [CTRL('Delete')],
     }),
@@ -381,8 +436,12 @@ export const installEditCommands = (
       undoable: true,
       invalidation: CONTAINER_INVALIDATION,
       run: (h) => deleteSelection(h),
-      enabledIn: (h) => editableOnly(h) && hasSelection(h),
-      reason: (h) => (h.loaded ? 'Select the text to delete' : NO_DOCUMENT),
+      enabledIn: (h) => editableInside(h) && hasSelection(h),
+      reason: (h) => {
+        if (!h.loaded) return NO_DOCUMENT;
+        if (h.editable && !withinOneContainer(h)) return CROSSES_CELLS;
+        return 'Select the text to delete';
+      },
       code: 'EMPTY_SELECTION',
     }),
     define(host, {
@@ -502,6 +561,7 @@ export const installEditCommands = (
       action: 'bold',
       label: 'Bold',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) => toggleRunFormat(h, (m) => m.bold, (on) => ({ bold: on })),
       enabledIn: formattableOnly,
@@ -514,6 +574,7 @@ export const installEditCommands = (
       action: 'italic',
       label: 'Italic',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) => toggleRunFormat(h, (m) => m.italic, (on) => ({ italic: on })),
       enabledIn: formattableOnly,
@@ -526,6 +587,7 @@ export const installEditCommands = (
       action: 'underline',
       label: 'Underline',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) => toggleRunFormat(h, (m) => m.underline, (on) => ({ underline: on })),
       enabledIn: formattableOnly,
@@ -538,6 +600,7 @@ export const installEditCommands = (
       action: 'strike',
       label: 'Strikethrough',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) => toggleRunFormat(h, (m) => m.strike, (on) => ({ strike: on })),
       enabledIn: formattableOnly,
@@ -549,6 +612,7 @@ export const installEditCommands = (
       action: 'allCaps',
       label: 'All capitals',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) => toggleRunFormat(h, (m) => m.allCaps, (on) => ({ allCaps: on })),
       enabledIn: formattableOnly,
@@ -560,6 +624,7 @@ export const installEditCommands = (
       action: 'smallCaps',
       label: 'Small capitals',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) => toggleRunFormat(h, (m) => m.smallCaps, (on) => ({ smallCaps: on })),
       enabledIn: formattableOnly,
@@ -571,6 +636,7 @@ export const installEditCommands = (
       action: 'superscript',
       label: 'Superscript',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) =>
         toggleRunFormat(
@@ -588,6 +654,7 @@ export const installEditCommands = (
       action: 'subscript',
       label: 'Subscript',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       repeatable: true,
       run: (h) =>
         toggleRunFormat(
@@ -605,6 +672,7 @@ export const installEditCommands = (
       action: 'setFontFamily',
       label: 'Font',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h, args) =>
         given(args.fontFamily, (fontFamily) => setRunFormat(h, { fontFamily })),
       enabledIn: formattableOnly,
@@ -615,6 +683,7 @@ export const installEditCommands = (
       action: 'setFontSize',
       label: 'Font size',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h, args) =>
         given(args.sizeHalfPoints, (sizeHalfPoints) => setRunFormat(h, { sizeHalfPoints })),
       enabledIn: formattableOnly,
@@ -625,6 +694,7 @@ export const installEditCommands = (
       action: 'setColor',
       label: 'Font colour',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h, args) => given(args.color, (color) => setRunFormat(h, { color })),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,
@@ -634,6 +704,7 @@ export const installEditCommands = (
       action: 'setHighlight',
       label: 'Highlight',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h, args) =>
         given(args.highlight, (highlight) => setRunFormat(h, { highlight })),
       enabledIn: formattableOnly,
@@ -644,6 +715,7 @@ export const installEditCommands = (
       action: 'clearCharacterFormatting',
       label: 'Clear character formatting',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h) => clearRunFormatting(h),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,
@@ -654,6 +726,7 @@ export const installEditCommands = (
       action: 'clearParagraphFormatting',
       label: 'Clear paragraph formatting',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h) => clearParagraphFormatting(h),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,
@@ -664,6 +737,7 @@ export const installEditCommands = (
       action: 'alignLeft',
       label: 'Align left',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h) => setParagraphFormat(h, { alignment: 'left' }),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,
@@ -675,6 +749,7 @@ export const installEditCommands = (
       action: 'alignRight',
       label: 'Align right',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h) => setParagraphFormat(h, { alignment: 'right' }),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,
@@ -686,6 +761,7 @@ export const installEditCommands = (
       action: 'alignCenter',
       label: 'Centre',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h) => setParagraphFormat(h, { alignment: 'center' }),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,
@@ -697,6 +773,7 @@ export const installEditCommands = (
       action: 'alignJustify',
       label: 'Justify',
       area: 'format',
+      invalidation: CONTAINER_INVALIDATION,
       run: (h) => setParagraphFormat(h, { alignment: 'both' }),
       enabledIn: formattableOnly,
       reason: () => READ_ONLY,

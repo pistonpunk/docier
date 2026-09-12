@@ -17,7 +17,10 @@ export { ResolvedProperties, resolvedPropertiesOf } from './resolved.js';
 
 export type {
   CellPosition,
+  NumberRunCascadeLevel,
+  NumberRunCascadeLevelId,
   NumberingContext,
+  NumberingRunResolutionInput,
   ParagraphCascadeLevel,
   ParagraphCascadeLevelId,
   ParagraphResolutionInput,
@@ -28,6 +31,7 @@ export type {
   TableStyleContext,
 } from './cascade.js';
 export {
+  NUMBER_RUN_CASCADE,
   PARAGRAPH_CASCADE,
   RUN_CASCADE,
   TABLE_CONDITION_PRECEDENCE,

@@ -367,6 +367,17 @@ export class DocumentModel {
     });
   }
 
+  resolveNumberingRunProperties(
+    paragraph: Paragraph,
+    context: NumberingContext,
+  ): ResolvedProperties {
+    return this.resolver.resolveNumberingRun({
+      paragraphProperties: paragraph.properties.element,
+      tableStyle: tableStyleContextOf(paragraph.element),
+      numbering: context,
+    });
+  }
+
   noteReferences(): readonly NoteReference[] {
     const references: NoteReference[] = [];
     for (const story of this.storyList) {

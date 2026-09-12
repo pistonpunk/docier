@@ -60,13 +60,13 @@ describe('ribbon controls', () => {
     expect(bold).not.toBeNull();
     expect(bold!.getAttribute('aria-disabled')).not.toBe('true');
 
-    const insertTable = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
-      '[data-docier-id="docier.command.insert.table"]',
+    const insertPicture = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
+      '[data-docier-id="docier.command.object.insertImage"]',
     );
-    expect(insertTable).not.toBeNull();
-    expect(insertTable!.getAttribute('aria-disabled')).toBe('true');
-    expect(insertTable!.getAttribute('aria-description')).toBe(
-      'The caret cannot be placed inside a table in this build, so table commands cannot act',
+    expect(insertPicture).not.toBeNull();
+    expect(insertPicture!.getAttribute('aria-disabled')).toBe('true');
+    expect(insertPicture!.getAttribute('aria-description')).toBe(
+      'This build cannot author drawing content: the editing layer cannot create media parts or w:drawing runs',
     );
 
     const unregistered = chrome.context.describe({ command: 'docier.command.nope.missing' });

@@ -1,4 +1,4 @@
-import type { DocPos, DocRange, LayoutResult } from '../layout/index.js';
+import type { CellRef, DocPos, DocRange, LayoutResult } from '../layout/index.js';
 import { layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
 import type { XmlElement, XmlNode } from '../ooxml/xml/index.js';
@@ -9,6 +9,8 @@ import type { DocumentModel } from '../model/index.js';
 import { Paragraph, childElements, wAttr } from '../model/index.js';
 import type { PositionIndex, ParagraphSpan } from './positions.js';
 import { blockText, buildPositionIndex } from './positions.js';
+import type { SlotContainer } from './containers.js';
+import { BODY_CONTAINER, collectContainers, containerKeyOf } from './containers.js';
 import type { ParagraphFormatPatch, RunFormatPatch } from './mutation.js';
 import {
   applyRunPatchToProperties,
@@ -36,6 +38,8 @@ export interface ParagraphSlot {
   readonly textEnd: DocPos;
   readonly end: DocPos;
   readonly length: number;
+  readonly container: string;
+  readonly cell: CellRef | undefined;
 }
 
 export interface NumberingSnapshot {
@@ -66,6 +70,7 @@ export interface EditSession {
   resolve(pos: DocPos): ResolvedPosition | undefined;
   textOf(range: DocRange): string;
   textRange(range: DocRange): TextRange;
+  spansContainers(range: DocRange): boolean;
   relayout(): LayoutResult;
   markChanged(): void;
   insertText(range: DocRange, text: string, patch?: RunFormatPatch): boolean;
@@ -175,12 +180,47 @@ const restoreRelationships = (
   }
 };
 
-const bodyParagraphElements = (model: DocumentModel): readonly XmlElement[] => {
-  const out: XmlElement[] = [];
-  for (const block of model.body().blocks()) {
-    if (block.blockKind === 'paragraph') out.push((block as Paragraph).element);
+interface SlotPair {
+  readonly element: XmlElement;
+  readonly span: ParagraphSpan;
+  readonly container: string;
+  readonly cell: CellRef | undefined;
+}
+
+interface PairedSlots {
+  readonly entries: readonly SlotPair[];
+  readonly aligned: boolean;
+}
+
+const pairContainers = (
+  containers: readonly SlotContainer[],
+  spans: readonly ParagraphSpan[],
+): PairedSlots => {
+  const groups = new Map<string, ParagraphSpan[]>();
+  for (const span of spans) {
+    const key = span.cell === undefined ? BODY_CONTAINER : containerKeyOf(span.cell);
+    const list = groups.get(key);
+    if (list === undefined) groups.set(key, [span]);
+    else list.push(span);
   }
-  return out;
+  const entries: SlotPair[] = [];
+  let aligned = true;
+  let used = 0;
+  for (const container of containers) {
+    const list = groups.get(container.key) ?? [];
+    if (list.length !== container.paragraphs.length) aligned = false;
+    const shared = Math.min(container.paragraphs.length, list.length);
+    used += shared;
+    for (let at = 0; at < shared; at += 1) {
+      const element = container.paragraphs[at];
+      const span = list[at];
+      if (element === undefined || span === undefined) continue;
+      entries.push({ element, span, container: container.key, cell: container.cell });
+    }
+  }
+  if (used !== spans.length) aligned = false;
+  entries.sort((first, second) => (first.span.start as number) - (second.span.start as number));
+  return { entries, aligned };
 };
 
 export const createEditSession = (
@@ -190,6 +230,7 @@ export const createEditSession = (
   let result: LayoutResult = layoutDocument(model, layoutOptions);
   let index: PositionIndex = buildPositionIndex(result);
   let cachedSlots: readonly ParagraphSlot[] | undefined;
+  let slotsAligned = true;
   let revisionCounter = 0;
   let numberingCapture: NumberingSnapshot = { name: undefined, root: undefined };
   let numberingStale = true;
@@ -203,25 +244,25 @@ export const createEditSession = (
   };
 
   const buildSlots = (): readonly ParagraphSlot[] => {
-    const elements = bodyParagraphElements(model);
-    const spans: readonly ParagraphSpan[] = index.paragraphs.filter((span) => !span.inCell);
+    const containers = collectContainers(model);
+    const paired = pairContainers(containers, index.paragraphs);
     const slots: ParagraphSlot[] = [];
-    const shared = Math.min(elements.length, spans.length);
-    for (let at = 0; at < shared; at += 1) {
-      const element = elements[at];
-      const span = spans[at];
-      if (element === undefined || span === undefined) continue;
+    for (const entry of paired.entries) {
+      const span = entry.span;
       slots.push({
-        element,
-        index: at,
+        element: entry.element,
+        index: 0,
         span,
         start: span.start,
         textEnd: span.textEnd,
         end: span.end,
         length: (span.textEnd as number) - (span.start as number),
+        container: entry.container,
+        cell: entry.cell,
       });
     }
-    return slots;
+    slotsAligned = paired.aligned;
+    return slots.map((slot, index) => ({ ...slot, index }));
   };
 
   const slots = (): readonly ParagraphSlot[] => {
@@ -259,6 +300,19 @@ export const createEditSession = (
     return { first, last };
   };
 
+  const spansContainers = (range: DocRange): boolean => {
+    const bounds = splitBoundaries(range);
+    if (bounds === undefined) return false;
+    const container = bounds.first.slot.container;
+    if (bounds.last.slot.container !== container) return true;
+    for (const slot of slots()) {
+      if ((slot.end as number) <= (range.start as number)) continue;
+      if ((slot.start as number) >= (range.end as number)) break;
+      if (slot.container !== container) return true;
+    }
+    return false;
+  };
+
   const markChanged = (): void => {
     cachedSlots = undefined;
     revisionCounter += 1;
@@ -283,7 +337,8 @@ export const createEditSession = (
       return index;
     },
     get aligned(): boolean {
-      return slots().length === bodyParagraphElements(model).length;
+      slots();
+      return slotsAligned;
     },
     slots,
     slotOf: slotOfPosition,
@@ -323,6 +378,7 @@ export const createEditSession = (
     relayout,
     markChanged,
     layoutOptions,
+    spansContainers,
     insertText: (range, text, patch) => {
       const target = resolve(range.start);
       if (target === undefined || text === '') return false;
@@ -344,12 +400,16 @@ export const createEditSession = (
       const list = slots();
       const first = bounds.first;
       const last = bounds.last;
+      if (first.slot.container !== last.slot.container) return false;
       const changed =
         first.slot.index === last.slot.index
           ? deleteRangeIn(model, first.slot.element, first.offset, last.offset)
           : (() => {
               const bridged = [...list].filter(
-                (slot) => slot.index > first.slot.index && slot.index < last.slot.index,
+                (slot) =>
+                  slot.container === first.slot.container &&
+                  slot.index > first.slot.index &&
+                  slot.index < last.slot.index,
               );
               const tail = deleteRangeIn(
                 model,
@@ -383,7 +443,7 @@ export const createEditSession = (
       const target = resolve(pos);
       if (target === undefined) return false;
       const next = slots()[target.slot.index + 1];
-      if (next === undefined) return false;
+      if (next === undefined || next.container !== target.slot.container) return false;
       const changed = joinParagraphInto(model, target.slot.element, next.element);
       if (changed) markChanged();
       return changed;
@@ -392,7 +452,7 @@ export const createEditSession = (
       const target = resolve(pos);
       if (target === undefined) return false;
       const previous = slots()[target.slot.index - 1];
-      if (previous === undefined) return false;
+      if (previous === undefined || previous.container !== target.slot.container) return false;
       const changed = joinParagraphInto(model, previous.element, target.slot.element);
       if (changed) markChanged();
       return changed;

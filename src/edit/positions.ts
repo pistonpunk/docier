@@ -1,4 +1,11 @@
-import type { CaretStop, DocPos, DocRange, LayoutResult, LineFragment } from '../layout/index.js';
+import type {
+  CaretStop,
+  CellRef,
+  DocPos,
+  DocRange,
+  LayoutResult,
+  LineFragment,
+} from '../layout/index.js';
 import type { TextAffinity } from '../api/types.js';
 import { docPos } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
@@ -11,6 +18,7 @@ export interface ParagraphSpan {
   readonly textEnd: DocPos;
   readonly end: DocPos;
   readonly inCell: boolean;
+  readonly cell: CellRef | undefined;
 }
 
 export interface CaretStopEntry {
@@ -84,6 +92,7 @@ export const buildPositionIndex = (result: LayoutResult): PositionIndex => {
           textEnd: docPos((block.docRange.end as number) - 1),
           end: block.docRange.end,
           inCell: block.cell !== undefined,
+          cell: block.cell,
         });
       }
       for (const line of block.lines) {

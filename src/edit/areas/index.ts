@@ -6,6 +6,7 @@ import { paragraphCommands } from './paragraph.js';
 import { proofCommands } from './proof.js';
 import { styleCommands } from './style.js';
 import { installAll } from './support.js';
+import { tableCommands } from './table.js';
 import type { AreaHost } from './support.js';
 import { unsupportedCommands } from './unsupported.js';
 
@@ -17,6 +18,7 @@ export { styleCommands } from './style.js';
 export { proofCommands } from './proof.js';
 export { insertCommands } from './insert.js';
 export { numberingCommands } from './numbering.js';
+export { tableCommands } from './table.js';
 export { unsupportedCommands } from './unsupported.js';
 
 export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
@@ -26,6 +28,7 @@ export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, 
   ...proofCommands(host),
   ...insertCommands(host),
   ...numberingCommands(host),
+  ...tableCommands(host),
   ...unsupportedCommands(host),
 ];
 

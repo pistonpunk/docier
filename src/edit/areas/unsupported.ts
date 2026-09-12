@@ -12,8 +12,6 @@ interface Refusal {
 
 const NO_OBJECT_SELECTION =
   'There is no object selection in this build, so drawing commands cannot act';
-const NO_TABLE_CARET =
-  'The caret cannot be placed inside a table in this build, so table commands cannot act';
 const NO_DRAWING =
   'This build cannot author drawing content: the editing layer cannot create media parts or w:drawing runs';
 const NO_PART = (part: string): string =>
@@ -80,7 +78,6 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'This build has no search engine, so find and replace are not implemented',
   },
 
-  { id: 'docier.command.insert.table', label: 'Table', category: 'insert', reason: NO_TABLE_CARET },
   { id: 'docier.command.insert.textBox', label: 'Text box', category: 'insert', reason: NO_DRAWING },
   { id: 'docier.command.insert.header', label: 'Header', category: 'insert', reason: NO_PART('header') },
   { id: 'docier.command.insert.footer', label: 'Footer', category: 'insert', reason: NO_PART('footer') },
@@ -202,27 +199,6 @@ const REFUSALS: readonly Refusal[] = [
   { id: 'docier.command.object.setSize', label: 'Size', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.setWrap', label: 'Wrap text', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.delete', label: 'Delete object', category: 'object', reason: NO_OBJECT_SELECTION },
-
-  { id: 'docier.command.table.delete', label: 'Delete table', category: 'table', reason: NO_TABLE_CARET },
-  { id: 'docier.command.table.deleteRow', label: 'Delete row', category: 'table', reason: NO_TABLE_CARET },
-  { id: 'docier.command.table.deleteColumn', label: 'Delete column', category: 'table', reason: NO_TABLE_CARET },
-  { id: 'docier.command.table.insertRowsAbove', label: 'Insert rows above', category: 'table', reason: NO_TABLE_CARET },
-  { id: 'docier.command.table.insertRowsBelow', label: 'Insert rows below', category: 'table', reason: NO_TABLE_CARET },
-  {
-    id: 'docier.command.table.insertColumnsLeft',
-    label: 'Insert columns left',
-    category: 'table',
-    reason: NO_TABLE_CARET,
-  },
-  {
-    id: 'docier.command.table.insertColumnsRight',
-    label: 'Insert columns right',
-    category: 'table',
-    reason: NO_TABLE_CARET,
-  },
-  { id: 'docier.command.table.mergeCells', label: 'Merge cells', category: 'table', reason: NO_TABLE_CARET },
-  { id: 'docier.command.table.splitCells', label: 'Split cells', category: 'table', reason: NO_TABLE_CARET },
-  { id: 'docier.command.table.setProperties', label: 'Table properties', category: 'table', reason: NO_TABLE_CARET },
 
   {
     id: 'docier.command.theme.setColors',

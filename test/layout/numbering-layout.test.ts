@@ -317,6 +317,22 @@ describe('number placement', () => {
     expect(runAt(result, 0, 0).width).toBe(8000 + 4000);
   });
 
+  it('leaves the paragraph text alone when the level enlarges the number', async () => {
+    const plain = await layoutWith(
+      bodyOf(numbered('alpha')),
+      numberingPart([lvl(0, { text: '%1.' })]),
+    );
+    const enlarged = await layoutWith(
+      bodyOf(numbered('alpha')),
+      numberingPart([lvl(0, { text: '%1.', rPr: '<w:rPr><w:sz w:val="32"/></w:rPr>' })]),
+    );
+    expect(runAt(enlarged, 0, 0).width).toBeGreaterThan(runAt(plain, 0, 0).width);
+    expect(runAt(enlarged, 0, 0).ascent).toBeGreaterThan(runAt(plain, 0, 0).ascent);
+    expect(runAt(enlarged, 0, 1).ascent).toBe(runAt(plain, 0, 1).ascent);
+    expect(runAt(enlarged, 0, 1).descent).toBe(runAt(plain, 0, 1).descent);
+    expect(runAt(enlarged, 0, 1).width).toBe(runAt(plain, 0, 1).width);
+  });
+
   it('writes a bullet level as the literal character from its level text', async () => {
     const result = await layoutWith(
       bodyOf(numbered('alpha')),
