@@ -33,6 +33,7 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-handle-size': '10px',
   '--docier-ruler-size': '20px',
   '--docier-tab-height': '24px',
+  '--docier-ribbon-height': '112px',
   '--docier-status-height': '22px',
   '--docier-radius': '4px',
   '--docier-gap': '4px',

@@ -39,7 +39,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-tab[aria-selected="true"]{background:var(--docier-surface-command);border-bottom-color:transparent;font-weight:400;color:var(--docier-text)}
 .docier-tab[data-docier-contextual="true"]{color:var(--docier-accent)}
 .docier-tab:focus-visible,.docier-control:focus-visible,.docier-menu-item:focus-visible,.docier-ruler-marker:focus-visible,.docier-status-item:focus-visible,.docier-tab:focus-visible{outline:2px solid var(--docier-focus-ring);outline-offset:-1px}
-.docier-ribbon{display:flex;grid-area:ribbon;overflow:hidden;container-type:inline-size;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);min-height:0}
+.docier-ribbon{display:flex;grid-area:ribbon;overflow:hidden;container-type:inline-size;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);min-height:var(--docier-ribbon-height)}
 .docier-ribbon[data-docier-collapsed="collapsed"]{position:absolute;top:0;inset-inline:0;z-index:11;box-shadow:var(--docier-shadow-2);border-bottom:1px solid var(--docier-border)}
 .docier-ribbon[data-docier-collapsed="hidden"]{display:none}
 .docier-ribbon[data-docier-collapsed="collapsed"] .docier-group-label{display:none}
