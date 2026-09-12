@@ -2,7 +2,7 @@ import type { Mp } from '../../units/index.js';
 import { mp, roundHalfEven } from '../../units/index.js';
 import type { ClusterStyle, TextMeasurer } from '../../measure/index.js';
 import { clusterLength } from '../../measure/index.js';
-import type { Sfnt } from './sfnt.js';
+import type { Sfnt } from '../../sfnt/sfnt.js';
 
 export interface FaceIdentity {
   readonly measurerId: string;

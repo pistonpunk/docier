@@ -1,4 +1,4 @@
-import type { DocPos, LayoutResult, StoryId } from '../layout/index.js';
+import type { DocPos, LayoutResult, StoryId, TextMeasurer } from '../layout/index.js';
 import type { DocumentModel } from '../model/index.js';
 import type { DocxPackage } from '../ooxml/package.js';
 import type { Mp } from '../units/index.js';
@@ -506,6 +506,7 @@ export interface LayoutConfig {
   readonly fonts: readonly string[];
   readonly compatibility: Readonly<Record<string, string>>;
   readonly extensions: Readonly<Record<string, string>>;
+  readonly measurer?: TextMeasurer;
 }
 
 export interface TransportConfig {

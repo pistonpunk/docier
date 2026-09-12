@@ -14,7 +14,7 @@ import { R_NAMESPACE, RELATIONSHIP_TYPES, W_NAMESPACE } from '../ooxml/namespace
 import type { BlockNode } from './blocks/block-node.js';
 import type { ContentControl } from './blocks/content-control.js';
 import type { Paragraph } from './blocks/paragraph.js';
-import type { Table } from './blocks/table.js';
+import type { Table, TableCell } from './blocks/table.js';
 import { ModelContext } from './context.js';
 import type { DiagnosticCollector } from './diagnostics.js';
 import type { NumberingContext } from './styles/cascade.js';
@@ -25,7 +25,7 @@ import { SettingsPart } from './settings.js';
 import type { StoryKind } from './story.js';
 import { Story } from './story.js';
 import { StyleResolver, tableStyleContextOf } from './styles/cascade.js';
-import type { ResolvedProperties } from './styles/resolved.js';
+import type { ResolvedProperties, ResolvedTableProperties } from './styles/resolved.js';
 import { StylesPart } from './styles/styles-part.js';
 import { childElements, isWElement } from './xml.js';
 
@@ -379,6 +379,22 @@ export class DocumentModel {
       paragraphProperties: paragraph.properties.element,
       tableStyle: tableStyleContextOf(paragraph.element),
       numbering: context,
+    });
+  }
+
+  resolveTableProperties(table: Table): ResolvedTableProperties {
+    return this.resolver.resolveTable({
+      properties: table.properties.element,
+      kind: 'table',
+      tableStyle: tableStyleContextOf(table.element),
+    });
+  }
+
+  resolveCellProperties(cell: TableCell): ResolvedTableProperties {
+    return this.resolver.resolveTable({
+      properties: cell.properties.element,
+      kind: 'cell',
+      tableStyle: tableStyleContextOf(cell.element),
     });
   }
 

@@ -3,8 +3,8 @@ import { findOrderedChild, findOrderedChildren } from '../schema-order.js';
 import { integerFrom, isWElement, wAttr } from '../xml.js';
 import type { NumberingLevel } from '../numbering/level.js';
 import { entriesOf } from '../properties/property-keys.js';
-import type { CascadeLayer } from './resolved.js';
-import { ResolvedProperties } from './resolved.js';
+import type { CascadeLayer, CascadeOrigin } from './resolved.js';
+import { ResolvedProperties, ResolvedTableProperties } from './resolved.js';
 import type { Style } from './style.js';
 import type { StylesPart } from './styles-part.js';
 
@@ -75,6 +75,20 @@ export const PARAGRAPH_CASCADE: readonly ParagraphCascadeLevel[] = [
   { id: 'direct', layer: 'paragraphMark', absoluteToggles: true },
 ];
 
+export type TableCascadeLevelId = 'docDefaults' | 'tableStyle' | 'tableStyleConditional' | 'direct';
+
+export interface TableCascadeLevel {
+  readonly id: TableCascadeLevelId;
+  readonly layer: CascadeLayer;
+}
+
+export const TABLE_CASCADE: readonly TableCascadeLevel[] = [
+  { id: 'docDefaults', layer: 'docDefaults' },
+  { id: 'tableStyle', layer: 'tableStyle' },
+  { id: 'tableStyleConditional', layer: 'tableStyleConditional' },
+  { id: 'direct', layer: 'table' },
+];
+
 export const TABLE_CONDITION_PRECEDENCE: readonly string[] = [
   'wholeTable',
   'band1Horz',
@@ -94,6 +108,14 @@ export const TABLE_CONDITION_PRECEDENCE: readonly string[] = [
 export interface TableStyleContext {
   readonly styleId: string;
   readonly conditions: readonly string[];
+}
+
+export type TablePropertyKind = 'table' | 'cell';
+
+export interface TableResolutionInput {
+  readonly properties: XmlElement | undefined;
+  readonly kind: TablePropertyKind;
+  readonly tableStyle: TableStyleContext | undefined;
 }
 
 export interface CellPosition {
@@ -289,7 +311,8 @@ const cnfStyleConditions = (element: XmlElement): readonly string[] => {
 };
 
 export const tableStyleContextOf = (element: XmlElement): TableStyleContext | undefined => {
-  const table = ancestorOfKind(element, 'tbl');
+  const self = isWElement(element, 'tbl');
+  const table = self ? element : ancestorOfKind(element, 'tbl');
   if (table === undefined) return undefined;
   const properties = findOrderedChild(table, 'tblPr');
   if (properties === undefined) return undefined;
@@ -297,8 +320,10 @@ export const tableStyleContextOf = (element: XmlElement): TableStyleContext | un
   const styleId = styleElement === undefined ? undefined : wAttr(styleElement, 'val');
   if (styleId === undefined || styleId.length === 0) return undefined;
   const look = tableLookFlags(findOrderedChild(properties, 'tblLook'));
-  const cell = ancestorOfKind(element, 'tc');
-  const row = ancestorOfKind(element, 'tr');
+  const nearest = (localName: string): XmlElement | undefined =>
+    isWElement(element, localName) ? element : ancestorOfKind(element, localName);
+  const cell = self ? undefined : nearest('tc');
+  const row = self ? undefined : nearest('tr');
   const explicit = [
     ...(row === undefined ? [] : cnfStyleConditions(row)),
     ...(cell === undefined ? [] : cnfStyleConditions(cell)),
@@ -353,9 +378,9 @@ const contextKey = (
     numbering === undefined ? '' : `${numbering.numId}/${numbering.ilvl}`,
   ].join(' ');
 
-interface ResolutionBucket {
+interface ResolutionBucket<T> {
   readonly content: string;
-  readonly entries: Map<string, ResolvedProperties>;
+  readonly entries: Map<string, T>;
 }
 
 const elementContentKey = (element: XmlElement): string => {
@@ -376,9 +401,11 @@ const contentKey = (element: XmlElement | undefined): string =>
 
 export class StyleResolver {
   private readonly styles: StylesPart | undefined;
-  private readonly runCache = new Map<XmlElement, ResolutionBucket>();
-  private readonly paragraphCache = new Map<XmlElement, ResolutionBucket>();
-  private readonly numberingRunCache = new Map<XmlElement, ResolutionBucket>();
+  private readonly runCache = new Map<XmlElement, ResolutionBucket<ResolvedProperties>>();
+  private readonly paragraphCache = new Map<XmlElement, ResolutionBucket<ResolvedProperties>>();
+  private readonly numberingRunCache = new Map<XmlElement, ResolutionBucket<ResolvedProperties>>();
+  private readonly tableCache = new Map<XmlElement, ResolutionBucket<ResolvedTableProperties>>();
+  private readonly cellCache = new Map<XmlElement, ResolutionBucket<ResolvedTableProperties>>();
   private cachedRevision = -1;
 
   constructor(styles: StylesPart | undefined) {
@@ -393,6 +420,8 @@ export class StyleResolver {
     this.runCache.clear();
     this.paragraphCache.clear();
     this.numberingRunCache.clear();
+    this.tableCache.clear();
+    this.cellCache.clear();
     this.cachedRevision = -1;
   }
 
@@ -402,13 +431,13 @@ export class StyleResolver {
     this.cachedRevision = this.revision;
   }
 
-  private cached(
-    cache: Map<XmlElement, ResolutionBucket>,
+  private cached<T>(
+    cache: Map<XmlElement, ResolutionBucket<T>>,
     key: XmlElement,
     content: string,
     signature: string,
-    compute: () => ResolvedProperties,
-  ): ResolvedProperties {
+    compute: () => T,
+  ): T {
     const bucket = cache.get(key);
     if (bucket !== undefined && bucket.content === content) {
       const hit = bucket.entries.get(signature);
@@ -466,6 +495,19 @@ export class StyleResolver {
     return this.cached(this.numberingRunCache, key, content, signature, () =>
       this.computeNumberingRun(input),
     );
+  }
+
+  resolveTable(input: TableResolutionInput): ResolvedTableProperties {
+    this.sync();
+    const key = input.properties;
+    const signature = [
+      input.kind,
+      input.tableStyle?.styleId ?? '',
+      input.tableStyle?.conditions.join(',') ?? '',
+    ].join(' ');
+    if (key === undefined) return this.computeTable(input);
+    const cache = input.kind === 'cell' ? this.cellCache : this.tableCache;
+    return this.cached(cache, key, contentKey(key), signature, () => this.computeTable(input));
   }
 
   private applyParagraphStyleRunProperties(
@@ -575,6 +617,86 @@ export class StyleResolver {
       ilvl: numbering.ilvl,
       absoluteToggles: true,
     });
+  }
+
+  private defaultTableStyleChain(): readonly Style[] {
+    const styles = this.styles;
+    if (styles === undefined) return [];
+    const declared = styles.defaultStyle('table');
+    if (declared !== undefined) return styles.chain(declared.styleId);
+    const fallback = styles.style('TableNormal');
+    return fallback === undefined ? [] : styles.chain(fallback.styleId);
+  }
+
+  private applyTableStyleLayer(
+    resolved: ResolvedProperties,
+    layers: (XmlElement | undefined)[],
+    container: string,
+    chain: readonly Style[],
+    origin: CascadeOrigin,
+    condition: string | undefined,
+  ): void {
+    for (const style of chain) {
+      if (style.type !== undefined && style.type !== 'table') continue;
+      const scope = condition === undefined ? style.element : style.conditionalElement(condition);
+      if (scope === undefined) continue;
+      const element = findOrderedChild(scope, container);
+      if (element === undefined) continue;
+      layers.push(element);
+      const scoped: CascadeOrigin =
+        condition === undefined
+          ? { ...origin, styleId: style.styleId }
+          : { ...origin, styleId: style.styleId, condition };
+      resolved.apply(entriesOf(element), scoped);
+    }
+  }
+
+  private computeTable(input: TableResolutionInput): ResolvedTableProperties {
+    const resolved = new ResolvedProperties();
+    const layers: (XmlElement | undefined)[] = [];
+    const container = input.kind === 'cell' ? 'tcPr' : 'tblPr';
+    const context = input.tableStyle;
+    const chain = context === undefined ? [] : this.chainOf(context.styleId);
+    for (const level of TABLE_CASCADE) {
+      switch (level.id) {
+        case 'docDefaults':
+          if (context !== undefined) break;
+          this.applyTableStyleLayer(
+            resolved,
+            layers,
+            container,
+            this.defaultTableStyleChain(),
+            { layer: level.layer },
+            undefined,
+          );
+          break;
+        case 'tableStyle':
+          this.applyTableStyleLayer(resolved, layers, container, chain, { layer: level.layer }, undefined);
+          break;
+        case 'tableStyleConditional':
+          for (const condition of context?.conditions ?? []) {
+            this.applyTableStyleLayer(
+              resolved,
+              layers,
+              container,
+              chain,
+              { layer: level.layer },
+              condition,
+            );
+          }
+          break;
+        case 'direct':
+          layers.push(input.properties);
+          resolved.apply(entriesOf(input.properties), {
+            layer: input.kind === 'cell' ? 'tableCell' : level.layer,
+            absoluteToggles: true,
+          });
+          break;
+        default:
+          break;
+      }
+    }
+    return new ResolvedTableProperties(layers, resolved);
   }
 
   private computeRun(input: RunResolutionInput): ResolvedProperties {

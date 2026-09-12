@@ -1,13 +1,13 @@
-import type { Mp, Twip } from '../units/index.js';
+import type { Mp, PercentFiftieth, Twip } from '../units/index.js';
 import { mp, twipToMp } from '../units/index.js';
 import type {
   BlockNode,
   ContentControl,
   DocumentModel,
   Paragraph,
+  ResolvedTableProperties,
   Table,
   TableCell,
-  TableProperties,
   TableRow,
 } from '../model/index.js';
 import type { BorderSet, CellMergeRole, CellVerticalAlignment, DocPos, LayoutDiagnostic, Shading } from './types.js';
@@ -16,9 +16,7 @@ import type { NumberingCounters } from './numbering.js';
 import type { IngestedBlock, IngestedParagraph, IngestOptions } from './ingest.js';
 import { MAX_DOC_POS, ingestParagraph } from './ingest.js';
 import type { TableBorderDeclarations } from './table-borders.js';
-import type { XmlElement } from '../ooxml/xml/index.js';
-import { childElements, getAttributeValue } from '../ooxml/xml/index.js';
-import { cellBordersOf, shadingOf, tableBordersOf } from './table-borders.js';
+import { cellBordersOf, shadingOfElement, tableBordersOf } from './table-borders.js';
 
 export const MAX_TABLE_DEPTH = 20;
 
@@ -113,44 +111,56 @@ export interface IngestState {
 
 const NO_WIDTH: TableWidth = { rule: 'auto', twips: undefined, percentFiftieths: undefined };
 
-export const WORD_NAMESPACE =
-  'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const layoutKindOf = (properties: ResolvedTableProperties): TableLayoutKind =>
+  properties.properties.value('tblLayout', 'type') === 'fixed' ? 'fixed' : 'autofit';
 
-const childAttribute = (
-  element: XmlElement | undefined,
-  localName: string,
-  name: string,
-): string | undefined => {
-  if (element === undefined) return undefined;
-  const child = childElements(element).find((node) => node.localName === localName);
-  if (child === undefined) return undefined;
-  return getAttributeValue(child, WORD_NAMESPACE, name);
-};
-
-const layoutKindOf = (properties: TableProperties): TableLayoutKind => {
-  if (properties.layout === 'fixed') return 'fixed';
-  return childAttribute(properties.element, 'tblLayout', 'type') === 'fixed' ? 'fixed' : 'autofit';
-};
-
-const declaredTwips = (properties: TableProperties, localName: string): Mp => {
+const declaredTwips = (properties: ResolvedTableProperties, localName: string): Mp | undefined => {
   const raw =
-    childAttribute(properties.element, localName, 'w') ??
-    childAttribute(properties.element, localName, 'val');
-  if (raw === undefined) return mp(0);
+    properties.properties.value(localName, 'w') ?? properties.properties.value(localName, 'val');
+  if (raw === undefined) return undefined;
   const twips = Number.parseInt(raw, 10);
-  if (!Number.isFinite(twips)) return mp(0);
-  return twipToMp(twips as Twip);
+  return Number.isFinite(twips) ? twipToMp(twips as Twip) : undefined;
 };
 
-const indentationOf = (properties: TableProperties): Mp =>
-  properties.indentation === undefined
-    ? declaredTwips(properties, 'tblInd')
-    : twipToMp(properties.indentation);
+const indentationOf = (properties: ResolvedTableProperties): Mp =>
+  declaredTwips(properties, 'tblInd') ?? mp(0);
 
-const cellSpacingOf = (properties: TableProperties): Mp =>
-  properties.cellSpacing === undefined
-    ? declaredTwips(properties, 'tblCellSpacing')
-    : twipToMp(properties.cellSpacing);
+const cellSpacingOf = (properties: ResolvedTableProperties): Mp =>
+  declaredTwips(properties, 'tblCellSpacing') ?? mp(0);
+
+const widthOfResolved = (properties: ResolvedTableProperties, localName: string): TableWidth => {
+  const raw = properties.properties.integer(localName, 'w');
+  return widthOf(
+    properties.properties.value(localName, 'type'),
+    raw === undefined ? undefined : (raw as Twip),
+    raw === undefined ? undefined : (raw as PercentFiftieth),
+  );
+};
+
+const sideTwips = (
+  properties: ResolvedTableProperties,
+  container: string,
+  names: readonly string[],
+): Mp | undefined => {
+  for (const name of names) {
+    const raw = properties.attribute([container, name], 'w');
+    if (raw === undefined) continue;
+    const twips = Number.parseInt(raw, 10);
+    if (Number.isFinite(twips)) return twipToMp(twips as Twip);
+  }
+  return undefined;
+};
+
+const marginsOfResolved = (
+  properties: ResolvedTableProperties,
+  container: string,
+  fallback: CellMarginSet,
+): CellMarginSet => ({
+  top: sideTwips(properties, container, ['top']) ?? fallback.top,
+  left: sideTwips(properties, container, ['left', 'start']) ?? fallback.left,
+  right: sideTwips(properties, container, ['right', 'end']) ?? fallback.right,
+  bottom: sideTwips(properties, container, ['bottom']) ?? fallback.bottom,
+});
 
 const STRUCTURAL_BLOCKS: ReadonlySet<string> = new Set([
   'sectPr',
@@ -180,16 +190,6 @@ const widthOf = (
   return NO_WIDTH;
 };
 
-const marginsOf = (
-  margins: { readonly top: Twip | undefined; readonly left: Twip | undefined; readonly right: Twip | undefined; readonly bottom: Twip | undefined },
-  fallback: CellMarginSet,
-): CellMarginSet => ({
-  top: margins.top === undefined ? fallback.top : twipToMp(margins.top),
-  left: margins.left === undefined ? fallback.left : twipToMp(margins.left),
-  right: margins.right === undefined ? fallback.right : twipToMp(margins.right),
-  bottom: margins.bottom === undefined ? fallback.bottom : twipToMp(margins.bottom),
-});
-
 const justificationOf = (raw: string | undefined): TableJustification => {
   if (raw === 'center') return 'center';
   if (raw === 'right' || raw === 'end') return 'right';
@@ -210,27 +210,22 @@ const ingestCell = (
   depth: number,
 ): IngestedCell => {
   const properties = cell.properties;
+  const resolved = state.model.resolveCellProperties(cell);
   const start = docPos(state.cursor);
   const merge = mergeRoleOf(cell);
-  const width = widthOf(
-    properties.width.type,
-    properties.width.twips,
-    properties.width.measurement.percentFiftieths,
-  );
+  const width = widthOfResolved(resolved, 'tcW');
   const keepWidth = width.rule !== 'auto' && (width.twips !== undefined || width.percentFiftieths !== undefined);
   const blocks = merge === 'continue' ? [] : ingestBlockList(state, cell.blocks(), depth);
+  const verticalAlign = resolved.properties.value('vAlign');
   return {
     gridStart,
     gridSpan: cell.gridSpan,
     merge,
     width: keepWidth ? width : undefined,
-    margins: marginsOf(properties.margins(), tableMargins),
-    verticalAlign:
-      properties.verticalAlign === 'center' || properties.verticalAlign === 'bottom'
-        ? properties.verticalAlign
-        : 'top',
-    shading: shadingOf(properties.shading),
-    borders: cellBordersOf(properties),
+    margins: marginsOfResolved(resolved, 'tcMar', tableMargins),
+    verticalAlign: verticalAlign === 'center' || verticalAlign === 'bottom' ? verticalAlign : 'top',
+    shading: shadingOfElement(resolved.element(['shd'])),
+    borders: cellBordersOf(resolved),
     textDirection: properties.textDirection,
     hideMark: properties.hideMark === true,
     blocks,
@@ -280,7 +275,8 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
   const start = docPos(state.cursor);
   const paragraphIndex = state.paragraphs.length;
   const properties = table.properties;
-  const declaredMargins = marginsOf(properties.margins(), DEFAULT_MARGINS);
+  const resolved = state.model.resolveTableProperties(table);
+  const declaredMargins = marginsOfResolved(resolved, 'tblCellMar', DEFAULT_MARGINS);
   const rows: IngestedRow[] = [];
   for (const row of table.rows()) rows.push(ingestRow(state, row, declaredMargins, depth + 1));
 
@@ -318,7 +314,7 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
       docPos: start,
     });
   }
-  const cellSpacing = cellSpacingOf(properties);
+  const cellSpacing = cellSpacingOf(resolved);
   if (cellSpacing !== undefined && cellSpacing !== 0) {
     state.diagnostics.push({
       code: 'tableCellSpacingNotLaidOut',
@@ -345,13 +341,13 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
     grid,
     columnCount,
     gridDerived,
-    width: widthOf(properties.width.type, properties.width.twips, properties.width.measurement.percentFiftieths),
-    layout: layoutKindOf(properties),
-    indentation: indentationOf(properties),
-    justification: justificationOf(properties.justification),
+    width: widthOfResolved(resolved, 'tblW'),
+    layout: layoutKindOf(resolved),
+    indentation: indentationOf(resolved),
+    justification: justificationOf(resolved.properties.value('jc')),
     cellMargins: declaredMargins,
-    borders: tableBordersOf(properties),
-    shading: shadingOf(properties.shading),
+    borders: tableBordersOf(resolved),
+    shading: shadingOfElement(resolved.element(['shd'])),
     cellSpacing,
     floating: properties.floating !== undefined,
     depth,

@@ -1,3 +1,4 @@
+import type { FontFaceSpec } from 'docier/layout';
 import type { PdfFontFace, PdfFontRequest } from 'docier/pdf';
 
 export type FaceStyle = 'regular' | 'bold' | 'italic' | 'boldItalic';
@@ -9,6 +10,7 @@ export interface LoadedFonts {
 
 export interface FontPlan {
   readonly provider: (request: PdfFontRequest) => PdfFontFace | undefined;
+  readonly faces: readonly FontFaceSpec[];
   readonly screenFamilies: readonly string[];
   readonly report: string;
 }
@@ -86,6 +88,15 @@ const STYLE_FALLBACKS: Readonly<Record<FaceStyle, readonly FaceStyle[]>> = {
   boldItalic: ['boldItalic', 'italic', 'bold', 'regular'],
 };
 
+const SFNT_VERSIONS: readonly number[] = [0x00010000, 0x74727565, 0x4f54544f, 0x74746366];
+
+const isFontFile = (bytes: Uint8Array): boolean => {
+  if (bytes.byteLength < 4) return false;
+  const version =
+    ((bytes[0] ?? 0) << 24) | ((bytes[1] ?? 0) << 16) | ((bytes[2] ?? 0) << 8) | (bytes[3] ?? 0);
+  return SFNT_VERSIONS.includes(version);
+};
+
 export const loadFonts = async (base = 'fonts/'): Promise<{ sans: LoadedFonts; serif: LoadedFonts; mono: LoadedFonts }> => {
   const load = async (files: readonly FaceFile[]): Promise<LoadedFonts> => {
     const entries = await Promise.all(
@@ -93,7 +104,9 @@ export const loadFonts = async (base = 'fonts/'): Promise<{ sans: LoadedFonts; s
         try {
           const response = await fetch(`${base}${file}`);
           if (!response.ok) return [style, undefined] as const;
-          return [style, new Uint8Array(await response.arrayBuffer())] as const;
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          // A dev server that answers a missing file with its own HTML page returns 200 and markup.
+          return [style, isFontFile(bytes) ? bytes : undefined] as const;
         } catch {
           return [style, undefined] as const;
         }
@@ -155,47 +168,82 @@ export const buildFontPlan = (
     ...loaded.mono.missing.map((style) => `mono/${style}`),
   ];
 
+  const faces: FontFaceSpec[] = [];
+  for (const family of aliases) {
+    for (const style of ['regular', 'bold', 'italic', 'boldItalic'] as const) {
+      const bytes = bytesFor(family, style);
+      if (bytes === undefined) continue;
+      faces.push({
+        family,
+        bold: style === 'bold' || style === 'boldItalic',
+        italic: style === 'italic' || style === 'boldItalic',
+        bytes,
+      });
+    }
+  }
+
   const report = [
     `${loaded.sans.missing.length === 0 ? 'DejaVu Sans complete' : `DejaVu Sans missing ${loaded.sans.missing.join(', ')}`}`,
     `serif ${loaded.serif.missing.length === 0 ? 'complete' : `missing ${loaded.serif.missing.join(', ')}`}`,
     `mono ${loaded.mono.missing.length === 0 ? 'complete' : `missing ${loaded.mono.missing.join(', ')}`}`,
-    `${String(aliases.length)} family aliases registered for screen and PDF`,
+    `${String(aliases.length)} family aliases registered for screen, PDF and layout`,
+    `${String(faces.length)} face(s) available to the font measurer`,
   ].join('; ');
 
-  return { provider, screenFamilies: aliases, report };
+  return { provider, faces, screenFamilies: aliases, report };
+};
+
+const FILE_BY_KIND: Readonly<Record<'serif' | 'mono' | 'sans', Readonly<Record<FaceStyle, string>>>> = {
+  sans: {
+    regular: 'DejaVuSans.ttf',
+    bold: 'DejaVuSans-Bold.ttf',
+    italic: 'DejaVuSans-Oblique.ttf',
+    boldItalic: 'DejaVuSans-BoldOblique.ttf',
+  },
+  serif: {
+    regular: 'DejaVuSerif.ttf',
+    bold: 'DejaVuSerif-Bold.ttf',
+    italic: 'DejaVuSerif-Italic.ttf',
+    boldItalic: 'DejaVuSerif-BoldItalic.ttf',
+  },
+  mono: {
+    regular: 'DejaVuSansMono.ttf',
+    bold: 'DejaVuSansMono-Bold.ttf',
+    italic: 'DejaVuSansMono-Oblique.ttf',
+    boldItalic: 'DejaVuSansMono-BoldOblique.ttf',
+  },
+};
+
+const WEIGHT_OF: Readonly<Record<FaceStyle, string>> = {
+  regular: 'normal',
+  bold: 'bold',
+  italic: 'normal',
+  boldItalic: 'bold',
+};
+
+const STYLE_OF: Readonly<Record<FaceStyle, string>> = {
+  regular: 'normal',
+  bold: 'normal',
+  italic: 'italic',
+  boldItalic: 'italic',
 };
 
 export const registerScreenFonts = (
+  loaded: { sans: LoadedFonts; serif: LoadedFonts; mono: LoadedFonts },
   families: readonly string[],
   base = 'fonts/',
 ): HTMLStyleElement => {
   const rules: string[] = [];
   for (const family of families) {
     const kind = familyKind(family);
-    const faces: readonly (readonly [string, string])[] = [
-      ['normal', 'normal'],
-      ['bold', 'normal'],
-      ['normal', 'italic'],
-      ['bold', 'italic'],
-    ];
-    const fileOf = (weight: string, style: string): string => {
-      if (kind === 'mono' && weight === 'normal' && style === 'normal') return 'DejaVuSansMono.ttf';
-      if (kind === 'mono' && weight === 'bold' && style === 'normal') return 'DejaVuSansMono-Bold.ttf';
-      if (kind === 'mono' && weight === 'normal' && style === 'italic') return 'DejaVuSansMono-Oblique.ttf';
-      if (kind === 'mono' && weight === 'bold' && style === 'italic') return 'DejaVuSansMono-BoldOblique.ttf';
-      if (kind === 'serif' && weight === 'normal' && style === 'normal') return 'DejaVuSerif.ttf';
-      if (kind === 'serif' && weight === 'bold' && style === 'normal') return 'DejaVuSerif-Bold.ttf';
-      if (kind === 'serif' && weight === 'normal' && style === 'italic') return 'DejaVuSerif-Italic.ttf';
-      if (kind === 'serif' && weight === 'bold' && style === 'italic') return 'DejaVuSerif-BoldItalic.ttf';
-      if (weight === 'bold' && style === 'normal') return 'DejaVuSans-Bold.ttf';
-      if (weight === 'normal' && style === 'italic') return 'DejaVuSans-Oblique.ttf';
-      if (weight === 'bold' && style === 'italic') return 'DejaVuSans-BoldOblique.ttf';
-      return 'DejaVuSans.ttf';
-    };
-    for (const [weight, style] of faces) {
+    const set = kind === 'serif' ? loaded.serif : kind === 'mono' ? loaded.mono : loaded.sans;
+    for (const style of ['regular', 'bold', 'italic', 'boldItalic'] as const) {
+      // Only the faces the host can actually serve are declared. A style that is declared without a
+      // file behind it makes the browser substitute a font the layout never measured.
+      if (set.faces[style] === undefined) continue;
       rules.push(
-        `@font-face{font-family:"${family}";font-weight:${weight};font-style:${style};` +
-          `font-display:swap;src:url("${base}${fileOf(weight, style)}") format("truetype")}`,
+        `@font-face{font-family:"${family}";font-weight:${WEIGHT_OF[style]};font-style:${STYLE_OF[style]};` +
+          `font-display:swap;src:url("${base}${FILE_BY_KIND[kind][style]}") format("truetype")}`,
       );
     }
   }

@@ -53,6 +53,7 @@ const RELOAD_KEYS: readonly string[] = [
   'document',
   'storage',
   'layout.fonts',
+  'layout.measurer',
   'export',
   'ui.chrome',
   'tokenization.enabled',
@@ -85,11 +86,18 @@ const KNOWN_KEYS: readonly string[] = [
   'transport',
 ];
 
-type FieldType = 'number' | 'string' | 'boolean' | 'object' | 'array' | 'function';
+type FieldType = 'number' | 'string' | 'boolean' | 'object' | 'array' | 'function' | 'value';
 
 interface FieldTable {
   readonly [key: string]: FieldType | FieldTable;
 }
+
+const LAYOUT_SHAPE: FieldTable = {
+  fonts: 'array',
+  compatibility: 'object',
+  extensions: 'object',
+  measurer: 'value',
+};
 
 const SHAPES: FieldTable = {
   document: { docId: 'string', autoFocus: 'boolean' },
@@ -125,7 +133,7 @@ const SHAPES: FieldTable = {
   debug: { includeValues: 'boolean', logCommands: 'boolean' },
   units: { imageDpi: 'number' },
   images: { maxPixels: 'number' },
-  layout: { fonts: 'array', compatibility: 'object', extensions: 'object' },
+  layout: LAYOUT_SHAPE,
   transport: {},
 };
 
@@ -161,6 +169,10 @@ const mergeInto = (
       });
       continue;
     }
+    if (field === 'value') {
+      target[key] = value;
+      continue;
+    }
     if (typeof field === 'string' && field !== 'object' && field !== 'array') {
       const actual = typeof value;
       if (actual !== field) {
@@ -175,8 +187,7 @@ const mergeInto = (
     }
     if (isPlain(value) && isPlain(target[key] ?? {})) {
       const nested = { ...(target[key] as Record<string, unknown>) };
-      const childShape = SHAPE_CHILDREN[`${prefix}.${key}`] ?? SHAPE_CHILDREN[key];
-      mergeInto(nested, value, path, unknown, warnings, childShape);
+      mergeInto(nested, value, path, unknown, warnings, childShapeOf(path, key, field));
       target[key] = nested;
       continue;
     }
@@ -185,6 +196,7 @@ const mergeInto = (
 };
 
 const SHAPE_CHILDREN: Readonly<Record<string, FieldTable>> = {
+  layout: LAYOUT_SHAPE,
   images: { maxPixels: 'number', compression: 'object' },
   'images.compression': { quality: 'number' },
 };
@@ -238,7 +250,7 @@ export const applyPatch = (
   const report = mergeConfig(base, patch);
   const requiresReload = reloadKeysOf(patch);
   const applied: string[] = [];
-  walkPaths(patch, '', (path) => applied.push(path));
+  walkPaths(patch, '', (path) => applied.push(path), SHAPES);
   return {
     report,
     applyReport: {
@@ -250,16 +262,27 @@ export const applyPatch = (
   };
 };
 
+const childShapeOf = (path: string, key: string, field: FieldType | FieldTable | undefined): FieldTable | undefined => {
+  const declared = SHAPE_CHILDREN[path] ?? SHAPE_CHILDREN[key];
+  if (declared !== undefined) return declared;
+  return typeof field === 'object' ? field : undefined;
+};
+
 const walkPaths = (
   value: Record<string, unknown> | undefined,
   prefix: string,
   visit: (path: string) => void,
+  shape: FieldTable | undefined,
 ): void => {
   if (value === undefined) return;
   for (const key of Object.keys(value)) {
     if (value[key] === undefined) continue;
     const path = prefix === '' ? key : `${prefix}.${key}`;
+    const field = shape?.[key];
     visit(path);
-    if (isPlain(value[key])) walkPaths(value[key] as Record<string, unknown>, path, visit);
+    if (field === 'value') continue;
+    if (isPlain(value[key])) {
+      walkPaths(value[key] as Record<string, unknown>, path, visit, childShapeOf(path, key, field));
+    }
   }
 };

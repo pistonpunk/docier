@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PdfError, exportPdf, renderPdf } from '../../src/pdf/index.js';
 import type { PdfExportResult, PdfLossCode } from '../../src/pdf/index.js';
-import { Sfnt } from '../../src/pdf/fonts/sfnt.js';
+import { Sfnt } from '../../src/sfnt/sfnt.js';
 import { subsetTrueType } from '../../src/pdf/fonts/subset.js';
 import {
   HAS_POPPLER,

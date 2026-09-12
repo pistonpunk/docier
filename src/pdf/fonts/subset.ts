@@ -1,4 +1,4 @@
-import type { Sfnt } from './sfnt.js';
+import type { Sfnt } from '../../sfnt/sfnt.js';
 import type { FontTable } from './table-builder.js';
 import { buildSfnt, concatChunks, paddedTo } from './table-builder.js';
 

@@ -27,3 +27,10 @@ export {
   DETERMINISTIC_SANS_LINE_BOX_RATIO,
   createDeterministicMeasurer,
 } from './deterministic.js';
+
+export type { FontFaceSpec, FontMeasurerOptions } from './font.js';
+export {
+  FONT_MEASURER_ADVANCE_SCALE,
+  FONT_MEASURER_ID,
+  createFontMeasurer,
+} from './font.js';

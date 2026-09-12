@@ -4,10 +4,11 @@ import type {
   BorderProperties,
   BorderSide,
   BordersProperties,
+  ResolvedTableProperties,
   ShadingProperties,
-  TableCellProperties,
-  TableProperties,
 } from '../model/index.js';
+import { integerFrom, wAttr } from '../model/index.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
 import type { BorderEdge, BorderLineStyle, BorderSet, Shading } from './types.js';
 
 export const DEFAULT_BORDER_EIGHTHS = 4;
@@ -42,19 +43,25 @@ const PAINT_STYLES: ReadonlySet<string> = new Set<BorderLineStyle>([
 
 const NO_FILL: ReadonlySet<string> = new Set(['nil', 'none', 'auto']);
 
-export const borderEdgeOf = (properties: BorderProperties | undefined): BorderEdge | undefined => {
-  if (properties === undefined) return undefined;
-  const raw = properties.style;
+export const borderEdgeOfElement = (element: XmlElement | undefined): BorderEdge | undefined => {
+  if (element === undefined) return undefined;
+  const raw = wAttr(element, 'val');
   if (raw === undefined || !PAINT_STYLES.has(raw)) return undefined;
-  const size = properties.size;
-  const space = properties.space;
+  const size = integerFrom(wAttr(element, 'sz'));
+  const space = integerFrom(wAttr(element, 'space'));
   return {
     style: raw as BorderLineStyle,
-    width: size === undefined ? eighthPointToMp(eighthPoint(DEFAULT_BORDER_EIGHTHS)) : eighthPointToMp(size),
-    color: properties.color,
+    width:
+      size === undefined
+        ? eighthPointToMp(eighthPoint(DEFAULT_BORDER_EIGHTHS))
+        : eighthPointToMp(eighthPoint(size)),
+    color: wAttr(element, 'color'),
     space: space === undefined ? undefined : pointToMp(pt(space)),
   };
 };
+
+export const borderEdgeOf = (properties: BorderProperties | undefined): BorderEdge | undefined =>
+  properties === undefined ? undefined : borderEdgeOfElement(properties.element);
 
 export const borderSideOf = (
   borders: BordersProperties | undefined,
@@ -86,11 +93,11 @@ export const resolveEdge = (
   return tableEdge;
 };
 
-export const shadingOf = (properties: ShadingProperties | undefined): Shading | undefined => {
-  if (properties === undefined) return undefined;
-  const fill = properties.fill;
-  const pattern = properties.pattern;
-  const color = properties.color;
+export const shadingOfElement = (element: XmlElement | undefined): Shading | undefined => {
+  if (element === undefined) return undefined;
+  const fill = wAttr(element, 'fill');
+  const pattern = wAttr(element, 'val');
+  const color = wAttr(element, 'color');
   const effectivePattern = pattern === undefined || NO_FILL.has(pattern) ? undefined : pattern;
   const effectiveFill = fill === undefined || NO_FILL.has(fill) ? undefined : fill;
   if (effectivePattern === undefined && effectiveFill === undefined) return undefined;
@@ -100,6 +107,9 @@ export const shadingOf = (properties: ShadingProperties | undefined): Shading | 
     color,
   };
 };
+
+export const shadingOf = (properties: ShadingProperties | undefined): Shading | undefined =>
+  properties === undefined ? undefined : shadingOfElement(properties.element);
 
 const EMPTY_BORDER_SET: BorderSet = {
   top: undefined,
@@ -117,27 +127,33 @@ export const borderSetOf = (properties: BordersProperties | undefined): BorderSe
   left: borderSideOf(properties, 'left'),
 });
 
-export const cellBordersOf = (properties: TableCellProperties): BorderSet => {
-  const borders = properties.borders;
-  return {
-    top: borderSideOf(borders, 'top'),
-    right: borderSideOf(borders, 'right') ?? borderSideOf(borders, 'end'),
-    bottom: borderSideOf(borders, 'bottom'),
-    left: borderSideOf(borders, 'left') ?? borderSideOf(borders, 'start'),
-  };
+const declaredEdge = (
+  resolved: ResolvedTableProperties,
+  container: string,
+  names: readonly string[],
+): BorderEdge | undefined => {
+  for (const name of names) {
+    const edge = borderEdgeOfElement(resolved.element([container, name]));
+    if (edge !== undefined) return edge;
+  }
+  return undefined;
 };
 
-export const tableBordersOf = (properties: TableProperties): TableBorderDeclarations => {
-  const borders = properties.borders;
-  return {
-    top: borderSideOf(borders, 'top'),
-    left: borderSideOf(borders, 'left') ?? borderSideOf(borders, 'start'),
-    bottom: borderSideOf(borders, 'bottom'),
-    right: borderSideOf(borders, 'right') ?? borderSideOf(borders, 'end'),
-    insideH: borderSideOf(borders, 'insideH'),
-    insideV: borderSideOf(borders, 'insideV'),
-  };
-};
+export const cellBordersOf = (resolved: ResolvedTableProperties): BorderSet => ({
+  top: declaredEdge(resolved, 'tcBorders', ['top']),
+  right: declaredEdge(resolved, 'tcBorders', ['right', 'end']),
+  bottom: declaredEdge(resolved, 'tcBorders', ['bottom']),
+  left: declaredEdge(resolved, 'tcBorders', ['left', 'start']),
+});
+
+export const tableBordersOf = (resolved: ResolvedTableProperties): TableBorderDeclarations => ({
+  top: declaredEdge(resolved, 'tblBorders', ['top']),
+  left: declaredEdge(resolved, 'tblBorders', ['left', 'start']),
+  bottom: declaredEdge(resolved, 'tblBorders', ['bottom']),
+  right: declaredEdge(resolved, 'tblBorders', ['right', 'end']),
+  insideH: declaredEdge(resolved, 'tblBorders', ['insideH']),
+  insideV: declaredEdge(resolved, 'tblBorders', ['insideV']),
+});
 
 export const outerBorderSet = (declarations: TableBorderDeclarations): BorderSet => ({
   top: declarations.top,

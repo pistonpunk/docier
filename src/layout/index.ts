@@ -61,16 +61,20 @@ export type { BreakLine, BreakRequest, Breaker } from './breaking.js';
 export { greedyBreaker } from './breaking.js';
 
 export type { DeterministicFontSpec, DeterministicMeasurerOptions } from '../measure/index.js';
+export type { FontFaceSpec, FontMeasurerOptions } from '../measure/index.js';
 export type { FontMetrics, LineBox, LineSpacing, MeasuredCluster, ScaledFontMetrics, TextMeasurer } from '../measure/index.js';
 export {
   DEFAULT_FONT_ALIASES,
   DETERMINISTIC_SANS,
   DETERMINISTIC_SANS_LINE_BOX_RATIO,
+  FONT_MEASURER_ADVANCE_SCALE,
+  FONT_MEASURER_ID,
   SINGLE_LINE_MULTIPLE,
   atLeastSpacing,
   autoSpacing,
   combineLineBoxes,
   createDeterministicMeasurer,
+  createFontMeasurer,
   exactSpacing,
   lineBoxOf,
   lineHeightOf,
@@ -201,6 +205,7 @@ export type { TableBorderDeclarations } from './table-borders.js';
 export {
   DEFAULT_BORDER_EIGHTHS,
   borderEdgeOf,
+  borderEdgeOfElement,
   borderHalf,
   borderSetOf,
   borderSideOf,
@@ -211,6 +216,7 @@ export {
   resolveBorder,
   resolveEdge,
   shadingOf,
+  shadingOfElement,
   tableBordersOf,
 } from './table-borders.js';
 

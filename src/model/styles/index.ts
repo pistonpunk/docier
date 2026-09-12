@@ -13,7 +13,7 @@ export type { LatentStyleException } from './styles-part.js';
 export { StylesPart } from './styles-part.js';
 
 export type { CascadeLayer, CascadeOrigin, ResolvedEntry } from './resolved.js';
-export { ResolvedProperties, resolvedPropertiesOf } from './resolved.js';
+export { ResolvedProperties, ResolvedTableProperties, resolvedPropertiesOf } from './resolved.js';
 
 export type {
   CellPosition,
@@ -27,13 +27,18 @@ export type {
   RunCascadeLevel,
   RunCascadeLevelId,
   RunResolutionInput,
+  TableCascadeLevel,
+  TableCascadeLevelId,
   TableLookFlags,
+  TablePropertyKind,
+  TableResolutionInput,
   TableStyleContext,
 } from './cascade.js';
 export {
   NUMBER_RUN_CASCADE,
   PARAGRAPH_CASCADE,
   RUN_CASCADE,
+  TABLE_CASCADE,
   TABLE_CONDITION_PRECEDENCE,
   StyleResolver,
   ancestorOfKind,

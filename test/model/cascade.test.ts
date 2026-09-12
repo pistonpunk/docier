@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Paragraph } from '../../src/model/blocks/paragraph.js';
-import type { Table } from '../../src/model/blocks/table.js';
-import { removeElement, removeWAttr, setWAttr } from '../../src/model/index.js';
+import type { Table, TableCell } from '../../src/model/blocks/table.js';
+import { removeElement, removeWAttr, setWAttr, wAttr } from '../../src/model/index.js';
 import { childElement } from './support.js';
 import {
   numberingRelationship,
@@ -394,6 +394,107 @@ describe('table style layer', () => {
     expect(run.bold).toBeUndefined();
     expect(run.italic).toBe(true);
     expect(model.resolveParagraphProperties(paragraph).justification).toBe('center');
+  });
+});
+
+describe('table property cascade', () => {
+  const TABLE_PROPERTY_STYLES = stylesXml(
+    '<w:style w:type="table" w:styleId="Grid"><w:name w:val="Grid"/>' +
+      '<w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:color="000000"/>' +
+      '<w:insideV w:val="single" w:sz="4" w:color="000000"/></w:tblBorders>' +
+      '<w:jc w:val="center"/><w:tblCellMar><w:left w:w="144" w:type="dxa"/></w:tblCellMar></w:tblPr>' +
+      '<w:tblStylePr w:type="firstRow"><w:tcPr><w:tcBorders>' +
+      '<w:bottom w:val="single" w:sz="24" w:color="000000"/></w:tcBorders>' +
+      '<w:shd w:val="clear" w:color="auto" w:fill="D9E2F3"/></w:tcPr></w:tblStylePr>' +
+      '</w:style>',
+  );
+
+  const TWO_ROWS =
+    '<w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid>' +
+    '<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc></w:tr>' +
+    '<w:tr><w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr>';
+
+  const styledTable = (properties: string): string =>
+    `<w:tbl><w:tblPr>${properties}</w:tblPr>${TWO_ROWS}</w:tbl>`;
+
+  const openTable = async (body: string) => {
+    const model = await openModel({
+      body,
+      styles: TABLE_PROPERTY_STYLES,
+      documentRelationships: [stylesRelationship()],
+    });
+    const table = model.tables()[0];
+    if (table === undefined) throw new Error('no table');
+    return { model, table };
+  };
+
+  it('resolves table properties the named style declares', async () => {
+    const { model, table } = await openTable(styledTable('<w:tblStyle w:val="Grid"/>'));
+    const resolved = model.resolveTableProperties(table);
+    expect(resolved.properties.justification).toBe('center');
+    expect(resolved.properties.describe('jc')).toBe('style:Grid');
+    expect(wAttr(resolved.element(['tblBorders', 'top']) ?? table.element, 'sz')).toBe('4');
+    expect(wAttr(resolved.element(['tblCellMar', 'left']) ?? table.element, 'w')).toBe('144');
+    expect(resolved.element(['tblBorders', 'bottom'])).toBeUndefined();
+  });
+
+  it('lets a direct declaration beat the style one edge at a time', async () => {
+    const { model, table } = await openTable(
+      styledTable(
+        '<w:tblStyle w:val="Grid"/><w:tblBorders><w:top w:val="double" w:sz="24" w:color="FF0000"/></w:tblBorders>',
+      ),
+    );
+    const resolved = model.resolveTableProperties(table);
+    const top = resolved.element(['tblBorders', 'top']);
+    expect(wAttr(top ?? table.element, 'val')).toBe('double');
+    expect(wAttr(top ?? table.element, 'sz')).toBe('24');
+    expect(resolved.properties.describe('jc')).toBe('style:Grid');
+    expect(wAttr(resolved.element(['tblBorders', 'insideV']) ?? table.element, 'sz')).toBe('4');
+  });
+
+  it('applies a conditional format to the cells the tblLook selects', async () => {
+    const { model, table } = await openTable(styledTable('<w:tblStyle w:val="Grid"/><w:tblLook w:firstRow="1"/>'));
+    const firstRow = model.resolveCellProperties(table.rows()[0]?.cells()[0] as TableCell);
+    const bottom = firstRow.element(['tcBorders', 'bottom']);
+    expect(wAttr(bottom ?? table.element, 'sz')).toBe('24');
+    expect(firstRow.properties.describe('shd')).toBe('table-style:firstRow');
+    expect(wAttr(firstRow.element(['shd']) ?? table.element, 'fill')).toBe('D9E2F3');
+    const secondRow = model.resolveCellProperties(table.rows()[1]?.cells()[0] as TableCell);
+    expect(secondRow.element(['tcBorders', 'bottom'])).toBeUndefined();
+    expect(secondRow.properties.describe('shd')).toBeUndefined();
+  });
+
+  it('lets a direct cell border beat the conditional one', async () => {
+    const { model, table } = await openTable(
+      `<w:tbl><w:tblPr><w:tblStyle w:val="Grid"/><w:tblLook w:firstRow="1"/></w:tblPr>` +
+        '<w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid>' +
+        '<w:tr><w:tc><w:tcPr><w:tcBorders><w:bottom w:val="single" w:sz="8" w:color="008000"/></w:tcBorders></w:tcPr>' +
+        '<w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc></w:tr></w:tbl>',
+    );
+    const resolved = model.resolveCellProperties(table.rows()[0]?.cells()[0] as TableCell);
+    const bottom = resolved.element(['tcBorders', 'bottom']);
+    expect(wAttr(bottom ?? table.element, 'sz')).toBe('8');
+    expect(wAttr(bottom ?? table.element, 'color')).toBe('008000');
+  });
+
+  it('resolves a nested table against its own style', async () => {
+    const { model, table } = await openTable(
+      '<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="4000"/></w:tblPr>' +
+        '<w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid>' +
+        `<w:tr><w:tc>${styledTable('<w:tblStyle w:val="Grid"/>')}</w:tc></w:tr></w:tbl>`,
+    );
+    const inner = table.rows()[0]?.cells()[0]?.blocks()[0] as Table | undefined;
+    if (inner === undefined) throw new Error('no nested table');
+    expect(wAttr(model.resolveTableProperties(inner).element(['tblBorders', 'top']) ?? inner.element, 'sz')).toBe('4');
+    expect(model.resolveTableProperties(table).element(['tblBorders', 'top'])).toBeUndefined();
+  });
+
+  it('leaves a table with no style untouched', async () => {
+    const { model, table } = await openTable(styledTable('<w:jc w:val="right"/>'));
+    const resolved = model.resolveTableProperties(table);
+    expect(resolved.properties.describe('jc')).toBe('table');
+    expect(resolved.element(['tblBorders', 'top'])).toBeUndefined();
+    expect(resolved.properties.describe('shd')).toBeUndefined();
   });
 });
 

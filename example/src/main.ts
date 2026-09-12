@@ -3,7 +3,13 @@ import './styles.css';
 import { createEditor, ui } from 'docier';
 import type { Diagnostic, EditorHandle, LayoutEnd } from 'docier';
 import { exportPdf } from 'docier/pdf';
-import { DEFAULT_FONT_ALIASES, DETERMINISTIC_SANS, createDeterministicMeasurer } from 'docier/layout';
+import type { TextMeasurer } from 'docier/layout';
+import {
+  DEFAULT_FONT_ALIASES,
+  DETERMINISTIC_SANS,
+  createDeterministicMeasurer,
+  createFontMeasurer,
+} from 'docier/layout';
 
 import { createPanel } from './diagnostics';
 import type { Severity } from './diagnostics';
@@ -61,10 +67,10 @@ const busy = (id: string, value: boolean): void => {
 
 const fontAliases: readonly string[] = [...DEFAULT_FONT_ALIASES, DETERMINISTIC_SANS.family, 'Symbol'];
 
-registerScreenFonts(fontAliases);
-
 const fonts = await loadFonts();
 const plan = buildFontPlan(fonts, fontAliases);
+
+registerScreenFonts(fonts, fontAliases);
 
 panel.add({
   code: 'host.fonts',
@@ -74,15 +80,30 @@ panel.add({
   source: 'example/src/fonts.ts',
 });
 
-const measurer = createDeterministicMeasurer();
+const measurer: TextMeasurer =
+  plan.faces.length === 0
+    ? createDeterministicMeasurer()
+    : createFontMeasurer({ faces: plan.faces, fallbackFamily: 'DejaVu Sans' });
+
+panel.add({
+  code: 'host.measurer',
+  severity: plan.faces.length === 0 ? 'error' : 'info',
+  message: `layout and PDF measure with ${measurer.id} over ${String(plan.faces.length)} face(s)`,
+  detail:
+    plan.faces.length === 0
+      ? 'no font bytes reached the measurer, so the built-in advance model is in use and runs will not match the painted text'
+      : 'the measured widths come from the same bytes the screen @font-face rules serve, so layout slots and painted runs agree',
+  source: 'example/src/main.ts',
+});
 
 let handle: EditorHandle;
 try {
   handle = createEditor(
     host,
     {
-      // ui.chrome is a reload key: it must be set here, it cannot be applied later.
+      // ui.chrome and layout.measurer are reload keys: they must be set here, they cannot be applied later.
       ui: { chrome: 'full', ariaLabel: 'docier demo document' },
+      layout: { measurer },
       document: { docId: 'docier-demo', autoFocus: true },
       permissions: { readOnly: false, allow: [], regionEnforcement: false },
       export: { fontMissing: 'fallback' },
@@ -444,5 +465,7 @@ panel.add({
   detail: `ui.chrome is a reload key — it is set in the createEditor patch, not in updateConfig(). Slots still unclaimed: ${chrome?.remaining().join(', ') ?? 'n/a'}`,
   source: 'example/src/main.ts',
 });
+
+(window as unknown as { docierDemo?: unknown }).docierDemo = { handle, measurer, plan };
 
 await fetchInto('sample.docx', 'sample.docx');

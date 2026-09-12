@@ -4,7 +4,7 @@ import { asciiBytes } from '../bytes.js';
 import { PdfArray, PdfDict, PdfName, PdfRef, pdfDict, pdfLiteral, pdfStream } from '../objects.js';
 import type { PdfWriter } from '../objects.js';
 import type { PdfValue } from '../objects.js';
-import type { Sfnt } from './sfnt.js';
+import type { Sfnt } from '../../sfnt/sfnt.js';
 import { subsetTrueType } from './subset.js';
 import { sha256 } from '../../ooxml/sha256.js';
 

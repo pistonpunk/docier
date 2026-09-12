@@ -1,7 +1,8 @@
 import type { HalfPoint, Twip } from '../../units/index.js';
 import { halfPoint, twip } from '../../units/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
-import { integerFrom, isOn } from '../xml.js';
+import { findOrderedChild } from '../schema-order.js';
+import { integerFrom, isOn, wAttr } from '../xml.js';
 import type { PropertyEntry } from '../properties/property-keys.js';
 import { entriesOf, propertyKey } from '../properties/property-keys.js';
 
@@ -13,7 +14,9 @@ export type CascadeLayer =
   | 'paragraphStyle'
   | 'paragraphMark'
   | 'characterStyle'
-  | 'run';
+  | 'run'
+  | 'table'
+  | 'tableCell';
 
 export interface CascadeOrigin {
   readonly layer: CascadeLayer;
@@ -437,3 +440,31 @@ export const resolvedPropertiesOf = (
   resolved.applyContainer(container, origin);
   return resolved;
 };
+
+export class ResolvedTableProperties {
+  private readonly layers: readonly (XmlElement | undefined)[];
+  readonly properties: ResolvedProperties;
+
+  constructor(layers: readonly (XmlElement | undefined)[], properties: ResolvedProperties) {
+    this.layers = layers;
+    this.properties = properties;
+  }
+
+  element(path: readonly string[]): XmlElement | undefined {
+    for (let index = this.layers.length - 1; index >= 0; index -= 1) {
+      let current = this.layers[index];
+      for (const name of path) {
+        if (current === undefined) break;
+        current = findOrderedChild(current, name);
+      }
+      if (current !== undefined) return current;
+    }
+    return undefined;
+  }
+
+  attribute(path: readonly string[], attribute: string): string | undefined {
+    const element = this.element(path);
+    return element === undefined ? undefined : wAttr(element, attribute);
+  }
+}
+

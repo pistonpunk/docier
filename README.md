@@ -154,9 +154,59 @@ top-level await. There are no polyfills for older browsers.
 you, but it means text will not render correctly until you wire up the fonts your documents use. See
 `docs/` for the requirement.
 
+### The font integration contract
+
+Layout happens before paint and without a browser, so the engine cannot ask a font file how wide a run
+is. It measures through a `TextMeasurer`, and the widths it returns are the widths the renderer has to
+produce. That makes three things your responsibility, and they have to agree with each other:
+
+1. **Supply the face bytes.** Read the TTF or OTF files you are licensed to serve, keyed by the family
+   names and the four styles (regular, bold, italic, bold italic) the documents actually ask for.
+2. **Register screen faces for every document family name.** The browser paints with fonts resolved from
+   CSS, so a family the page does not know falls back to something else and the painted run will not be
+   the width the engine reserved. A document asks for `Calibri`, `Times New Roman` or `Arial`, not for
+   the name of the file you happen to ship. Declare only the styles you can actually serve: a `@font-face`
+   with no file behind it makes the browser substitute a font the measurer never saw, which is worse than
+   leaving the style out and letting the family's regular face answer for it.
+3. **Build the measurer from the same bytes.** `createFontMeasurer({ faces })` takes `{ family, bold,
+   italic, bytes }` records and returns a `TextMeasurer` that reads real `hmtx` advances and `cmap`
+   coverage, segments text exactly like the built-in model (combining marks and variation selectors stay
+   with their base), and reports a face id the PDF exporter can verify against the font it embeds. Pass
+   it as `layout.measurer`:
+
+   ```ts
+   import { createEditor, createFontMeasurer } from 'docier';
+
+   const measurer = createFontMeasurer({
+     faces: [
+       { family: 'Calibri', bold: false, italic: false, bytes: regularBytes },
+       { family: 'Calibri', bold: true, italic: false, bytes: boldBytes },
+     ],
+     fallbackFamily: 'Calibri',
+   });
+
+   const handle = createEditor(host, { layout: { measurer }, /* ... */ });
+   ```
+
+`layout.measurer` is a reload key, so setting a different measurer lays the document out again with it;
+`updateConfig({ layout: { measurer: other } })` takes effect on the next layout rather than mutating the
+painted page in place.
+
+If no measurer is supplied the engine falls back to a deterministic advance model, which is legible in
+tests but is not a font: real faces are 14 to 30 percent wider, so with that model adjacent runs overlap
+and right-aligned text runs past the margin. That is the failure you see when only the screen `@font-face`
+rules were wired up.
+
+Check that what you fetched really is a font. A development server that answers a missing file with its
+own HTML page returns `200 OK` and markup, and font bytes are parsed rather than trusted, so a placeholder
+page in the place of a face is an error rather than a silent fallback.
+
+The full worked example is the demo host in `example/src/fonts.ts` and `example/src/main.ts`: it loads the
+faces, registers the screen aliases, and hands the same bytes to `createFontMeasurer`.
+
 ## Status
 
-Version 0.x. Under active development, CI on every push, 1,100+ assertions.
+Version 0.x. Under active development, CI on every push, 1,200+ assertions.
 
 **Working:** everything listed under "What it handles".
 

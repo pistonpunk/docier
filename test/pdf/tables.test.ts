@@ -6,7 +6,9 @@ import { paintScale } from '../../src/render/scale.js';
 import { formatNumber } from '../../src/pdf/content.js';
 import { pdfFrame, pdfRect } from '../../src/pdf/geometry.js';
 import type { Rect } from '../../src/layout/index.js';
+import { layoutDocument } from '../../src/layout/index.js';
 import { exportPdf } from '../../src/pdf/index.js';
+import { openModel, stylesRelationship, stylesXml } from '../model/support.js';
 import {
   BORDERS,
   BORDER_WIDTH_MP,
@@ -47,6 +49,19 @@ const render = async (body: string) => {
 
 const rectCommand = (rect: { x: number; y: number; width: number; height: number }, operator: string): string =>
   `${formatNumber(rect.x)} ${formatNumber(rect.y)} ${formatNumber(rect.width)} ${formatNumber(rect.height)} re ${operator}`;
+
+const renderStyled = async (body: string, styles: string) => {
+  const model = await openModel({
+    body: sampleBody(body),
+    styles,
+    documentRelationships: [stylesRelationship()],
+  });
+  const result = await layoutDocument(model, { measurer: font.measurer });
+  const exported = await exportPdf(result, fontOptions(font));
+  const page = result.pages[0];
+  if (page === undefined) throw new Error('the layout result has no first page');
+  return { result, exported, page, frame: pdfFrame(page), content: await contentStreamOf(exported.bytes) };
+};
 
 describe('a table the layout result places', () => {
   it('fills a shaded cell at the same point the DOM painter would', async () => {
@@ -138,5 +153,28 @@ describe('a table the layout result places', () => {
     expect(top(first.box)).toBeGreaterThan(top(second.box));
     const rows = content.split('\n').filter((line) => line.endsWith(' re f'));
     expect(rows.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('fills the border a table style declares', async () => {
+    const styles = stylesXml(
+      '<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:tblPr>' +
+        '<w:tblBorders><w:top w:val="single" w:sz="8" w:color="000000"/>' +
+        '<w:left w:val="single" w:sz="8" w:color="000000"/><w:bottom w:val="single" w:sz="8" w:color="000000"/>' +
+        '<w:right w:val="single" w:sz="8" w:color="000000"/><w:insideH w:val="single" w:sz="8" w:color="000000"/>' +
+        '<w:insideV w:val="single" w:sz="8" w:color="000000"/></w:tblBorders></w:tblPr></w:style>',
+    );
+    const body = table('<w:tblStyle w:val="TableGrid"/>', grid([500, 500]), [
+      row('', [cell('', para('aa')), cell('', para('bb'))]),
+    ]);
+    const { result, frame, content } = await renderStyled(body, styles);
+    const cellFragment = cellOn(rowOn(tableOn(result, 0), 0), 0);
+    expect(cellFragment).toBeDefined();
+    if (cellFragment === undefined) return;
+    const top = cellFragment.borders.top;
+    expect(top?.width).toBe(BORDER_WIDTH_MP);
+    if (top === undefined || top.width === undefined) return;
+    const rect = pdfRect(frame, edgeBandOf(cellFragment.box, 'top', top.width));
+    expect(content).toContain(rectCommand(rect, 'f'));
+    expect(content).toContain('0 0 0 rg');
   });
 });

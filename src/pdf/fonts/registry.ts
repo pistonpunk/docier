@@ -11,7 +11,7 @@ import { PdfError } from '../errors.js';
 import { throwIfAborted } from '../abort.js';
 import type { Compressor } from '../stream.js';
 import type { PdfRef, PdfWriter } from '../objects.js';
-import { Sfnt } from './sfnt.js';
+import { Sfnt } from '../../sfnt/sfnt.js';
 import { embedFont, licenceOf } from './embed.js';
 import type { FaceIdentity } from './advance.js';
 import { identitiesAgree, identityOfFont, parseFaceId } from './advance.js';
@@ -173,11 +173,14 @@ export class FontRegistry {
       font = new Sfnt(face.bytes);
     } catch (error) {
       this.byKey.set(key, null);
-      if (policy === 'fail') throw error;
+      const detail = error instanceof Error ? error.message : String(error);
+      if (policy === 'fail') {
+        throw new PdfError(detail, { code: 'PDF_FONT_UNREADABLE', detail });
+      }
       this.reportLoss({
         code: 'missingFont',
         message: `the font supplied for ${paint.requestedFamily} could not be read`,
-        detail: error instanceof Error ? error.message : String(error),
+        detail,
       });
       return;
     }
