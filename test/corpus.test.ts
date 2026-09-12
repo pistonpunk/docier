@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { DocxPackage } from '../src/ooxml/index.js';
+import {
+  createPinnedDeflateBackend,
+  inflateRawWithLimit,
+  resolveDeflateBackend,
+} from '../src/ooxml/zip/index.js';
+
 import { ALL_FIXTURE_FILES, BROKEN_CORPUS, CORPUS, fixtureBytes } from './harness/corpus.js';
 import { crc32Of } from './harness/zip-build.js';
 import { readZipMembers } from './harness/zip-read.js';
@@ -173,5 +180,69 @@ describe('fixture archives', () => {
       const stored = ALL_FIXTURE_FILES.find((file) => file.name === fixture.name)?.bytes;
       expect(sameBytes(fixtureBytes(fixture), stored ?? new Uint8Array(0)), fixture.name).toBe(true);
     }
+  });
+});
+
+const fixtureNamed = (name: string): Uint8Array =>
+  ALL_FIXTURE_FILES.find((file) => file.name === name)?.bytes ?? new Uint8Array(0);
+
+describe('pinned DEFLATE', () => {
+  it('resolves to a pinned backend by default and compresses identically every time', async () => {
+    const resolution = resolveDeflateBackend();
+    expect(resolution.deterministic).toBe(true);
+    expect(resolution.backend.flavour).toBe('pinned');
+    const input = fixtureNamed('minimal.docx');
+    const first = await resolution.backend.deflateRaw(input);
+    const second = await resolution.backend.deflateRaw(input);
+    expect(sameBytes(first, second)).toBe(true);
+    expect(sameBytes(await resolution.backend.inflateRaw(first), input)).toBe(true);
+  });
+
+  it('reproduces the committed minimal.docx and every deflate stream inside it', async () => {
+    const backend = createPinnedDeflateBackend();
+    expect(backend.flavour).toBe('pinned');
+    const committed = readFileSync(join(fixturesDirectory, 'minimal.docx'));
+    expect(sameBytes(committed, fixtureNamed('minimal.docx')), 'minimal.docx is stale').toBe(true);
+    const members = readZipMembers(committed);
+    expect(members.length).toBeGreaterThan(0);
+    for (const member of members) {
+      if (member.method !== 8) continue;
+      const recompressed = await backend.deflateRaw(member.bytes);
+      expect(sameBytes(recompressed, member.compressed), `${member.name} deflate stream`).toBe(true);
+    }
+  });
+
+  it('bounds decompression and reports corrupt streams through the pinned backend', async () => {
+    const backend = createPinnedDeflateBackend();
+    const input = new Uint8Array(8192).fill(65);
+    const deflated = await backend.deflateRaw(input);
+    expect(sameBytes(await inflateRawWithLimit(backend, deflated, 8192), input)).toBe(true);
+    await expect(inflateRawWithLimit(backend, deflated, 4096)).rejects.toMatchObject({
+      code: 'DOCUMENT_TOO_LARGE',
+    });
+    const corrupt = deflated.slice();
+    for (let index = 2; index < corrupt.byteLength; index += 1) corrupt[index] = 0x5a;
+    await expect(backend.inflateRaw(corrupt)).rejects.toMatchObject({ code: 'ZIP_MALFORMED' });
+    await expect(inflateRawWithLimit(backend, corrupt, 8192)).rejects.toMatchObject({
+      code: 'ZIP_MALFORMED',
+    });
+  });
+
+  it('saves without a nondeterministicCompression diagnostic by default', async () => {
+    const bytes = fixtureNamed('minimal.docx');
+    const pkg = await DocxPackage.open(bytes);
+    await pkg.save();
+    expect(pkg.diagnosticsReport().filter((entry) => entry.code === 'nondeterministicCompression')).toEqual(
+      [],
+    );
+  });
+
+  it('reports the diagnostic when the native compressor is requested', async () => {
+    const bytes = fixtureNamed('minimal.docx');
+    const pkg = await DocxPackage.open(bytes);
+    await pkg.save({ flavour: 'native' });
+    expect(pkg.diagnosticsReport().map((entry) => entry.code)).toContain(
+      'nondeterministicCompression',
+    );
   });
 });

@@ -1,3 +1,5 @@
+import { Inflate, deflateSync, inflateSync } from 'fflate';
+
 import { concatBytes } from '../bytes.js';
 import { DocierError } from '../errors.js';
 
@@ -135,6 +137,58 @@ export const createPlatformDeflateBackend = (): DeflateBackend | undefined => {
   };
 };
 
+const INFLATE_CHUNK_BYTES = 1 << 15;
+
+const inflateBounded = (data: Uint8Array, maxBytes: number): Uint8Array => {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const inflater = new Inflate((chunk) => {
+    total += chunk.byteLength;
+    if (total > maxBytes) throw limitExceeded(maxBytes);
+    chunks.push(chunk);
+  });
+  try {
+    if (data.byteLength === 0) inflater.push(data, true);
+    for (let offset = 0; offset < data.byteLength; offset += INFLATE_CHUNK_BYTES) {
+      const end = Math.min(offset + INFLATE_CHUNK_BYTES, data.byteLength);
+      inflater.push(data.subarray(offset, end), end === data.byteLength);
+    }
+  } catch (error) {
+    if (error instanceof DocierError) throw error;
+    throw new DocierError(`Raw DEFLATE failed: ${String(error)}`, {
+      code: 'ZIP_MALFORMED',
+      cause: error,
+    });
+  }
+  return concatBytes(chunks);
+};
+
+export const createPinnedDeflateBackend = (): DeflateBackend => ({
+  name: 'fflate',
+  flavour: 'pinned',
+  deflateRaw: async (data) => {
+    try {
+      return deflateSync(data, { level: DEFLATE_LEVEL });
+    } catch (error) {
+      throw new DocierError(`Raw DEFLATE failed: ${String(error)}`, {
+        code: 'UNSUPPORTED_COMPRESSION',
+        cause: error,
+      });
+    }
+  },
+  inflateRaw: async (data) => {
+    try {
+      return inflateSync(data);
+    } catch (error) {
+      throw new DocierError(`Raw DEFLATE failed: ${String(error)}`, {
+        code: 'ZIP_MALFORMED',
+        cause: error,
+      });
+    }
+  },
+  inflateRawBounded: async (data, maxBytes) => inflateBounded(data, maxBytes),
+});
+
 export const inflateRawWithLimit = async (
   backend: DeflateBackend,
   data: Uint8Array,
@@ -163,16 +217,23 @@ export const getDeflateBackend = (): DeflateBackend => {
 };
 
 let pinnedBackend: DeflateBackend | undefined;
+let builtinPinnedBackend: DeflateBackend | undefined;
 
 export const setPinnedDeflateBackend = (backend: DeflateBackend | undefined): void => {
   pinnedBackend = backend;
 };
 
-export const getPinnedDeflateBackend = (): DeflateBackend | undefined => pinnedBackend;
+export const getPinnedDeflateBackend = (): DeflateBackend => {
+  const injected = pinnedBackend;
+  if (injected !== undefined) return injected;
+  builtinPinnedBackend ??= createPinnedDeflateBackend();
+  return builtinPinnedBackend;
+};
 
 export const resolveDeflateBackend = (flavour: DeflateFlavour = 'pinned'): DeflateResolution => {
-  if (flavour === 'pinned' && pinnedBackend !== undefined) {
-    return { backend: pinnedBackend, deterministic: pinnedBackend.flavour === 'pinned' };
+  if (flavour === 'pinned') {
+    const pinned = getPinnedDeflateBackend();
+    return { backend: pinned, deterministic: pinned.flavour === 'pinned' };
   }
   const platform = getDeflateBackend();
   return { backend: platform, deterministic: platform.flavour === 'pinned' };

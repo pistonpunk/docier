@@ -1,4 +1,6 @@
-import { deflateRawSync } from 'node:zlib';
+import { deflateSync } from 'fflate';
+
+import { DEFLATE_LEVEL } from '../../src/ooxml/zip/deflate.js';
 
 export interface FixtureEntry {
   readonly name: string;
@@ -89,7 +91,7 @@ export const buildZip = (entries: readonly FixtureEntry[]): Uint8Array => {
     const rawName = utf8.encode(entry.name);
     const compressed = entry.store
       ? entry.bytes
-      : new Uint8Array(deflateRawSync(entry.bytes, { level: 6 }));
+      : deflateSync(entry.bytes, { level: DEFLATE_LEVEL });
     const method = entry.store ? 0 : 8;
     const flags = hasNonAscii(rawName) ? 0x0800 : 0;
     const crc = crc32Of(entry.bytes);

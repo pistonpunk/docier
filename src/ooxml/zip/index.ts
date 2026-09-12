@@ -35,10 +35,12 @@ export type { DeflateBackend, DeflateFlavour, DeflateResolution } from './deflat
 export {
   DEFLATE_LEVEL,
   RAW_DEFLATE_FORMAT,
+  createPinnedDeflateBackend,
   createPlatformDeflateBackend,
   getDeflateBackend,
   getPinnedDeflateBackend,
   hasPlatformDeflateSupport,
+  inflateRawWithLimit,
   resolveDeflateBackend,
   setPinnedDeflateBackend,
 } from './deflate.js';
