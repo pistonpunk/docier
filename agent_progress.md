@@ -404,3 +404,29 @@ of `commands.list()` for enablement and `commands.execute()` for dispatch, then 
 `editCommandIds` are registered and none is declared-but-unimplemented; the empty areas a toolbar will
 reach for are `insert`, `table`, `clipboard`, `view` and `style`, which `COMMAND_AREAS` reserves but
 nothing registers into yet.
+
+## Diagnosed defect: a table column can be allocated less than its own content
+
+Found by measuring the sample document in a browser. The table's first column is
+62px wide while its header text "Column" needs 64px, so the text overflows into
+the next cell and the header prints as "ColumnEvidence".
+
+Cause, with the line references:
+
+- `src/layout/table-prepare.ts:344` sets `boxWidth` from the resolved column
+  widths, so the algorithm's numbers are **cell box** widths.
+- `src/layout/table-prepare.ts:350` computes `contentWidth` as
+  `boxWidth - margins.left - margins.right - halfLeft - halfRight`, so the
+  margins are subtracted from the box.
+- `src/layout/table-prepare.ts` `cellIntrinsic` derives `min` and `preferred`
+  from the cell's paragraphs only, and never adds `cell.margins`. The requirement
+  therefore describes the content, while it is compared against a box.
+
+The fix is to add `cell.margins.left + cell.margins.right` to both `min` and
+`preferred` in `cellIntrinsic`. It was written and it resolves the overflow, but
+it moves the numbers in four cases of `test/layout/table-columns.test.ts` and
+those expectations were not re-derived, so the change was reverted rather than
+committed with numbers taken from observed output. Do it properly: re-derive each
+expectation as content + padding, and confirm the sample's first column allocates
+78px so its 64px of text fits.
+
