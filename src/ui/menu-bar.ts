@@ -223,7 +223,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
       button.tabIndex = id === active ? 0 : -1;
       const contextual = CONTEXTUAL_TAB_SURFACE[id];
       const visible =
-        contextual === undefined || context.state.surface === CONTEXTUAL_TAB_SURFACE[id];
+        contextual === undefined || context.state.caretSurface === CONTEXTUAL_TAB_SURFACE[id];
       button.hidden = !visible;
     }
   };

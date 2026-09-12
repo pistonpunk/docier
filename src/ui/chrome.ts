@@ -662,6 +662,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       save: queries.save(),
       language: queries.language(),
       selectionEmpty: queries.selectionEmpty(),
+      caretSurface: queries.caretSurface(),
     });
   }
 

@@ -52,6 +52,7 @@ export interface ChromeState {
   readonly save: SaveState;
   readonly language: string | undefined;
   readonly surface: ContextSurface | null;
+  readonly caretSurface: 'table' | 'image' | null;
   readonly selectionEmpty: boolean;
   readonly rulerVisible: boolean;
   readonly units: RulerUnit;

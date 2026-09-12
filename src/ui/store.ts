@@ -67,6 +67,7 @@ const BASE_STATE: ChromeState = {
   save: 'saved',
   language: undefined,
   surface: null,
+  caretSurface: null,
   selectionEmpty: true,
   rulerVisible: false,
   units: 'cm',

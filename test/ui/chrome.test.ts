@@ -4,6 +4,7 @@ import { mountChrome } from '../../src/ui/chrome.js';
 import type { ChromeHandle } from '../../src/ui/chrome.js';
 import { editorWith, disposeEditors } from '../api/support.js';
 import { bodyOf, chromeOf, click, disposeChromes, longBody, paragraphText } from './support.js';
+import { contentRun, paragraphOf, text } from '../layout/support.js';
 
 const extra: ChromeHandle[] = [];
 
@@ -177,17 +178,36 @@ describe('state', () => {
     expect(chrome.menuBar!.ribbon.getAttribute('data-docier-collapsed')).toBe('collapsed');
   });
 
-  it('shows a contextual tab only for the matching surface', async () => {
-    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+  it('shows a contextual tab only while the caret is in that context', async () => {
+    const { chrome, handle } = await mountWith(
+      bodyOf(
+        '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>',
+        paragraphOf('', contentRun('', text('after the table'))),
+      ),
+      { mode: 'full' },
+    );
     const table = chrome.menuBar!.tablist.querySelector<HTMLElement>('[data-docier-tab="table"]');
     const picture = chrome.menuBar!.tablist.querySelector<HTMLElement>('[data-docier-tab="picture"]');
-    expect(table!.hidden).toBe(true);
     expect(picture!.hidden).toBe(true);
-    chrome.store.set({ surface: 'table' });
+
+    const cell = handle.session!.slots().find((slot) => slot.cell !== undefined);
+    if (cell === undefined) throw new Error('no cell slot');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: cell.start });
+    await handle.whenReady();
     expect(table!.hidden).toBe(false);
-    expect(picture!.hidden).toBe(true);
-    chrome.store.set({ surface: 'image' });
-    expect(picture!.hidden).toBe(false);
+
+    const body = handle.session!.slots().find((slot) => slot.cell === undefined);
+    if (body === undefined) throw new Error('no body slot');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: body.start });
+    await handle.whenReady();
+    expect(table!.hidden).toBe(true);
+  });
+
+  it('does not latch a contextual tab on from a context menu', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    const table = chrome.menuBar!.tablist.querySelector<HTMLElement>('[data-docier-tab="table"]');
+    expect(table!.hidden).toBe(true);
+    chrome.store.set({ surface: 'table' });
     expect(table!.hidden).toBe(true);
   });
 });

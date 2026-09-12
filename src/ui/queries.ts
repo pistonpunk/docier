@@ -16,6 +16,7 @@ export interface EditorQueries {
   readonly save: () => SaveState;
   readonly language: () => string | undefined;
   readonly selectionEmpty: () => boolean;
+  readonly caretSurface: () => 'table' | 'image' | null;
   readonly surface: () => ContextSurface | null;
   setSurface(value: ContextSurface | null): void;
   readonly indents: () => RulerIndents | undefined;
@@ -99,6 +100,12 @@ export const createEditorQueries = (
     save: () => save,
     language: () => options?.language?.() ?? handle.config.locale,
     selectionEmpty: () => handle.selection.anchor === handle.selection.focus,
+    caretSurface: () => {
+      const session = handle.session;
+      if (session === undefined) return null;
+      const resolved = session.resolve(session.index.clamp(handle.selection.focus));
+      return resolved !== undefined && resolved.slot.cell !== undefined ? 'table' : null;
+    },
     surface: () => surface,
     indents: () => options?.indents?.(self.page()) ?? DEFAULT_INDENTS,
     pageFragment: (index) => handle.layout?.pages[index],
@@ -128,6 +135,7 @@ export const NO_QUERIES: EditorQueries = {
   save: () => 'saved',
   language: () => undefined,
   selectionEmpty: () => true,
+  caretSurface: () => null,
   surface: () => null,
   setSurface: () => {},
   indents: () => DEFAULT_INDENTS,
