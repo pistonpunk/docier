@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ContentControl } from '../../src/model/blocks/content-control.js';
 import type { Paragraph } from '../../src/model/blocks/paragraph.js';
 import type { Table } from '../../src/model/blocks/table.js';
 import type { DocumentModel } from '../../src/model/document.js';
