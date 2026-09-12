@@ -74,23 +74,27 @@ export class TableProperties {
   }
 
   get indentation(): Twip | undefined {
-    const raw = integerFrom(this.prop('tblInd').value);
+    const raw = integerFrom(this.prop('tblInd').attribute('w'));
     return raw === undefined ? undefined : (raw as Twip);
   }
 
   get cellSpacing(): Twip | undefined {
-    const raw = integerFrom(this.prop('tblCellSpacing').value);
+    const raw = integerFrom(this.prop('tblCellSpacing').attribute('w'));
     return raw === undefined ? undefined : (raw as Twip);
   }
 
   get layout(): TableLayout | undefined {
-    const raw = this.prop('tblLayout').value;
+    const raw = this.prop('tblLayout').attribute('type');
     if (raw === 'autofit' || raw === 'fixed') return raw;
     return undefined;
   }
 
   set layout(to: TableLayout | undefined) {
-    this.prop('tblLayout').value = to;
+    if (to === undefined) {
+      this.prop('tblLayout').remove();
+      return;
+    }
+    this.prop('tblLayout').setAttribute('type', to);
   }
 
   get isBidiVisual(): boolean | undefined {

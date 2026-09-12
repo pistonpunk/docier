@@ -1,4 +1,4 @@
-import { W_NAMESPACE, XML_NAMESPACE, defaultPrefixFor, xml } from '../ooxml/index.js';
+import { R_NAMESPACE, W_NAMESPACE, XML_NAMESPACE, defaultPrefixFor, xml } from '../ooxml/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
 
 export const W = W_NAMESPACE;
@@ -14,6 +14,9 @@ export const wChildren = (element: XmlElement, localName: string): readonly XmlE
 
 export const wAttr = (element: XmlElement, localName: string): string | undefined =>
   xml.getAttributeValue(element, W_NAMESPACE, localName);
+
+export const rAttr = (element: XmlElement, localName: string): string | undefined =>
+  xml.getAttributeValue(element, R_NAMESPACE, localName);
 
 export const prefixInScope = (element: XmlElement, uri: string): string => {
   let current: XmlElement | undefined = element;

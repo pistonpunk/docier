@@ -1,6 +1,6 @@
 import type { XmlElement } from '../ooxml/xml/index.js';
 import { ensureOrderedChild, findOrderedChild } from './schema-order.js';
-import { integerFrom, setWAttr, wAttr } from './xml.js';
+import { integerFrom, rAttr, setWAttr, wAttr } from './xml.js';
 import { isOn } from './xml.js';
 
 export type DocumentProtectionEdit = 'none' | 'readOnly' | 'comments' | 'trackedChanges' | 'forms';
@@ -145,12 +145,12 @@ export class SettingsPart {
 
   get attachedTemplateRelationshipId(): string | undefined {
     const element = findOrderedChild(this.root, 'attachedTemplate');
-    return element === undefined ? undefined : wAttr(element, 'id');
+    return element === undefined ? undefined : rAttr(element, 'id');
   }
 
   get documentTypeRelationshipId(): string | undefined {
     const element = findOrderedChild(this.root, 'attachedSchema');
-    return element === undefined ? undefined : wAttr(element, 'id');
+    return element === undefined ? undefined : wAttr(element, 'val');
   }
 
   compatElement(): XmlElement | undefined {

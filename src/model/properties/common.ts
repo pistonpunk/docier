@@ -121,11 +121,11 @@ export class FontProperties extends PropertyGroup {
   }
 
   get csTheme(): string | undefined {
-    return this.handle.attribute('csTheme');
+    return this.handle.attribute('cstheme');
   }
 
   set csTheme(to: string | undefined) {
-    this.handle.setAttribute('csTheme', to);
+    this.handle.setAttribute('cstheme', to);
   }
 
   get eastAsiaTheme(): string | undefined {
