@@ -12,6 +12,7 @@ export interface TextMeasurer {
   readonly fallbackFamily: string;
   has(family: string): boolean;
   metrics(family: string): FontMetrics;
+  faceId(family: string): string;
   clusters(family: string, text: string): readonly MeasuredCluster[];
 }
 

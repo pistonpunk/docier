@@ -162,7 +162,7 @@ export const layoutDocument = (
 
   for (const diagnostic of ingested.diagnostics) diagnostics.push(diagnostic);
   for (const diagnostic of tablePrepare.diagnostics) diagnostics.push(diagnostic);
-  for (const diagnostic of coverageDiagnostics(ingested.hasThemeFonts, ingested.hasFields, ingested.hasNotes, ingested.hasDrawings, ingested.hasNumbering)) {
+  for (const diagnostic of coverageDiagnostics(ingested.hasThemeFonts, ingested.hasFields, ingested.hasNotes, ingested.hasUnresolvedDrawings, ingested.hasNumbering)) {
     diagnostics.push(diagnostic);
   }
   if (sections.some((section) => section.contentBox.width <= 0)) {
@@ -193,7 +193,10 @@ export const layoutDocument = (
   const paginated = paginateFlow(flow, sections, diagnostics, {
     widowControlEnabled: options.widowControl ?? true,
   });
-  for (const paintEntry of paint.list()) hash.field(paintEntry.size);
+  for (const paintEntry of paint.list()) {
+    hash.field(paintEntry.size);
+    hash.field(paintEntry.faceId);
+  }
 
   return finalize({
     blocks: paragraphBlocks,
@@ -214,7 +217,7 @@ const coverageDiagnostics = (
   hasThemeFonts: boolean,
   hasFields: boolean,
   hasNotes: boolean,
-  hasDrawings: boolean,
+  hasUnresolvedDrawings: boolean,
   hasNumbering: boolean,
 ): readonly LayoutDiagnostic[] => {
   const out: LayoutDiagnostic[] = [];
@@ -242,11 +245,11 @@ const coverageDiagnostics = (
       docPos: undefined,
     });
   }
-  if (hasDrawings) {
+  if (hasUnresolvedDrawings) {
     out.push({
       code: 'drawingsNotLaidOut',
       severity: 'info',
-      message: 'drawings become zero-size objects and are not painted',
+      message: 'drawings without a resolvable inline extent become zero-size objects',
       docPos: undefined,
     });
   }

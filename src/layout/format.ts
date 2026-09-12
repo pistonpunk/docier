@@ -3,7 +3,8 @@ import { halfPoint, halfPointToMp, mp, twipToMp } from '../units/index.js';
 import type { LineSpacing } from '../measure/index.js';
 import { SINGLE_LINE_MULTIPLE, atLeastSpacing, autoSpacing, exactSpacing } from '../measure/index.js';
 import type { ResolvedProperties } from '../model/index.js';
-import type { Justification, TextDirection, VerticalAlign } from './types.js';
+import { emptyBorderSet } from './table-borders.js';
+import type { BorderSet, Justification, Shading, TextDirection, VerticalAlign } from './types.js';
 
 export const DEFAULT_FONT_SIZE_HALF_POINTS = 20;
 export const DEFAULT_FONT_SIZE: Mp = halfPointToMp(halfPoint(DEFAULT_FONT_SIZE_HALF_POINTS));
@@ -45,6 +46,8 @@ export interface ParagraphFormat {
   readonly widowControl: boolean;
   readonly contextualSpacing: boolean;
   readonly tabStops: readonly Mp[];
+  readonly borders: BorderSet;
+  readonly shading: Shading | undefined;
 }
 
 const twipsToMp = (value: Twip | undefined, fallback: Mp): Mp =>
@@ -146,5 +149,7 @@ export const paragraphFormatOf = (
     widowControl: resolved.widowControl ?? true,
     contextualSpacing: resolved.contextualSpacing ?? false,
     tabStops,
+    borders: emptyBorderSet(),
+    shading: undefined,
   };
 };

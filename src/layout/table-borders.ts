@@ -1,5 +1,5 @@
 import type { Mp } from '../units/index.js';
-import { eighthPoint, eighthPointToMp, mp } from '../units/index.js';
+import { eighthPoint, eighthPointToMp, mp, pointToMp, pt } from '../units/index.js';
 import type {
   BorderProperties,
   BorderSide,
@@ -47,10 +47,12 @@ export const borderEdgeOf = (properties: BorderProperties | undefined): BorderEd
   const raw = properties.style;
   if (raw === undefined || !PAINT_STYLES.has(raw)) return undefined;
   const size = properties.size;
+  const space = properties.space;
   return {
     style: raw as BorderLineStyle,
     width: size === undefined ? eighthPointToMp(eighthPoint(DEFAULT_BORDER_EIGHTHS)) : eighthPointToMp(size),
     color: properties.color,
+    space: space === undefined ? undefined : pointToMp(pt(space)),
   };
 };
 

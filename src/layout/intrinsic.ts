@@ -67,6 +67,10 @@ export const advanceAt = (
 
 export const measureAtom = (atom: Atom): MeasuredAtom => {
   const positionDependent = atom.kind === 'tab';
+  const object = atom.object;
+  if (object !== undefined) {
+    return { atom, width: object.width, offsets: [mp(0), object.width], positionDependent };
+  }
   const offsets = positionDependent ? [mp(0)] : scaledOffsets(atom);
   const width = offsets[offsets.length - 1] ?? mp(0);
   return { atom, width, offsets, positionDependent };

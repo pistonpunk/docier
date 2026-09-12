@@ -61,6 +61,25 @@ export const prepareParagraph = (
   hash.field(format.widowControl);
   hash.field(format.contextualSpacing);
   for (const stop of format.tabStops) hash.field(stop);
+  hash.field(format.borders.top?.style);
+  hash.field(format.borders.top?.width);
+  hash.field(format.borders.top?.color);
+  hash.field(format.borders.top?.space);
+  hash.field(format.borders.right?.style);
+  hash.field(format.borders.right?.width);
+  hash.field(format.borders.right?.color);
+  hash.field(format.borders.right?.space);
+  hash.field(format.borders.bottom?.style);
+  hash.field(format.borders.bottom?.width);
+  hash.field(format.borders.bottom?.color);
+  hash.field(format.borders.bottom?.space);
+  hash.field(format.borders.left?.style);
+  hash.field(format.borders.left?.width);
+  hash.field(format.borders.left?.color);
+  hash.field(format.borders.left?.space);
+  hash.field(format.shading?.fill);
+  hash.field(format.shading?.pattern);
+  hash.field(format.shading?.color);
   hash.field(markBox.height);
   hash.field(markBox.aboveBaseline);
   hash.field(markBox.belowBaseline);
@@ -69,6 +88,7 @@ export const prepareParagraph = (
     hash.field(atom.text);
     hash.field(atom.face.family);
     hash.field(atom.face.requestedFamily);
+    hash.field(atom.face.faceId);
     hash.field(atom.face.size);
     hash.field(atom.face.unitsPerEm);
     hash.field(atom.face.metrics.ascent);
@@ -86,6 +106,14 @@ export const prepareParagraph = (
     hash.field(atom.source.end);
     for (const unit of atom.units) hash.field(unit);
     for (const unit of atom.hyphen?.units ?? []) hash.field(unit);
+    hash.field(atom.object?.relationshipId);
+    hash.field(atom.object?.width);
+    hash.field(atom.object?.height);
+    hash.field(atom.object?.crop?.x);
+    hash.field(atom.object?.crop?.y);
+    hash.field(atom.object?.crop?.width);
+    hash.field(atom.object?.crop?.height);
+    hash.field(atom.object?.rotationMilliDegrees);
   }
   return { paragraph, atoms, measured: measureAtoms(atoms), markBox };
 };

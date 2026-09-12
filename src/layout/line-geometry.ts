@@ -1,9 +1,10 @@
 import type { Mp } from '../units/index.js';
 import { mp } from '../units/index.js';
 import type { LineBox } from '../measure/index.js';
+import type { Atom } from './atoms.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 import { advanceAt } from './intrinsic.js';
-import type { CaretStop, DocPos, LineRun } from './types.js';
+import type { CaretStop, DocPos, LineRun, ObjectPlacement } from './types.js';
 import { docPos } from './types.js';
 
 export interface PlacedAtom {
@@ -43,6 +44,18 @@ export const lineEndOf = (placed: readonly PlacedAtom[], offset: Mp): Mp => {
   return last === undefined ? offset : mp(last.x + last.width);
 };
 
+export const ascentOfAtom = (atom: Atom): Mp => {
+  const object = atom.object;
+  if (object !== undefined) return mp(object.height + atom.shift);
+  return mp(atom.face.lineBox.aboveBaseline + atom.shift);
+};
+
+export const descentOfAtom = (atom: Atom): Mp => {
+  const object = atom.object;
+  if (object !== undefined) return mp(Math.max(0, -atom.shift));
+  return mp(atom.face.lineBox.belowBaseline - atom.shift);
+};
+
 export const geometryOfPlaced = (
   placed: readonly PlacedAtom[],
   fallback: LineBox,
@@ -51,10 +64,9 @@ export const geometryOfPlaced = (
   let above = 0;
   let below = 0;
   for (const item of placed) {
-    const box = item.measured.atom.face.lineBox;
-    const shift = item.measured.atom.shift;
-    above = Math.max(above, box.aboveBaseline + shift);
-    below = Math.max(below, box.belowBaseline - shift);
+    const atom = item.measured.atom;
+    above = Math.max(above, ascentOfAtom(atom));
+    below = Math.max(below, descentOfAtom(atom));
   }
   if (placed.length === 0) {
     above = Math.max(above, fallback.aboveBaseline);
@@ -68,20 +80,27 @@ export const geometryOfPlaced = (
   };
 };
 
+const sameRun = (previous: LineRun, atom: Atom): boolean =>
+  previous.paint === atom.paint &&
+  previous.object === undefined &&
+  atom.object === undefined &&
+  previous.source.end === atom.source.start;
+
 export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] => {
   const runs: LineRun[] = [];
   for (const item of placed) {
     const atom = item.measured.atom;
     const previous = runs[runs.length - 1];
-    if (
-      previous !== undefined &&
-      previous.paint === atom.paint &&
-      previous.source.end === atom.source.start
-    ) {
+    const object: ObjectPlacement | undefined = atom.object;
+    if (previous !== undefined && sameRun(previous, atom)) {
       runs[runs.length - 1] = {
         paint: previous.paint,
         x: previous.x,
         width: mp(item.x + item.width - previous.x),
+        shift: mp(Math.max(previous.shift, atom.shift)),
+        ascent: mp(Math.max(previous.ascent, ascentOfAtom(atom))),
+        descent: mp(Math.max(previous.descent, descentOfAtom(atom))),
+        object: undefined,
         text: previous.text + atom.text,
         source: { start: previous.source.start, end: atom.source.end },
       };
@@ -91,6 +110,10 @@ export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] 
       paint: atom.paint,
       x: item.x,
       width: item.width,
+      shift: atom.shift,
+      ascent: ascentOfAtom(atom),
+      descent: descentOfAtom(atom),
+      object,
       text: atom.text,
       source: atom.source,
     });

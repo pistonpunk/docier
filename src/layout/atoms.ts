@@ -4,7 +4,7 @@ import type { MeasuredCluster, TextMeasurer } from '../measure/index.js';
 import type { RunFormat } from './format.js';
 import type { FontFace } from './fonts.js';
 import type { IngestedItem, IngestedParagraph } from './ingest.js';
-import type { AtomKind, DocRange, ForcedBreak } from './types.js';
+import type { AtomKind, DocRange, ForcedBreak, ObjectPlacement } from './types.js';
 import { docPos } from './types.js';
 
 export interface HyphenGlyph {
@@ -17,6 +17,7 @@ export interface Atom {
   readonly kind: AtomKind;
   readonly text: string;
   readonly face: FontFace;
+  readonly object: ObjectPlacement | undefined;
   readonly units: readonly number[];
   readonly lengths: readonly number[];
   readonly characterSpacing: Mp;
@@ -79,6 +80,7 @@ export interface AtomizeOptions {
 interface Draft {
   readonly kind: AtomKind;
   readonly text: string;
+  readonly object: ObjectPlacement | undefined;
   readonly units: readonly number[];
   readonly lengths: readonly number[];
   readonly suppressible: boolean;
@@ -128,6 +130,7 @@ export const atomize = (
       kind: draft.kind,
       text: draft.text,
       face,
+      object: draft.object,
       units: draft.units,
       lengths: draft.lengths,
       characterSpacing: format.characterSpacing,
@@ -162,15 +165,17 @@ export const atomize = (
       const base = item.docStart as number;
 
       if (item.kind !== 'text' && item.kind !== 'symbol') {
+        const replacement = item.object !== undefined;
         push(
           {
             kind: item.kind,
             text: item.text,
+            object: item.object,
             units: [],
-            lengths: [],
+            lengths: item.object === undefined ? [] : [1],
             suppressible: false,
-            breakBefore: item.kind === 'tab',
-            breakAfter: false,
+            breakBefore: item.kind === 'tab' || replacement,
+            breakAfter: replacement,
             breakHyphen: false,
             forcedBreak: item.forcedBreak,
             source: { start: item.docStart, end: docPos(base + 1) },
@@ -203,6 +208,7 @@ export const atomize = (
           {
             kind: pendingKind,
             text: pendingText.join(''),
+            object: undefined,
             units: pendingUnits,
             lengths: pendingLengths,
             suppressible: pendingSuppressible,

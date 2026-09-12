@@ -97,6 +97,7 @@ export interface IngestFlags {
   fields: boolean;
   notes: boolean;
   drawings: boolean;
+  unresolvedDrawings: boolean;
   numbering: boolean;
 }
 
@@ -389,6 +390,7 @@ export const ingestBlockList = (
       state.flags.fields = state.flags.fields || result.hasFields;
       state.flags.notes = state.flags.notes || result.hasNotes;
       state.flags.drawings = state.flags.drawings || result.hasDrawings;
+      state.flags.unresolvedDrawings = state.flags.unresolvedDrawings || result.hasUnresolvedDrawings;
       state.flags.numbering = state.flags.numbering || result.hasNumbering;
       out.push({ kind: 'paragraph', paragraph: result.paragraph });
       continue;

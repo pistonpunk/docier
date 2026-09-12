@@ -4,7 +4,9 @@ import type { RunPaint } from './types.js';
 
 const keyOf = (format: RunFormat, face: FontFace): string =>
   [
+    format.requestedFamily,
     face.family,
+    face.faceId,
     face.size,
     format.bold ? 'b' : '',
     format.italic ? 'i' : '',
@@ -34,6 +36,7 @@ export class PaintRegistry {
     this.items.push({
       requestedFamily: format.requestedFamily,
       family: face.family,
+      faceId: face.faceId,
       size: face.size,
       bold: format.bold,
       italic: format.italic,

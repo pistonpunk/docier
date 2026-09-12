@@ -24,8 +24,10 @@ export type {
   LayoutResult,
   LineFragment,
   LineRun,
+  ObjectPlacement,
   PageFragment,
   PageKind,
+  PageOrigin,
   Rect,
   RowFragment,
   RunPaint,
@@ -89,7 +91,7 @@ export { deepFreeze } from './freeze.js';
 export { Hasher } from './hash.js';
 
 export type { IngestedDocument, IngestedItem, IngestedParagraph, IngestedRun, IngestOptions } from './ingest.js';
-export { MAX_DOC_POS, ingest, ingestParagraph } from './ingest.js';
+export { MAX_DOC_POS, ingest, ingestParagraph, paragraphDecorationOf } from './ingest.js';
 
 export type { LineRef, IndexInput } from './indices.js';
 export { buildIndices } from './indices.js';
@@ -98,7 +100,20 @@ export type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 export { advanceAt, intrinsicWidthOf, measureAtom, measureAtoms, nextTabStop, scaledOffsets } from './intrinsic.js';
 
 export type { LineGeometry, PlacedAtom } from './line-geometry.js';
-export { caretStopsOfPlaced, geometryOfPlaced, lineEndOf, placeAtoms, runsOfPlaced } from './line-geometry.js';
+export {
+  ascentOfAtom,
+  caretStopsOfPlaced,
+  descentOfAtom,
+  geometryOfPlaced,
+  lineEndOf,
+  placeAtoms,
+  runsOfPlaced,
+} from './line-geometry.js';
+
+export type { PageBox } from './page-geometry.js';
+export { documentRectOf, pageOrigins } from './page-geometry.js';
+
+export { objectPlacementOf } from './objects.js';
 
 export { justifyPlaced, shiftPlaced, stretchableCount } from './justify.js';
 

@@ -1,6 +1,6 @@
 import type { Mp } from '../units/index.js';
 
-export const LAYOUT_RESULT_VERSION = 1;
+export const LAYOUT_RESULT_VERSION = 2;
 
 export const DOC_POS_ORIGIN = 0;
 
@@ -81,9 +81,18 @@ export interface LayoutDiagnostic {
   readonly docPos: DocPos | undefined;
 }
 
+export interface ObjectPlacement {
+  readonly relationshipId: string | undefined;
+  readonly width: Mp;
+  readonly height: Mp;
+  readonly crop: Rect | undefined;
+  readonly rotationMilliDegrees: number;
+}
+
 export interface RunPaint {
   readonly requestedFamily: string;
   readonly family: string;
+  readonly faceId: string;
   readonly size: Mp;
   readonly bold: boolean;
   readonly italic: boolean;
@@ -107,6 +116,8 @@ export interface AtomPlacement {
   readonly paint: number;
   readonly x: Mp;
   readonly width: Mp;
+  readonly size: Mp;
+  readonly object: ObjectPlacement | undefined;
   readonly text: string;
   readonly source: DocRange;
   readonly level: number;
@@ -116,6 +127,10 @@ export interface LineRun {
   readonly paint: number;
   readonly x: Mp;
   readonly width: Mp;
+  readonly shift: Mp;
+  readonly ascent: Mp;
+  readonly descent: Mp;
+  readonly object: ObjectPlacement | undefined;
   readonly text: string;
   readonly source: DocRange;
 }
@@ -152,6 +167,8 @@ export interface BlockFragment {
   readonly docRange: DocRange;
   readonly split: FragmentSplit;
   readonly lines: readonly LineFragment[];
+  readonly borders: BorderSet;
+  readonly shading: Shading | undefined;
   readonly cell: CellRef | undefined;
 }
 
@@ -183,6 +200,7 @@ export interface BorderEdge {
   readonly style: BorderLineStyle;
   readonly width: Mp;
   readonly color: string | undefined;
+  readonly space: Mp | undefined;
 }
 
 export interface BorderSet {
@@ -238,10 +256,16 @@ export interface TableFragment {
   readonly rows: readonly RowFragment[];
 }
 
+export interface PageOrigin {
+  readonly x: Mp;
+  readonly y: Mp;
+}
+
 export interface PageFragment {
   readonly index: number;
   readonly kind: PageKind;
   readonly page: Rect;
+  readonly origin: PageOrigin;
   readonly contentBox: Rect;
   readonly column: number;
   readonly blocks: readonly BlockFragment[];

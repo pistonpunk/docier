@@ -8,6 +8,7 @@ import type { LayoutDiagnostic } from './types.js';
 export interface FontFace {
   readonly requestedFamily: string;
   readonly family: string;
+  readonly faceId: string;
   readonly size: Mp;
   readonly unitsPerEm: number;
   readonly metrics: ScaledFontMetrics;
@@ -54,9 +55,10 @@ export class FontResolver {
 
   face(format: RunFormat, spacing: LineSpacing): FontFace {
     const family = this.resolvedFamily(format.requestedFamily);
-    const key = `${family}|${format.size}|${spacing.rule}|${
+    const shift = shiftOf(format);
+    const key = `${format.requestedFamily}|${family}|${format.size}|${spacing.rule}|${
       spacing.rule === 'auto' ? spacing.multiple240 : spacing.height
-    }`;
+    }|${shift}`;
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
     const metrics = scaleFontMetrics(this.measurer.metrics(family), format.size);
@@ -71,11 +73,12 @@ export class FontResolver {
     const face: FontFace = {
       requestedFamily: format.requestedFamily,
       family,
+      faceId: this.measurer.faceId(family),
       size: format.size,
       unitsPerEm: metrics.unitsPerEm,
       metrics,
       lineBox: lineBoxOf(metrics, spacing),
-      shift: shiftOf(format),
+      shift,
     };
     this.cache.set(key, face);
     return face;

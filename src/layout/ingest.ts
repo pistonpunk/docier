@@ -14,8 +14,10 @@ import {
 } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
 import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
+import { objectPlacementOf } from './objects.js';
+import { borderSetOf, shadingOf } from './table-borders.js';
 import { Hasher } from './hash.js';
-import type { DocPos, ForcedBreak, LayoutDiagnostic } from './types.js';
+import type { DocPos, ForcedBreak, LayoutDiagnostic, ObjectPlacement } from './types.js';
 import { docPos } from './types.js';
 import type { IngestState, IngestedTable } from './table-ingest.js';
 import { ingestBlockList } from './table-ingest.js';
@@ -32,6 +34,7 @@ export interface IngestedItem {
   readonly docStart: DocPos;
   readonly forcedBreak: ForcedBreak;
   readonly codePoint: number;
+  readonly object: ObjectPlacement | undefined;
 }
 
 export interface IngestedRun {
@@ -67,6 +70,7 @@ export interface IngestedDocument {
   readonly hasFields: boolean;
   readonly hasNotes: boolean;
   readonly hasDrawings: boolean;
+  readonly hasUnresolvedDrawings: boolean;
   readonly diagnostics: readonly LayoutDiagnostic[];
   readonly hash: Hasher;
 }
@@ -88,6 +92,26 @@ const forcedBreakOf = (content: BreakContent): ForcedBreak => {
   return 'line';
 };
 
+const itemOf = (
+  kind: ItemKind,
+  text: string,
+  family: string,
+  size: Mp,
+  start: DocPos,
+  forcedBreak: ForcedBreak,
+  codePoint: number,
+  object: ObjectPlacement | undefined = undefined,
+): IngestedItem => ({
+  kind,
+  text,
+  family,
+  size,
+  docStart: start,
+  forcedBreak,
+  codePoint,
+  object,
+});
+
 const itemFromContent = (
   content: unknown,
   format: RunFormat,
@@ -95,83 +119,52 @@ const itemFromContent = (
 ): IngestedItem | undefined => {
   if (content instanceof TextContent) {
     if (content.value.length === 0) return undefined;
-    return {
-      kind: 'text',
-      text: content.value,
-      family: format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: 'none',
-      codePoint: 0,
-    };
+    return itemOf('text', content.value, format.requestedFamily, format.size, start, 'none', 0);
   }
   if (content instanceof TabContent) {
-    return {
-      kind: 'tab',
-      text: '\t',
-      family: format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: 'none',
-      codePoint: 0x09,
-    };
+    return itemOf('tab', '\t', format.requestedFamily, format.size, start, 'none', 0x09);
   }
   if (content instanceof BreakContent || content instanceof CarriageReturnContent) {
-    return {
-      kind: 'break',
-      text: '',
-      family: format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: content instanceof BreakContent ? forcedBreakOf(content) : 'line',
-      codePoint: 0,
-    };
+    return itemOf(
+      'break',
+      '',
+      format.requestedFamily,
+      format.size,
+      start,
+      content instanceof BreakContent ? forcedBreakOf(content) : 'line',
+      0,
+    );
   }
   if (content instanceof HyphenContent) {
-    return {
-      kind: 'text',
-      text: content.logicalText,
-      family: format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: 'none',
-      codePoint: 0,
-    };
+    return itemOf('text', content.logicalText, format.requestedFamily, format.size, start, 'none', 0);
   }
   if (content instanceof SymbolContent) {
     const codePoint = content.codePoint;
     if (codePoint === undefined) return undefined;
-    return {
-      kind: 'symbol',
-      text: String.fromCodePoint(codePoint),
-      family: content.font ?? format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: 'none',
+    return itemOf(
+      'symbol',
+      String.fromCodePoint(codePoint),
+      content.font ?? format.requestedFamily,
+      format.size,
+      start,
+      'none',
       codePoint,
-    };
+    );
   }
   if (content instanceof DrawingContent) {
-    return {
-      kind: 'object',
-      text: '',
-      family: format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: 'none',
-      codePoint: 0,
-    };
+    return itemOf(
+      'object',
+      '',
+      format.requestedFamily,
+      format.size,
+      start,
+      'none',
+      0,
+      objectPlacementOf(content.element),
+    );
   }
   if (content instanceof NoteReferenceContent && content.kind === 'noteReference') {
-    return {
-      kind: 'noteRef',
-      text: '',
-      family: format.requestedFamily,
-      size: format.size,
-      docStart: start,
-      forcedBreak: 'none',
-      codePoint: 0,
-    };
+    return itemOf('noteRef', '', format.requestedFamily, format.size, start, 'none', 0);
   }
   return undefined;
 };
@@ -183,8 +176,19 @@ interface ParagraphIngest {
   readonly hasFields: boolean;
   readonly hasNotes: boolean;
   readonly hasDrawings: boolean;
+  readonly hasUnresolvedDrawings: boolean;
   readonly hasNumbering: boolean;
 }
+
+export const paragraphDecorationOf = (
+  paragraph: Paragraph,
+): { readonly borders: ParagraphFormat['borders']; readonly shading: ParagraphFormat['shading'] } => {
+  const properties = paragraph.properties;
+  return {
+    borders: borderSetOf(properties.borders),
+    shading: shadingOf(properties.shading),
+  };
+};
 
 export const ingestParagraph = (
   model: DocumentModel,
@@ -196,16 +200,20 @@ export const ingestParagraph = (
   const resolvedParagraph = model.resolveParagraphProperties(paragraph);
   const markResolved = model.resolveRunProperties(paragraph, paragraph.markProperties.element);
   const markFormat = runFormatOf(markResolved, options.defaultFontFamily);
-  const format = paragraphFormatOf(
-    resolvedParagraph,
-    paragraph.properties.tabStops.map((stop) => twipToMp(stop.position)),
-  );
+  const format: ParagraphFormat = {
+    ...paragraphFormatOf(
+      resolvedParagraph,
+      paragraph.properties.tabStops.map((stop) => twipToMp(stop.position)),
+    ),
+    ...paragraphDecorationOf(paragraph),
+  };
 
   const runs: IngestedRun[] = [];
   let cursor = start as number;
   let hasThemeFontSeen = hasThemeFont(resolvedParagraph);
   let hasNotes = false;
   let hasDrawings = false;
+  let hasUnresolvedDrawings = false;
 
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);
@@ -217,7 +225,10 @@ export const ingestParagraph = (
     for (const content of run.contents()) {
       const item = itemFromContent(content, runFormat, docPos(cursor));
       if (item === undefined) continue;
-      if (item.kind === 'object') hasDrawings = true;
+      if (item.kind === 'object') {
+        hasDrawings = true;
+        if (item.object === undefined) hasUnresolvedDrawings = true;
+      }
       if (item.kind === 'noteRef') hasNotes = true;
       items.push(item);
       cursor += ingestedItemLength(item);
@@ -244,6 +255,7 @@ export const ingestParagraph = (
     hasFields: paragraph.fields().length > 0,
     hasNotes,
     hasDrawings,
+    hasUnresolvedDrawings,
     hasNumbering: numberingId !== undefined && numberingId !== 0,
   };
 };
@@ -260,7 +272,14 @@ export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDo
     options,
     diagnostics,
     paragraphs: [],
-    flags: { themeFonts: false, fields: false, notes: false, drawings: false, numbering: false },
+    flags: {
+      themeFonts: false,
+      fields: false,
+      notes: false,
+      drawings: false,
+      unresolvedDrawings: false,
+      numbering: false,
+    },
     cursor: 0,
   };
   const blocks = ingestBlockList(state, model.body().blocks(), 0);
@@ -275,6 +294,7 @@ export const ingest = (model: DocumentModel, options: IngestOptions): IngestedDo
     hasFields: state.flags.fields,
     hasNotes: state.flags.notes,
     hasDrawings: state.flags.drawings,
+    hasUnresolvedDrawings: state.flags.unresolvedDrawings,
     diagnostics,
     hash,
   };

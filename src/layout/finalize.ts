@@ -6,6 +6,7 @@ import { buildIndices } from './indices.js';
 import type { LineRef } from './indices.js';
 import { frozenMapOf } from './frozen-map.js';
 import { caretStopsOfPlaced, runsOfPlaced } from './line-geometry.js';
+import { pageOrigins } from './page-geometry.js';
 import type {
   AtomPlacement,
   BlockFragment,
@@ -49,6 +50,8 @@ const atomsOf = (line: LaidLine): readonly AtomPlacement[] =>
       paint: atom.paint,
       x: item.x,
       width: item.width,
+      size: atom.face.size,
+      object: atom.object,
       text: atom.text,
       source: atom.source,
       level: atom.level,
@@ -126,6 +129,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
   }
   const orderOf = (id: number): number => tableOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
   const firstPageOf = new Map<number, number>();
+  const origins = pageOrigins(input.pages);
   let lineId = 0;
 
   for (const page of input.pages) {
@@ -209,6 +213,8 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
         docRange: block.docRange,
         split: piece.split,
         lines: lineFragments,
+        borders: block.format.borders,
+        shading: block.format.shading,
         cell: piece.cell,
       });
     }
@@ -236,6 +242,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
       index: page.index,
       kind: page.kind,
       page: page.page,
+      origin: origins[pages.length] ?? { x: mp(0), y: mp(0) },
       contentBox: page.contentBox,
       column: page.column,
       blocks,

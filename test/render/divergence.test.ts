@@ -212,7 +212,7 @@ describe('layout divergence detection', () => {
     expect(() => assertNoDivergence(report, { requireAuthoritative: true })).toThrow(/runBox/);
   });
 
-  it('names the gaps the layout result leaves for faithful painting', async () => {
+  it('names the gaps the renderer still declares against the layout result', async () => {
     const superscript =
       '<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>' +
       '<w:t xml:space="preserve">2</w:t></w:r><w:r><w:t xml:space="preserve">base</w:t></w:r></w:p>';
@@ -221,13 +221,25 @@ describe('layout divergence detection', () => {
     const line = block?.lines[0];
     expect(line?.runs.length).toBe(2);
     const raised = line?.runs.find((run) => run.text === '2');
-    expect(Object.keys(raised ?? {}).sort()).toEqual(['paint', 'source', 'text', 'width', 'x']);
+    expect(Object.keys(raised ?? {}).sort()).toEqual([
+      'ascent',
+      'descent',
+      'object',
+      'paint',
+      'shift',
+      'source',
+      'text',
+      'width',
+      'x',
+    ]);
     const atom = line?.atoms.find((candidate) => candidate.text === '2');
     expect(Object.keys(atom ?? {}).sort()).toEqual([
       'atomId',
       'kind',
       'level',
+      'object',
       'paint',
+      'size',
       'source',
       'text',
       'width',
@@ -239,6 +251,29 @@ describe('layout divergence detection', () => {
     renderDocument(result, target);
     const tops = new Set(runBoxes(target).map((node) => node.style.top));
     expect(tops.size).toBe(1);
+  });
+
+  it('carries the per-run vertical shift the painter raises a superscript with', async () => {
+    const superscript =
+      '<w:p><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>' +
+      '<w:t xml:space="preserve">2</w:t></w:r><w:r><w:t xml:space="preserve">base</w:t></w:r></w:p>';
+    const result = await layoutOf(bodyOf(superscript));
+    const line = result.pages[0]?.blocks[0]?.lines[0];
+    const raised = line?.runs.find((run) => run.text === '2');
+    const base = line?.runs.find((run) => run.text === 'base');
+    expect(raised?.shift).toBeGreaterThan(0);
+    expect(base?.shift).toBe(0);
+    expect(raised?.ascent).toBeGreaterThan(base?.ascent ?? 0);
+    expect(raised?.descent).toBeLessThan(base?.descent ?? 0);
+    const baselineY = line?.baselineY ?? 0;
+    const raisedTop = mp(baselineY - (raised?.ascent ?? 0));
+    const baseTop = mp(baselineY - (base?.ascent ?? 0));
+    expect(raisedTop).toBeLessThan(baseTop);
+    expect(raised?.object).toBeUndefined();
+    expect(mp((baseTop as number) - (raisedTop as number))).toBe(raised?.shift ?? 0);
+    expect(mp((raised?.ascent ?? 0) + (raised?.descent ?? 0))).toBe(
+      mp((base?.ascent ?? 0) + (base?.descent ?? 0)),
+    );
   });
 
   it('refuses to call a style-derived check authoritative', async () => {

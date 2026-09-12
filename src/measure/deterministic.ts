@@ -44,6 +44,8 @@ const ADVANCE_EIGHTH_EM = 256;
 const ADVANCE_HYPHEN = 682;
 const ADVANCE_SCALE_UNITY = 1024;
 
+export const MEASURER_ID = 'docier-deterministic-sans/1';
+
 const ZERO_ADVANCE: ReadonlySet<number> = new Set([
   0x0009, 0x00ad, 0x200b, 0x200c, 0x200d, 0x2060, 0xfeff,
 ]);
@@ -128,11 +130,25 @@ export const createDeterministicMeasurer = (
     };
   };
 
+  const faceIdOf = (family: string): string => {
+    const spec = lookup(family);
+    return [
+      MEASURER_ID,
+      spec.family,
+      spec.unitsPerEm,
+      spec.ascent,
+      spec.descent,
+      spec.lineGap,
+      spec.advanceScale ?? ADVANCE_SCALE_UNITY,
+    ].join('/');
+  };
+
   return {
-    id: 'docier-deterministic-sans/1',
+    id: MEASURER_ID,
     fallbackFamily: primary.family,
     has: (family: string): boolean => byName.has(family.toLowerCase()),
     metrics: metricsOf,
+    faceId: faceIdOf,
     clusters: (family: string, text: string): readonly MeasuredCluster[] =>
       segmentClusters(text, advanceOf(lookup(family)), isCovered),
   };

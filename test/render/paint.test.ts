@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LayoutResult, LineFragment, RunPaint } from '../../src/layout/index.js';
-import { docPos } from '../../src/layout/index.js';
+import { createDeterministicMeasurer, docPos } from '../../src/layout/index.js';
 import { mp } from '../../src/units/index.js';
 import { ATTR, paintLine, paintScale, renderDocument } from '../../src/render/index.js';
 import {
@@ -248,6 +248,7 @@ describe('layout freedom of the painted document', () => {
     const paint: RunPaint = {
       requestedFamily: 'Docier Deterministic Sans',
       family: 'Docier Deterministic Sans',
+      faceId: createDeterministicMeasurer().faceId('Docier Deterministic Sans'),
       size: mp(10000),
       bold: false,
       italic: false,
@@ -272,7 +273,19 @@ describe('layout freedom of the painted document', () => {
       descent: mp(2358),
       lineHeight: mp(11640),
       atoms: [],
-      runs: [{ paint: 0, x: mp(0), width: mp(20000), text: 'gone', source: range(0, 4) }],
+      runs: [
+        {
+          paint: 0,
+          x: mp(0),
+          width: mp(20000),
+          shift: mp(0),
+          ascent: mp(9282),
+          descent: mp(2358),
+          object: undefined,
+          text: 'gone',
+          source: range(0, 4),
+        },
+      ],
       caretStops: [],
       justified: false,
       bidiLevels: [],
