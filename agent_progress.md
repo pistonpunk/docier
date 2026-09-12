@@ -115,12 +115,28 @@ constrain what can be done.**
 - [ ] Add `.github/workflows/ci.yml`
 - [ ] Decide the module boundary map from `docs/SPEC.md` and create the empty module folders
 
-### Phase 1 — A document that survives a round trip
-- [ ] `src/model/` — the OOXML-faithful document model (paragraphs, runs, rPr/pPr, styles, numbering)
-- [ ] Parse a real Word `.docx` into the model
-- [ ] Serialise the model back to a byte-comparable `.docx`
-- [ ] **Round-trip test against real Word files** — this is the gate for everything else
-- [ ] Styles resolution (basedOn chain, docDefaults, direct formatting precedence)
+### Phase 1 — A document that survives a round trip  ✅ COMPLETE
+- [x] `src/model/` — the OOXML-faithful document model. 37 files, ~8750 lines: paragraphs, runs, inline
+      content, tables, sections, content controls, styles with the basedOn chain and direct-formatting
+      precedence, numbering, settings. A typed view over the parsed XML tree that mutates in place, so
+      unmodelled elements, attributes, comments and namespaces survive verbatim.
+- [x] Parse a real Word `.docx` into the model
+- [x] Serialise back; an untouched document is returned byte for byte, an edited one keeps its comments,
+      smartTags, OMML, VML and vendor elements
+- [x] Round-trip harness — 16 fixtures, validated externally with Python's `zipfile` and `minidom` rather
+      than by the library checking itself
+- [x] Styles resolution (7-level run cascade, 5-level paragraph cascade, Word's toggle semantics)
+- [x] **ADR-0003 closed**: DEFLATE pinned with `fflate@0.8.3` at level 6, proven byte-identical across
+      separate processes. `fflate` is docier's one runtime dependency, taken deliberately because
+      byte-determinism cannot be met with the platform compressor.
+
+**270 assertions, 12 suites, CI green (run #9).**
+
+**The bug that justifies the whole approach:** `Part.document()` left the part marked `original`, so
+`writePlan()` returned passthrough and **every model edit was silently dropped by `save()`**. An edit
+would report success and the file would come back unchanged. Found only because the round-trip test
+compared bytes. Two other agents independently flagged the neighbouring `markDirty()` trap; it is still
+open and should be fixed in `src/ooxml/part.ts`.
 
 ### Phase 2 — Layout
 - [ ] `src/layout/` — the pass pipeline in dependency order, per spec 02
