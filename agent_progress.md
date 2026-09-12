@@ -70,9 +70,16 @@ it stood. The only part of that claim that held is Docker — the socket is perm
 
 ```
 cd /home/daniel/work/docier
-npx tsc --noEmit -p tsconfig.json     # typecheck, currently exit 0
+npx tsc --noEmit -p tsconfig.json      # typecheck, exit 0
+npx tsc --noEmit -p tsconfig.test.json # typecheck the tests, exit 0
 npm run build                          # emit
+npx vitest run                         # 44 files, 582 passed, 1 skipped
 ```
+
+Suite projects: `node` (`test/**` except `test/render`, `test/edit`, `test/api`) and `dom` (jsdom —
+`test/render/**`, `test/edit/**`, `test/api/**`). Anything that touches the DOM belongs in the `dom`
+project; adding a new DOM-touching directory means adding it to both the `dom` include and the `node`
+exclude in `vitest.config.ts`, or it runs twice with no `document`.
 
 CI runs the same thing on every push (`.github/workflows/ci.yml`), and the GitHub token now in the session
 lets me read the run result and the failing log myself, so failures get fixed without a round trip through
@@ -139,17 +146,39 @@ compared bytes. Two other agents independently flagged the neighbouring `markDir
 open and should be fixed in `src/ooxml/part.ts`.
 
 ### Phase 2 — Layout
-- [ ] `src/layout/` — the pass pipeline in dependency order, per spec 02
-- [ ] Font metrics and measurement (the single measurement seam)
-- [ ] Line breaking to millipoint `LayoutResult`
-- [ ] Pagination: page boxes, margins, breaks, widow/orphan, keep-with-next
-- [ ] The rendered-DOM-vs-engine divergence detector
+- [x] `src/layout/` — the pass pipeline in dependency order, per spec 02
+- [x] Font metrics and measurement (the single measurement seam)
+- [x] Line breaking to millipoint `LayoutResult`
+- [x] Pagination: page boxes, margins, breaks, widow/orphan, keep-with-next
+- [x] The rendered-DOM-vs-engine divergence detector (`test/render/divergence.test.ts`)
 
 ### Phase 3 — A visible, editable document
-- [ ] `src/render/` — paint-only DOM renderer from `LayoutResult`
-- [ ] `src/edit/` — caret, selection, keyboard, IME, undo/redo
-- [ ] `createEditor(el, config)` mount API and the command/event surface
+- [x] `src/render/` — paint-only DOM renderer from `LayoutResult`
+- [x] `src/edit/` — caret, selection, keyboard, IME, undo/redo
+- [x] `createEditor(el, config)` mount API and the command/event surface
 - [ ] Minimum viable chrome so it is actually usable
+
+**The editing surface, as built.** `src/edit/` is arithmetic over `LayoutResult` — it makes no layout
+decisions. `src/edit/positions.ts` turns a `LayoutResult` into a `PositionIndex` (caret stops, line boxes,
+paragraph spans); `caret.ts` maps a position to geometry and a pointer back to a position; `navigation.ts`
+implements character/word/line/story movement including Word's Home/End semantics; `mutation.ts` edits the
+model's XML in place; `actions.ts` composes those into named actions; `commands.ts` exposes them through the
+command registry; `input.ts` bridges keyboard, pointer and native selection.
+
+`src/api/` is the host surface: a command registry (`docier.command.<area>.<action>`, a closed
+`COMMAND_AREAS` set), an event bus (`docier:<area>:<verb>`), history with coalescing, transactions, config
+merging, `DocierError`, and `createEditor(element, config, options)`.
+
+Five defects found and fixed while testing this surface, all in the new code: `contentLength` measured a
+`w:t` by summing element children rather than text nodes, so every split inside a run silently produced an
+empty paragraph; `partition` could not descend into a run, so a paragraph split never divided it;
+`prepare()`'s shift-extend guard was inverted, making every shift-move a no-op; the first entry of a typing
+run stored no coalescing key, so three keystrokes became two undo entries; and `redo` returned the entry's
+selection *before* the change instead of after.
+
+**Declared but not implemented:** `docier:issues:change` is never emitted (no issues subsystem yet), and the
+spec's async `createDocier(options)` constructor — with plugins, tokens, theme, ui and renderers — is not
+built; `createEditor` is the mount API this phase delivered.
 
 ### Phase 4 — Word-like
 - [ ] Formatting and the styles engine
@@ -190,7 +219,9 @@ failure under Blockers, and change approach rather than retrying.
 
 ## Current active sub-task
 
-**Awaiting the consolidation agent (`docs/SPEC.md` + `docs/adr/`) and the foundation agent
-(`src/units/`, `src/ooxml/`).** Both were running when this file was created. Next action on their
-completion: review their output against the decisions above, resolve any conflict with D1–D10, commit,
-and open Phase 1 with the document model.
+**Phase 3's editing surface and public API are complete and verified; Phase 3's chrome is not started.**
+Next action: build the minimum viable chrome (toolbar, status bar, context menu, selection handles) on top
+of `commands.list()` for enablement and `commands.execute()` for dispatch, then close Phase 3. All 49 ids in
+`editCommandIds` are registered and none is declared-but-unimplemented; the empty areas a toolbar will
+reach for are `insert`, `table`, `clipboard`, `view` and `style`, which `COMMAND_AREAS` reserves but
+nothing registers into yet.

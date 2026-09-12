@@ -15,7 +15,7 @@ export default defineConfig({
           ...shared,
           name: 'node',
           include: ['test/**/*.test.ts'],
-          exclude: ['test/render/**'],
+          exclude: ['test/render/**', 'test/edit/**', 'test/api/**'],
           environment: 'node',
         },
       },
@@ -23,7 +23,11 @@ export default defineConfig({
         test: {
           ...shared,
           name: 'dom',
-          include: ['test/render/**/*.test.ts'],
+          include: [
+            'test/render/**/*.test.ts',
+            'test/edit/**/*.test.ts',
+            'test/api/**/*.test.ts',
+          ],
           environment: 'jsdom',
         },
       },
