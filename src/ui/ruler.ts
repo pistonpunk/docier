@@ -155,22 +155,29 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     marker.setAttribute('aria-valuetext', `${formatRulerValue(reportedMp, units())} ${unitSuffix(units())}`);
   };
 
-  const renderTicks = (fromMp: number, toMp: number, zoom: number, offsetPx: number): void => {
+  const renderTicks = (
+    fromMp: number,
+    toMp: number,
+    zoom: number,
+    offsetPx: number,
+    labelOriginMp: number,
+  ): void => {
     while (ticks.firstChild !== null) ticks.removeChild(ticks.firstChild);
     const spec = UNIT_SPECS[units()];
     const majorMp = spec.majorStep * spec.mpPerUnit;
     const minorMp = spec.minorStep * spec.mpPerUnit;
-    const start = Math.floor(fromMp / minorMp) * minorMp;
+    const start = labelOriginMp + Math.floor((fromMp - labelOriginMp) / minorMp) * minorMp;
     let count = 0;
     for (let value = start; value <= toMp && count < MAX_TICKS; value += minorMp) {
       count += 1;
-      const isMajor = Math.abs(value / majorMp - Math.round(value / majorMp)) < 0.0001;
+      const relative = Math.round(value - labelOriginMp);
+      const isMajor = Math.abs(relative / majorMp - Math.round(relative / majorMp)) < 0.0001;
       const tick = make('span', 'docier-ruler-tick');
       tick.style.left = `${String(offsetPx + toCssPx(mp(Math.round(value)) as Mp, zoom))}px`;
       tick.style.height = isMajor ? '100%' : '35%';
       if (isMajor) {
         const label = make('span', 'docier-ruler-tick-label');
-        setText(label, formatRulerValue(value, units()));
+        setText(label, formatRulerValue(Math.round(value - labelOriginMp), units()));
         tick.appendChild(label);
       }
       ticks.appendChild(tick);
@@ -217,7 +224,7 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     );
     positionMarker('indent-right', right - indents.rightTwips * MP_PER_TWIP, zoom, offsetPx);
 
-    renderTicks(pageStart, pageEnd, zoom, offsetPx);
+    renderTicks(pageStart, pageEnd, zoom, offsetPx, left);
   };
 
   const currentIndents = (): RulerIndents => options.metrics()?.indents ?? ZERO_INDENTS;
