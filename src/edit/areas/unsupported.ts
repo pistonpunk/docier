@@ -136,22 +136,53 @@ const REFUSALS: readonly Refusal[] = [
   },
 
   {
-    id: 'docier.command.numbering.bullets',
-    label: 'Bullets',
+    id: 'docier.command.numbering.continuePrevious',
+    label: 'Continue previous list',
     category: 'numbering',
-    reason: 'List numbering writes a definition to numbering.xml, which the undo history does not cover',
+    reason:
+      "This build joins a paragraph to a list only by applying that list; it has no command that adopts the previous list's w:numId",
   },
   {
-    id: 'docier.command.numbering.numbers',
-    label: 'Numbering',
+    id: 'docier.command.numbering.newDefinition',
+    label: 'New numbering definition',
     category: 'numbering',
-    reason: 'List numbering writes a definition to numbering.xml, which the undo history does not cover',
+    reason:
+      'This build cannot clone an abstract definition: a format change rewrites the definition every list of that kind shares',
   },
   {
-    id: 'docier.command.numbering.multilevel',
-    label: 'Multilevel list',
+    id: 'docier.command.numbering.setLevelRestart',
+    label: 'Level restart',
     category: 'numbering',
-    reason: 'List numbering writes a definition to numbering.xml, which the undo history does not cover',
+    reason:
+      "This build never writes w:lvlRestart; a level's restart rule is preserved exactly as it was loaded",
+  },
+  {
+    id: 'docier.command.numbering.setLegal',
+    label: 'Legal numbering',
+    category: 'numbering',
+    reason:
+      "This build never writes w:isLgl; a level's legal-numbering flag is preserved exactly as it was loaded",
+  },
+  {
+    id: 'docier.command.numbering.applyListStyle',
+    label: 'List style',
+    category: 'numbering',
+    reason:
+      'This build applies numbering as a direct w:numPr and never authors a w:style of type numbering with a w:numStyleLink',
+  },
+  {
+    id: 'docier.command.numbering.cleanup',
+    label: 'Clean up numbering',
+    category: 'numbering',
+    reason:
+      'This build never deletes unused w:abstractNum definitions, so a numbered document keeps every definition it was given',
+  },
+  {
+    id: 'docier.command.numbering.convertToText',
+    label: 'Convert list to text',
+    category: 'numbering',
+    reason:
+      'List numbers come from w:numFmt/w:lvlText rather than from w:t, so this build cannot turn them into literal text',
   },
 
   { id: 'docier.command.object.insertImage', label: 'Picture', category: 'object', reason: NO_DRAWING },

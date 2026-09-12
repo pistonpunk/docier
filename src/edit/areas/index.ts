@@ -1,5 +1,6 @@
 import type { CommandDefinition, CommandRegistry, Disposable } from '../../api/types.js';
 import { insertCommands } from './insert.js';
+import { numberingCommands } from './numbering.js';
 import { pageCommands } from './page.js';
 import { paragraphCommands } from './paragraph.js';
 import { proofCommands } from './proof.js';
@@ -15,6 +16,7 @@ export { paragraphCommands } from './paragraph.js';
 export { styleCommands } from './style.js';
 export { proofCommands } from './proof.js';
 export { insertCommands } from './insert.js';
+export { numberingCommands } from './numbering.js';
 export { unsupportedCommands } from './unsupported.js';
 
 export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
@@ -23,6 +25,7 @@ export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, 
   ...styleCommands(host),
   ...proofCommands(host),
   ...insertCommands(host),
+  ...numberingCommands(host),
   ...unsupportedCommands(host),
 ];
 

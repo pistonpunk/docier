@@ -2,10 +2,11 @@ import type { DocPos, DocRange, LayoutResult } from '../layout/index.js';
 import { layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
 import type { XmlElement, XmlNode } from '../ooxml/xml/index.js';
+import { serializeXmlNode } from '../ooxml/xml/index.js';
 import { cloneNode } from '../ooxml/xml/tree.js';
 import type { Relationship } from '../ooxml/relationships.js';
 import type { DocumentModel } from '../model/index.js';
-import { Paragraph } from '../model/index.js';
+import { Paragraph, childElements, wAttr } from '../model/index.js';
 import type { PositionIndex, ParagraphSpan } from './positions.js';
 import { blockText, buildPositionIndex } from './positions.js';
 import type { ParagraphFormatPatch, RunFormatPatch } from './mutation.js';
@@ -37,9 +38,15 @@ export interface ParagraphSlot {
   readonly length: number;
 }
 
+export interface NumberingSnapshot {
+  readonly name: string | undefined;
+  readonly root: XmlElement | undefined;
+}
+
 export interface EditSnapshot {
   readonly body: readonly XmlNode[];
   readonly relationships: readonly Relationship[];
+  readonly numbering: NumberingSnapshot;
 }
 
 export interface ResolvedPosition {
@@ -73,8 +80,75 @@ export interface EditSession {
   clearParagraphFormatting(range: DocRange): boolean;
   snapshot(): EditSnapshot;
   restore(snapshot: EditSnapshot): void;
+  changeNumbering(write: () => unknown): boolean;
   readonly layoutOptions: LayoutOptions;
 }
+
+const NUMBERING_KEY_ATTRIBUTES: readonly string[] = ['abstractNumId', 'numId', 'numPicBulletId'];
+
+const numberingKeyOf = (element: XmlElement): string => {
+  for (const name of NUMBERING_KEY_ATTRIBUTES) {
+    const value = wAttr(element, name);
+    if (value !== undefined) return `${element.localName}:${value}`;
+  }
+  return element.localName;
+};
+
+const cloneElement = (element: XmlElement): XmlElement => cloneNode(element) as XmlElement;
+
+const captureNumbering = (model: DocumentModel): NumberingSnapshot => {
+  const numbering = model.numbering;
+  return numbering === undefined
+    ? { name: undefined, root: undefined }
+    : { name: model.parts.numbering, root: cloneElement(numbering.element) };
+};
+
+const applyNumberingChildren = (
+  model: DocumentModel,
+  live: XmlElement,
+  wanted: XmlElement,
+): void => {
+  const liveElements = childElements(live);
+  const byKey = new Map<string, XmlElement>();
+  for (const child of liveElements) byKey.set(numberingKeyOf(child), child);
+  const kept = new Set<XmlElement>();
+  const next: XmlNode[] = [];
+  for (const child of wanted.children) {
+    if (child.kind !== 'element') {
+      next.push(cloneNode(child));
+      continue;
+    }
+    const key = numberingKeyOf(child);
+    const current = byKey.get(key);
+    byKey.delete(key);
+    if (current !== undefined && serializeXmlNode(current) === serializeXmlNode(child)) {
+      kept.add(current);
+      next.push(current);
+      continue;
+    }
+    if (current !== undefined) model.context.forgetSubtree(current);
+    next.push(cloneElement(child));
+  }
+  for (const child of liveElements) {
+    if (!kept.has(child)) model.context.forgetSubtree(child);
+  }
+  live.children = next;
+  for (const child of next) child.parent = live;
+  live.selfClosing = wanted.selfClosing;
+};
+
+const restoreNumbering = (model: DocumentModel, snapshot: NumberingSnapshot): boolean => {
+  const numbering = model.numbering;
+  const root = snapshot.root;
+  if (root === undefined) return numbering === undefined ? false : model.dropNumbering();
+  if (numbering === undefined) {
+    model.adoptNumbering(snapshot.name, cloneElement(root));
+    return true;
+  }
+  const before = serializeXmlNode(numbering.element);
+  applyNumberingChildren(model, numbering.element, root);
+  return serializeXmlNode(numbering.element) !== before;
+};
 
 const relationshipsOf = (model: DocumentModel): readonly Relationship[] =>
   model.package.getRelationships(model.package.mainDocumentPartName);
@@ -117,6 +191,16 @@ export const createEditSession = (
   let index: PositionIndex = buildPositionIndex(result);
   let cachedSlots: readonly ParagraphSlot[] | undefined;
   let revisionCounter = 0;
+  let numberingCapture: NumberingSnapshot = { name: undefined, root: undefined };
+  let numberingStale = true;
+
+  const numberedCapture = (): NumberingSnapshot => {
+    if (numberingStale) {
+      numberingCapture = captureNumbering(model);
+      numberingStale = false;
+    }
+    return numberingCapture;
+  };
 
   const buildSlots = (): readonly ParagraphSlot[] => {
     const elements = bodyParagraphElements(model);
@@ -341,6 +425,7 @@ export const createEditSession = (
     snapshot: (): EditSnapshot => ({
       body: model.body().element.children.map((child) => cloneNode(child)),
       relationships: [...relationshipsOf(model)],
+      numbering: numberedCapture(),
     }),
     restore: (snapshot) => {
       const body = model.body().element;
@@ -348,8 +433,23 @@ export const createEditSession = (
       body.children = snapshot.body.map((node) => cloneNode(node));
       for (const child of body.children) child.parent = body;
       restoreRelationships(model, snapshot.relationships);
+      if (restoreNumbering(model, snapshot.numbering)) {
+        model.invalidateNumbering();
+        numberingStale = true;
+      }
       model.context.forgetSubtree(body);
       markChanged();
+    },
+    changeNumbering: (write) => {
+      const current = model.numbering;
+      const before = current === undefined ? undefined : serializeXmlNode(current.element);
+      write();
+      const numbering = model.numbering;
+      const after = numbering === undefined ? undefined : serializeXmlNode(numbering.element);
+      if (before === after) return false;
+      model.invalidateNumbering();
+      numberingStale = true;
+      return true;
     },
   };
 

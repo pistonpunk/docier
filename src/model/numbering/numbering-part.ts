@@ -81,6 +81,7 @@ export class NumberingPart {
   }
 
   get maxNumId(): number {
+    this.build();
     let max = 0;
     for (const numId of this.instanceByNumId.keys()) {
       if (numId > max) max = numId;
@@ -89,6 +90,7 @@ export class NumberingPart {
   }
 
   get maxAbstractNumId(): number {
+    this.build();
     let max = -1;
     for (const id of this.abstractByCrowd.keys()) {
       if (id > max) max = id;

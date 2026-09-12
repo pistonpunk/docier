@@ -1,8 +1,16 @@
 import { bytesEqual } from '../ooxml/bytes.js';
 import type { DocxPackage } from '../ooxml/package.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
-import { rootElement, serializeXmlBytes } from '../ooxml/xml/index.js';
-import { R_NAMESPACE, RELATIONSHIP_TYPES } from '../ooxml/namespaces.js';
+import {
+  createDeclaration,
+  createDocument,
+  createElement,
+  declareNamespace,
+  rootElement,
+  serializeXmlBytes,
+} from '../ooxml/xml/index.js';
+import { relativeTargetFor } from '../ooxml/relationships.js';
+import { R_NAMESPACE, RELATIONSHIP_TYPES, W_NAMESPACE } from '../ooxml/namespaces.js';
 import type { BlockNode } from './blocks/block-node.js';
 import type { ContentControl } from './blocks/content-control.js';
 import type { Paragraph } from './blocks/paragraph.js';
@@ -82,11 +90,12 @@ export class DocumentModel {
   readonly context: ModelContext;
   readonly diagnostics: DiagnosticCollector;
   readonly styles: StylesPart | undefined;
-  readonly numbering: NumberingPart | undefined;
   readonly settings: SettingsPart | undefined;
   readonly resolver: StyleResolver;
   readonly mainPartName: string;
-  readonly parts: ModelParts;
+  private readonly declaredParts: ModelParts;
+  private numberingPart: NumberingPart | undefined;
+  private numberingPartName: string | undefined;
   private readonly storyList: readonly Story[];
   private readonly storyById: Map<string, Story>;
 
@@ -98,10 +107,23 @@ export class DocumentModel {
     this.storyList = init.stories;
     this.storyById = new Map(init.stories.map((story) => [story.id, story]));
     this.styles = init.styles;
-    this.numbering = init.numbering;
+    this.numberingPart = init.numbering;
+    this.numberingPartName = init.parts.numbering;
     this.settings = init.settings;
     this.resolver = init.resolver;
-    this.parts = init.parts;
+    this.declaredParts = init.parts;
+  }
+
+  get numbering(): NumberingPart | undefined {
+    return this.numberingPart;
+  }
+
+  get parts(): ModelParts {
+    return {
+      styles: this.declaredParts.styles,
+      numbering: this.numberingPartName,
+      settings: this.declaredParts.settings,
+    };
   }
 
   static async load(pkg: DocxPackage, options: LoadModelOptions = {}): Promise<DocumentModel> {
@@ -369,6 +391,57 @@ export class DocumentModel {
   invalidateStyles(): void {
     this.styles?.invalidate();
     this.resolver.invalidate();
+  }
+
+  invalidateNumbering(): void {
+    this.numberingPart?.invalidate();
+    this.resolver.invalidate();
+  }
+
+  adoptNumbering(name: string | undefined, root: XmlElement): NumberingPart {
+    const requested = name ?? NUMBERING_PART_NAME;
+    const target = this.package.hasPart(requested)
+      ? this.package.allocateName('numbering')
+      : requested;
+    const document = createDocument(createDeclaration());
+    document.children.push(root);
+    this.package.createDocumentPart(target, document, { role: 'numbering' });
+    const numbering = new NumberingPart(root, this.context);
+    this.numberingPart = numbering;
+    this.numberingPartName = target;
+    return numbering;
+  }
+
+  ensureNumbering(): NumberingPart {
+    const existing = this.numberingPart;
+    if (existing !== undefined) return existing;
+    const type = RELATIONSHIP_TYPES.numbering ?? '';
+    const declared = this.package.relationships.firstRelationshipOfType(this.mainPartName, type);
+    const referenced = declared === undefined ? undefined : declared.resolvedTarget;
+    const name =
+      referenced !== undefined
+        ? referenced
+        : this.package.hasPart(NUMBERING_PART_NAME)
+          ? this.package.allocateName('numbering')
+          : NUMBERING_PART_NAME;
+    const root = createElement('numbering', 'w', W_NAMESPACE);
+    declareNamespace(root, 'w', W_NAMESPACE);
+    this.adoptNumbering(name, root);
+    if (referenced === undefined) {
+      this.package.addRelationship(this.mainPartName, {
+        type,
+        target: relativeTargetFor(this.mainPartName, this.numberingPartName ?? name),
+      });
+    }
+    return this.numberingPart as NumberingPart;
+  }
+
+  dropNumbering(): boolean {
+    const name = this.numberingPartName;
+    this.numberingPart = undefined;
+    this.numberingPartName = undefined;
+    if (name === undefined) return false;
+    return this.package.removePart(name);
   }
 
   editablePartNames(): readonly string[] {

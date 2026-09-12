@@ -198,7 +198,7 @@ describe('deliberately unavailable commands', () => {
     expect(reasonOf(handle, 'docier.command.insert.table')).toContain('caret cannot be placed');
     expect(reasonOf(handle, 'docier.command.object.insertImage')).toContain('drawing content');
     expect(reasonOf(handle, 'docier.command.insert.header')).toContain('undo history');
-    expect(reasonOf(handle, 'docier.command.numbering.bullets')).toContain('numbering.xml');
+    expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');
     expect(reasonOf(handle, 'docier.command.theme.setColors')).toContain('theme part');
     expect(reasonOf(handle, 'docier.command.doc.save')).toContain('host application');
     expect(reasonOf(handle, 'docier.command.find.find')).toContain('search engine');

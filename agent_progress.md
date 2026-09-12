@@ -43,6 +43,7 @@ pleasant to integrate for a developer.
 | D16 | **PDF/A-2b** as the archival profile, configurable. | The pragmatic archival choice, and it permits transparency that PDF/A-1b does not. The RO/RU compliance question remains open for the owner to confirm. |
 | D17 | **One engine, two painters.** The PDF exporter renders the *same* `LayoutResult` the screen renders — it is a second painter, never a DOCX→PDF conversion through LibreOffice or any external converter. | This is the Google Docs property and the whole point of D2. Routing print through a converter reintroduces a second layout engine, and the screen/print drift returns one step downstream. Two painters of one layout is what makes "exact" true rather than aspirational. Resolves ADR-0002. |
 | D18 | **"Exact" means screen equals print, and both are faithful to the DOCX semantics — NOT pixel-identical to Microsoft Word.** | Nothing in a browser is pixel-identical to Word, including LibreOffice, ONLYOFFICE and Word Online. And it is not required here: templates are authored in docier, so Word is never in the loop and there is nothing to be exact *with* except ourselves. Setting the bar at Word-parity would mean chasing an impossible target for years. |
+| D19 | **The undo snapshot covers `numbering.xml`, and restoring it forgets the derived caches explicitly rather than keying them on content.** The part is captured copy-on-write (one shared clone, refreshed only when a numbering command's own before/after serialisation says the part changed) and restored as a minimal diff by `abstractNumId`/`numId`, so untouched definitions keep their parsed XML. `EditSession.changeNumbering` owns every numbering write and is the only thing that invalidates `NumberingPart`'s index maps and the `StyleResolver`. | A numbered clause is the commonest layout in the templates this library serves, and every `numbering.*` command was refused while the part sat outside the snapshot. Explicit forgetting over content-keying: a run's numbering depends on the whole `num → abstractNumId → abstractNum → lvl` chain plus the part's own key→object maps, so content-keying would mean serialising that chain per run in the layout hot path. The body still clones before every mutation — that clone is the pre-mutation state and cannot be shared. |
 
 ### Resolved product calls
 
@@ -182,6 +183,12 @@ built; `createEditor` is the mount API this phase delivered.
 
 ### Phase 4 — Word-like
 - [ ] Formatting and the styles engine
+- [x] Lists: `src/edit/list.ts` writes and reads bullet, decimal and multilevel definitions, and
+      `docier.command.numbering.*` applies a list, removes it, sets the level, promotes/demotes,
+      restarts and sets the format — one undo entry each, numbering part included (D19). Still
+      refused: continuation, definition cloning, `w:lvlRestart`/`w:isLgl`, list styles, cleanup,
+      list→text. The layout slice paints no numbering text or indent yet, so lists are model-complete
+      and render-incomplete.
 - [ ] Rulers (one per document, not per page), status bar, zoom
 - [ ] Menu bar / ribbon, dialogs, context menus for every surface
 - [ ] Floating selection controls
