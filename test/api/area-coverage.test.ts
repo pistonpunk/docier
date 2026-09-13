@@ -103,7 +103,9 @@ describe('chrome command coverage', () => {
       areas.set(area, (areas.get(area) ?? 0) + 1);
     }
 
-    expect(registered).toBe(112);
+    // the number rises whenever a menu entry is wired from a dialog stub to the
+    // command it names; the last rise was Paste Options reaching clipboard.pastePlain
+    expect(registered).toBe(113);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
