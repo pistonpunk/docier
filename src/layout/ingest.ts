@@ -54,6 +54,7 @@ export interface IngestedItem {
   readonly forcedBreak: ForcedBreak;
   readonly codePoint: number;
   readonly object: ObjectPlacement | undefined;
+  readonly noteId: number | undefined;
 }
 
 export interface IngestedRun {
@@ -131,6 +132,7 @@ const itemOf = (
   forcedBreak: ForcedBreak,
   codePoint: number,
   object: ObjectPlacement | undefined = undefined,
+  noteId: number | undefined = undefined,
 ): IngestedItem => ({
   kind,
   text,
@@ -140,6 +142,7 @@ const itemOf = (
   forcedBreak,
   codePoint,
   object,
+  noteId,
 });
 
 const itemFromContent = (
@@ -194,7 +197,17 @@ const itemFromContent = (
     );
   }
   if (content instanceof NoteReferenceContent && content.kind === 'noteReference') {
-    return itemOf('noteRef', '', format.requestedFamily, format.size, start, 'none', 0);
+    return itemOf(
+      'noteRef',
+      '',
+      format.requestedFamily,
+      format.size,
+      start,
+      'none',
+      0,
+      undefined,
+      content.noteId,
+    );
   }
   return undefined;
 };

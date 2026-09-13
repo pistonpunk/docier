@@ -36,6 +36,7 @@ const regionBlocks = (page: PageFragment): readonly BlockFragment[] => {
   const out: BlockFragment[] = [];
   if (page.header !== undefined) out.push(...page.header.blocks);
   if (page.footer !== undefined) out.push(...page.footer.blocks);
+  if (page.footnotes !== undefined) out.push(...page.footnotes.blocks);
   return out;
 };
 

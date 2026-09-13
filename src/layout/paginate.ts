@@ -1,5 +1,5 @@
 import type { Mp } from '../units/index.js';
-import { mp } from '../units/index.js';
+import { maxMp, mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
 import type { ParagraphFormat } from './format.js';
 import type { Section } from './sections.js';
@@ -59,9 +59,12 @@ export interface PaginationResult {
   readonly tables: readonly PlacedTable[];
 }
 
+export const DEFAULT_RESERVE_FLOOR_MP = 10000;
+
 export interface PaginateOptions {
   readonly widowControlEnabled: boolean;
   readonly evenAndOddHeaders: boolean;
+  readonly bottomReserve?: ((pageIndex: number, section: Section) => Mp | undefined) | undefined;
 }
 
 const fallbackSection = (): Section => {
@@ -173,10 +176,18 @@ export const paginateFlow = (
         }
       }
     }
-    const box = contentBoxFor(
+    const full = contentBoxFor(
       section,
       pageVariantOf(section, kind, !openedSections.has(section.index), options.evenAndOddHeaders),
     );
+    const reserve = options.bottomReserve?.(pageIndex, section);
+    const box =
+      reserve === undefined || reserve <= 0
+        ? full
+        : {
+            ...full,
+            height: maxMp(mp(full.height - reserve), mp(DEFAULT_RESERVE_FLOOR_MP)),
+          };
     openedSections.add(section.index);
     currentSection = section;
     pages.push({

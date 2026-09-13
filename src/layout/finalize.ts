@@ -16,6 +16,7 @@ import type {
   CellRef,
   DocPos,
   FragmentSplit,
+  FootnoteAreaFragment,
   HeaderFooterFragment,
   LayoutDiagnostic,
   LayoutResult,
@@ -35,6 +36,7 @@ import { deepFreeze } from './freeze.js';
 export interface PageHeaderFooter {
   readonly header: HeaderFooterFragment | undefined;
   readonly footer: HeaderFooterFragment | undefined;
+  readonly footnotes: FootnoteAreaFragment | undefined;
 }
 
 export interface FinalizeInput {
@@ -312,6 +314,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
       page: page.page,
       origin: origins[pages.length] ?? { x: mp(0), y: mp(0) },
       contentBox: page.contentBox,
+      footnotes: regions?.footnotes,
       column: page.column,
       section: page.section,
       header: regions?.header,

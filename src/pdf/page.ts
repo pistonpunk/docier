@@ -2,6 +2,7 @@ import type {
   AtomPlacement,
   BlockFragment,
   CellFragment,
+  FootnoteAreaFragment,
   HeaderFooterFragment,
   LayoutResult,
   LineFragment,
@@ -253,6 +254,25 @@ export const paintRegion = (
   for (const block of region.blocks) paintBlock(block, frame, context);
 };
 
+const PAGE_RULE_RGB = { r: 0.4, g: 0.4, b: 0.4 } as const;
+
+export const paintFootnotes = (
+  area: FootnoteAreaFragment,
+  frame: PdfFrame,
+  context: PagePaintContext,
+): void => {
+  context.content.fillRgb(PAGE_RULE_RGB);
+  context.content.fillRect(
+    pdfRect(frame, {
+      x: area.box.x,
+      y: area.separatorY,
+      width: area.separatorWidth,
+      height: area.separatorHeight,
+    }),
+  );
+  for (const block of area.blocks) paintBlock(block, frame, context);
+};
+
 export const paintPage = (page: PageFragment, context: PagePaintContext): void => {
   const frame = pdfFrame(page);
   const blocks = blocksById(page);
@@ -262,12 +282,14 @@ export const paintPage = (page: PageFragment, context: PagePaintContext): void =
   for (const table of page.tables) paintTable(table, blocks, frame, context);
   if (page.header !== undefined) paintRegion(page.header, frame, context);
   if (page.footer !== undefined) paintRegion(page.footer, frame, context);
+  if (page.footnotes !== undefined) paintFootnotes(page.footnotes, frame, context);
 };
 
 export const blocksOfPage = (page: PageFragment): readonly BlockFragment[] => {
   const out: BlockFragment[] = [...page.blocks];
   if (page.header !== undefined) out.push(...page.header.blocks);
   if (page.footer !== undefined) out.push(...page.footer.blocks);
+  if (page.footnotes !== undefined) out.push(...page.footnotes.blocks);
   return out;
 };
 

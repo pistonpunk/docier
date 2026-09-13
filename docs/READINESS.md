@@ -114,11 +114,12 @@ inserted, the icons are drawn and the ribbon holds one height. A person can open
 document, edit it, format it, draw a table to the width they want, insert a
 picture, save it and export it today.
 
-What they cannot yet see on screen is a footnote body and the text inside a text
-box. Both documents are correct and round-trip through Word, and the editor says
-which part of the rendering is missing through `footnotesNotLaidOut` and
-`shapeContentNotLaidOut` rather than drawing nothing in silence. A comment is now
-fully visible: its range is marked and its text is readable in the comments panel.
+What they cannot yet see on screen is the text inside a text box. A document that
+needs one is correct and round-trips through Word, and the editor says which part of
+the rendering is missing through `shapeContentNotLaidOut` rather than drawing
+nothing in silence. A comment is fully visible - its range is marked and its text is
+readable in the comments panel - and **a footnote is drawn at the page foot**, with
+its separator rule, in the space the engine reserved for it.
 
 Ready, in the honest sense, means: nothing on the Insert tab refusing, view modes
 that change the view, and the ribbon at Word's height. The ribbon is within five
@@ -130,9 +131,8 @@ So the bar this document set for itself is **met on the Insert tab and one step
 short on the view modes**: nothing on that tab refuses any more, the ribbon is
 within five pixels of Word's, and three of four view modes change the view.
 
-Three gaps are left, and all three are in the layout engine rather than in a
-command: a per-page reserve so a footnote body can be drawn at the page foot, a
-nested story so a text box's own text can be laid out, and a flow-width option so
-Draft can re-flow. `docs/UI-PROGRESS.md` has each one with the shape of the change
-it needs. No feature is half-built - what is missing is three pieces of machinery
-that were never written.
+Two gaps are left, both in the layout engine rather than in a command: a nested
+story so a text box's own text can be laid out, and a flow-width option so Draft can
+re-flow. `docs/UI-PROGRESS.md` has each one with the shape of the change it needs.
+No feature is half-built - what is missing is two pieces of machinery that were
+never written.

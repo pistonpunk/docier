@@ -12,12 +12,16 @@ import {
 } from '../../src/render/index.js';
 import { geometryAt } from '../../src/render/dom.js';
 import {
+  footnotesRelationship,
   footerRelationship,
   footerXml,
   headerRelationship,
   headerXml,
   openModel,
 } from '../model/support.js';
+import { bodyOf } from '../layout/table-support.js';
+import { createDeterministicMeasurer } from '../../src/layout/index.js';
+import { toCssPx } from '../../src/units/index.js';
 import { host, measurerOf } from './support.js';
 
 const PAGE_TWIPS = 3000;
@@ -190,5 +194,38 @@ describe('the DOM painter draws the header and the footer', () => {
     expect(page.footer?.box.y).toBe(
       page.page.height - FOOTER_TWIPS * 50 - (page.footer?.box.height ?? 0),
     );
+  });
+});
+
+describe('the footnote area', () => {
+  it('paints the separator and the notes above the footer', async () => {
+    const spec = {
+      body: bodyOf(
+        '<w:p><w:r><w:t>alpha</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r></w:p>',
+      ),
+      footnotes: '<w:footnote w:id="1"><w:p><w:r><w:t>the note</w:t></w:r></w:p></w:footnote>',
+      documentRelationships: [footnotesRelationship()],
+    };
+    const model = await openModel(spec);
+    const result = layoutDocument(model, { measurer: createDeterministicMeasurer() });
+    const target = host();
+    renderDocument(result, target);
+
+    const area = result.pages[0]?.footnotes;
+    expect(area).toBeDefined();
+    const node = target.querySelector<HTMLElement>(`[${ATTR.footnotes}]`);
+    expect(node, 'the DOM paints the area the engine placed').not.toBeNull();
+    expect(node?.getAttribute(ATTR.footnotes)).toBe('1');
+    expect(node?.style.top).toBe(formatPx(toCssPx(area!.box.y, 1)));
+    expect(node?.style.left).toBe(formatPx(toCssPx(area!.box.x, 1)));
+
+    const rule = target.querySelector<HTMLElement>('.docier-footnote-separator');
+    expect(rule, 'the separator is painted, not implied').not.toBeNull();
+    expect(Number.parseFloat(rule!.style.width)).toBeGreaterThan(0);
+    expect(Number.parseFloat(rule!.style.height)).toBeGreaterThan(0);
+
+    const painted = [...node!.querySelectorAll(`[${ATTR.block}]`)];
+    expect(painted.length).toBe(area!.blocks.length);
+    expect(node!.textContent).toContain('the note');
   });
 });

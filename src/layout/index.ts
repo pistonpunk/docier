@@ -13,6 +13,7 @@ export type {
   DocPos,
   DocRange,
   DocSpan,
+  FootnoteAreaFragment,
   ForcedBreak,
   FragmentRef,
   FragmentSplit,

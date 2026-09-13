@@ -514,7 +514,7 @@ still announces that it is not available.
 | F4 | Symbol | **done** |
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
-| F4 | Footnote | **done at the document level, bodies not laid out** |
+| F4 | Footnote | **done, drawn at the page foot** |
 | F4 | Text box | **done at the document level, content not laid out** |
 
 ### Phase D notes
@@ -575,23 +575,58 @@ Not done, and belonging to D2 rather than here: the glyphs are all drawn on the
 same 16-unit grid, and there are no 32px variants yet, because the large-button
 variant that would use them does not exist.
 
+## Footnote bodies, drawn at the page foot
+
+This was the piece that needed the engine's most protected machinery, and it turned
+out to be the region machinery one level finer - the same measure, reserve, iterate
+the header and footer already do, applied per page instead of per section.
+
+**The primitive that was missing** is a per-page bottom reserve. Reserves were keyed
+`(section, variant)` and applied to every page of that section, while a footnote
+area depends on which notes land on *that* page - and which notes land there depends
+on where the pagination broke, which depends on the reserve. `paginateFlow` now
+takes a `bottomReserve` callback and shortens that page's content box by it, and the
+pipeline runs a second bounded fixpoint over the per-page reserves inside the
+existing one, converging when neither the region reserves nor the footnote reserves
+change.
+
+**A note is laid out as a region.** `layoutRegion` already lays a story's blocks out
+in a box, so each note gets a transient `Story` over its own `w:footnote` element and
+is laid out through it - no new paragraph machinery and no slicing of a concatenated
+story. The notes are then stacked below a separator rule and the wall of blocks is
+shifted to the area's page-absolute top, which is the detail that cost the most:
+region blocks carry page-absolute coordinates and are painted against
+`frameOf(region.box)`, and a first version that stacked them in *area-local*
+coordinates painted every note at the top of the page instead. Measured, not
+guessed: the note block's painted box came back at the page top, and it is now at the
+area's own y.
+
+**Which notes go on which page** comes from the reference atoms. The note id was
+being dropped in ingest - a `noteRef` item carried no id at all - so it is carried
+now from `w:footnoteReference` through the item and the atom to the page's pieces.
+
+**The area is a first-class fragment, not a decoration.** `PageFragment.footnotes`
+carries its box, the separator's own rectangle, the laid-out blocks and the note ids;
+both painters draw it - the DOM as a `docier-footnotes` container with a
+`docier-footnote-separator` rule, the PDF as a filled rectangle and the note blocks -
+and the divergence detector checks its blocks with the regions', so a note the engine
+places and the DOM does not paint fails in CI like any other drift.
+
+**The diagnostic retired itself.** `footnotesNotLaidOut` used to fire whenever the
+document had note bodies. It now fires only when the document carries notes that no
+reference in the body points at, which is a real and different problem, and the
+message says so.
+
+Verified live in Chromium: inserting a footnote into the sample draws a
+`[data-docier-footnotes]` area 602 by 45 pixels holding the note text, a separator
+rule 201 pixels wide at its top, and the sample's footer below it - all inside the
+page and above the bottom margin.
+
 ## What is left, and why it is not a command's worth of work
 
-Three gaps remain, all of them in the layout rather than in a command, and each is
-recorded here with the shape of the change it needs. Everything else in every
-phase's list is done and verified.
-
-**Footnote bodies at the page foot.** The part, the reference and the note are all
-written; what is missing is that the note is not drawn. It needs a **per-page**
-reserve, and that is the obstacle rather than the note's own layout, which is
-ordinary paragraph layout. The header and footer reserve cannot express it: reserves
-are keyed `(section, variant)` and applied to every page of that section, while a
-footnote area depends on which notes land on *that* page - and which notes land
-there depends on where the pagination broke, which depends on the reserve. It is the
-same circularity the region fixpoint already resolves, one level finer, so
-`paginateFlow` needs a per-page bottom reserve and the pipeline a second bounded
-iteration over it. The painters and the divergence detector have to land in the same
-change or the detector reports the engine painting notes the DOM does not.
+Two gaps remain, both in the layout rather than in a command, and each is recorded
+here with the shape of the change it needs. Everything else in every phase's list is
+done and verified.
 
 **The text inside a text box.** The drawing, its geometry and its nested
 `w:txbxContent` are written and the box is placed at its extent. Laying its text out
@@ -952,6 +987,7 @@ answer than the placeholder was.
 | Undo | back to 14 |
 | Inserting a footnote | the command runs, and the layout reports `footnotesNotLaidOut` |
 | The footnote written | the separators, the reference and the note text are all in the saved package |
+| The footnote drawn | the separator rule and the note text at the page foot, above the footer |
 | Inserting a text box | the drawing is placed as an object at its extent, 1 object node |
 | What the engine says about it | `shapeContentNotLaidOut`, and no false `missingImage` |
 | The comments panel | hidden at first, shown by the Review tab's Comments button |

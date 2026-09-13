@@ -1,6 +1,7 @@
 import type {
   BlockFragment,
   CellFragment,
+  FootnoteAreaFragment,
   HeaderFooterFragment,
   LayoutResult,
   PageFragment,
@@ -9,6 +10,7 @@ import type {
 } from '../layout/index.js';
 import type { Frame, ResolvedRenderOptions } from './types.js';
 import type { PaintScale } from './scale.js';
+import { formatPx } from './scale.js';
 import { applyStyle, positionStyle } from './style.js';
 import { ATTR, box, frameOf, geometryAt, stamp } from './dom.js';
 import { paintBorders, paintShading } from './decoration.js';
@@ -142,6 +144,42 @@ export const paintRegion = (
   return node;
 };
 
+export const paintFootnotes = (
+  sheet: HTMLElement,
+  area: FootnoteAreaFragment,
+  frame: Frame,
+  context: PagePaintContext,
+): HTMLElement => {
+  const node = box('docier-footnotes');
+  stamp(node, { [ATTR.footnotes]: area.noteIds.join(' ') });
+  applyStyle(node, positionStyle(geometryAt(area.box, frame, context.scale)));
+  const rule = box('docier-footnote-separator');
+  applyStyle(
+    rule,
+    positionStyle(
+      geometryAt(
+        {
+          x: area.box.x,
+          y: area.separatorY,
+          width: area.separatorWidth,
+          height: area.separatorHeight,
+        },
+        frame,
+        context.scale,
+      ),
+      {
+        'background-color': 'var(--docier-page-rule, rgba(0, 0, 0, 0.55))',
+        height: formatPx(context.scale.px(area.separatorHeight)),
+      },
+    ),
+  );
+  sheet.appendChild(rule);
+  const inner = frameOf(area.box);
+  for (const block of area.blocks) paintBlock(node, block, inner, context);
+  sheet.appendChild(node);
+  return node;
+};
+
 export const paintPage = (
   sheet: HTMLElement,
   page: PageFragment,
@@ -155,6 +193,7 @@ export const paintPage = (
   for (const table of page.tables) paintTable(sheet, table, blocks, frame, context);
   if (page.header !== undefined) paintRegion(sheet, page.header, frame, context);
   if (page.footer !== undefined) paintRegion(sheet, page.footer, frame, context);
+  if (page.footnotes !== undefined) paintFootnotes(sheet, page.footnotes, frame, context);
 };
 
 export const paintOverlay = (

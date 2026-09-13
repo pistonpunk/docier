@@ -1,5 +1,6 @@
 import type { Mp, Twip } from '../units/index.js';
 import { mp, twip, twipToMp } from '../units/index.js';
+import { Story } from '../model/index.js';
 import type { DocumentModel } from '../model/index.js';
 import type { TextMeasurer } from '../measure/index.js';
 import { SINGLE_LINE_MULTIPLE, autoSpacing, createDeterministicMeasurer } from '../measure/index.js';
@@ -19,6 +20,7 @@ import type { FlowBlock, PaginateBlock, PaginationResult } from './paginate.js';
 import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
 import type { PageHeaderFooter } from './finalize.js';
 import { finalize } from './finalize.js';
+import type { FootnoteAreaFragment } from './types.js';
 import type {
   BlockFragment,
   HeaderFooterFragment,
@@ -28,7 +30,7 @@ import type {
   LineFragment,
   Rect,
 } from './types.js';
-import type { HeaderFooterSlot } from './header-footer.js';
+import type { HeaderFooterSlot, RegionLayout } from './header-footer.js';
 import { HEADER_FOOTER_VARIANTS, layoutRegion, resolveHeaderFooterPlan, storyLayoutOf } from './header-footer.js';
 import type { PageFieldValues } from './fields.js';
 import { maxMp, minMp } from '../units/index.js';
@@ -36,6 +38,10 @@ import { maxMp, minMp } from '../units/index.js';
 export const DEFAULT_TAB_STOP_TWIPS = 720;
 
 export const MAX_PAGE_COUNT_ITERATIONS = 4;
+
+export const FOOTNOTE_SEPARATOR_MP = 12000;
+
+export const FOOTNOTE_RULE_MP = 500;
 
 export interface LayoutOptions {
   readonly measurer?: TextMeasurer;
@@ -218,9 +224,10 @@ export const layoutDocument = (
   for (const diagnostic of coverageDiagnostics(
     ingested.hasThemeFonts,
     ingested.hasFields,
-    ingested.hasNotes,
+    false,
     ingested.hasUnresolvedDrawings,
     ingested.hasShapeDrawings,
+    false,
   )) {
     diagnostics.push(diagnostic);
   }
@@ -319,6 +326,107 @@ export const layoutDocument = (
     return fragment;
   };
 
+  const notesStory = model.stories().find((story) => story.kind === 'footnote');
+  const noteIdsPerPage = (paginated: PaginationResult): ReadonlyMap<number, readonly number[]> => {
+    const out = new Map<number, number[]>();
+    if (notesStory === undefined) return out;
+    const seen = new Set<string>();
+    for (const piece of paginated.pieces) {
+      const block = paragraphBlocks[piece.block];
+      if (block === undefined) continue;
+      const key = `${String(piece.page)}:${String(piece.block)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ids: number[] = [];
+      for (let index = piece.lineStart; index < piece.lineEnd; index += 1) {
+        for (const placed of block.lines[index]?.placed ?? []) {
+          const noteId = placed.measured.atom.noteId;
+          if (noteId === undefined || noteId <= 0) continue;
+          if (ids.includes(noteId)) continue;
+          ids.push(noteId);
+        }
+      }
+      if (ids.length === 0) continue;
+      const existing = out.get(piece.page) ?? [];
+      for (const id of ids) if (!existing.includes(id)) existing.push(id);
+      out.set(piece.page, existing);
+    }
+    return out;
+  };
+
+  const footnoteAreasFor = (
+    paginated: PaginationResult,
+    regions: RegionsForResult,
+  ): { readonly byPage: ReadonlyMap<number, FootnoteAreaFragment>; readonly reserves: ReadonlyMap<number, Mp> } => {
+    const byPage = new Map<number, FootnoteAreaFragment>();
+    const reserves = new Map<number, Mp>();
+    if (notesStory === undefined) return { byPage, reserves };
+    const wanted = noteIdsPerPage(paginated);
+    let lineIdBase = -1;
+    for (const page of paginated.pages) {
+      const ids = wanted.get(page.index) ?? [];
+      if (ids.length === 0) continue;
+      const box = page.contentBox;
+      const laid: RegionLayout[] = [];
+      let stacked = 0;
+      for (const id of ids) {
+        const note = notesStory.note(id);
+        if (note === undefined) continue;
+        const story = new Story({
+          kind: 'footnote',
+          id: `footnote:${String(id)}`,
+          partName: notesStory.partName,
+          element: note.element,
+          context: model.context,
+        });
+        const one = layoutRegion({
+          model,
+          story,
+          page: page.index,
+          values: { page: page.index + 1, pages: paginated.pages.length, section: page.section + 1, sectionPages: 1 },
+          x: box.x,
+          width: box.width,
+          blockIdBase: blockIdBase(story.id, story.paragraphCount),
+          lineIdBase: 0,
+          measurer,
+          fonts,
+          paint,
+          hash,
+          defaultFontFamily,
+          defaultTabStop: defaultTabStopMp,
+          diagnostics,
+        });
+        laid.push(one);
+        stacked += one.height;
+      }
+      if (laid.length === 0) continue;
+      const height = mp(stacked + FOOTNOTE_SEPARATOR_MP);
+      const footer = regions.byPage.get(page.index)?.footer;
+      const textBottom = mp(page.contentBox.y + page.contentBox.height);
+      const bottom = footer === undefined ? textBottom : minMp(footer.box.y, textBottom);
+      const top = mp(bottom - height);
+      const blocks: BlockFragment[] = [];
+      let y = FOOTNOTE_SEPARATOR_MP;
+      for (const one of laid) {
+        const placed = placeBlocks(one.blocks, mp(top + y), lineIdBase);
+        lineIdBase = placed.nextLineId;
+        for (const entry of placed.blocks) blocks.push(entry);
+        y += one.height;
+      }
+      const area: FootnoteAreaFragment = {
+        box: rectOf(box.x, top, box.width, height),
+        separatorY: top,
+        separatorWidth: mp(Math.round(box.width / 3)),
+        separatorHeight: mp(FOOTNOTE_RULE_MP),
+        blocks,
+        noteIds: ids,
+      };
+      byPage.set(page.index, area);
+      reserves.set(page.index, height);
+    }
+    return { byPage, reserves };
+  };
+
   const regionsFor = (
     paginated: PaginationResult,
   ): RegionsForResult => {
@@ -348,9 +456,13 @@ export const layoutDocument = (
       const sectionPlan = plan.sections[section.index];
       const header = regionOf(section, page.index, variant, sectionPlan?.header[variant], values);
       const footer = regionOf(section, page.index, variant, sectionPlan?.footer[variant], values);
-      byPage.set(page.index, { header, footer });
+      byPage.set(page.index, { header, footer, footnotes: undefined });
       const key = reserveKey(section.index, variant);
-      const existing = reserves.get(key) ?? { header: undefined, footer: undefined };
+      const existing = reserves.get(key) ?? {
+        header: undefined,
+        footer: undefined,
+        footnotes: undefined,
+      };
       reserves.set(key, {
         header: widest(existing.header, header?.box.height),
         footer: widest(existing.footer, footer?.box.height),
@@ -360,22 +472,40 @@ export const layoutDocument = (
   };
 
   let reserves: ReserveMap = new Map();
+  let footnoteReserves: ReadonlyMap<number, Mp> = new Map();
   let reserved = sectionsWithReserve(sections, reserves, defaultLineBox.height);
   let paginated = paginateFlow(flow, reserved.sections, diagnostics, {
     widowControlEnabled: options.widowControl ?? true,
     evenAndOddHeaders,
   });
   let regions = regionsFor(paginated);
-  let converged = reservesEqual(reserves, regions.reserves);
+  let footnotes = footnoteAreasFor(paginated, regions);
+  let converged =
+    reservesEqual(reserves, regions.reserves) &&
+    footnoteReservesEqual(footnoteReserves, footnotes.reserves);
   for (let attempt = 0; !converged && attempt < MAX_PAGE_COUNT_ITERATIONS; attempt += 1) {
     reserves = regions.reserves;
+    footnoteReserves = footnotes.reserves;
     reserved = sectionsWithReserve(sections, reserves, defaultLineBox.height);
     paginated = paginateFlow(flow, reserved.sections, diagnostics, {
       widowControlEnabled: options.widowControl ?? true,
       evenAndOddHeaders,
+      bottomReserve: (page) => footnoteReserves.get(page),
     });
     regions = regionsFor(paginated);
-    converged = reservesEqual(reserves, regions.reserves);
+    footnotes = footnoteAreasFor(paginated, regions);
+    converged =
+      reservesEqual(reserves, regions.reserves) &&
+      footnoteReservesEqual(footnoteReserves, footnotes.reserves);
+  }
+  if (ingested.hasNotes && footnotes.byPage.size === 0) {
+    diagnostics.push({
+      code: 'footnotesNotLaidOut',
+      severity: 'warning',
+      message:
+        'this document carries footnote or endnote bodies that no reference in the body points at, so they are not laid out',
+      docPos: undefined,
+    });
   }
   if (!converged) {
     diagnostics.push({
@@ -413,7 +543,10 @@ export const layoutDocument = (
     storyKind: model.body().kind,
     blockCount: ingested.blocks.length,
     headerFooters: paginated.pages.map(
-      (page): PageHeaderFooter => regions.byPage.get(page.index) ?? { header: undefined, footer: undefined },
+      (page): PageHeaderFooter => ({
+        ...(regions.byPage.get(page.index) ?? { header: undefined, footer: undefined }),
+        footnotes: footnotes.byPage.get(page.index),
+      }),
     ),
     stories: plan.stories.map((story) => storyLayoutOf(story, story.blocks().length)),
     lineIdBase: 0,
@@ -438,6 +571,15 @@ const widest = (current: Mp | undefined, candidate: Mp | undefined): Mp | undefi
   if (candidate === undefined) return current;
   if (current === undefined) return candidate;
   return mp(Math.max(current, candidate));
+};
+
+const footnoteReservesEqual = (
+  left: ReadonlyMap<number, Mp>,
+  right: ReadonlyMap<number, Mp>,
+): boolean => {
+  if (left.size !== right.size) return false;
+  for (const [key, value] of left) if (right.get(key) !== value) return false;
+  return true;
 };
 
 const reservesEqual = (left: ReserveMap, right: ReserveMap): boolean => {
@@ -492,6 +634,7 @@ const coverageDiagnostics = (
   hasNotes: boolean,
   hasUnresolvedDrawings: boolean,
   hasShapeDrawings: boolean,
+  footnotesLaidOut: boolean,
 ): readonly LayoutDiagnostic[] => {
   const out: LayoutDiagnostic[] = [];
   if (hasThemeFonts) {
@@ -510,11 +653,12 @@ const coverageDiagnostics = (
       docPos: undefined,
     });
   }
-  if (hasNotes) {
+  if (hasNotes && !footnotesLaidOut) {
     out.push({
       code: 'footnotesNotLaidOut',
       severity: 'warning',
-      message: 'footnote and endnote bodies are not laid out by this slice',
+      message:
+        'this document carries footnote or endnote bodies that no reference in the body points at, so they are not laid out',
       docPos: undefined,
     });
   }

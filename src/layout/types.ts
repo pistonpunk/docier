@@ -134,6 +134,15 @@ export interface AtomPlacement {
   readonly level: number;
 }
 
+export interface FootnoteAreaFragment {
+  readonly box: Rect;
+  readonly separatorY: Mp;
+  readonly separatorWidth: Mp;
+  readonly separatorHeight: Mp;
+  readonly blocks: readonly BlockFragment[];
+  readonly noteIds: readonly number[];
+}
+
 export interface LineRun {
   readonly paint: number;
   readonly x: Mp;
@@ -297,6 +306,7 @@ export interface PageFragment {
   readonly section: number;
   readonly header: HeaderFooterFragment | undefined;
   readonly footer: HeaderFooterFragment | undefined;
+  readonly footnotes: FootnoteAreaFragment | undefined;
   readonly blocks: readonly BlockFragment[];
   readonly tables: readonly TableFragment[];
 }

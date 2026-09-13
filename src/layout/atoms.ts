@@ -35,6 +35,7 @@ export interface Atom {
   readonly hyphen: HyphenGlyph | undefined;
   readonly level: number;
   readonly annotation: RunAnnotation;
+  readonly noteId: number | undefined;
 }
 
 export interface ParagraphAtoms {
@@ -93,6 +94,7 @@ interface Draft {
   readonly forcedBreak: ForcedBreak;
   readonly source: DocRange;
   readonly hyphen: HyphenGlyph | undefined;
+  readonly noteId: number | undefined;
 }
 
 interface RenderedText {
@@ -151,6 +153,7 @@ export const atomize = (
       hyphen: draft.hyphen,
       level: 0,
       annotation: currentAnnotation,
+      noteId: draft.noteId,
     });
     nextId += 1;
   };
@@ -187,6 +190,7 @@ export const atomize = (
             forcedBreak: item.forcedBreak,
             source: { start: item.docStart, end: docPos(base + 1) },
             hyphen: undefined,
+            noteId: item.noteId,
           },
           face,
           itemFormat,
@@ -230,6 +234,7 @@ export const atomize = (
                   source: { start: docPos(base + end), end: docPos(base + end + 1) },
                 }
               : undefined,
+            noteId: item.noteId,
           },
           pendingFace,
           itemFormat,

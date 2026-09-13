@@ -72,6 +72,7 @@ const prefixAtom = (
     hyphen: undefined,
     level: 0,
     annotation: NO_ANNOTATION,
+    noteId: undefined,
   };
 };
 
