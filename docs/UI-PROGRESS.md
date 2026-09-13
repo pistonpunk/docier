@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B**: B1, B2, B3 done, B4 to do. **Phase C**: C1 to C5 done, table menu partly. **Phase D**: D1, D3 and D4 done, D2 to do. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
+Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done, table menu partly. **Phase D**: D1, D3 and D4 done, D2 to do. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
 
 Done and verified in the browser:
 
@@ -78,7 +78,7 @@ have removed drag-to-move, which works and is worth keeping.
 | B1 | Delete `startDrag`, give the indent markers the margin interaction, clamp negative indents | **done** |
 | B2 | Make pictures visible at all, by giving the renderer the media parts | **done** |
 | B3 | Object selection and resize handles for inline pictures | **done** |
-| B4 | Table width handles, proportional write, `tblLayout` fixed | to do |
+| B4 | Table width handles, proportional write, `tblLayout` fixed | **done** |
 
 ### Phase B notes
 
@@ -149,6 +149,55 @@ reproduce:
 - No keyboard nudge, no drag-to-move, no multi-select, no rotation, no size readout.
 - `docier.command.object.select` exists but no menu or toolbar dispatches it; the
   pointer path executes it directly.
+
+**B4 done.** A table could be resized only by dragging a cell border, which moved
+one column and grew the table: the audit measured a 60px drag taking it 623 to
+686. The decision was width only, no height handle and no move, so what was
+missing was a handle on the table's own outer edges.
+
+`tableWidthEdgeInPage` finds the outer left and right edges of every table on the
+page, and `tableEdgeAt` prefers them over a column edge, so the outermost boundary
+is the table's and an inner boundary is still the column's. Verified in the
+browser: both outer edges report `ew-resize`, and the first cell's right edge
+still reports `col-resize`.
+
+The commit is `docier.command.table.setWidth`. It scales every column
+proportionally so the grid sums to the width that was dragged, then writes all
+three places the width lives - `w:tblW`, every `w:gridCol` and every `w:tcW`,
+summing a spanned cell's columns for its own width - and sets `w:tblLayout` to
+fixed, without which Word resizes the table again on open.
+
+**The bug the first version had, and the reason the argument exists.** It scaled
+the widths declared in `tblGrid`. The sample's table is autofit, so its grid
+columns and its real columns are different numbers, and the first drag came back
+with the columns **equalised** - measured 62/180/310 becoming 189/189/253 - which
+is a table someone would have to fix by hand. The drag now reads the column widths
+the layout actually resolved (`TableFragment.columns`, the same authority the
+paint uses) and passes them in, so the scale is taken from what the user can see.
+With that, the same drag on the same table gives 71/206/355 for a table that grew
+551 to 631 pixels, and each column is the same multiple of what it was.
+
+Verified live, in Chromium, against the built demo:
+
+| Check | Measured |
+|---|---|
+| Outer left and right edges cue a width drag | `ew-resize` on both |
+| An inner cell border is still a column edge | `col-resize` |
+| The guide follows the pointer and hides on release | present during, hidden after |
+| The table grows by the drag | 551 to 631 for an 80px drag |
+| Every column keeps its proportion | 62/180/310 to 71/206/355 |
+| One commit per gesture | 551 to 611 to 651, undo to 611 by one step |
+| Undo stops at the start | a third undo leaves 551 |
+| Redo replays both gestures | 611, then 651 |
+| The saved file carries the width | `tblLayout fixed`, `tblW 8000 dxa`, grid and cell widths |
+| Console and page errors | none |
+
+Not done, recorded rather than implied: there is no table-level width control in
+the menu or on the Table tab, so the only way to reach this is the pointer; a
+table with no `tblGrid` has nothing to scale from and is refused; the left handle
+grows the table to the right, matching Word, so it does not preserve the table's
+left edge; and nothing here touches a table inside a header or footer, which the
+layout still does not lay out.
 
 ## Phase C - The menu surface
 

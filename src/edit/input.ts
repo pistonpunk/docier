@@ -53,6 +53,7 @@ const CARET_BLINK_MS = 530;
 const COLUMN_EDGE_PX = 5;
 const MIN_COLUMN_WIDTH_MP = mp(120 * MP_PER_TWIP);
 const MIN_ROW_HEIGHT_MP = mp(120 * MP_PER_TWIP);
+const MIN_TABLE_WIDTH_MP = mp(240 * MP_PER_TWIP);
 
 export interface ColumnEdge {
   readonly table: number;
@@ -62,9 +63,18 @@ export interface ColumnEdge {
   readonly widths: readonly number[];
 }
 
+export interface TableWidthEdge {
+  readonly table: number;
+  readonly side: 'left' | 'right';
+  readonly x: Mp;
+  readonly width: Mp;
+  readonly columns: readonly number[];
+}
+
 type TableEdge =
   | ({ readonly kind: 'column' } & ColumnEdge)
-  | ({ readonly kind: 'row' } & RowEdge);
+  | ({ readonly kind: 'row' } & RowEdge)
+  | ({ readonly kind: 'table' } & TableWidthEdge);
 
 export interface RowEdge {
   readonly table: number;
@@ -72,6 +82,38 @@ export interface RowEdge {
   readonly y: Mp;
   readonly height: Mp;
 }
+
+export const tableWidthEdgeInPage = (
+  page: PageFragment,
+  point: { readonly x: Mp; readonly y: Mp },
+  tolerance: Mp,
+): TableWidthEdge | undefined => {
+  let best: TableWidthEdge | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const table of page.tables) {
+    const box = table.box;
+    if (point.y < box.y || point.y > box.y + box.height) continue;
+    const left = box.x;
+    const right = mp(box.x + box.width);
+    const candidates: readonly { readonly side: 'left' | 'right'; readonly x: Mp }[] = [
+      { side: 'left', x: left },
+      { side: 'right', x: right },
+    ];
+    for (const candidate of candidates) {
+      const distance = Math.abs((point.x as number) - (candidate.x as number));
+      if (distance > (tolerance as number) || distance >= bestDistance) continue;
+      bestDistance = distance;
+      best = {
+        table: table.table,
+        side: candidate.side,
+        x: candidate.x,
+        width: box.width,
+        columns: table.columns.map((value) => mpToTwip(value)),
+      };
+    }
+  }
+  return best;
+};
 
 export const rowEdgeInPage = (
   page: PageFragment,
@@ -640,6 +682,8 @@ export const attachInput = (host: InputHost): InputHandle => {
       const page = pageFragmentOf(pageIndex);
       if (page === undefined) return undefined;
       const point = clientToPage(page, { left: box.left, top: box.top }, clientX, clientY, zoom);
+      const table = tableWidthEdgeInPage(page, point, tolerance);
+      if (table !== undefined) return { kind: 'table', ...table };
       const column = columnEdgeInPage(page, point, tolerance);
       const row = rowEdgeInPage(page, point, tolerance);
       if (column !== undefined && row !== undefined) {
@@ -711,7 +755,52 @@ export const attachInput = (host: InputHost): InputHandle => {
       startRowDrag(edge, event);
       return;
     }
+    if (edge.kind === 'table') {
+      startTableWidthDrag(edge, event);
+      return;
+    }
     startColumnDrag(edge, event);
+  };
+
+  const startTableWidthDrag = (edge: TableWidthEdge, event: PointerEvent): void => {
+    const zoom = host.zoom === 0 ? 1 : host.zoom;
+    const anchor = hitTest(event.clientX, event.clientY)?.pos;
+    const startX = event.clientX;
+    const base = edge.width;
+    const direction = edge.side === 'right' ? 1 : -1;
+    const guide = guideFor('column');
+    const baseBox = host.rendered.getBoundingClientRect();
+    let pending = mpToTwip(base);
+    guide.hidden = false;
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      const delta = fromCssPx(direction * (moveEvent.clientX - startX), zoom);
+      const width = mp(Math.max(MIN_TABLE_WIDTH_MP as number, (base as number) + (delta as number)) as number);
+      pending = mpToTwip(width);
+      guide.style.left = `${String(
+        Math.round(moveEvent.clientX - baseBox.left - (direction > 0 ? 0 : 1)),
+      )}px`;
+    };
+    const finish = (): void => {
+      guide.hidden = true;
+      owner.removeEventListener('pointermove', onMove);
+      owner.removeEventListener('pointerup', finish);
+      owner.removeEventListener('pointercancel', finish);
+      if (pending !== mpToTwip(base)) {
+        run(`${PREFIX}table.setWidth`, {
+          widthTwips: pending,
+          fromWidths: edge.columns,
+          ...(anchor === undefined ? {} : { anchor }),
+        });
+      }
+    };
+    guide.style.left = `${String(
+      Math.round(event.clientX - baseBox.left - (direction > 0 ? 0 : 1)),
+    )}px`;
+    owner.addEventListener('pointermove', onMove);
+    owner.addEventListener('pointerup', finish);
+    owner.addEventListener('pointercancel', finish);
+    event.preventDefault();
   };
 
   const startColumnDrag = (edge: ColumnEdge, event: PointerEvent): void => {
@@ -766,7 +855,13 @@ export const attachInput = (host: InputHost): InputHandle => {
     }
     const edge = tableEdgeAt(event.clientX, event.clientY);
     host.rendered.style.cursor =
-      edge === undefined ? '' : edge.kind === 'column' ? 'col-resize' : 'row-resize';
+      edge === undefined
+        ? ''
+        : edge.kind === 'row'
+          ? 'row-resize'
+          : edge.kind === 'table'
+            ? 'ew-resize'
+            : 'col-resize';
   };
 
   const releasePointer = (): void => {

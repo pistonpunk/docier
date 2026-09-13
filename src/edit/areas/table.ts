@@ -36,6 +36,7 @@ const ONE_TABLE: LocalizedString = 'The selection starts and ends in different t
 const RECTANGLE: LocalizedString =
   'This build merges cells along one row or one column; a block of rows and columns is not merged';
 const BAD_WIDTH: LocalizedString = 'A column needs a width of at least 6 points';
+const BAD_TABLE_WIDTH: LocalizedString = 'A table needs a width of at least 12 points';
 const BAD_HEIGHT: LocalizedString = 'A row needs a height of at least 6 points';
 const NOT_MERGED: LocalizedString =
   'The cell under the caret is not merged, so there is nothing to split';
@@ -600,6 +601,120 @@ const setRowHeightSpec: AreaSpec<RowHeightArgs> = {
   },
 };
 
+export interface TableWidthArgs {
+  readonly widthTwips?: number;
+  readonly fromWidths?: readonly number[];
+  readonly anchor?: DocPos;
+}
+
+const MIN_TABLE_TWIPS = 240;
+
+export const proportionalWidths = (
+  current: readonly number[],
+  total: number,
+): readonly number[] => {
+  const count = current.length;
+  if (count === 0) return [];
+  const sum = current.reduce((running, value) => running + Math.max(0, value), 0);
+  const share = sum <= 0 ? total / count : 0;
+  const exact = current.map((value) => (sum <= 0 ? share : (Math.max(0, value) * total) / sum));
+  const widths = exact.map((value) => Math.max(MIN_COLUMN_TWIPS, Math.floor(value)));
+  let remainder = total - widths.reduce((running, value) => running + value, 0);
+  const byFraction = exact
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
+  for (const entry of byFraction) {
+    if (remainder <= 0) break;
+    widths[entry.index] = (widths[entry.index] ?? 0) + 1;
+    remainder -= 1;
+  }
+  const bySize = [...widths]
+    .map((value, index) => ({ index, value }))
+    .sort((left, right) => right.value - left.value || left.index - right.index);
+  for (const entry of bySize) {
+    if (remainder >= 0) break;
+    const room = (widths[entry.index] ?? 0) - MIN_COLUMN_TWIPS;
+    if (room <= 0) continue;
+    const take = Math.min(room, -remainder);
+    widths[entry.index] = (widths[entry.index] ?? 0) - take;
+    remainder += take;
+  }
+  return widths;
+};
+
+const setTableWidthSpec: AreaSpec<TableWidthArgs> = {
+  id: 'docier.command.table.setWidth',
+  label: 'Table width',
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host, args) => {
+    if (!host.session.aligned) return false;
+    const target = targetAt(host, args?.anchor);
+    return target !== undefined && tableWidthSettable(target, args);
+  },
+  reason: (host, args) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    const target = targetAt(host, args?.anchor);
+    if (target === undefined) return PLACE_CARET;
+    return tableWidthSettable(target, args) ? NEEDS_PROPERTY : BAD_TABLE_WIDTH;
+  },
+  run: (host, args) => {
+    const target = targetAt(host, args.anchor);
+    if (target === undefined || !tableWidthSettable(target, args)) return false;
+    const table = target.table;
+    const total = Math.max(MIN_TABLE_TWIPS, Math.floor(args.widthTwips ?? 0));
+    const grid = table.gridColumns();
+    const declared = grid.map((column) =>
+      column.width === undefined ? MIN_COLUMN_TWIPS : Math.max(MIN_COLUMN_TWIPS, Math.floor(column.width)),
+    );
+    const seen = args.fromWidths;
+    const current =
+      seen === undefined || seen.length !== declared.length
+        ? declared
+        : seen.map((value) =>
+            Number.isFinite(value) ? Math.max(MIN_COLUMN_TWIPS, Math.floor(value)) : MIN_COLUMN_TWIPS,
+          );
+    const widths = proportionalWidths(current, total);
+    const changed = changedBy([table.element], () => {
+      const properties = table.properties;
+      properties.ensure();
+      properties.layout = 'fixed';
+      properties.width.type = 'dxa';
+      properties.width.twips = twip(widths.reduce((running, value) => running + value, 0));
+      for (let index = 0; index < grid.length; index += 1) {
+        const column = grid[index];
+        if (column === undefined) continue;
+        setWAttr(column.element, 'w', String(widths[index] ?? MIN_COLUMN_TWIPS));
+      }
+      for (const row of table.rows()) {
+        for (const span of row.cellSpans()) {
+          const spanWidth = Math.max(1, span.span);
+          let cellTotal = 0;
+          for (let step = 0; step < spanWidth; step += 1) {
+            cellTotal += widths[span.start + step] ?? MIN_COLUMN_TWIPS;
+          }
+          span.cell.properties.width.type = 'dxa';
+          span.cell.properties.width.twips = twip(cellTotal);
+        }
+      }
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(table.element);
+    return true;
+  },
+};
+
+const tableWidthSettable = (
+  target: CellTarget | undefined,
+  args: TableWidthArgs | undefined,
+): boolean => {
+  if (target === undefined || args === undefined) return false;
+  const width = args.widthTwips;
+  if (width === undefined || !Number.isFinite(width)) return false;
+  if (Math.floor(width) < MIN_TABLE_TWIPS) return false;
+  return target.table.columnCount > 0;
+};
+
 const rowSettable = (target: CellTarget | undefined, args: RowHeightArgs | undefined): boolean => {
   if (target === undefined || args === undefined) return false;
   const height = args.heightTwips;
@@ -639,6 +754,7 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<CountArgs>(host, splitSpec),
   areaCommand<TablePropertiesArgs>(host, setPropertiesSpec),
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
+  areaCommand<TableWidthArgs>(host, setTableWidthSpec),
   areaCommand<RowHeightArgs>(host, setRowHeightSpec),
   areaCommand<CountArgs>(host, deleteSpec),
 ];
