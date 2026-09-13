@@ -575,6 +575,43 @@ Not done, and belonging to D2 rather than here: the glyphs are all drawn on the
 same 16-unit grid, and there are no 32px variants yet, because the large-button
 variant that would use them does not exist.
 
+## What is left, and why it is not a command's worth of work
+
+Three gaps remain, all of them in the layout rather than in a command, and each is
+recorded here with the shape of the change it needs. Everything else in every
+phase's list is done and verified.
+
+**Footnote bodies at the page foot.** The part, the reference and the note are all
+written; what is missing is that the note is not drawn. It needs a **per-page**
+reserve, and that is the obstacle rather than the note's own layout, which is
+ordinary paragraph layout. The header and footer reserve cannot express it: reserves
+are keyed `(section, variant)` and applied to every page of that section, while a
+footnote area depends on which notes land on *that* page - and which notes land
+there depends on where the pagination broke, which depends on the reserve. It is the
+same circularity the region fixpoint already resolves, one level finer, so
+`paginateFlow` needs a per-page bottom reserve and the pipeline a second bounded
+iteration over it. The painters and the divergence detector have to land in the same
+change or the detector reports the engine painting notes the DOM does not.
+
+**The text inside a text box.** The drawing, its geometry and its nested
+`w:txbxContent` are written and the box is placed at its extent. Laying its text out
+is contained - the object's box is known before pagination and never changes, so
+there is no circularity - but it is a nested story, so it needs its own ingest and
+its own place in `ObjectPlacement` before both painters can draw it and the
+`shapeContentNotLaidOut` diagnostic can be retired.
+
+**Draft view.** Web Layout and Draft paint the same continuous column. They differ in
+Word because Draft re-flows the text to the window, which is a layout change, and
+the honest way to do it is an engine option that lays the sections out at a flow
+width on one variable-height page. No paint-only difference exists: hiding drawn
+content would be wrong, because Word shows inline pictures in Draft.
+
+None of the three is a case of a feature that was started and stopped. Each is a
+piece of the layout engine that does not exist yet, and each is named here with what
+it would take rather than left as a silent absence - which is also what the engine
+itself does, in `footnotesNotLaidOut` and `shapeContentNotLaidOut`, in the
+diagnostics a person can read in the demo.
+
 ## View modes, closed after Phase F
 
 `READINESS.md` named three view modes writing a state nothing read as the largest

@@ -114,10 +114,11 @@ inserted, the icons are drawn and the ribbon holds one height. A person can open
 document, edit it, format it, draw a table to the width they want, insert a
 picture, save it and export it today.
 
-What they cannot yet do is *see* a comment, a footnote body or the text inside a
-text box on screen. Those documents are correct, round-trip through Word and show
-what they should there; in this editor three of them are invisible and each says so
-through a diagnostic rather than pretending.
+What they cannot yet see on screen is a footnote body and the text inside a text
+box. Both documents are correct and round-trip through Word, and the editor says
+which part of the rendering is missing through `footnotesNotLaidOut` and
+`shapeContentNotLaidOut` rather than drawing nothing in silence. A comment is now
+fully visible: its range is marked and its text is readable in the comments panel.
 
 Ready, in the honest sense, means: nothing on the Insert tab refusing, view modes
 that change the view, and the ribbon at Word's height. The ribbon is within five
@@ -127,8 +128,11 @@ than a command, and each named with what it would take.
 
 So the bar this document set for itself is **met on the Insert tab and one step
 short on the view modes**: nothing on that tab refuses any more, the ribbon is
-within five pixels of Word's, and three of four view modes change the view. What
-remains is rendering breadth rather than authoring breadth - a comment margin, a
-note area at the page foot, a text box's own text, and a Draft view that re-flows -
-all of which are layout work, each recorded with its cost in
-`docs/UI-PROGRESS.md`.
+within five pixels of Word's, and three of four view modes change the view.
+
+Three gaps are left, and all three are in the layout engine rather than in a
+command: a per-page reserve so a footnote body can be drawn at the page foot, a
+nested story so a text box's own text can be laid out, and a flow-width option so
+Draft can re-flow. `docs/UI-PROGRESS.md` has each one with the shape of the change
+it needs. No feature is half-built - what is missing is three pieces of machinery
+that were never written.
