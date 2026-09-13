@@ -544,6 +544,7 @@ describe('layout divergence detection', () => {
     expect(raised?.shift).toBeGreaterThan(0);
     expect(base?.shift).toBe(0);
     expect(Object.keys(raised ?? {}).sort()).toEqual([
+      'annotation',
       'ascent',
       'descent',
       'object',

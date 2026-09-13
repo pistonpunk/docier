@@ -4,6 +4,8 @@ import type { MeasuredCluster, TextMeasurer } from '../measure/index.js';
 import type { RunFormat } from './format.js';
 import type { FontFace } from './fonts.js';
 import type { IngestedItem, IngestedParagraph } from './ingest.js';
+import type { RunAnnotation } from '../model/index.js';
+import { NO_ANNOTATION } from '../model/index.js';
 import type { AtomKind, DocRange, ForcedBreak, ObjectPlacement } from './types.js';
 import { docPos } from './types.js';
 
@@ -32,6 +34,7 @@ export interface Atom {
   readonly source: DocRange;
   readonly hyphen: HyphenGlyph | undefined;
   readonly level: number;
+  readonly annotation: RunAnnotation;
 }
 
 export interface ParagraphAtoms {
@@ -124,6 +127,8 @@ export const atomize = (
   const atoms: Atom[] = [];
   let nextId = 0;
 
+  let currentAnnotation: RunAnnotation = NO_ANNOTATION;
+
   const push = (draft: Draft, face: FontFace, format: RunFormat): void => {
     atoms.push({
       id: nextId,
@@ -145,11 +150,13 @@ export const atomize = (
       source: draft.source,
       hyphen: draft.hyphen,
       level: 0,
+      annotation: currentAnnotation,
     });
     nextId += 1;
   };
 
   for (const run of paragraph.runs) {
+    currentAnnotation = run.annotation;
     const format = run.format;
     const capitalise = format.allCaps;
     const smallCaps = format.smallCaps && !format.allCaps;

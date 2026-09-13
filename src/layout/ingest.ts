@@ -17,14 +17,17 @@ import {
   CarriageReturnContent,
   DrawingContent,
   HyphenContent,
+  NO_ANNOTATION,
   NoteReferenceContent,
   SymbolContent,
   TabContent,
   TextContent,
+  annotateRuns,
   branchCarriesModelledContent,
   collectAlternateContent,
   resolvedRunContents,
 } from '../model/index.js';
+import type { RunAnnotation } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
 import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
 import { NumberingCounters, defaultLevelText, numberTextOf } from './numbering.js';
@@ -58,6 +61,7 @@ export interface IngestedRun {
   readonly items: readonly IngestedItem[];
   readonly docStart: DocPos;
   readonly docEnd: DocPos;
+  readonly annotation: RunAnnotation;
 }
 
 export interface IngestedNumbering {
@@ -375,6 +379,8 @@ export const ingestParagraph = (
     });
   }
 
+  const annotations = annotateRuns(paragraph.inlineChildren());
+
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);
     const runFormat = runFormatOf(resolvedRun, options.defaultFontFamily);
@@ -418,7 +424,13 @@ export const ingestParagraph = (
       }
     }
     if (items.length > 0) {
-      runs.push({ format: runFormat, items, docStart: runStart, docEnd: docPos(cursor) });
+      runs.push({
+        format: runFormat,
+        items,
+        docStart: runStart,
+        docEnd: docPos(cursor),
+        annotation: annotations.get(run) ?? NO_ANNOTATION,
+      });
     }
 
     const injection = substitution?.injections.get(run);
@@ -444,6 +456,7 @@ export const ingestParagraph = (
       items: [injected],
       docStart: injectionStart,
       docEnd: docPos(cursor),
+      annotation: annotations.get(injection.run) ?? NO_ANNOTATION,
     });
   }
 

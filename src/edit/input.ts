@@ -879,8 +879,29 @@ export const attachInput = (host: InputHost): InputHandle => {
     return (pos as number) > (range.start as number) && (pos as number) < (range.end as number);
   };
 
+  const linkTargetAt = (event: PointerEvent): string | undefined => {
+    const target = event.target;
+    if (!(target instanceof Element)) return undefined;
+    const node = target.closest(`[${ATTR.hyperlink}]`);
+    if (node === null) return undefined;
+    const id = node.getAttribute(ATTR.hyperlink) ?? '';
+    if (id === '') return undefined;
+    const model = host.session?.model;
+    const resolved = model?.relationshipTarget(id);
+    if (resolved === undefined) return undefined;
+    return /^(https?|mailto|tel):/i.test(resolved) ? resolved : undefined;
+  };
+
   const onPointerDown = (event: PointerEvent): void => {
     const button = buttonOf(event);
+    if (button === 0 && (event.ctrlKey || event.metaKey)) {
+      const url = linkTargetAt(event);
+      if (url !== undefined) {
+        event.preventDefault();
+        owner.defaultView?.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
     if (button === 0) {
       const handle = objectHandleAt(event.clientX, event.clientY);
       if (handle !== undefined) {

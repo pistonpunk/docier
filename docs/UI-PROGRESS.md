@@ -509,8 +509,8 @@ still announces that it is not available.
 | # | Item | State |
 |---|---|---|
 | F1 | Insert a picture | **done** |
-| F2 | Hyperlink | **done, no on-screen link affordance** |
-| F3 | Comments | **done at the document level, no on-screen marker** |
+| F2 | Hyperlink | **done, styled and openable on Ctrl+click** |
+| F3 | Comments | **done, with the range marked on screen** |
 | F4 | Symbol | **done** |
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
@@ -668,14 +668,14 @@ writes the `w:hyperlink` with the relationship, the text and the tooltip, and
 applies Word's `Hyperlink` run style so a document that defines that style shows
 the link as one.
 
-**The gap.** Nothing in the layout or the renderer knows what a hyperlink is:
-there is no `data-docier-hyperlink` node, no pointer cue, and no way to open one.
-A hyperlink renders as its own characters - styled if the document defines the
-`Hyperlink` style and plain text if it does not - and it is only a link in the
-file and in Word. That is recorded here rather than fixed, because a click target
-and a Ctrl+click to open are a different piece of work from producing the markup,
-and the acceptance this phase was written against is that the document can be
-produced.
+**The affordance, which was the gap, is closed.** The layout now carries the
+annotation to the painter, and a hyperlink run is stamped
+`data-docier-hyperlink` with its relationship id, underlined, and given
+`cursor: pointer`. **Ctrl+click opens the target** and a plain click does not - it
+places the caret and leaves the link editable, which is Word's model. Verified in
+Chromium against a routed address: Ctrl+click opened exactly
+`https://example.test/contract` in one new tab, and a plain click afterwards put
+the caret in the link without opening anything.
 
 ### F4, symbol: done, and a real bug fixed on the way
 
@@ -820,13 +820,17 @@ stories again. `changeRegions` had to widen with it - it compared only the
 header and footer stories, so a comment read as no change and the region capture
 went stale, which made redo fail in exactly the way the test for it asserts.
 
-**The gap, recorded rather than glossed.** Nothing on screen marks a commented
-range. The layout ingests `w:commentRangeStart` and `w:commentRangeEnd` as
-ignorable content, so the painter never learns a range exists: no highlight, no
-margin note, no count. A comment is real in the file and in Word and invisible in
-this editor. That is a layout-and-paint change - ingest the markers, tag the runs
-they span, paint them - and it is the same kind of gap as the hyperlink's missing
-click target, recorded in the same way rather than half-built.
+**The range is marked on screen now.** The same annotation pass that carries the
+hyperlink carries the open comment ids, so a run inside a commented range is
+stamped `data-docier-comment` with the ids and painted with a translucent band.
+Verified in Chromium: the eight selected characters carry the id, the background is
+`rgba(255, 214, 0, 0.24)`, and the text is exactly what was selected.
+
+**The margin note is still missing**, and it is the smaller half of the feature: the
+comment's own text is in the part and Word shows it in a bubble, and this editor
+shows the range it belongs to but not the text. Reading it needs a surface beside
+the page, which the chrome does not have - it is a panel rather than a paint
+concern, and the next thing to build here.
 
 ### Footnote, done at the document level
 

@@ -28,6 +28,8 @@ export const ATTR = {
   cell: 'data-docier-cell',
   cellContent: 'data-docier-cell-content',
   border: 'data-docier-border',
+  hyperlink: 'data-docier-hyperlink',
+  comment: 'data-docier-comment',
   shading: 'data-docier-shading',
   overlay: 'data-docier-overlay',
   slotError: 'data-docier-slot-error',

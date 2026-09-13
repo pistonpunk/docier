@@ -1,4 +1,5 @@
 import type { Mp } from '../units/index.js';
+import type { RunAnnotation } from '../model/index.js';
 
 export const LAYOUT_RESULT_VERSION = 3;
 
@@ -143,6 +144,7 @@ export interface LineRun {
   readonly object: ObjectPlacement | undefined;
   readonly text: string;
   readonly source: DocRange;
+  readonly annotation: RunAnnotation;
 }
 
 export interface CaretStop {

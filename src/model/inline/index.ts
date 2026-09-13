@@ -70,6 +70,14 @@ export {
   isWordManagedBookmark,
 } from './nodes.js';
 
+export type { LinkAnnotation, RunAnnotation } from './annotation.js';
+export {
+  NO_ANNOTATION,
+  annotateRuns,
+  annotationIsEmpty,
+  commentIdOf,
+} from './annotation.js';
+
 export type { FieldInstruction, FieldSpan, FieldSwitch, SimpleFieldSpan } from './field.js';
 export {
   collectRuns,

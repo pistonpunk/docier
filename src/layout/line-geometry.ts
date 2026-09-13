@@ -5,6 +5,7 @@ import type { Atom } from './atoms.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 import { advanceAt } from './intrinsic.js';
 import type { CaretStop, DocPos, LineRun, ObjectPlacement } from './types.js';
+import type { RunAnnotation } from '../model/index.js';
 import { docPos } from './types.js';
 
 export interface PlacedAtom {
@@ -80,11 +81,18 @@ export const geometryOfPlaced = (
   };
 };
 
+const sameAnnotation = (left: RunAnnotation, right: RunAnnotation): boolean =>
+  left.link?.relationshipId === right.link?.relationshipId &&
+  left.link?.anchor === right.link?.anchor &&
+  left.commentIds.length === right.commentIds.length &&
+  left.commentIds.every((id, at) => id === right.commentIds[at]);
+
 const sameRun = (previous: LineRun, atom: Atom): boolean =>
   previous.paint === atom.paint &&
   previous.object === undefined &&
   atom.object === undefined &&
-  previous.source.end === atom.source.start;
+  previous.source.end === atom.source.start &&
+  sameAnnotation(previous.annotation, atom.annotation);
 
 export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] => {
   const runs: LineRun[] = [];
@@ -103,6 +111,7 @@ export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] 
         object: undefined,
         text: previous.text + atom.text,
         source: { start: previous.source.start, end: atom.source.end },
+        annotation: previous.annotation,
       };
       continue;
     }
@@ -116,6 +125,7 @@ export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] 
       object,
       text: atom.text,
       source: atom.source,
+      annotation: atom.annotation,
     });
   }
   return runs;

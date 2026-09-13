@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LayoutResult, LineFragment, RunPaint } from '../../src/layout/index.js';
 import { createDeterministicMeasurer, docPos } from '../../src/layout/index.js';
 import { mp } from '../../src/units/index.js';
+import { NO_ANNOTATION } from '../../src/model/index.js';
 import {
   ATTR,
   createImageRegistry,
@@ -301,6 +302,7 @@ describe('layout freedom of the painted document', () => {
           object: undefined,
           text: 'gone',
           source: range(0, 4),
+          annotation: NO_ANNOTATION,
         },
       ],
       caretStops: [],

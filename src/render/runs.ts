@@ -95,6 +95,14 @@ export const paintLine = (parent: HTMLElement, input: LinePaintInput): void => {
       const spec = runFontSpecAt(paint, scale, segment.size);
       const node = box('docier-run');
       stamp(node, { [ATTR.line]: String(line.id), [ATTR.run]: String(index) });
+      const link = run.annotation.link;
+      if (link !== undefined) {
+        stamp(node, { [ATTR.hyperlink]: link.relationshipId ?? link.anchor ?? '' });
+        if (link.tooltip !== undefined) node.setAttribute('title', link.tooltip);
+      }
+      if (run.annotation.commentIds.length > 0) {
+        stamp(node, { [ATTR.comment]: run.annotation.commentIds.join(' ') });
+      }
       applyStyle(
         node,
         positionStyle(
@@ -102,6 +110,19 @@ export const paintLine = (parent: HTMLElement, input: LinePaintInput): void => {
           runStyle(paint, spec, {
             'line-height': formatPx(scale.px(height)),
             'background-color': 'transparent',
+            ...(link === undefined
+              ? {}
+              : {
+                  cursor: 'pointer',
+                  'text-decoration-line': 'underline',
+                  'text-decoration-color': 'var(--docier-link, #1f6feb)',
+                  'text-underline-offset': '2px',
+                }),
+            ...(run.annotation.commentIds.length === 0
+              ? {}
+              : {
+                  'background-color': 'var(--docier-comment-range, rgba(255, 214, 0, 0.24))',
+                }),
           }),
         ),
       );

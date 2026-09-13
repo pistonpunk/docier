@@ -15,6 +15,7 @@ export const PAINT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
   'background-size',
   'box-shadow',
   'color',
+  'cursor',
   'direction',
   'font-family',
   'font-feature-settings',

@@ -5,6 +5,7 @@ import type { LineBox, TextMeasurer } from '../measure/index.js';
 import type { IngestedNumbering, IngestedParagraph } from './ingest.js';
 import type { Atom } from './atoms.js';
 import { atomize } from './atoms.js';
+import { NO_ANNOTATION } from '../model/index.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 import { measureAtoms, nextTabStop } from './intrinsic.js';
 import type { LaidLine, NumberingPlacement } from './assembly.js';
@@ -70,6 +71,7 @@ const prefixAtom = (
     source: { start: paragraph.docStart, end: paragraph.docStart },
     hyphen: undefined,
     level: 0,
+    annotation: NO_ANNOTATION,
   };
 };
 
