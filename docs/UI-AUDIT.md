@@ -67,17 +67,75 @@ pixels of the others, and the document does not move when a tab changes.
 
 ### Range formatting does not apply
 
-**Reported:** "can't highlight text and apply styling just to it".
+**Reported:** "can't highlight text and apply styling just to it". **Confirmed,
+and it is severe.**
 
-My own DOM measurements were ambiguous, because applying a mark to a range splits
-it into several run elements and the probe then looked for a run whose text no
-longer exists as one piece. What I did establish: after selecting a range with
-the mouse and pressing Ctrl+B, the selection survives and the paragraph's runs
-re-render, but reading the computed weight of the run that contained the original
-text returns `null` because that run no longer exists. That is consistent with
-the format having applied and the run having split, and equally consistent with
-nothing having happened. It needs a model-level answer, which is being gathered
-separately and will be folded in here.
+At the model level, with the XML read before and after:
+
+| Selection | Result |
+|---|---|
+| Mid-run inside a paragraph's only run | `noop`. No mark anywhere, and the paragraph is **silently split** at the start offset |
+| Same on `fixtures/contract.docx` p0, selecting 1..6 of the Heading1 run | same `noop`, the paragraph becomes `<r>C</r><r>ONTRACT ...</r>`, still no `w:b` |
+| Mid-run in a multi-run paragraph | partially applies: the middle and trailing runs get the mark, the run holding the selection **start** never does |
+| Spanning two paragraphs | only the second is formatted; the first is split and left unformatted |
+| Starting exactly on a run boundary, or covering a whole run | works correctly |
+
+Press Bold once and nothing happens; press it again, on the same selection, and
+it works, because the first press split the paragraph at the selection start. That
+is why the DOM-level measurements were ambiguous.
+
+**Root cause.** `setRunPropertiesOnRange` (`src/edit/mutation.ts:460`) splits the
+selection boundaries with `splitBoundary` (`src/edit/mutation.ts:454`), which
+splits through `splitRunAt` (`src/edit/mutation.ts:196`) by mutating
+`paragraph.children` directly. But `runSpans` (`src/edit/mutation.ts:99`) reads
+the run list from `Paragraph.of(...)`, and `Paragraph.children()` memoizes it in
+`childCache` (`src/model/blocks/paragraph.ts:47-59`). Nothing invalidates that
+cache, and `forgetSubtree` is not called until the very end
+(`src/edit/mutation.ts:475`), after the damage. Measured directly: after
+`splitRunAt(run, 2)`, `runSpans` still reports a single run of length 2 while the
+paragraph really holds 11 characters across two runs.
+
+So the second split is computed against a truncated paragraph, and the scan that
+chooses which runs to patch sees a run list that no longer matches the text, comes
+back empty, and the command returns `false`. `clearRunFormattingOnRange`
+(`src/edit/mutation.ts:479`) has the same defect.
+
+**The fix is one line**: invalidate the paragraph view inside `splitBoundary`
+after its loop, with `model.context.forgetSubtree(paragraph)`. Both callers route
+their splits through it. Emulated with that single change: a mid-run selection
+yields `<r>al</r><r><w:rPr><w:b/></w:rPr>pha b</r><r>ravo</r>`; the multi-run case
+now marks the leading partial run; the two-paragraph case marks both paragraphs.
+
+**A second, separate defect behind the same report.** The report also says the
+toggle "unselects them once I start typing", and that is true whenever the caret
+sits on a run boundary. Three conventions for "the run at the caret" disagree:
+`caretRun` (`src/edit/mutation.ts:504-510`, used by the toggle) and
+`runElementAt` (`src/edit/inspect.ts:62-72`, used by the toolbar) are left-biased,
+while `insertionPoint` (`src/edit/mutation.ts:247-285`) is right-biased and at
+`at === span.start` inserts *before* that run while copying **its** properties. So
+the toggle and the toolbar mean the run ending at the caret, and typing continues
+in the run starting at it. Confirmed in the browser: with the caret at the start
+of a bold run, Ctrl+B wrote `<w:b w:val="0"/>` onto the preceding run, the text
+the user never pointed at, and the button went out.
+
+The fix is in `insertionPoint`'s `at === span.start` branch: take the properties
+from `previous` when it exists, keeping the insertion index so surrounding markers
+do not move. That makes what the toggle writes, what the toolbar shows and what
+typing inherits the same run. Right-biasing the other two instead would remove the
+disagreement but invert which run the button toggles, so it is the worse option.
+
+**Three secondary findings from the same investigation:**
+
+- When a format fails this way the paragraph has still been mutated, but the
+  command reports `changed: false`, so no change event is emitted and no undo
+  entry is recorded (`src/edit/commands.ts:174-188`). The tree is dirty, undo
+  reports disabled, and a save would contain the stray runs.
+- **There is no pending or sticky format state anywhere in the code base.** Caret
+  formatting is implemented purely by writing into the run under the caret, which
+  is why the boundary convention matters as much as it does.
+- `isActive` resolves marks through styles, so on a Heading paragraph the Bold
+  button reads active even when the run carries no `w:b`, and the first toggle
+  writes an explicit off rather than turning the button off.
 
 ### The caret is lost during work
 
