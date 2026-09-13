@@ -132,3 +132,63 @@ describe('selecting from the keyboard', () => {
     expect(handle.selection.focus).toBe(handle.selection.anchor);
   });
 });
+
+describe('the composer that holds focus', () => {
+  const composerOf = (handle: EditorHandle): HTMLElement => {
+    const composer = handle.root.querySelector<HTMLElement>('.docier-input');
+    if (composer === null) throw new Error('the composer is not mounted');
+    return composer;
+  };
+
+  it('is never hidden, because a hidden composer can never be focused again', async () => {
+    const handle = await editorOf(bodyOf(paragraphText('hello')));
+    const composer = composerOf(handle);
+    expect(composer.style.display).not.toBe('none');
+
+    await setCaret(handle, 2);
+    expect(composer.style.display).not.toBe('none');
+    await handle.commands.execute('docier.command.edit.insertText', { text: 'X' });
+    await handle.whenReady();
+    expect(composer.style.display).not.toBe('none');
+  });
+
+  it('keeps the composer focusable after a caret it cannot place', async () => {
+    const handle = await editorOf(bodyOf(paragraphText('hello')));
+    const composer = composerOf(handle);
+    composer.focus();
+    expect(document.activeElement).toBe(composer);
+
+    await setCaret(handle, 3);
+    await handle.whenReady();
+    composer.focus();
+    expect(document.activeElement).toBe(composer);
+    expect(composer.style.display).not.toBe('none');
+  });
+
+  it('brings the caret back after an edit rather than leaving it hidden', async () => {
+    const handle = await editorOf(bodyOf(paragraphText('hello world')));
+    await setCaret(handle, 5);
+    await handle.whenReady();
+    const caret = handle.root.querySelector<HTMLElement>('.docier-caret');
+    expect(caret?.style.display).toBe('block');
+
+    await handle.commands.execute('docier.command.edit.insertText', { text: '!' });
+    await handle.whenReady();
+    expect(caret?.style.display).toBe('block');
+  });
+});
+
+describe('a document with nothing to place a caret on', () => {
+  it('keeps the composer visible and the caret comes back once there is text', async () => {
+    const handle = await editorOf(bodyOf(''));
+    const composer = handle.root.querySelector<HTMLElement>('.docier-input');
+    expect(composer).not.toBeNull();
+    expect(composer!.style.display).not.toBe('none');
+
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: 0 });
+    await handle.whenReady();
+    expect(composer!.style.display).not.toBe('none');
+    composer!.focus();
+    expect(document.activeElement).toBe(composer);
+  });
+});

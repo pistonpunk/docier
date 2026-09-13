@@ -1020,6 +1020,50 @@ answer than the placeholder was.
 | Clicking a row | selects the range the comment is anchored to |
 | Console and page errors | none, in any of it |
 
+## The caret that never came back
+
+**Reported by the owner:** the caret shows, they pick a location and it shows, they
+start typing and it disappears and never shows again, and after that nothing can be
+highlighted either.
+
+**Cause.** `paintCaret` had two early returns for "there is no caret geometry right
+now" - no layout, or a position the index has no caret stop for - and both of them
+did this:
+
+    caret.style.display = 'none';
+    composer.style.display = 'none';
+
+The composer is the `contenteditable` element the editor types into. It is
+invisible already - `opacity: 0`, one pixel wide - and it is the thing that holds
+focus. **An element with `display: none` cannot hold focus and cannot be focused.**
+So the first time a paint ran without a caret geometry, the composer was hidden, the
+browser blurred it, and every later `composer.focus()` was a silent no-op: no caret
+element updates, no typing, no selection, and no way back. It also started life with
+`display: 'none'` in its creation styles, so the same dead state was the initial one.
+
+A missing caret geometry is a *transient* - the position index is rebuilt on every
+relayout, and a paint can land in a moment where the caret's position has no stop.
+Making the editor permanently unusable because of it is the bug.
+
+**Fix.** The composer is never hidden. It has no `display` in its creation styles
+and nothing sets one except the `block` the caret paint writes; the invisible
+appearance was always the opacity and the 1px width. A paint with no geometry now
+hides only the caret mark, and leaves focus and the native selection exactly where
+they were.
+
+**Verified.** `test/edit/caret-repaint.test.ts` gained three cases: the composer is
+never `none` across a caret move and an insert; it stays focusable across a caret
+move; and the caret is `block` again after an insert rather than left hidden. A
+fourth loads a document the index has no stops for at all - the case that reaches
+the old branch - and asserts the composer is visible and focusable. Reverting the
+fix makes that test fail with `expected 'none' not to be 'none'`, so it guards the
+bug rather than describing it.
+
+Live in Chromium, with the composer's computed `display` sampled every 40ms through
+clicking, typing and drag-selecting in the body and in a table cell: **142 samples,
+zero with the composer hidden**, focus on the composer throughout, the caret
+`block`, and each drag producing its selection. No console or page errors.
+
 ## Appendices
 
 Findings that belong to a phase other than the one being worked on. Each says

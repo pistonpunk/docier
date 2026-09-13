@@ -361,7 +361,6 @@ export const attachInput = (host: InputHost): InputHandle => {
     'caret-color': 'transparent',
     outline: 'none',
     'white-space': 'pre',
-    display: 'none',
   });
   host.rendered.appendChild(composer);
 
@@ -448,14 +447,12 @@ export const attachInput = (host: InputHost): InputHandle => {
     const geometry = caretOf();
     if (geometry === undefined) {
       caret.style.display = 'none';
-      composer.style.display = 'none';
       return false;
     }
     const page = pageFragmentOf(geometry.page);
     const sheet = sheetFor(geometry.page);
     if (page === undefined || sheet === undefined) {
       caret.style.display = 'none';
-      composer.style.display = 'none';
       return false;
     }
     const zoom = host.zoom;
