@@ -378,11 +378,13 @@ Word will resize the table on open; then floating objects, which is the large
 piece and where move lives; and picture *insert* last, because it is the only item
 that changes what the file can contain and the only one the snapshot gates.
 
-**A decision to put to the commissioner.** Word has no height handle on a table,
-because a table's height is the sum of its rows. I recommend refusing one and
-pointing at Table Properties rather than inventing an affordance Word does not
-have. The same reasoning puts table *move* out of scope: OOXML has no in-flow
-table position.
+**Decided: tables get a width control and no height control.** Word has no height
+handle on a table, because a table's height is the sum of its rows, and the
+commissioner agreed to width only. So a table gets left and right handles on its
+outer edges, with a proportional write to `tblW`, `gridCol` and `tcW` that sets
+`tblLayout` to fixed, and no vertical handle at all. A person wanting a taller
+table changes its rows. Table *move* stays out of scope for the same reason: OOXML
+has no in-flow table position.
 
 ### The interface chrome reads as unfinished
 
