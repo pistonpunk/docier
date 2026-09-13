@@ -3,7 +3,10 @@ import type { XmlElement } from '../../ooxml/xml/index.js';
 import { R_NAMESPACE, xml } from '../../ooxml/index.js';
 import { Paragraph, Table, createWElement, setWAttr } from '../../model/index.js';
 import type { BlockNode, DocumentModel } from '../../model/index.js';
+import { buildTextBoxDrawing } from '../../ooxml/drawing.js';
+import { twip, twipToEmu } from '../../units/index.js';
 import { appendRun, insertContainerAt, insertRunChildAt } from './content.js';
+import { nextDocPrId } from './object.js';
 import { areaCommand, writingAt } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
@@ -303,10 +306,54 @@ const tocSpec: AreaSpec<TocArgs> = {
   },
 };
 
+export interface TextBoxArgs {
+  readonly text?: string | undefined;
+  readonly widthTwips?: number | undefined;
+  readonly heightTwips?: number | undefined;
+  readonly name?: string | undefined;
+}
+
+const DEFAULT_TEXT_BOX = { width: 3600, height: 1440 } as const;
+
+const textBoxSpec: AreaSpec<TextBoxArgs> = {
+  id: 'docier.command.insert.textBox',
+  label: 'Text box',
+  category: 'insert',
+  permissions: ['insert'],
+  enabledIn: (host) =>
+    host.session.aligned && host.session.index.storyAt(host.selection.focus)?.kind === 'body',
+  reason: (host) =>
+    host.session.aligned ? 'Place the caret in the body to insert a text box' : NOT_ALIGNED,
+  run: (host, args) => {
+    const target = caretOf(host);
+    if (target === undefined) return false;
+    const width = Math.max(720, Math.floor(args?.widthTwips ?? DEFAULT_TEXT_BOX.width));
+    const height = Math.max(720, Math.floor(args?.heightTwips ?? DEFAULT_TEXT_BOX.height));
+    const name = args?.name ?? 'Text Box';
+    const drawing = buildTextBoxDrawing({
+      cx: twipToEmu(twip(width)),
+      cy: twipToEmu(twip(height)),
+      docPrId: nextDocPrId(host.session.model),
+      name,
+      text: args?.text ?? '',
+    });
+    const changed = writingAt(host, () =>
+      insertRunChildAt(host.session.model, target.element, target.offset, (run) => {
+        run.children.push(drawing);
+        drawing.parent = run;
+      }),
+    );
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(target.element);
+    return true;
+  },
+};
+
 export const insertCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<SymbolArgs>(host, symbolSpec),
   areaCommand<LinkArgs>(host, linkSpec),
   areaCommand<FieldArgs>(host, fieldSpec('docier.command.insert.pageNumber', 'Page number', 'PAGE')),
   areaCommand<FieldArgs>(host, fieldSpec('docier.command.insert.dateTime', 'Date and time', 'DATE')),
   areaCommand<TocArgs>(host, tocSpec),
+  areaCommand<TextBoxArgs>(host, textBoxSpec),
 ];

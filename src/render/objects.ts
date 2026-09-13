@@ -109,9 +109,13 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
       container,
       positionStyle(geometryAt(objectBoxOf(line, run, atom), frame, scale)),
     );
+    if (object.relationshipId === undefined) {
+      parent.appendChild(container);
+      continue;
+    }
     const url = images.urlFor(object.relationshipId);
-    if (url === undefined) paintMissing(container, object.relationshipId, scale, object);
-    else paintImage(container, object, url, scale);
+    if (url !== undefined) paintImage(container, object, url, scale);
+    else paintMissing(container, object.relationshipId, scale, object);
     parent.appendChild(container);
   }
 };

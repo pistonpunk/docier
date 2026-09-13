@@ -78,7 +78,6 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'This build has no search engine, so find and replace are not implemented',
   },
 
-  { id: 'docier.command.insert.textBox', label: 'Text box', category: 'insert', reason: NO_DRAWING },
   { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },
   {
     id: 'docier.command.insert.coverPage',

@@ -515,7 +515,7 @@ still announces that it is not available.
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
 | F4 | Footnote | **done at the document level, bodies not laid out** |
-| F4 | Text box | **refused, with the reason named** |
+| F4 | Text box | **done at the document level, content not laid out** |
 
 ### Phase D notes
 
@@ -702,7 +702,7 @@ rather than a generic refusal, which is the state the phase asked for.
 | ~~Comments~~ | **Done.** See below. |
 | Footnote | **Done at the document level.** See below. |
 | Header creation | **Done.** See the note below. |
-| Text box | A drawing with a text body: `wps:wsp` inside a `wps:txbx`, whose content is a whole nested story. This build authors exactly one kind of drawing, a picture from host bytes. |
+| Text box | **Done at the document level.** See below. |
 | ~~Table of contents~~ | **Done.** See below. |
 
 Each of these is a subsystem rather than a command. Recording them as such is the
@@ -858,6 +858,30 @@ of work: give the reference its number in the text - which is the substitution
 and then measure, reserve and paginate a note area at the page foot, which is the
 bounded fixpoint the header and footer reserve already implements.
 
+### Text box, done at the document level, and a renderer bug it exposed
+
+`docier.command.insert.textBox` writes a `w:drawing` holding an inline `wps:wsp`:
+the shape's non-visual properties with `txBox="1"`, a transform and a rectangle
+geometry, a `wps:txbx` with a `w:txbxContent` paragraph holding the text, and a
+`wps:bodyPr`. No new part and no relationship - the content is inside the drawing.
+
+**It exposed a real bug in the painter.** The renderer treated *every* object whose
+relationship had no bytes as a missing image, and a text box has no relationship at
+all, so it painted the dashed red "missing image" placeholder over a shape that is
+not an image and reported a `missingImage` issue that was not true. The painter now
+asks a different question: a drawing with no relationship is not a picture, so it
+gets its box and nothing else.
+
+**A render test was asserting the old behaviour** - "reports an inline drawing with
+no relationship as missing, not as absent" - and it was right to, at the time: when
+the only drawings this build produced were pictures, a drawing it could not paint
+was a picture it had lost. The test now asserts the precise contract: the box is
+placed at the engine's extent, no placeholder is painted, no issue is raised, and
+**the loss is reported by the engine instead**, through a new
+`shapeContentNotLaidOut` diagnostic. That is the same principle the rest of this
+work follows - the thing that knows is the thing that says so - and it is a better
+answer than the placeholder was.
+
 ### Phase F verification, live in the browser
 
 | Check | Measured |
@@ -876,6 +900,8 @@ bounded fixpoint the header and footer reserve already implements.
 | Undo | back to 14 |
 | Inserting a footnote | the command runs, and the layout reports `footnotesNotLaidOut` |
 | The footnote written | the separators, the reference and the note text are all in the saved package |
+| Inserting a text box | the drawing is placed as an object at its extent, 1 object node |
+| What the engine says about it | `shapeContentNotLaidOut`, and no false `missingImage` |
 | Console and page errors | none, in any of it |
 
 ## Appendices

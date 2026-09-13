@@ -97,6 +97,7 @@ export interface IngestFlags {
   notes: boolean;
   drawings: boolean;
   unresolvedDrawings: boolean;
+  shapeDrawings: boolean;
 }
 
 export interface IngestState {
@@ -390,6 +391,7 @@ export const ingestBlockList = (
       state.flags.notes = state.flags.notes || result.hasNotes;
       state.flags.drawings = state.flags.drawings || result.hasDrawings;
       state.flags.unresolvedDrawings = state.flags.unresolvedDrawings || result.hasUnresolvedDrawings;
+      state.flags.shapeDrawings = state.flags.shapeDrawings || result.hasShapeDrawings;
       out.push({ kind: 'paragraph', paragraph: result.paragraph });
       continue;
     }

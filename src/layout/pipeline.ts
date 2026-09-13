@@ -215,7 +215,13 @@ export const layoutDocument = (
 
   for (const diagnostic of ingested.diagnostics) diagnostics.push(diagnostic);
   for (const diagnostic of tablePrepare.diagnostics) diagnostics.push(diagnostic);
-  for (const diagnostic of coverageDiagnostics(ingested.hasThemeFonts, ingested.hasFields, ingested.hasNotes, ingested.hasUnresolvedDrawings)) {
+  for (const diagnostic of coverageDiagnostics(
+    ingested.hasThemeFonts,
+    ingested.hasFields,
+    ingested.hasNotes,
+    ingested.hasUnresolvedDrawings,
+    ingested.hasShapeDrawings,
+  )) {
     diagnostics.push(diagnostic);
   }
   if (sections.some((section) => section.contentBox.width <= 0)) {
@@ -485,6 +491,7 @@ const coverageDiagnostics = (
   hasFields: boolean,
   hasNotes: boolean,
   hasUnresolvedDrawings: boolean,
+  hasShapeDrawings: boolean,
 ): readonly LayoutDiagnostic[] => {
   const out: LayoutDiagnostic[] = [];
   if (hasThemeFonts) {
@@ -508,6 +515,15 @@ const coverageDiagnostics = (
       code: 'footnotesNotLaidOut',
       severity: 'warning',
       message: 'footnote and endnote bodies are not laid out by this slice',
+      docPos: undefined,
+    });
+  }
+  if (hasShapeDrawings) {
+    out.push({
+      code: 'shapeContentNotLaidOut',
+      severity: 'warning',
+      message:
+        'a drawing that is not a picture is placed at its declared extent, and the text or shape inside it is not laid out by this slice',
       docPos: undefined,
     });
   }

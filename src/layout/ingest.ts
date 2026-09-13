@@ -94,6 +94,7 @@ export interface IngestedDocument {
   readonly hasNotes: boolean;
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
+  readonly hasShapeDrawings: boolean;
   readonly diagnostics: readonly LayoutDiagnostic[];
   readonly hash: Hasher;
 }
@@ -202,6 +203,7 @@ interface ParagraphIngest {
   readonly hasNotes: boolean;
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
+  readonly hasShapeDrawings: boolean;
   readonly diagnostics: readonly LayoutDiagnostic[];
 }
 
@@ -355,6 +357,7 @@ export const ingestParagraph = (
   let hasNotes = false;
   let hasDrawings = false;
   let hasUnresolvedDrawings = false;
+  let hasShapeDrawings = false;
 
   for (const wrapper of collectAlternateContent(paragraph.inlineChildren())) {
     diagnostics.push(...alternateContentDiagnostics(wrapper.selection, start));
@@ -384,6 +387,7 @@ export const ingestParagraph = (
       if (item.kind === 'object') {
         hasDrawings = true;
         if (item.object === undefined) hasUnresolvedDrawings = true;
+        else if (item.object.relationshipId === undefined) hasShapeDrawings = true;
       }
       if (item.kind === 'noteRef') hasNotes = true;
       items.push(item);
@@ -464,6 +468,7 @@ export const ingestParagraph = (
     hasNotes,
     hasDrawings,
     hasUnresolvedDrawings,
+    hasShapeDrawings,
     diagnostics,
   };
 };
@@ -491,6 +496,7 @@ export const ingestStory = (
       notes: false,
       drawings: false,
       unresolvedDrawings: false,
+      shapeDrawings: false,
     },
     cursor: 0,
   };
@@ -506,6 +512,7 @@ export const ingestStory = (
     hasNotes: state.flags.notes,
     hasDrawings: state.flags.drawings,
     hasUnresolvedDrawings: state.flags.unresolvedDrawings,
+    hasShapeDrawings: state.flags.shapeDrawings,
     diagnostics,
     hash,
   };

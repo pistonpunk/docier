@@ -50,6 +50,7 @@ export type LayoutDiagnosticCode =
   | 'columnsNotLaidOut'
   | 'tablesNotLaidOut'
   | 'drawingsNotLaidOut'
+  | 'shapeContentNotLaidOut'
   | 'alternateContentChoiceSkipped'
   | 'alternateContentNotLaidOut'
   | 'alternateContentUnresolved'

@@ -296,7 +296,7 @@ const insertImageSpec: AreaSpec<InsertImageArgs> = {
   },
 };
 
-const nextDocPrId = (model: DocumentModel): number => {
+export const nextDocPrId = (model: DocumentModel): number => {
   let highest = 0;
   const visit = (element: XmlElement): void => {
     for (const child of childrenOf(element)) {

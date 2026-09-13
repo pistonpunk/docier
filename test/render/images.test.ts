@@ -204,7 +204,7 @@ describe('an image the host never supplied', () => {
     expect(rendered.issues?.length).toBe(1);
   });
 
-  it('reports an inline drawing with no relationship as missing, not as absent', async () => {
+  it('puts an inline drawing with no relationship at its box without calling it a missing image', async () => {
     const drawing =
       '<w:p><w:r><w:drawing>' +
       `<wp:inline xmlns:wp="${WP_NS}"><wp:extent cx="254000" cy="254000"/></wp:inline>` +
@@ -214,12 +214,16 @@ describe('an image the host never supplied', () => {
     const rendered = renderDocument(result, target, { images: [] });
     const found = objectOf(result);
     expect(found.run.object?.relationshipId).toBeUndefined();
-    const node = missingOf(target);
+
+    expect(missingOf(target)).toBeNull();
+    expect(rendered.issues ?? []).toEqual([]);
+    const node = target.querySelector<HTMLElement>(`[${ATTR.object}]`);
     expect(node).not.toBeNull();
-    expect(node?.getAttribute(ATTR.imageMissing)).toBe('');
-    expect(node?.textContent).toBe('missing image');
-    expect(rendered.issues?.length).toBe(1);
-    expect(rendered.issues?.[0]?.detail).toBeUndefined();
+    expect(node?.style.width).toBe(px(PICTURE_MP));
+
+    const shape = result.diagnostics.find((entry) => entry.code === 'shapeContentNotLaidOut');
+    expect(shape, 'the engine reports the shape it did not lay out').toBeDefined();
+    expect(shape?.severity).toBe('warning');
   });
 });
 
