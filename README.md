@@ -24,14 +24,14 @@ understand, so re-saving a contract does not quietly remove things.
 ## Install
 
 ```
-npm install docier
+npm install docier-web
 ```
 
 ## Quick start
 
 ```ts
-import { createEditor } from 'docier'
-import { mountChrome } from 'docier/ui'
+import { createEditor } from 'docier-web'
+import { mountChrome } from 'docier-web/ui'
 
 const bytes = await fetch('/contract.docx').then((r) => r.arrayBuffer())
 
@@ -84,7 +84,7 @@ editor.events.on('docier:doc:beforechange', (event) => {
 PDF export is a separate entry point, so an application that never exports never loads it.
 
 ```ts
-import { exportPdf } from 'docier/pdf'
+import { exportPdf } from 'docier-web/pdf'
 
 const { bytes, report } = await exportPdf(editor.layout, { pdfa: 'a-2b' })
 ```
@@ -109,7 +109,7 @@ fields, which means a template stays a valid `.docx` that a person can open and 
 fields still working. Placeholders are not a special text syntax that only `docier` understands.
 
 ```ts
-import { createTokenAttachment, fillTemplate } from 'docier/tokens'
+import { createTokenAttachment, fillTemplate } from 'docier-web/tokens'
 
 const tokens = createTokenAttachment(editor, { catalogue, locale: 'ro-RO' })
 tokens.data.setData({ 'employee.surname': 'Popescu' })
@@ -175,7 +175,7 @@ produce. That makes three things your responsibility, and they have to agree wit
    it as `layout.measurer`:
 
    ```ts
-   import { createEditor, createFontMeasurer } from 'docier';
+   import { createEditor, createFontMeasurer } from 'docier-web';
 
    const measurer = createFontMeasurer({
      faces: [

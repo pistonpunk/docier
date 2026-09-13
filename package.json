@@ -1,6 +1,6 @@
 {
-  "name": "docier",
-  "version": "0.0.0",
+  "name": "docier-web",
+  "version": "0.1.0",
   "private": false,
   "type": "module",
   "description": "A Word-compatible DOCX editor for the browser. Framework-agnostic, command and event driven, with an optional tokenization module for document templates.",
@@ -15,6 +15,15 @@
     "typescript"
   ],
   "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pistonpunk/docier.git"
+  },
+  "homepage": "https://editor.pistonpunk.com",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
