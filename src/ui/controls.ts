@@ -381,7 +381,7 @@ export const createControl = (
       });
       return;
     }
-    context.invoke(spec);
+    context.invoke(spec, element);
   });
 
   return element;

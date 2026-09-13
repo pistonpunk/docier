@@ -187,7 +187,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
         launcher.setAttribute('title', resolved.label);
         launcher.addEventListener('click', (event) => {
           event.preventDefault();
-          context.invoke(specOf(group.launcher as UiNode));
+          context.invoke(specOf(group.launcher as UiNode), launcher);
         });
         label.appendChild(launcher);
       }

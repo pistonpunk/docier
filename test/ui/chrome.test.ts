@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerLanguage, messagesFor } from '../../src/ui/i18n.js';
 import { mountChrome } from '../../src/ui/chrome.js';
+import { dialogNameFor } from '../../src/ui/dialog.js';
+import { FONT_DIALOG_NAME } from '../../src/ui/font-dialog.js';
+import { PARAGRAPH_DIALOG_NAME } from '../../src/ui/paragraph-dialog.js';
 import { ZOOM_MAX, ZOOM_MIN, positionOfZoom, zoomAtPosition } from '../../src/ui/status-bar.js';
 import type { ChromeHandle } from '../../src/ui/chrome.js';
 import { editorWith, disposeEditors } from '../api/support.js';
@@ -284,6 +287,76 @@ describe('status bar', () => {
     );
     expect(chrome.store.get().surface).toBe('statusBar');
     expect(document.querySelector('[data-docier-menu]')).not.toBeNull();
+  });
+});
+
+describe('dialogs', () => {
+  it('resolves the dialog names the chrome publishes and refuses the rest', () => {
+    expect(dialogNameFor('font')).toBe(FONT_DIALOG_NAME);
+    expect(dialogNameFor('paragraph')).toBe(PARAGRAPH_DIALOG_NAME);
+    expect(dialogNameFor('docier.command.format.setFontFamily')).toBe(FONT_DIALOG_NAME);
+    expect(dialogNameFor('docier.command.format.setLineSpacing')).toBe(PARAGRAPH_DIALOG_NAME);
+    expect(dialogNameFor('styles')).toBeUndefined();
+    expect(dialogNameFor('')).toBeUndefined();
+    expect(dialogNameFor('docier.command.object.insertImage')).toBeUndefined();
+  });
+
+  it('opens the Font dialog from the ribbon launcher, anchored under it', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    expect(document.querySelector('[data-docier-dialog]')).toBeNull();
+    chrome.context.run('openDialog', { dialog: 'font' });
+    const dialog = document.querySelector<HTMLElement>('[data-docier-dialog]');
+    expect(dialog).not.toBeNull();
+    expect(dialog!.getAttribute('role')).toBe('dialog');
+    expect(dialog!.getAttribute('aria-modal')).toBe('true');
+    expect(document.querySelector('.docier-dialog-overlay')).not.toBeNull();
+    expect(document.querySelector('[data-docier-dialog-tab]')).not.toBeNull();
+    expect(document.querySelector('[data-docier-dialog-preview-sample]')).not.toBeNull();
+    expect(chrome.remaining()).not.toContain('dialogs');
+  });
+
+  it('replaces one dialog with the next instead of stacking them', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    chrome.context.run('openDialog', { dialog: 'font' });
+    const first = document.querySelector('[data-docier-dialog]');
+    chrome.context.run('openDialog', { dialog: 'paragraph' });
+    expect(document.querySelectorAll('[data-docier-dialog]').length).toBe(1);
+    expect(document.querySelector('[data-docier-dialog]')).not.toBe(first);
+    expect(document.querySelector('.docier-dialog-title')?.textContent).toBe('Paragraph');
+  });
+
+  it('leaves a dialog with no surface behind it as an honest message', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    chrome.context.run('openDialog', { dialog: 'styles' });
+    expect(document.querySelector('[data-docier-dialog]')).toBeNull();
+    expect(chrome.store.get().message).not.toBe('');
+    const live = document.getElementById('docier-ui-live');
+    expect(live?.textContent).toContain('styles');
+  });
+
+  it('opens the Font dialog on control D from the page, but not from a field', async () => {
+    await mountWith(longBody(), { mode: 'full' });
+    document
+      .querySelector('.docier-input')
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', ctrlKey: true, bubbles: true }));
+    expect(document.querySelector('[data-docier-dialog]')).not.toBeNull();
+    document.querySelector('[data-docier-dialog-cancel]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.querySelector('[data-docier-dialog]')).toBeNull();
+
+    const field = document.createElement('input');
+    document.body.appendChild(field);
+    field.focus();
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', ctrlKey: true, bubbles: true }));
+    expect(document.querySelector('[data-docier-dialog]')).toBeNull();
+  });
+
+  it('closes the open dialog when the chrome is disposed', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    chrome.context.run('openDialog', { dialog: 'font' });
+    expect(document.querySelector('[data-docier-dialog]')).not.toBeNull();
+    chrome.dispose();
+    expect(document.querySelector('[data-docier-dialog]')).toBeNull();
+    expect(document.querySelector('.docier-dialog-overlay')).toBeNull();
   });
 });
 

@@ -133,7 +133,7 @@ export interface ChromeContext {
   readonly host: HTMLElement;
   subscribe(listener: (state: ChromeState) => void): Unsubscribe;
   describe(spec: ControlSpec): ResolvedControl;
-  invoke(spec: ControlSpec): void;
+  invoke(spec: ControlSpec, anchor?: HTMLElement | undefined): void;
   run(action: ChromeActionName, args?: ChromeActionArgs): void;
 }
 

@@ -5,6 +5,8 @@ import { toCssPx, mp } from '../units/index.js';
 import { createContextMenus } from './context-menu.js';
 import type { ContextMenuController } from './context-menu.js';
 import { createResolver } from './controls.js';
+import { dialogNameFor, openEditorDialog } from './dialog.js';
+import type { EditorDialogHandle } from './dialog.js';
 import { createDisposableStore, markPart, markSlot, make } from './dom.js';
 import { createFloatingToolbar } from './floating-toolbar.js';
 import type { FloatingToolbarHandle } from './floating-toolbar.js';
@@ -365,10 +367,28 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         store.set({ surface: (surface === undefined ? null : surface) as ContextSurface | null });
         return;
       }
-      case 'openDialog':
-        setMessage(i18n.text('ui.dialog.notImplemented', { name: String(args?.dialog ?? '') }));
+      case 'openDialog': {
+        const requested = String(args?.dialog ?? '');
+        const name = dialogNameFor(requested);
+        if (name === undefined) {
+          setMessage(i18n.text('ui.dialog.notImplemented', { name: requested }));
+          return;
+        }
+        const anchor = args?.anchor;
+        setMessage('');
+        editorDialog = openEditorDialog(context, {
+          dialog: name,
+          mount: dialogHost(),
+          anchor: anchor instanceof HTMLElement ? anchor : undefined,
+          placement: 'anchor',
+          onClose: () => {
+            editorDialog = undefined;
+          },
+        });
         return;
+      }
       case 'closeDialog':
+        editorDialog?.close();
         setMessage('');
         return;
       case 'setIndent':
@@ -410,13 +430,14 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     }
   };
 
-  const invoke = (spec: ControlSpec): void => {
+  const invoke = (spec: ControlSpec, anchor?: HTMLElement | undefined): void => {
     if (spec.command !== undefined && handle.commands.get(spec.command) !== undefined) {
       void handle.commands.execute(spec.command, spec.args, { source: 'ui' });
       return;
     }
     if (spec.action !== undefined && (ACTIONS as readonly string[]).includes(spec.action)) {
-      run(spec.action, spec.args as ChromeActionArgs | undefined);
+      const base = (spec.args ?? {}) as ChromeActionArgs;
+      run(spec.action, anchor === undefined ? base : { ...base, anchor });
       return;
     }
     if (spec.command !== undefined) {
@@ -481,6 +502,16 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     return widget;
   };
 
+  const dialogHost = (): HTMLElement => {
+    if (!replaced('dialogs')) return portal ?? root;
+    if (dialogSlot === undefined) {
+      dialogSlot = slotElement('dialogs');
+      root.appendChild(dialogSlot);
+    }
+    return dialogSlot;
+  };
+  take('dialogs');
+
   let menuBar: MenuBarHandle | undefined;
   let ruler: RulerHandle | undefined;
   let verticalRuler: VerticalRulerHandle | undefined;
@@ -488,6 +519,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   let statusBar: StatusBarHandle | undefined;
   let floating: FloatingToolbarHandle | undefined;
   let contextMenus: ContextMenuController | undefined;
+  let editorDialog: EditorDialogHandle | undefined;
+  let dialogSlot: HTMLElement | undefined;
   let portal: HTMLElement | undefined;
 
   if (mode !== 'none') {
@@ -737,6 +770,24 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   ownerWindow?.addEventListener('resize', viewportChanged);
   ownerDocument.addEventListener('scroll', viewportChanged, true);
 
+  const fontDialogKey = (event: KeyboardEvent): void => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    if (event.altKey || event.shiftKey) return;
+    if (event.key.toLowerCase() !== 'd') return;
+    const active = ownerDocument.activeElement;
+    if (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement
+    ) {
+      return;
+    }
+    if (editorDialog?.isOpen === true) return;
+    event.preventDefault();
+    run('openDialog', { dialog: 'font' });
+  };
+  if (mode !== 'none') ownerDocument.addEventListener('keydown', fontDialogKey);
+
   applyThemeMode();
   trackVerticalRuler();
 
@@ -764,6 +815,12 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     dispose: () => {
       ownerWindow?.removeEventListener('resize', viewportChanged);
       ownerDocument.removeEventListener('scroll', viewportChanged, true);
+      ownerDocument.removeEventListener('keydown', fontDialogKey);
+      editorDialog?.dispose();
+      editorDialog = undefined;
+      if (dialogSlot !== undefined && dialogSlot.parentNode !== null) {
+        dialogSlot.parentNode.removeChild(dialogSlot);
+      }
       for (const unsubscribe of subscriptions.splice(0, subscriptions.length)) unsubscribe();
       styleStore.dispose();
       queries.dispose();
