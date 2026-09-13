@@ -53,7 +53,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:4px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
 @container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}
-.docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
+.docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;min-height:var(--docier-ribbon-group-height);border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
 .docier-group:last-child{border-inline-end:0}
 .docier-group-controls{display:flex;align-items:center;flex-wrap:wrap;align-content:center;gap:2px;row-gap:2px;flex:1 1 auto;min-width:0}
 .docier-group-controls > *{flex:0 0 auto}
@@ -62,13 +62,19 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-group-launcher{appearance:none;border:0;background:transparent;color:var(--docier-text-muted);cursor:pointer;line-height:1;padding:0 2px}
 .docier-group-launcher:hover{color:var(--docier-accent)}
 .docier-group[data-docier-grow="true"]{flex:0 1 auto;min-width:0}
-.docier-group[data-docier-group="editing"]{min-width:76px}
+.docier-group[data-docier-group="editing"]{min-width:122px}
+.docier-group[data-docier-group="clipboard"]{min-width:138px}
 .docier-control{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:var(--docier-control-height);min-width:var(--docier-control-height);padding:0 calc(var(--docier-gap) + 2px);background:transparent;border:1px solid transparent;border-radius:var(--docier-radius);color:var(--docier-text);font:inherit;cursor:pointer;white-space:nowrap}
 .docier-control:hover:not([aria-disabled="true"]){background:var(--docier-state-hover)}
 .docier-control[aria-pressed="true"],.docier-control[aria-checked="true"]{background:var(--docier-state-selected);border-color:var(--docier-border);color:var(--docier-text)}
 .docier-control[aria-disabled="true"]{color:var(--docier-text-disabled);cursor:default}
 .docier-control[data-docier-toggle="true"][aria-pressed="true"]{font-weight:700}
 .docier-control-wide{min-width:calc(var(--docier-control-height) * 2)}
+.docier-ribbon .docier-control-large{flex-direction:column;justify-content:flex-start;gap:2px;min-height:46px;min-width:40px;padding:2px 5px;white-space:normal;text-align:center;align-self:flex-start}
+.docier-ribbon .docier-control-large .docier-control-icon{width:28px;height:28px}
+.docier-ribbon .docier-control-large .docier-control-icon svg{width:28px;height:28px}
+.docier-ribbon .docier-control-large .docier-control-label{display:block;font-size:calc(var(--docier-ui-font-size) - 2px);line-height:1.15;max-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.docier-ribbon .docier-control-large.docier-control-iconic > .docier-control-label{display:block}
 .docier-control-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:0 0 auto}
 .docier-control-icon svg{display:block}
 .docier-control-iconic > .docier-control-label{display:none}
@@ -89,7 +95,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-menu-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:var(--docier-gap);padding:calc(var(--docier-gap) * 2)}
 .docier-menu-gallery > .docier-control{min-width:0;overflow:hidden}
 .docier-menu-gallery .docier-control-label{display:block;overflow:hidden;text-overflow:ellipsis}
-.docier-ribbon .docier-menu-gallery{display:grid;grid-auto-flow:column;grid-auto-columns:88px;grid-template-columns:none;overflow-x:auto;overflow-y:hidden;flex:1 1 264px;min-width:0;gap:2px;padding:calc(var(--docier-gap) * 1.5)}
+.docier-ribbon .docier-menu-gallery{display:grid;grid-auto-flow:column;grid-auto-columns:88px;grid-template-columns:none;overflow-x:auto;overflow-y:hidden;flex:1 1 120px;min-width:0;gap:2px;padding:calc(var(--docier-gap) * 1.5)}
 .docier-ribbon .docier-menu-gallery .docier-control{min-height:22px;font-family:var(--docier-doc-font);font-size:12px;justify-content:flex-start;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .docier-ribbon .docier-menu-gallery > .docier-control{min-height:calc(var(--docier-control-height) - 8px);padding:0 3px;font-size:calc(var(--docier-ui-font-size) - 2px)}
 .docier-ribbon .docier-menu-gallery .docier-control-label{line-height:1.1}

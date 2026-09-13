@@ -26,6 +26,7 @@ export interface UiNode {
   readonly options?: readonly ControlOption[] | undefined;
   readonly keytip?: string | undefined;
   readonly wide?: boolean | undefined;
+  readonly large?: boolean | undefined;
   readonly value?: string | undefined;
   readonly valueKey?: string | undefined;
   readonly valueArg?: string | undefined;
@@ -35,6 +36,7 @@ export interface UiGroup {
   readonly id: string;
   readonly labelKey: string;
   readonly launcher?: UiNode | undefined;
+  readonly large?: boolean | undefined;
   readonly nodes: readonly UiNode[];
 }
 
@@ -64,6 +66,7 @@ const node = (kind: UiNodeKind, init: Partial<UiNode> & { readonly labelKey: str
     options: init.options,
     keytip: init.keytip,
     wide: init.wide,
+    large: init.large,
     value: init.value,
     valueKey: init.valueKey,
     valueArg: init.valueArg,
@@ -172,6 +175,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             command: command('clipboard.paste'),
             keytip: 'V',
             wide: true,
+            large: true,
             action: 'openDialog',
             actionArgs: { dialog: command('clipboard.paste') },
           }),
@@ -392,6 +396,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             labelKey: 'ui.control.find',
             command: command('find.find'),
             keytip: 'FD',
+            large: true,
             action: 'openDialog',
             actionArgs: { dialog: command('find.find') },
           }),
@@ -419,6 +424,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'pages',
         labelKey: 'ui.group.pages',
+        large: true,
         nodes: [
           button({
             labelKey: 'ui.control.insertPageBreak',
@@ -431,11 +437,13 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'tables',
         labelKey: 'ui.group.tables',
+        large: true,
         nodes: [pending('insert.table', 'ui.control.insertTable', 'T')],
       },
       {
         id: 'illustrations',
         labelKey: 'ui.group.illustrations',
+        large: true,
         nodes: [
           pending('object.insertImage', 'ui.control.insertImage', 'P'),
           pending('object.insertShape', 'ui.control.insertShape', 'SH'),
@@ -445,11 +453,13 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'links',
         labelKey: 'ui.group.links',
+        large: true,
         nodes: [pending('insert.link', 'ui.control.insertLink', 'L')],
       },
       {
         id: 'headerFooter',
         labelKey: 'ui.group.headerFooter',
+        large: true,
         nodes: [
           pending('insert.header', 'ui.control.insertHeader', 'HD'),
           pending('insert.footer', 'ui.control.insertFooter', 'FT'),
@@ -459,6 +469,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'text',
         labelKey: 'ui.group.text',
+        large: true,
         nodes: [
           button({
             labelKey: 'ui.control.insertField',
@@ -473,6 +484,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'symbols',
         labelKey: 'ui.group.symbols',
+        large: true,
         nodes: [
           pending('insert.symbol', 'ui.control.insertSymbol', 'SY'),
           button({
@@ -493,6 +505,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'documentFormatting',
         labelKey: 'ui.group.documentFormatting',
+        large: true,
         nodes: [
           pending('theme.setFonts', 'ui.control.themeFonts', 'TF'),
           pending('theme.setColors', 'ui.control.themeColors', 'TC'),
@@ -502,6 +515,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'pageBackground',
         labelKey: 'ui.group.pageBackground',
+        large: true,
         nodes: [
           pending('doc.setPageBackground', 'ui.menu.pageColour', 'PC'),
           pending('doc.setWatermark', 'ui.menu.watermark', 'WM'),
@@ -518,6 +532,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'pageSetup',
         labelKey: 'ui.group.pageSetup',
+        large: true,
         launcher: button({
           labelKey: 'ui.control.pageSetupDialog',
           action: 'openDialog',
@@ -573,6 +588,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'paragraphLayout',
         labelKey: 'ui.group.paragraph',
+        large: true,
         launcher: button({
           labelKey: 'ui.control.paragraphDialog',
           action: 'openDialog',
@@ -598,6 +614,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'arrange',
         labelKey: 'ui.group.arrange',
+        large: true,
         nodes: [
           pending('object.bringForward', 'ui.control.arrangeBringForward', 'BF'),
           pending('object.sendBackward', 'ui.control.arrangeSendBackward', 'SBK'),
@@ -615,6 +632,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'toc',
         labelKey: 'ui.group.tableOfContents',
+        large: true,
         nodes: [
           pending('insert.tableOfContents', 'ui.control.tableOfContents', 'TOC'),
           pending('insert.updateTable', 'ui.control.updateTable', 'UT'),
@@ -623,6 +641,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'notes',
         labelKey: 'ui.group.footnotes',
+        large: true,
         nodes: [
           pending('insert.footnote', 'ui.control.insertFootnote', 'FN'),
           pending('insert.endnote', 'ui.control.insertEndnote', 'EN'),
@@ -631,6 +650,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'captions',
         labelKey: 'ui.group.captions',
+        large: true,
         nodes: [
           pending('insert.caption', 'ui.control.insertCaption', 'CP'),
           pending('insert.crossReference', 'ui.control.crossReference', 'CR'),
@@ -639,6 +659,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'index',
         labelKey: 'ui.group.index',
+        large: true,
         nodes: [
           pending('insert.index', 'ui.control.insertIndex', 'IX'),
           pending('insert.bibliography', 'ui.control.bibliography', 'BI'),
@@ -654,6 +675,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'proofing',
         labelKey: 'ui.group.proofing',
+        large: true,
         nodes: [
           pending('proof.spelling', 'ui.control.spelling', 'SP'),
           pending('proof.thesaurus', 'ui.control.thesaurus', 'TH'),
@@ -669,11 +691,13 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'language',
         labelKey: 'ui.group.language',
+        large: true,
         nodes: [pending('proof.setLanguage', 'ui.control.setLanguage', 'SL')],
       },
       {
         id: 'comments',
         labelKey: 'ui.group.comments',
+        large: true,
         nodes: [
           pending('comment.create', 'ui.control.newComment', 'NC'),
           pending('comment.delete', 'ui.control.deleteComment', 'DC'),
@@ -682,6 +706,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'tracking',
         labelKey: 'ui.group.tracking',
+        large: true,
         nodes: [
           toggle({
             labelKey: 'ui.control.trackChanges',
@@ -704,6 +729,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'views',
         labelKey: 'ui.group.views',
+        large: true,
         nodes: [
           toggle({ labelKey: 'ui.control.viewPrint', action: 'setViewMode', actionArgs: { mode: 'print' }, keytip: 'VP' }),
           toggle({ labelKey: 'ui.control.viewWeb', action: 'setViewMode', actionArgs: { mode: 'web' }, keytip: 'VW' }),
@@ -714,6 +740,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'show',
         labelKey: 'ui.group.show',
+        large: true,
         nodes: [
           toggle({ labelKey: 'ui.control.showRuler', action: 'toggleRuler', keytip: 'RU' }),
           pending('view.setGridlines', 'ui.control.showGridlines', 'GL'),
@@ -723,6 +750,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
       {
         id: 'zoom',
         labelKey: 'ui.group.zoom',
+        large: true,
         nodes: [
           button({ labelKey: 'ui.control.zoomIn', action: 'zoomIn', keytip: 'ZI' }),
           button({ labelKey: 'ui.control.zoomOut', action: 'zoomOut', keytip: 'ZO' }),

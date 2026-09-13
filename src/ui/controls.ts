@@ -330,6 +330,7 @@ export const createControl = (
   markPart(element, 'control');
   element.setAttribute('data-docier-kind', node.kind);
   if (node.wide === true) element.classList.add('docier-control-wide');
+  if (node.large === true) element.classList.add('docier-control-large');
   element.setAttribute('data-docier-id', node.id);
 
   const label = make('span', 'docier-control-label');

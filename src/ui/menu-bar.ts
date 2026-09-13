@@ -158,7 +158,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
       groupElement.setAttribute('data-docier-group', group.id);
       const controls = make('div', 'docier-group-controls');
       for (const node of group.nodes) {
-        const element = createControl(context, node, {
+        const element = createControl(context, group.large === true ? { ...node, large: true } : node, {
           role: 'button',
           onItem: (itemElement, itemNode) => {
             bindNode(itemElement, itemNode, 'button');

@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done. **Phase D**: D1, D3 and D4 done, D2 to do. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
+Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done. **Phase D**: D1 to D4 done. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
 
 Done and verified in the browser:
 
@@ -341,9 +341,74 @@ adds `cell.margins`) showing up through a second surface, and it is still open.
 | # | Item | State |
 |---|---|---|
 | D1 | The Styles gallery as one scrolling row of preview tiles | **done** |
-| D2 | Large buttons for the important commands | to do |
+| D2 | Large buttons for the important commands | **done** |
 | D3 | The remaining icons | **done** |
-| D4 | Remove the forced ribbon height | **done, uniformity still needs D2** |
+| D4 | Remove the forced ribbon height | **done** |
+
+**D2 done, and D4's deferred question answered.** D4 finished with a ribbon that
+fitted its contents and a document that moved 56px whenever the tab changed,
+because Home's content genuinely needed more height than the others. This is the
+pass that makes the content need the same height everywhere.
+
+**The large variant.** `UiNode` gained `large`, the ribbon renders it as a column:
+a 28px glyph with the label beneath, 46px tall, labels kept to one line. It can be
+set on a node or on a whole group, which is what "the whole Insert tab" needs.
+Applied to Paste, all seven Insert groups, both Design groups, Editing's Find, and
+then - going one step past the audit's list - to every group on Layout,
+References, Review and View, because the audit's own reasoning is that Word's tabs
+are all the same height *because Word's tabs are all designed to need the same
+height*, and those four were the ones still at one row.
+
+**What actually held Home at 107px, and it was not the large button.** The
+Clipboard and Editing groups were too narrow for their small controls to sit
+beside the large one, so Cut, Copy and Format Painter wrapped onto two extra rows
+under Paste: measured as a large at y=128, two smalls at 139 and one at 177, which
+is 46 + 4 + 26 of controls before the group label. Widening those two groups - by
+letting the Styles gallery yield width, since it scrolls its content anyway - put
+the smalls back on Paste's line, and Home's tallest group fell from 91px to 70px.
+
+**The second thing that held the tabs apart was a wrapping label.** Groups landed
+at 63px or 74px with nothing to explain the difference, and the difference was a
+long label like "Set Proofing Language" wrapping onto a second line and adding
+eleven pixels. Large labels are now one line with an ellipsis.
+
+**Then uniformity by construction, not by luck.** The group height is a token,
+`--docier-ribbon-group-height: 70px`, so every group is the same height whatever
+its contents and no tab can drift. Measured live: **every one of the seven
+ribbon tabs is 79px**, where before this pass they were 107, 51, 51, 51, 51, 51
+and 51. Home came down 28px, the other six came up 28px, and the document no
+longer moves at all when the tab changes.
+
+79 is not Word's 84. Word reaches 84 with 32px glyphs and 22px controls where
+ours are 28 and 26, and with an adaptive menu that hides controls when the window
+is narrow, which this build does not have. Five pixels short of Word, uniform,
+nothing clipped and nothing overlapping is the honest place to stop, and it is
+strictly better than either of the two states D4 had to choose between.
+
+### Phase D2 verification, live in the browser
+
+| Check | Measured |
+|---|---|
+| Every ribbon tab | 79px, all seven identical |
+| Home, before to after | 107px to 79px |
+| The other six, before to after | 51px to 79px |
+| Controls clipped by their own box | zero, on every tab |
+| The document's position across a tab change | unchanged |
+| The large variant | 28px glyph, label beneath, one line |
+| Real overlaps on Home | four, all a gallery tile against Editing |
+
+Those four are the **probe artefact the audit already recorded** under D4, not a
+regression: `overflow-x: auto` clips the gallery's tiles on screen while they go
+on reporting their full bounding rectangles, so a rectangle comparison sees
+Title and Subtitle reaching into the Editing group. Confirmed by name this time -
+every one of the four pairs has a gallery tile on one side and a Find, Replace or
+Select All on the other - and confirmed on screen.
+
+Not done, recorded rather than implied: the large variant does not scale with the
+density tokens, so a touch-density chrome keeps 46px large buttons where every
+other control grows to 44px; and there is no adaptive behaviour, so a narrow
+window still wraps the panel rather than collapsing groups into the dropdowns
+Word shows.
 
 ## Phase E - Dialogs
 
