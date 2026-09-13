@@ -746,10 +746,10 @@ export const TABLE_TAB: UiTab = {
       id: 'tableTools',
       labelKey: 'ui.group.tableTools',
       nodes: [
-        pending('table.insertRowsAbove', 'ui.menu.insertRowsAbove', 'RA'),
-        pending('table.insertRowsBelow', 'ui.menu.insertRowsBelow', 'RB'),
-        pending('table.insertColumnsLeft', 'ui.menu.insertColumnsLeft', 'CL'),
-        pending('table.insertColumnsRight', 'ui.menu.insertColumnsRight', 'CR'),
+        button({ labelKey: 'ui.menu.insertRowsAbove', id: 'ctx:table:rowsAbove', command: command('table.insertRowsAbove') }),
+        button({ labelKey: 'ui.menu.insertRowsBelow', id: 'ctx:table:rowsBelow', command: command('table.insertRowsBelow') }),
+        button({ labelKey: 'ui.menu.insertColumnsLeft', id: 'ctx:table:colsLeft', command: command('table.insertColumnsLeft') }),
+        button({ labelKey: 'ui.menu.insertColumnsRight', id: 'ctx:table:colsRight', command: command('table.insertColumnsRight') }),
       ],
     },
     {
@@ -804,10 +804,11 @@ export const PICTURE_TAB: UiTab = {
   ],
 };
 
+
 const editSubmenuFor = (prefix: string): readonly UiNode[] => [
-  button({ labelKey: 'ui.control.cut', id: `${prefix}:cut`, command: command('clipboard.cut'), action: 'openDialog', actionArgs: { dialog: command('clipboard.cut') } }),
-  button({ labelKey: 'ui.control.copy', id: `${prefix}:copy`, command: command('clipboard.copy'), action: 'openDialog', actionArgs: { dialog: command('clipboard.copy') } }),
-  button({ labelKey: 'ui.control.paste', id: `${prefix}:paste`, command: command('clipboard.paste'), action: 'openDialog', actionArgs: { dialog: command('clipboard.paste') } }),
+  button({ labelKey: 'ui.control.cut', id: `${prefix}:cut`, command: command('clipboard.cut') }),
+  button({ labelKey: 'ui.control.copy', id: `${prefix}:copy`, command: command('clipboard.copy') }),
+  button({ labelKey: 'ui.control.paste', id: `${prefix}:paste`, command: command('clipboard.paste') }),
 ];
 
 const fontSubmenu = (prefix: string): UiNode =>
@@ -860,12 +861,12 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
   ],
   table: [
     menu('ui.menu.insertRows', [
-      pending('table.insertRowsAbove', 'ui.menu.insertRowsAbove', 'RA'),
-      pending('table.insertRowsBelow', 'ui.menu.insertRowsBelow', 'RB'),
+      button({ labelKey: 'ui.menu.insertRowsAbove', id: 'ctx:table2:rowsAbove', command: command('table.insertRowsAbove') }),
+      button({ labelKey: 'ui.menu.insertRowsBelow', id: 'ctx:table2:rowsBelow', command: command('table.insertRowsBelow') }),
     ]),
     menu('ui.menu.insertColumns', [
-      pending('table.insertColumnsLeft', 'ui.menu.insertColumnsLeft', 'CL'),
-      pending('table.insertColumnsRight', 'ui.menu.insertColumnsRight', 'CR'),
+      button({ labelKey: 'ui.menu.insertColumnsLeft', id: 'ctx:table2:colsLeft', command: command('table.insertColumnsLeft') }),
+      button({ labelKey: 'ui.menu.insertColumnsRight', id: 'ctx:table2:colsRight', command: command('table.insertColumnsRight') }),
     ]),
     menu('ui.menu.deleteRows', [
       pending('table.deleteRow', 'ui.menu.deleteRows', 'DR'),

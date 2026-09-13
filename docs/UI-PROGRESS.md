@@ -118,7 +118,7 @@ placeholders, three sources handed over.
 | C1 | Style the rows, and make items fill the row | **done** |
 | C2 | Move the disabled reasons out of the items | **done** |
 | C3 | The four behavioural defects in `menu.ts` and `context-menu.ts` | to do |
-| C4 | Wire Cut, Copy, Paste and the table insert rows to the commands that exist | to do |
+| C4 | Wire Cut, Copy, Paste and the table insert rows to the commands that exist | **done, verification blocked** |
 | C5 | Fill the menus out to Word's contents | to do |
 
 ### Phase C notes
@@ -173,4 +173,29 @@ row.
 Findings that belong to a phase other than the one being worked on. Each says
 which phase owns it.
 
-*(none yet)*
+### A1. Right-clicking inside a selection collapses it
+
+Found while verifying C4. Owner: **Phase B3's agent**, which holds
+`src/edit/input.ts`, and it has been asked to fix it.
+
+The context menu's Cut, Copy and Paste were wired to their real commands, and
+neither command fires when you use them, because the right-click that opens the
+menu has already destroyed the selection. Measured with the command bus tapped:
+
+    shift+ArrowRight x6     -> selection.moveRight x6
+    right-click inside it   -> selection.setCaret      <- selection gone
+    Copy                    -> nothing fires, nothing is selected
+
+Word preserves a selection that is right-clicked inside, and moves the caret when
+the right-click is outside it. Until this is fixed the menu's clipboard entries
+cannot work however correctly they are wired, which is why C4 is marked done but
+not verified.
+
+### A2. The context menu has no Picture surface for an unresolvable image
+
+Owner: **Phase C**. `SURFACE_ATLAS` (`src/ui/context-menu.ts:18`) detects an image
+surface with `img,[data-docier-image]`, which never matches the wrapper the
+missing-image path produces, because that carries `data-docier-image-missing`. An
+image with no bytes therefore gets the ordinary text menu. Adding
+`[data-docier-object]` to the selector fixes it. B2 removed the missing-image case
+from the demo by supplying the bytes, so this now only bites a host that does not.
