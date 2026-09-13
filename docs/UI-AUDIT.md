@@ -185,17 +185,130 @@ first item under the pointer and is about 35 percent taller than Word's, and the
 text menu is missing most of Word's entries. Being measured and designed
 separately and will be folded in here.
 
-### Objects cannot be resized like Word's
+### Objects cannot be resized like Word's, and a picture cannot even be seen
 
 **Reported:** "images, tables, whatnot, should be resizable just like in word".
+**Confirmed, and there is a larger problem underneath it.**
 
-Dragging a vertical cell border resizes a table column and dragging a horizontal
-one resizes a row, both verified. What does not exist: selecting an object and
-getting handles, resizing a picture, resizing a table as a whole, or moving either.
-Inserting a picture is refused outright, as are footnotes, headers, hyperlinks,
-symbols, text boxes, a table of contents and comments. Being researched
-separately, including whether the transaction snapshot covering media is the gate,
-and will be folded in here.
+Measured against `contract.docx`, the only shipped document with media:
+
+- **An image cannot be selected.** Clicking its centre sets a *text* caret: the
+  selection moved from 0 to 311. There is no object-selection state to reach.
+  `EditSelection` (`src/edit/selection.ts:16-21`) is anchor/focus/affinity, all
+  text positions, and `hitTestPage` (`src/edit/caret.ts:89-100`) maps a point to a
+  caret stop with no object test.
+- **It shows no handles.** The only object DOM is one
+  `<div class="docier-object" ...>`. Probing all eight handle positions returns
+  the image's own label or the hidden input, with cursor `auto` at every one.
+- **A table cannot be resized as a whole or moved.** Its outer right edge and its
+  bottom edge both have cursor `auto`, dragging either changes nothing, and
+  dragging from its top-left corner changes nothing.
+- **The only affordance beyond the cell borders is the cell borders**, and both
+  work: a 60px column drag took the table 623 to 686 wide, a 30px row drag took
+  the row 30 to 60, one commit per gesture.
+
+**And the bigger problem: no picture renders in the demo at all.** `contract.docx`
+carries `word/media/image1.png`, but the renderer takes the missing path:
+`data-docier-image-missing="rId4"`, a dashed red outline, a child label reading
+`missing image: rId4`, and zero `docier-image` elements. The 64px box is exactly
+the extent, so position, crop and rotation are laid out correctly and only the
+bytes are absent. `images` and `imageProvider` are host-supplied render options
+(`src/render/types.ts:113-114`), the demo passes neither, and nothing extracts
+media parts for the renderer. So any resize would be validated against a red
+dashed placeholder.
+
+**Also absent: floating objects.** Replacing the fixture's `wp:inline` with a
+well-formed `wp:anchor` made the object disappear entirely, with the document
+still loading clean and no error surfaced. `objectPlacementOf`
+(`src/layout/objects.ts:90-94`) returns nothing unless a `wp:inline` child exists,
+and there is no wrap type, position or anchor modelling anywhere in `src`.
+
+**A small related defect:** right-clicking the picture gives the ordinary *text*
+menu. `SURFACE_ATLAS` (`src/ui/context-menu.ts:18`) detects an image surface with
+`img,[data-docier-image]`, which never matches the wrapper the missing path
+produces, because that carries `data-docier-image-missing`.
+
+#### The snapshot gate is narrower than the plan assumed
+
+`EditSnapshot` (`src/edit/session.ts:60-65`) is body, relationships, numbering and
+regions. Media is not in it. But what that actually gates matters, because it
+changes the order of work:
+
+- **Resizing an existing picture is not gated.** A resize writes attributes
+  inside `body`, which is cloned and restored, and the relationship row is covered
+  by the relationships field. Undo restores both.
+- **Resizing a table is not gated.** Columns and rows already commit this way.
+- **Inserting a picture *is* gated**, because it creates a media part. The package
+  layer already has both halves: `addMediaPart`
+  (`src/ooxml/package.ts:636-658`) creates the part and its relationship, and
+  `Part.setBytes` (`src/ooxml/part.ts:204-211`) replaces bytes. Only the snapshot
+  fails to call them. Note `pruneUnusedMedia` (`package.ts:752-769`) has **no
+  callers**, so an undone insert leaks an orphan part into the saved package
+  rather than corrupting it.
+- **Floating objects are gated on the model, not the snapshot.** Nothing exists.
+
+Undo runs the stored closure rather than the commit hooks, so media has to go into
+the snapshot itself, not into `afterRollback`.
+
+#### The design trap: object identity does not survive an edit
+
+`paintObjects` stamps each object with `String(atom.atomId)`
+(`src/render/objects.ts:103`), and `atomId` is a per-paragraph ordinal from a
+counter inside atomize (`src/layout/atoms.ts:125-149`). Every resize triggers a
+relayout, so a selection held as an atom id does not survive the edit it causes.
+A stable id has to be added at the same time: either the `DrawingContent` `NodeId`
+or `wp:docPr/@id` read during ingest.
+
+#### The good news, which makes this cheaper than it looks
+
+The overlay and the drag guide are appended to the **unscaled** surface,
+`.docier-editor-surface` (`src/api/editor.ts:309-312`), which is the parent of the
+element carrying `transform: scale(zoom)`. So a handle drawn there is constant in
+device pixels at every zoom with no extra work, which is the hardest constraint in
+the object spec already satisfied. The coordinate conversion, the drag skeleton
+and the commit wrapper all exist for the table borders, and `TableFragment.box` and
+`PreparedTable.total` already give a table's edges without new layout work.
+
+#### The order of work
+
+**Step 0, with step 1: make pictures visible in the demo**, by passing the media
+parts of the loaded package to the renderer as `images` or `imageProvider`.
+Without it nobody can see a resize, and the byte-preserving round trip is
+untestable. It is small, it is demo-side, and it turns a plausible feature into an
+observable one.
+
+**Step 1, the first real resize: selection and handles for inline pictures.**
+
+1. A stable id on `ObjectPlacement`, stamped on `.docier-object`.
+2. An object-selection state beside the text selection, with
+   `docier.command.object.select`, and un-refusing the existing
+   `docier.command.object.setSize` (`src/edit/areas/unsupported.ts:191`), whose id,
+   label and shape are already correct.
+3. A hit test for object rects before the caret fallback, and eight handles plus a
+   frame drawn on the unscaled surface.
+4. A handle drag that previews by scaling the object element and commits once on
+   release through a new area command written like `setColumnWidth`.
+
+Corner handles lock the aspect ratio with the **opposite corner fixed**, which is
+what stops the object walking across the page, and `Shift` inverts the lock, which
+is Word's model and the opposite of most web editors. Commit `wp:extent` for the
+layout and `pic:spPr/a:xfrm/a:ext` for everyone else; the media bytes and the crop
+are never touched.
+
+This step needs no snapshot change, no model change beyond one id, and no new
+public API, which is why it is first.
+
+**Then:** the table's whole width, which is a proportional multi-element write to
+keep `tblW`, `gridCol` and `tcW` consistent and must set `tblLayout` to fixed or
+Word will resize the table on open; then floating objects, which is the large
+piece and where move lives; and picture *insert* last, because it is the only item
+that changes what the file can contain and the only one the snapshot gates.
+
+**A decision to put to the commissioner.** Word has no height handle on a table,
+because a table's height is the sum of its rows. I recommend refusing one and
+pointing at Table Properties rather than inventing an affordance Word does not
+have. The same reasoning puts table *move* out of scope: OOXML has no in-flow
+table position.
 
 ### The interface chrome reads as unfinished
 
