@@ -270,7 +270,8 @@ const insertionPoint = (
     if (at === span.start) {
       const parent = span.element.parent;
       if (parent === undefined) return undefined;
-      return { parent, index: indexOfChild(parent, span.element), properties: runPropertiesOf(span.element) };
+      const source = previous === undefined ? span.element : previous.element;
+      return { parent, index: indexOfChild(parent, span.element), properties: runPropertiesOf(source) };
     }
     previous = span;
   }
@@ -452,9 +453,14 @@ export const clearRunProperties = (run: XmlElement): boolean => {
 };
 
 const splitBoundary = (model: DocumentModel, paragraph: XmlElement, at: number): void => {
+  let split = false;
   for (const span of runSpans(model, paragraph)) {
-    if (at > span.start && at < span.end) splitRunAt(span.element, at - span.start);
+    if (at > span.start && at < span.end) {
+      splitRunAt(span.element, at - span.start);
+      split = true;
+    }
   }
+  if (split) model.context.forgetSubtree(paragraph);
 };
 
 export const setRunPropertiesOnRange = (

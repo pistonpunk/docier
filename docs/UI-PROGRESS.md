@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase A in progress**, four of its nine items done.
+Status: **Phase A in progress**, six of its nine items done.
 
 Done and verified in the browser:
 
@@ -24,6 +24,18 @@ Done and verified in the browser:
   the caret was dark about half the time while typing. `reveal()` restarts its
   phase. Verified: twelve samples taken right after keystrokes are all fully
   opaque, where before they alternated.
+- **A4** Selecting a range mid-run and pressing Ctrl+B was a `noop` that also
+  silently split the paragraph, because `splitRunAt` mutated the paragraph's
+  children without invalidating the view cache that the span scan reads.
+  `splitBoundary` invalidates it now. Verified at the model level: the paragraph
+  becomes exactly two runs with `b` on the first, where before it was one split
+  run with no `b` at all.
+- **A5** The toggle and the toolbar meant the run *ending* at the caret while
+  typing continued in the run *starting* at it, so a mark written at a run
+  boundary was lost on the next keystroke. `insertionPoint` now takes the
+  properties from the run the caret convention points at. Verified: at the start
+  of a bold run, Ctrl+B turns bold off on that run and the text typed afterwards
+  is not bold, which is what the button showed.
 
 ## Phase A - The editor must accept input, and formatting must work
 
@@ -32,8 +44,8 @@ Done and verified in the browser:
 | A1 | Focus on mount, so `autoFocus` stops being dead code | **done** |
 | A2 | Ribbon and status-bar controls must not steal focus | **done** |
 | A3 | Ctrl+A must not produce an uneditable selection, and a click inside a selection must collapse it | to do |
-| A4 | Range formatting: the stale-cache fix in `splitBoundary` | to do |
-| A5 | Range formatting: the run-at-the-caret convention in `insertionPoint` | to do |
+| A4 | Range formatting: the stale-cache fix in `splitBoundary` | **done** |
+| A5 | Range formatting: the run-at-the-caret convention in `insertionPoint` | **done** |
 | A6 | Caret: shift the region stops so a header or footer caret is where its text is | to do |
 | A7 | Caret: reveal on zoom | **done** |
 | A8 | Caret: reset the blink phase on input | **done** |
