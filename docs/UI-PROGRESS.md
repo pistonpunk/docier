@@ -510,7 +510,7 @@ still announces that it is not available.
 |---|---|---|
 | F1 | Insert a picture | **done** |
 | F2 | Hyperlink | **done, styled and openable on Ctrl+click** |
-| F3 | Comments | **done, with the range marked on screen** |
+| F3 | Comments | **done, with the range marked and the text readable** |
 | F4 | Symbol | **done** |
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
@@ -826,11 +826,22 @@ stamped `data-docier-comment` with the ids and painted with a translucent band.
 Verified in Chromium: the eight selected characters carry the id, the background is
 `rgba(255, 214, 0, 0.24)`, and the text is exactly what was selected.
 
-**The margin note is still missing**, and it is the smaller half of the feature: the
-comment's own text is in the part and Word shows it in a bubble, and this editor
-shows the range it belongs to but not the text. Reading it needs a surface beside
-the page, which the chrome does not have - it is a panel rather than a paint
-concern, and the next thing to build here.
+**The text is readable now, which closes the item.** A comments panel lists every
+comment in the document - the author's initials in a badge, their name, and what
+they wrote - and clicking a row selects the range it is anchored to, so the comment
+and the text it is about are one click apart.
+
+Three pieces make that work. `documentComments` reads the comments part through the
+model's own note reading, so it needs no new parsing. `docier.command.comment.select`
+walks the paragraphs to find the two range markers by id and turns the distance
+between them into a document range, which is what a row click runs. And the panel
+itself is chrome: it hangs off the `panels` slot, is hidden until asked for, and is
+toggled from the Review tab's Comments button.
+
+The panel is mounted only when the chrome is full *and* the host did not supply its
+own surface list. A host that names the surfaces it wants gets exactly those, and
+`panels` stays in `remaining` for it - which is what a chrome test asserts, and it
+caught the first version claiming the slot unconditionally.
 
 ### Footnote, done at the document level
 
@@ -906,6 +917,9 @@ answer than the placeholder was.
 | The footnote written | the separators, the reference and the note text are all in the saved package |
 | Inserting a text box | the drawing is placed as an object at its extent, 1 object node |
 | What the engine says about it | `shapeContentNotLaidOut`, and no false `missingImage` |
+| The comments panel | hidden at first, shown by the Review tab's Comments button |
+| What a row shows | the initials badge, the author and the comment text |
+| Clicking a row | selects the range the comment is anchored to |
 | Console and page errors | none, in any of it |
 
 ## Appendices

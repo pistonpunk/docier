@@ -175,6 +175,8 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H7.5L4.6 13.4V11H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M8.2 5.4v2.8"/><path d="M6.8 6.8h2.8"/>',
   'comment.delete':
     '<path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H7.5L4.6 13.4V11H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="m6.7 5.4 2.8 2.8"/><path d="m9.5 5.4-2.8 2.8"/>',
+  'view.toggleComments':
+    '<rect x="2.5" y="2.5" width="7.5" height="11" rx="1"/><path d="M4.6 5.5h3.3"/><path d="M4.6 8h3.3"/><path d="M12.6 4.4h1.2a1.2 1.2 0 0 1 1.2 1.2v6.8a1.2 1.2 0 0 1-1.2 1.2h-1.2"/><path d="M12.9 7.2h1.3"/><path d="M12.9 9.6h1.3"/>',
   'doc.acceptChange':
     '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="m5.2 8.4 2.2 2.2 3.6-4.4"/>',
   'doc.rejectChange':

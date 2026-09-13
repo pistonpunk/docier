@@ -79,6 +79,7 @@ export type ChromeActionName =
   | 'setUnits'
   | 'toggleStatusItem'
   | 'toggleKeyTips'
+  | 'toggleComments'
   | 'showFloatingControls'
   | 'hideFloatingControls'
   | 'openContextMenu'

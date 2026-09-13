@@ -1,11 +1,14 @@
 import type { CommandDefinition, LocalizedString } from '../../api/types.js';
-import { createWElement, setWAttr } from '../../model/index.js';
+import { noInvalidation } from '../../api/types.js';
+import type { DocRange } from '../../layout/index.js';
+import { docPos } from '../../layout/index.js';
+import { Paragraph, RangeMarker, createWElement, setWAttr } from '../../model/index.js';
 import type { DocumentModel } from '../../model/index.js';
 import { RELATIONSHIP_TYPES } from '../../ooxml/namespaces.js';
 import { createDeclaration, createDocument } from '../../ooxml/xml/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { insertionPoint } from '../mutation.js';
-import { rangeAsDocRange } from '../selection.js';
+import { rangeAsDocRange, setSelection } from '../selection.js';
 import { areaCommand, changedBy } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
@@ -156,6 +159,57 @@ const commentSpec: AreaSpec<CommentArgs> = {
   },
 };
 
+export interface CommentSelectArgs {
+  readonly id?: number | undefined;
+}
+
+const paragraphByElement = (host: AreaHost): ReadonlyMap<XmlElement, Paragraph> => {
+  const out = new Map<XmlElement, Paragraph>();
+  for (const paragraph of host.session.model.paragraphs()) out.set(paragraph.element, paragraph);
+  return out;
+};
+
+export const commentRangeOf = (host: AreaHost, id: number): DocRange | undefined => {
+  const paragraphs = paragraphByElement(host);
+  for (const slot of host.session.slots()) {
+    const paragraph = paragraphs.get(slot.element);
+    if (paragraph === undefined) continue;
+    let offset = 0;
+    let from: number | undefined;
+    for (const node of paragraph.inlineChildren()) {
+      if (node instanceof RangeMarker && node.commentId === String(id)) {
+        if (node.markerKind === 'commentRangeStart') from = offset;
+        else if (node.markerKind === 'commentRangeEnd' && from !== undefined) {
+          return { start: docPos((slot.start as number) + from), end: docPos((slot.start as number) + offset) };
+        }
+      }
+      offset += node.logicalText.length;
+    }
+  }
+  return undefined;
+};
+
+const selectSpec: AreaSpec<CommentSelectArgs> = {
+  id: 'docier.command.comment.select',
+  label: 'Select comment',
+  category: 'comment',
+  layer: 'chrome',
+  chrome: true,
+  undoable: false,
+  invalidation: noInvalidation,
+  enabledIn: (host, args) => args?.id !== undefined && commentRangeOf(host, args.id) !== undefined,
+  reason: () => 'There is no comment with that id in this document',
+  run: (host, args) => {
+    const id = args?.id;
+    if (id === undefined) return false;
+    const range = commentRangeOf(host, id);
+    if (range === undefined) return false;
+    host.setSelection(setSelection(host.session.index, range.start, range.end), 'set');
+    return true;
+  },
+};
+
 export const commentCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<CommentArgs>(host, commentSpec),
+  areaCommand<CommentSelectArgs>(host, selectSpec),
 ];

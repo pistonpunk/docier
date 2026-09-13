@@ -719,6 +719,12 @@ export const RIBBON_TABS: readonly UiTab[] = [
         nodes: [
           pending('comment.create', 'ui.control.newComment', 'NC'),
           pending('comment.delete', 'ui.control.deleteComment', 'DC'),
+          button({
+            labelKey: 'ui.control.commentsPane',
+            id: 'docier.command.view.toggleComments',
+            action: 'toggleComments',
+            keytip: 'CP',
+          }),
         ],
       },
       {

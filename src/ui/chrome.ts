@@ -2,6 +2,8 @@ import type { EditorHandle } from '../api/editor.js';
 import type { ChromeMode, CommandDescriptor, Disposable, Unsubscribe } from '../api/types.js';
 import { marksAt } from '../edit/index.js';
 import { toCssPx, mp } from '../units/index.js';
+import { createCommentsPanel } from './comments-panel.js';
+import type { CommentsPanelHandle } from './comments-panel.js';
 import { createContextMenus } from './context-menu.js';
 import type { ContextMenuController } from './context-menu.js';
 import { createResolver } from './controls.js';
@@ -59,6 +61,7 @@ const ACTIONS: readonly ChromeActionName[] = [
   'setUnits',
   'toggleStatusItem',
   'toggleKeyTips',
+  'toggleComments',
   'showFloatingControls',
   'hideFloatingControls',
   'openContextMenu',
@@ -187,6 +190,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         return state.statusItems.includes(args.item as StatusItemId);
       case 'toggleKeyTips':
         return state.keyTips;
+      case 'toggleComments':
+        return commentsPanel !== undefined && !commentsPanel.element.hidden;
       default:
         return false;
     }
@@ -364,6 +369,11 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       case 'toggleKeyTips':
         store.set({ keyTips: !state.keyTips });
         return;
+      case 'toggleComments':
+        if (commentsPanel === undefined) return;
+        commentsPanel.element.hidden = !commentsPanel.element.hidden;
+        if (!commentsPanel.element.hidden) commentsPanel.refresh();
+        return;
       case 'openContextMenu': {
         const surface = args?.surface;
         store.set({ surface: (surface === undefined ? null : surface) as ContextSurface | null });
@@ -536,6 +546,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   let statusBar: StatusBarHandle | undefined;
   let floating: FloatingToolbarHandle | undefined;
   let contextMenus: ContextMenuController | undefined;
+  let commentsPanel: CommentsPanelHandle | undefined;
   let editorDialog: EditorDialogHandle | undefined;
   let imagePicker: ImagePickerHandle | undefined;
   let dialogSlot: HTMLElement | undefined;
@@ -657,6 +668,25 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       });
       styleStore.add(contextMenus);
       take('contextMenu');
+    }
+
+    if (mode === 'full' && options?.surfaces === undefined) {
+      const mount = replaced('panels') ? slotElement('panels') : make('div', 'docier-comments-host');
+      commentsPanel = createCommentsPanel({
+        context,
+        comments: () => queries.comments(),
+        mount,
+        onSelect: (comment) => {
+          void handle.commands.execute('docier.command.comment.select', { id: comment.id }, {
+            source: 'ui',
+          });
+        },
+      });
+      commentsPanel.element.hidden = true;
+      mount.appendChild(commentsPanel.element);
+      root.appendChild(mount);
+      take('panels');
+      styleStore.add(commentsPanel);
     }
 
     for (const slot of remaining) root.appendChild(slotElement(slot));
