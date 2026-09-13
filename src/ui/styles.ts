@@ -62,6 +62,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-group-launcher{appearance:none;border:0;background:transparent;color:var(--docier-text-muted);cursor:pointer;line-height:1;padding:0 2px}
 .docier-group-launcher:hover{color:var(--docier-accent)}
 .docier-group[data-docier-grow="true"]{flex:0 1 auto;min-width:0}
+.docier-group[data-docier-group="editing"]{min-width:76px}
 .docier-control{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:var(--docier-control-height);min-width:var(--docier-control-height);padding:0 calc(var(--docier-gap) + 2px);background:transparent;border:1px solid transparent;border-radius:var(--docier-radius);color:var(--docier-text);font:inherit;cursor:pointer;white-space:nowrap}
 .docier-control:hover:not([aria-disabled="true"]){background:var(--docier-state-hover)}
 .docier-control[aria-pressed="true"],.docier-control[aria-checked="true"]{background:var(--docier-state-selected);border-color:var(--docier-border);color:var(--docier-text)}

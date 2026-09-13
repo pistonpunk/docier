@@ -216,6 +216,11 @@ style reads as itself rather than as a word in the interface font. Verified on
 screen: one row of tiles, the Editing group clear of them, and the gallery
 scrolling its 727px of content inside a 430px box.
 
+**The Editing group was what set the Home height.** Its three buttons stacked in a
+58px column, and three rows is exactly the 82px that every group was stretched to.
+Giving that group a 76px minimum lets its buttons sit in two rows, and Home came
+down from 107px to **79px**, against Word's 84, with no overflow.
+
 **D4 done, with an honest number.** The forced ribbon height is gone, because the
 commissioner's correction is that the ribbon should fit its contents. Measured after:
 Home is **107px** and the other eight tabs are **51px**. So it fits its contents and
