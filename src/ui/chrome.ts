@@ -251,6 +251,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     return Math.min(byWidth, (box.height - FIT_SLACK_PX) / height);
   };
 
+  let readingRestore: { collapse: 'expanded' | 'collapsed' | 'hidden'; ruler: boolean } | undefined;
+
   const setMessage = (message: string | undefined): void => {
     store.set({ message: message ?? '' });
     if (message !== undefined && message !== '') announce(message);
@@ -375,9 +377,29 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         return;
       case 'setViewMode': {
         const target = args?.mode;
-        if (target === 'print' || target === 'web' || target === 'draft' || target === 'read') {
-          store.set({ viewMode: target });
+        if (target !== 'print' && target !== 'web' && target !== 'draft' && target !== 'read') {
+          return;
         }
+        if (target === 'read' && state.viewMode !== 'read') {
+          readingRestore = { collapse: state.collapse, ruler: state.rulerVisible };
+          store.set({ viewMode: target, collapse: 'hidden', rulerVisible: false });
+          ruler?.refresh();
+          verticalRuler?.refresh();
+          return;
+        }
+        if (target !== 'read' && readingRestore !== undefined) {
+          const previous = readingRestore;
+          readingRestore = undefined;
+          store.set({
+            viewMode: target,
+            collapse: previous.collapse,
+            rulerVisible: previous.ruler,
+          });
+          ruler?.refresh();
+          verticalRuler?.refresh();
+          return;
+        }
+        store.set({ viewMode: target });
         return;
       }
       case 'flushMessage':
