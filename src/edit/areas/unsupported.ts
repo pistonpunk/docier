@@ -254,6 +254,92 @@ const REFUSALS: readonly Refusal[] = [
     category: 'comment',
     reason: 'Comments are preserved exactly as they were loaded; this build does not edit them',
   },
+  {
+    id: 'docier.command.clipboard.formatPainter',
+    label: 'Format painter',
+    category: 'clipboard',
+    reason:
+      'This build has no format painter: it would have to hold a character format independently of the selection, and nothing in the editing layer carries one between edits',
+  },
+  {
+    id: 'docier.command.proof.translate',
+    label: 'Translate',
+    category: 'proof',
+    reason: 'This build has no translation backend; the host application owns anything that leaves the machine',
+  },
+  {
+    id: 'docier.command.table.insertCells',
+    label: 'Insert cells',
+    category: 'table',
+    reason:
+      'Shifting cells sideways rewrites the grid spans of the whole row, which this build does not do; insert a row or a column instead',
+  },
+  {
+    id: 'docier.command.table.propertiesDialog',
+    label: 'Table properties',
+    category: 'table',
+    reason:
+      'This build has no table-properties dialog; the width, the layout and the alignment are set by the commands that need them, and the row cannot enable a dialog that does not exist',
+  },
+  {
+    id: 'docier.command.table.distributeRows',
+    label: 'Distribute rows evenly',
+    category: 'table',
+    reason:
+      'Even row heights need a height for the selection as a whole, and this build has no row selection to measure one against',
+  },
+  {
+    id: 'docier.command.table.splitTable',
+    label: 'Split table',
+    category: 'table',
+    reason:
+      'Splitting a table moves rows into a second table, and this build has no command that moves blocks between tables',
+  },
+  {
+    id: 'docier.command.table.selectRow',
+    label: 'Select row',
+    category: 'table',
+    reason:
+      'A row spans several cell containers and no edit command accepts a range crossing one, so selecting a row would leave a selection that swallows every keystroke',
+  },
+  {
+    id: 'docier.command.table.selectColumn',
+    label: 'Select column',
+    category: 'table',
+    reason:
+      'A column spans several cell containers and no edit command accepts a range crossing one, so selecting a column would leave a selection that swallows every keystroke',
+  },
+  {
+    id: 'docier.command.table.selectTable',
+    label: 'Select table',
+    category: 'table',
+    reason:
+      'A table spans several cell containers and no edit command accepts a range crossing one, so selecting it would leave a selection that swallows every keystroke',
+  },
+  {
+    id: 'docier.command.table.setBorders',
+    label: 'Borders and shading',
+    category: 'table',
+    reason: 'This build edits table borders as cell properties and has no borders-and-shading dialog',
+  },
+  {
+    id: 'docier.command.table.setTextDirection',
+    label: 'Text direction',
+    category: 'table',
+    reason: 'This build reads w:textDirection and never writes it',
+  },
+  {
+    id: 'docier.command.table.sort',
+    label: 'Sort',
+    category: 'table',
+    reason: 'This build has no sort over table rows, and sorting would reorder blocks the undo history tracks one at a time',
+  },
+  {
+    id: 'docier.command.table.formula',
+    label: 'Formula',
+    category: 'table',
+    reason: 'This build evaluates no field formula; fields are preserved exactly as they were loaded',
+  },
 ];
 
 const tokenReason = (host: AreaHost): string =>

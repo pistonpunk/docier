@@ -836,6 +836,27 @@ const paragraphSubmenu = (prefix: string): UiNode =>
     button({ labelKey: 'ui.control.indentDecrease', id: `${prefix}:ind-`, command: command('format.decreaseIndent'), action: 'setIndent', actionArgs: { deltaTwips: -720, target: 'left' } }),
   ]);
 
+const CELL_ALIGNMENTS: readonly { readonly name: string; readonly labelKey: string }[] = [
+  { name: 'TopLeft', labelKey: 'ui.menu.cellAlignTopLeft' },
+  { name: 'TopCenter', labelKey: 'ui.menu.cellAlignTopCentre' },
+  { name: 'TopRight', labelKey: 'ui.menu.cellAlignTopRight' },
+  { name: 'CenterLeft', labelKey: 'ui.menu.cellAlignMiddleLeft' },
+  { name: 'CenterCenter', labelKey: 'ui.menu.cellAlignMiddle' },
+  { name: 'CenterRight', labelKey: 'ui.menu.cellAlignMiddleRight' },
+  { name: 'BottomLeft', labelKey: 'ui.menu.cellAlignBottomLeft' },
+  { name: 'BottomCenter', labelKey: 'ui.menu.cellAlignBottomCentre' },
+  { name: 'BottomRight', labelKey: 'ui.menu.cellAlignBottomRight' },
+];
+
+const CELL_ALIGNMENT_ITEMS = (): readonly UiNode[] =>
+  CELL_ALIGNMENTS.map((alignment) =>
+    toggle({
+      labelKey: alignment.labelKey,
+      id: `ctx:table2:align${alignment.name}`,
+      command: command(`table.cellAlign${alignment.name}`),
+    }),
+  );
+
 export const ALL_RIBBON_TABS: readonly UiTab[] = [...RIBBON_TABS, TABLE_TAB, PICTURE_TAB];
 
 export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> = {
@@ -860,6 +881,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
       labelKey: 'ui.menu.synonyms',
       items: [button({ labelKey: 'ui.control.thesaurus', id: 'ctx:text:thesaurus', command: command('proof.thesaurus'), action: 'openDialog', actionArgs: { dialog: command('proof.thesaurus') } })],
     }),
+    button({ labelKey: 'ui.control.translate', id: 'ctx:text:translate', command: command('proof.translate') }),
     pending('comment.create', 'ui.control.newComment', 'NC'),
     separator('ctx:text:sep4'),
     button({ labelKey: 'ui.control.find', id: 'ctx:text:find', command: command('find.find'), action: 'openDialog', actionArgs: { dialog: command('find.find') } }),
@@ -874,27 +896,40 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
       button({ labelKey: 'ui.menu.insertColumnsLeft', id: 'ctx:table2:colsLeft', command: command('table.insertColumnsLeft') }),
       button({ labelKey: 'ui.menu.insertColumnsRight', id: 'ctx:table2:colsRight', command: command('table.insertColumnsRight') }),
     ]),
-    menu('ui.menu.deleteRows', [
-      pending('table.deleteRow', 'ui.menu.deleteRows', 'DR'),
-      pending('table.deleteColumn', 'ui.menu.deleteColumns', 'DC'),
+    button({ labelKey: 'ui.menu.insertCells', id: 'ctx:table2:insertCells', command: command('table.insertCells'), keytip: 'IC' }),
+    separator('ctx:table:sep0'),
+    menu('ui.menu.delete', [
+      button({ labelKey: 'ui.menu.deleteRows', id: 'ctx:table2:deleteRows', command: command('table.deleteRow'), keytip: 'DR' }),
+      button({ labelKey: 'ui.menu.deleteColumns', id: 'ctx:table2:deleteCols', command: command('table.deleteColumn'), keytip: 'DC' }),
+      button({ labelKey: 'ui.menu.deleteTable', id: 'ctx:table2:deleteTable', command: command('table.delete'), keytip: 'DT' }),
     ]),
     separator('ctx:table:sep1'),
-    pending('table.mergeCells', 'ui.menu.mergeCells', 'MC'),
-    pending('table.splitCells', 'ui.menu.splitCells', 'SC'),
+    menu('ui.menu.select', [
+      button({ labelKey: 'ui.menu.selectRow', id: 'ctx:table2:selectRow', command: command('table.selectRow'), keytip: 'SR' }),
+      button({ labelKey: 'ui.menu.selectColumn', id: 'ctx:table2:selectCol', command: command('table.selectColumn'), keytip: 'SC' }),
+      button({ labelKey: 'ui.menu.selectTable', id: 'ctx:table2:selectTable', command: command('table.selectTable'), keytip: 'ST' }),
+    ]),
     separator('ctx:table:sep2'),
-    node('menu', {
-      id: 'ctx:table:cellAlign',
-      labelKey: 'ui.menu.cellAlignment',
-      items: [
-        toggle({ labelKey: 'ui.control.alignLeft', id: 'ctx:table:al', action: 'openDialog', actionArgs: { dialog: 'table.cellAlignLeft' } }),
-        toggle({ labelKey: 'ui.control.alignCenter', id: 'ctx:table:ac', action: 'openDialog', actionArgs: { dialog: 'table.cellAlignCenter' } }),
-        toggle({ labelKey: 'ui.control.alignRight', id: 'ctx:table:ar', action: 'openDialog', actionArgs: { dialog: 'table.cellAlignRight' } }),
-      ],
-    }),
-    button({ labelKey: 'ui.menu.borders', id: 'ctx:table:borders', action: 'openDialog', actionArgs: { dialog: 'table.borders' } }),
+    button({ labelKey: 'ui.menu.mergeCells', id: 'ctx:table2:merge', command: command('table.mergeCells'), keytip: 'MC' }),
+    button({ labelKey: 'ui.menu.splitCells', id: 'ctx:table2:split', command: command('table.splitCells'), keytip: 'SP' }),
+    button({ labelKey: 'ui.menu.splitTable', id: 'ctx:table2:splitTable', command: command('table.splitTable'), keytip: 'SB' }),
     separator('ctx:table:sep3'),
-    pending('table.setProperties', 'ui.menu.tableProperties', 'TP'),
-    pending('table.delete', 'ui.menu.deleteTable', 'DT'),
+    menu('ui.menu.cellAlignment', CELL_ALIGNMENT_ITEMS()),
+    menu('ui.menu.autoFit', [
+      toggle({ labelKey: 'ui.menu.autoFitContents', id: 'ctx:table2:autoFitContents', command: command('table.autoFitContents') }),
+      toggle({ labelKey: 'ui.menu.autoFitWindow', id: 'ctx:table2:autoFitWindow', command: command('table.autoFitWindow') }),
+      toggle({ labelKey: 'ui.menu.fixedWidth', id: 'ctx:table2:fixedWidth', command: command('table.autoFitFixed') }),
+    ]),
+    button({ labelKey: 'ui.menu.distributeColumns', id: 'ctx:table2:distributeCols', command: command('table.distributeColumns'), keytip: 'DC' }),
+    button({ labelKey: 'ui.menu.distributeRows', id: 'ctx:table2:distributeRows', command: command('table.distributeRows'), keytip: 'DR' }),
+    button({ labelKey: 'ui.menu.bordersShading', id: 'ctx:table2:borders', command: command('table.setBorders'), keytip: 'BS' }),
+    button({ labelKey: 'ui.menu.textDirection', id: 'ctx:table2:textDirection', command: command('table.setTextDirection'), keytip: 'TD' }),
+    separator('ctx:table:sep4'),
+    button({ labelKey: 'ui.menu.sort', id: 'ctx:table2:sort', command: command('table.sort'), keytip: 'SO' }),
+    button({ labelKey: 'ui.menu.formula', id: 'ctx:table2:formula', command: command('table.formula'), keytip: 'FM' }),
+    toggle({ labelKey: 'ui.menu.repeatHeaderRows', id: 'ctx:table2:repeatHeader', command: command('table.repeatHeaderRows'), keytip: 'RH' }),
+    separator('ctx:table:sep5'),
+    button({ labelKey: 'ui.menu.tableProperties', id: 'ctx:table2:properties', command: command('table.propertiesDialog'), keytip: 'TP' }),
   ],
   image: [
     pending('object.setWrap', 'ui.menu.wrapText', 'WT'),

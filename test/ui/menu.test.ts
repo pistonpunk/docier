@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { chromeOf, click, disposeChromes, longBody, menuItemByText, menuItems, menus } from './support.js';
+import {
+  ALL_RIBBON_TABS,
+  BACKSTAGE_ITEMS,
+  CONTEXT_MENUS,
+  FLOATING_CONTROLS,
+  QUICK_ACCESS,
+  STATUS_ITEM_MENU,
+} from '../../src/ui/menu-model.js';
+import type { UiNode } from '../../src/ui/menu-model.js';
+import type { CommandId } from '../../src/api/types.js';
 
 afterEach(() => {
   disposeChromes();
@@ -212,5 +222,74 @@ describe('menu primitive', () => {
     menu!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(menus().length).toBe(0);
     expect(chrome.store.get().surface).toBeNull();
+  });
+});
+
+describe('every row a menu can show', () => {
+  const walk = (nodes: readonly UiNode[]): UiNode[] =>
+    nodes.flatMap((entry) => [entry, ...walk(entry.items ?? [])]);
+
+  it('names a command the registry knows, so no row is a stub that does nothing', async () => {
+    const { handle, chrome } = await chromeOf(longBody());
+    expect(chrome.mounted).toBe(true);
+    const registered = new Map(handle.commands.list().map((entry) => [String(entry.id), entry]));
+    expect(registered.size).toBeGreaterThan(150);
+
+    const roots: UiNode[] = [
+      ...Object.values(CONTEXT_MENUS).flat(),
+      ...ALL_RIBBON_TABS.flatMap((tab) => tab.groups.flatMap((group) => walk(group.nodes))),
+      ...ALL_RIBBON_TABS.flatMap((tab) =>
+        tab.groups.flatMap((group) => (group.launcher === undefined ? [] : [group.launcher])),
+      ),
+      ...walk(FLOATING_CONTROLS),
+      ...walk(BACKSTAGE_ITEMS),
+      ...walk(QUICK_ACCESS),
+      ...walk(STATUS_ITEM_MENU),
+    ];
+    const missing = roots
+      .filter((entry) => entry.command !== undefined)
+      .map((entry) => entry.command!)
+      .filter((id) => !registered.has(id as CommandId));
+    expect([...new Set(missing)]).toEqual([]);
+  });
+
+  it('gives the table menu Word order and no leftovers from the two delete groupings', async () => {
+    const items = CONTEXT_MENUS.table;
+    const top = items.map((entry) => entry.labelKey);
+    expect(top).toEqual([
+      'ui.menu.insertRows',
+      'ui.menu.insertColumns',
+      'ui.menu.insertCells',
+      '',
+      'ui.menu.delete',
+      '',
+      'ui.menu.select',
+      '',
+      'ui.menu.mergeCells',
+      'ui.menu.splitCells',
+      'ui.menu.splitTable',
+      '',
+      'ui.menu.cellAlignment',
+      'ui.menu.autoFit',
+      'ui.menu.distributeColumns',
+      'ui.menu.distributeRows',
+      'ui.menu.bordersShading',
+      'ui.menu.textDirection',
+      '',
+      'ui.menu.sort',
+      'ui.menu.formula',
+      'ui.menu.repeatHeaderRows',
+      '',
+      'ui.menu.tableProperties',
+    ]);
+    const del = items.find((entry) => entry.labelKey === 'ui.menu.delete');
+    expect(del?.items?.map((entry) => entry.labelKey)).toEqual([
+      'ui.menu.deleteRows',
+      'ui.menu.deleteColumns',
+      'ui.menu.deleteTable',
+    ]);
+    const align = items.find((entry) => entry.labelKey === 'ui.menu.cellAlignment');
+    expect(align?.items?.length).toBe(9);
+    expect(align?.items?.every((entry) => entry.kind === 'toggle')).toBe(true);
   });
 });

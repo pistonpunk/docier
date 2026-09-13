@@ -212,17 +212,19 @@ afterEach(() => {
 });
 
 describe('clipboard command area', () => {
-  it('registers copy, cut, paste, pastePlain and moveRange in the clipboard area', async () => {
+  it('registers the five clipboard verbs and the format painter it refuses', async () => {
     const handle = await editorOf(paragraphText('alpha'));
     const listed = handle.commands.list({ area: 'clipboard' });
-    expect(listed.map((entry) => entry.category)).toEqual(Array.from({ length: 5 }, () => 'clipboard'));
+    expect(listed.map((entry) => entry.category)).toEqual(Array.from({ length: 6 }, () => 'clipboard'));
     expect([...listed.map((entry) => entry.id)].sort()).toEqual([
       'docier.command.clipboard.copy',
       'docier.command.clipboard.cut',
+      'docier.command.clipboard.formatPainter',
       'docier.command.clipboard.moveRange',
       'docier.command.clipboard.paste',
       'docier.command.clipboard.pastePlain',
     ]);
+    expect(handle.commands.get('docier.command.clipboard.formatPainter')?.undoable).toBe(true);
   });
 
   it('reports honest availability instead of a silent no-op', async () => {

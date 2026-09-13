@@ -2,7 +2,7 @@ import type { CommandDefinition, LocalizedString } from '../../api/types.js';
 import type { DocPos } from '../../layout/index.js';
 import type { Mp } from '../../units/index.js';
 import { mpToTwip, twip } from '../../units/index.js';
-import type { Table, TableCell } from '../../model/index.js';
+import type { Paragraph, Table, TableCell, TableRow } from '../../model/index.js';
 import { isWElement, propertyOf, setWAttr } from '../../model/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { caretSelection, rangeAsDocRange } from '../selection.js';
@@ -601,6 +601,264 @@ const setRowHeightSpec: AreaSpec<RowHeightArgs> = {
   },
 };
 
+export type CellVertical = 'top' | 'center' | 'bottom';
+export type CellHorizontal = 'left' | 'center' | 'right';
+
+export interface CellAlignment {
+  readonly vertical: CellVertical;
+  readonly horizontal: CellHorizontal;
+}
+
+export const CELL_ALIGNMENTS: readonly CellAlignment[] = (['top', 'center', 'bottom'] as const).flatMap(
+  (vertical) =>
+    (['left', 'center', 'right'] as const).map((horizontal) => ({ vertical, horizontal })),
+);
+
+export const CELL_ALIGNMENT_ORDER: readonly CellHorizontal[] = ['left', 'center', 'right'];
+
+const alignmentIdOf = (alignment: CellAlignment): string =>
+  `docier.command.table.cellAlign${alignment.vertical[0]!.toUpperCase()}${alignment.vertical.slice(1)}${alignment.horizontal[0]!.toUpperCase()}${alignment.horizontal.slice(1)}`;
+
+export const cellAlignmentCommandId = (alignment: CellAlignment): string => alignmentIdOf(alignment);
+
+const cellParagraphs = (cell: TableCell): readonly Paragraph[] =>
+  cell.paragraphs.filter((block): block is Paragraph => block.blockKind === 'paragraph');
+
+const cellAlignmentOf = (cell: TableCell): CellAlignment | undefined => {
+  const vertical = cell.properties.verticalAlign;
+  if (vertical !== 'top' && vertical !== 'center' && vertical !== 'bottom') return undefined;
+  const paragraph = cellParagraphs(cell)[0];
+  const raw = paragraph?.properties.justification;
+  const horizontal: CellHorizontal | undefined =
+    raw === 'left' || raw === 'center' || raw === 'right' ? raw : raw === undefined ? 'left' : undefined;
+  if (horizontal === undefined) return undefined;
+  return { vertical, horizontal };
+};
+
+const cellAlignmentSpec = (alignment: CellAlignment): AreaSpec<never> => ({
+  id: alignmentIdOf(alignment),
+  label: `Align ${alignment.vertical} ${alignment.horizontal}`,
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host) => host.session.aligned && targetAt(host) !== undefined,
+  reason: (host) => (host.session.aligned ? PLACE_CARET : NOT_ALIGNED),
+  activeIn: (host) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const current = cellAlignmentOf(target.cell);
+    return (
+      current?.vertical === alignment.vertical && current.horizontal === alignment.horizontal
+    );
+  },
+  run: (host) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const cells = targetCells(host, target);
+    const changed = changedBy(
+      cells.map((cell) => cell.element),
+      () => {
+        for (const cell of cells) {
+          cell.properties.verticalAlign = alignment.vertical;
+          for (const paragraph of cellParagraphs(cell)) {
+            paragraph.properties.justification = alignment.horizontal;
+          }
+        }
+      },
+    );
+    if (!changed) return false;
+    for (const cell of cells) host.session.model.context.forgetSubtree(cell.element);
+    return true;
+  },
+});
+
+const targetCells = (host: AreaHost, target: CellTarget): readonly TableCell[] => {
+  const range = rangeAsDocRange(host.selection);
+  if ((range.start as number) === (range.end as number)) return [target.cell];
+  const cells: TableCell[] = [];
+  const seen = new Set<string>();
+  for (const slot of host.session.slots()) {
+    const ref = slot.cell;
+    if (ref === undefined) continue;
+    if (tableOf(host.session.model, slot.element) !== target.table) continue;
+    if ((slot.end as number) < (range.start as number) || (slot.start as number) > (range.end as number)) {
+      continue;
+    }
+    const key = `${String(ref.row)}:${String(ref.column)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const cell = target.table.cellAt(ref.row, ref.column);
+    if (cell !== undefined) cells.push(cell);
+  }
+  return cells.length === 0 ? [target.cell] : cells;
+};
+
+export interface RepeatHeaderArgs {
+  readonly repeat?: boolean;
+  readonly anchor?: DocPos;
+}
+
+const repeatHeaderSpec: AreaSpec<RepeatHeaderArgs> = {
+  id: 'docier.command.table.repeatHeaderRows',
+  label: 'Repeat header rows',
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host) => host.session.aligned && targetAt(host) !== undefined,
+  reason: (host) => (host.session.aligned ? PLACE_CARET : NOT_ALIGNED),
+  activeIn: (host) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const rows = targetRows(host, target);
+    return rows.length > 0 && rows.every((row) => row.properties.repeatsAsHeader === true);
+  },
+  run: (host, args) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const rows = targetRows(host, target);
+    if (rows.length === 0) return false;
+    const want =
+      args.repeat ?? !rows.every((row) => row.properties.repeatsAsHeader === true);
+    const changed = changedBy(
+      rows.map((row) => row.element),
+      () => {
+        for (const row of rows) row.properties.repeatsAsHeader = want;
+      },
+    );
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(target.table.element);
+    return true;
+  },
+};
+
+const targetRows = (host: AreaHost, target: CellTarget): readonly TableRow[] => {
+  const range = rangeAsDocRange(host.selection);
+  if ((range.start as number) === (range.end as number)) {
+    const row = target.table.rows()[target.row];
+    return row === undefined ? [] : [row];
+  }
+  const rows: TableRow[] = [];
+  const seen = new Set<number>();
+  for (const slot of host.session.slots()) {
+    const ref = slot.cell;
+    if (ref === undefined) continue;
+    if (tableOf(host.session.model, slot.element) !== target.table) continue;
+    if ((slot.end as number) < (range.start as number) || (slot.start as number) > (range.end as number)) {
+      continue;
+    }
+    if (seen.has(ref.row)) continue;
+    seen.add(ref.row);
+    const row = target.table.rows()[ref.row];
+    if (row !== undefined) rows.push(row);
+  }
+  return rows;
+};
+
+export type AutoFitMode = 'contents' | 'window' | 'fixed';
+
+export interface AutoFitArgs {
+  readonly mode?: AutoFitMode;
+  readonly anchor?: DocPos;
+}
+
+const AUTO_FIT_MODES: readonly AutoFitMode[] = ['contents', 'window', 'fixed'];
+
+const autoFitSpec = (mode: AutoFitMode): AreaSpec<never> => ({
+  id: `docier.command.table.autoFit${mode[0]!.toUpperCase()}${mode.slice(1)}`,
+  label:
+    mode === 'contents'
+      ? 'AutoFit contents'
+      : mode === 'window'
+        ? 'AutoFit window'
+        : 'Fixed column width',
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host) => host.session.aligned && targetAt(host) !== undefined,
+  reason: (host) => (host.session.aligned ? PLACE_CARET : NOT_ALIGNED),
+  activeIn: (host) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const properties = target.table.properties;
+    if (mode === 'fixed') return properties.layout === 'fixed';
+    if (properties.layout === 'fixed') return false;
+    const type = properties.width.type;
+    return mode === 'window' ? type === 'pct' : type !== 'pct';
+  },
+  run: (host) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const properties = target.table.properties;
+    const changed = changedBy([target.table.element], () => {
+      properties.ensure();
+      properties.layout = mode === 'fixed' ? 'fixed' : 'autofit';
+      if (mode === 'window') {
+        properties.width.type = 'pct';
+        const element = properties.element;
+        if (element !== undefined) setWAttr(element, 'w', '5000');
+        return;
+      }
+      properties.width.type = 'auto';
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(target.table.element);
+    return true;
+  },
+});
+
+export const autoFitCommandId = (mode: AutoFitMode): string =>
+  `docier.command.table.autoFit${mode[0]!.toUpperCase()}${mode.slice(1)}`;
+
+export const AUTO_FIT = AUTO_FIT_MODES;
+
+export interface DistributeArgs {
+  readonly anchor?: DocPos;
+}
+
+const distributeSpec: AreaSpec<DistributeArgs> = {
+  id: 'docier.command.table.distributeColumns',
+  label: 'Distribute columns',
+  category: 'table',
+  permissions: ['format'],
+  enabledIn: (host) => host.session.aligned && targetAt(host) !== undefined,
+  reason: (host) => (host.session.aligned ? PLACE_CARET : NOT_ALIGNED),
+  run: (host, args) => {
+    const target = targetAt(host, args?.anchor);
+    if (target === undefined) return false;
+    const table = target.table;
+    const grid = table.gridColumns();
+    if (grid.length === 0) return false;
+    const current = grid.map((column) =>
+      column.width === undefined ? MIN_COLUMN_TWIPS : Math.max(MIN_COLUMN_TWIPS, Math.floor(column.width)),
+    );
+    const total = current.reduce((sum, value) => sum + value, 0);
+    const widths = proportionalWidths(current.map(() => 1), total);
+    const changed = changedBy([table.element], () => {
+      const properties = table.properties;
+      properties.ensure();
+      properties.layout = 'fixed';
+      properties.width.type = 'dxa';
+      properties.width.twips = twip(total);
+      for (let index = 0; index < grid.length; index += 1) {
+        const column = grid[index];
+        if (column === undefined) continue;
+        setWAttr(column.element, 'w', String(widths[index] ?? MIN_COLUMN_TWIPS));
+      }
+      for (const row of table.rows()) {
+        for (const span of row.cellSpans()) {
+          const spanWidth = Math.max(1, span.span);
+          let cellTotal = 0;
+          for (let step = 0; step < spanWidth; step += 1) {
+            cellTotal += widths[span.start + step] ?? MIN_COLUMN_TWIPS;
+          }
+          span.cell.properties.width.type = 'dxa';
+          span.cell.properties.width.twips = twip(cellTotal);
+        }
+      }
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(table.element);
+    return true;
+  },
+};
+
 export interface TableWidthArgs {
   readonly widthTwips?: number;
   readonly fromWidths?: readonly number[];
@@ -756,5 +1014,9 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
   areaCommand<TableWidthArgs>(host, setTableWidthSpec),
   areaCommand<RowHeightArgs>(host, setRowHeightSpec),
+  areaCommand<DistributeArgs>(host, distributeSpec),
+  areaCommand<RepeatHeaderArgs>(host, repeatHeaderSpec),
+  ...CELL_ALIGNMENTS.map((alignment) => areaCommand<never>(host, cellAlignmentSpec(alignment))),
+  ...AUTO_FIT.map((mode) => areaCommand<never>(host, autoFitSpec(mode))),
   areaCommand<CountArgs>(host, deleteSpec),
 ];

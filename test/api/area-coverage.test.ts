@@ -104,8 +104,11 @@ describe('chrome command coverage', () => {
     }
 
     // the number rises whenever a menu entry is wired from a dialog stub to the
-    // command it names; the last rise was Paste Options reaching clipboard.pastePlain
-    expect(registered).toBe(113);
+    // command it names, or when a menu row that named nothing gains a command;
+    // the last rise was the table menu's nine cell alignments, three AutoFit
+    // modes, Repeat Header Rows and Distribute Columns Evenly, plus the
+    // registered refusals that replaced four rows that named nothing at all
+    expect(registered).toBe(140);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -128,7 +131,7 @@ describe('chrome command coverage', () => {
     expect(areas.get('doc')).toBe(15);
     expect(areas.get('insert')).toBe(18);
     expect(areas.get('format')).toBe(24);
-    expect(areas.get('table')).toBe(10);
+    expect(areas.get('table')).toBe(35);
     expect(areas.get('object')).toBe(12);
     expect(areas.get('token')).toBe(6);
     expect(areas.get('theme')).toBe(3);

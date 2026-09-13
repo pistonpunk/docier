@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done, table menu partly. **Phase D**: D1, D3 and D4 done, D2 to do. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
+Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done. **Phase D**: D1, D3 and D4 done, D2 to do. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
 
 Done and verified in the browser:
 
@@ -207,7 +207,7 @@ layout still does not lay out.
 | C2 | Move the disabled reasons out of the items | **done** |
 | C3 | The four behavioural defects in `menu.ts` and `context-menu.ts` | **done** |
 | C4 | Wire Cut, Copy, Paste and the table insert rows to the commands that exist | **done, verification blocked** |
-| C5 | Fill the menus out to Word's contents | **text menu done, table menu partly** |
+| C5 | Fill the menus out to Word's contents | **done** |
 
 ### Phase C notes
 
@@ -267,6 +267,74 @@ table menu should nest its two delete groupings under one Delete submenu and add
 Cell Alignment's other six positions, Insert Cells, Split Table, Borders and
 Shading, Text Direction, AutoFit and Distribute, Sort, Formula and Repeat Header
 Rows; of those, only the delete nesting and New Comment need no new command.
+
+**C5, the table menu.** Rebuilt in Word's order: Insert Rows, Insert Columns,
+Insert Cells, then a single **Delete** submenu holding Delete Rows, Delete
+Columns and Delete Table where two separate groupings used to sit, then Select,
+Merge Cells, Split Cells, Split Table, Cell Alignment, AutoFit, Distribute
+Columns Evenly, Distribute Rows Evenly, Borders and Shading, Text Direction,
+Sort, Formula, Repeat Header Rows and Table Properties.
+
+**The Cell Alignment defect, which was the real one.** It was three toggle nodes
+with an `openDialog` action and no command, so `active` was always false and the
+submenu could never show which position the caret was in. There are nine now, one
+command each, `docier.command.table.cellAlign<Vertical><Horizontal>`, and each
+reports its own `activeIn` by reading the cell under the caret. Applying one
+writes `w:vAlign` on the cell and `w:jc` on its paragraphs together, which is what
+Word's nine positions are, and it is one undo entry.
+
+**Four rows the audit called actionable are now real commands** rather than
+stubs: Repeat Header Rows (a `w:tblHeader` toggle on the caret row, lit when every
+target row carries it), AutoFit Contents, AutoFit Window and Fixed Column Width
+(`w:tblLayout` plus the `w:tblW` type each mode needs), and Distribute Columns
+Evenly, which reuses the proportional write B4 added.
+
+**The rows that cannot be real are registered refusals, not rows that lie.** Insert
+Cells, Split Table, the three Select entries, Borders and Shading, Text Direction,
+Sort, Formula, Distribute Rows Evenly and the Table Properties dialog each have a
+command whose reason says what specifically is missing. Verified live: each renders
+disabled and carries its own sentence, where before Insert Cells, Select and the
+rest either did not exist or would have printed a generic refusal.
+
+Table Properties deserves its own line. It named `table.setProperties`, which is a
+real command that needs a width or a layout argument, so the row could never enable
+and its reason was "This control needs a table property to apply" - true, and
+useless to the person reading it. It now names a refusal that says the build has no
+table-properties dialog. Cleanup, when a row can never be enabled, is to say so.
+
+**The test that found the last one.** Nothing checked that a menu row names a
+command the registry knows, so a row could be written and never resolve.
+`menu.test.ts` now walks every node in `CONTEXT_MENUS`, `ALL_RIBBON_TABS` and its
+launchers, `FLOATING_CONTROLS`, `BACKSTAGE_ITEMS`, `QUICK_ACCESS` and
+`STATUS_ITEM_MENU`, and fails on any command id the registry does not have. Its
+first run found `docier.command.clipboard.formatPainter`, which the ribbon's
+Clipboard group names and which nothing registered - the exact "row that lies"
+the audit predicted, sitting there since C4.
+
+### Phase C verification, live in the browser
+
+| Check | Measured |
+|---|---|
+| The menu's top-level order | the eighteen rows above, in that order |
+| The two delete groupings | one Delete submenu, three rows |
+| Rows that are enabled | the eight with real commands behind them |
+| Rows that are disabled | ten, each with its own reason, none generic |
+| Cell Alignment | nine toggles, exactly one lit, matching the caret's cell |
+| Applying one | lit moves to Align Bottom Right, and the model carries it |
+| AutoFit | three modes, exactly one lit, matching the table |
+| Console and page errors | none |
+
+### A finding that is not a C defect, and belongs to the layout
+
+A cell's text cannot be aligned when its column has no slack, and on an autofit
+table every column is allocated very close to its own content width - so on the
+demo's sample document, centring a cell moves it by a few points and looks like it
+did nothing. Measured in the engine rather than in pixels: the same command on a
+fixed-layout 8000-twip cell moves the ink from 55760 to 228750 millipoints, which
+is the exact centre of a 388480-wide content box holding 42500 of text. The
+alignment arithmetic is right; the autofit table is simply already tight. This is
+the diagnosed column-allocation defect (`cellIntrinsic` in `table-prepare.ts` never
+adds `cell.margins`) showing up through a second surface, and it is still open.
 
 ## Phase D - Ribbon content design
 
