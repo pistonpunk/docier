@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B in progress.** Phase A complete.
+Status: **Phase B in progress** (B1, B2 done, B3 with an agent), **Phase C started** (C1, C2 done).
 
 Done and verified in the browser:
 
@@ -115,11 +115,32 @@ placeholders, three sources handed over.
 
 | # | Item | State |
 |---|---|---|
-| C1 | Style the rows, and make items fill the row | to do |
-| C2 | Move the disabled reasons out of the items | to do |
+| C1 | Style the rows, and make items fill the row | **done** |
+| C2 | Move the disabled reasons out of the items | **done** |
 | C3 | The four behavioural defects in `menu.ts` and `context-menu.ts` | to do |
 | C4 | Wire Cut, Copy, Paste and the table insert rows to the commands that exist | to do |
 | C5 | Fill the menus out to Word's contents | to do |
+
+### Phase C notes
+
+**C1 done.** The rows drew as user-agent buttons: Arial 13.33px on a grey
+buttonface with a 2px outset border, because the reset lives on `.docier-control`
+and menu items never received that class. They also shrink-wrapped their row, so a
+hover fill was a ragged patch that stopped at the label. Measured after: rows are
+22px tall, every item is the full 215px of its row, the type is the 12px UI font,
+and `appearance`, border and cursor are all reset. The text menu went from **451 by
+327** to **217 by 116**. The same rules apply to the ribbon's menu, checked
+separately.
+
+Dark mode was also broken here and is fixed: it overrode neither state fill, so a
+hover painted a light-theme colour; both now have dark values.
+
+**C2 done.** Disabled items printed their reason inside themselves, duplicating
+what the accessible name, the tooltip and the status bar already carry. The span is
+gone and the reason stays in `aria-description` and `title`. The test that covered
+this asserted the prose was in the row; it now asserts the row carries the reason
+accessibly and does *not* print it, plus a new test that an item is as wide as its
+row.
 
 ## Phase D - Ribbon content design
 

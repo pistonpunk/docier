@@ -40,6 +40,8 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-shadow-1': '0 1px 2px rgba(0, 0, 0, 0.12)',
   '--docier-shadow-2': '0 4px 8px rgba(0, 0, 0, 0.14), 0 0 2px rgba(0, 0, 0, 0.12)',
   '--docier-shadow-3': '0 8px 16px rgba(0, 0, 0, 0.14), 0 0 2px rgba(0, 0, 0, 0.12)',
+  '--docier-menu-min-width': '200px',
+  '--docier-menu-item-height': '22px',
   '--docier-page-shadow': '0 2px 6px rgba(0, 0, 0, 0.10), 0 0 1px rgba(0, 0, 0, 0.10)',
 };
 
@@ -67,6 +69,7 @@ export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, st
     '--docier-ruler-size': '20px',
     '--docier-handle-size': '9px',
     '--docier-gap': '3px',
+    '--docier-menu-item-height': '20px',
   },
   comfortable: {
     '--docier-control-height': '32px',
@@ -79,6 +82,7 @@ export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, st
     '--docier-ruler-size': '28px',
     '--docier-handle-size': '20px',
     '--docier-gap': '8px',
+    '--docier-menu-item-height': '44px',
   },
 };
 

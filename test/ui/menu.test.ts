@@ -97,7 +97,7 @@ describe('menu enabled state and reasons', () => {
     expect(bold!.getAttribute('aria-description')).toBe('The document is read-only');
   });
 
-  it('shows a disabled item in a menu with its reason rather than hiding it', async () => {
+  it('shows a disabled item rather than hiding it, and keeps its reason out of the row', async () => {
     const { chrome } = await chromeOf(longBody());
     const host = document.querySelector('[data-docier-block]');
     expect(host).not.toBeNull();
@@ -105,13 +105,28 @@ describe('menu enabled state and reasons', () => {
 
     const item = menuItemByText('Cut');
     expect(item).toBeDefined();
-    const reason = chrome.context.describe({ command: 'docier.command.clipboard.cut' }).reason;
+    const resolved = chrome.context.describe({ command: 'docier.command.clipboard.cut' });
     if (item!.getAttribute('aria-disabled') === 'true') {
-      expect(reason).toBeDefined();
-      expect(item!.textContent).toContain(reason!);
+      expect(resolved.reason).toBeDefined();
+      const described =
+        item!.getAttribute('aria-description') ?? item!.getAttribute('title') ?? '';
+      expect(described).toContain(resolved.reason!);
+      expect(item!.textContent).not.toContain(resolved.reason!);
     } else {
       expect(item!.getAttribute('aria-disabled')).not.toBe('true');
     }
+  });
+
+  it('renders menu rows as full-width items rather than user-agent buttons', async () => {
+    const { chrome } = await chromeOf(longBody());
+    chrome.contextMenus!.open('text', 10, 20);
+    const item = menuItemByText('Cut');
+    expect(item).toBeDefined();
+    const row = item!.closest('li');
+    expect(row).not.toBeNull();
+    const itemBox = item!.getBoundingClientRect();
+    const rowBox = row!.getBoundingClientRect();
+    expect(Math.round(itemBox.width)).toBe(Math.round(rowBox.width));
   });
 });
 

@@ -356,11 +356,6 @@ export const createControl = (
       setText(shortcut, resolved.hint);
       element.appendChild(shortcut);
     }
-    if (!resolved.enabled && resolved.reason !== undefined) {
-      const reason = make('span', 'docier-menu-hint');
-      setText(reason, resolved.reason);
-      element.appendChild(reason);
-    }
   } else if (resolved.hint !== undefined) {
     element.setAttribute('data-docier-shortcut', resolved.hint);
   }
