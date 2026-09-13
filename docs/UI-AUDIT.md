@@ -161,16 +161,90 @@ Two things about it are nonetheless worth acting on, and may be what is meant:
 
 Being gathered separately at the model level and will be folded in here.
 
-### The indent controls cannot be dragged
+### The indent controls cannot be dragged, and they corrupt other paragraphs
 
 **Reported:** "the indent controls are fucked, i need to click to move one and
 then click somewhere else on the page etc etc. make it drag to move as it's
-unusable".
+unusable". **Confirmed, and the real behaviour is worse than reported.**
 
-The margin markers on the same ruler already drag correctly, hold to move, with a
-guide and one commit on release. The indent markers still use an older helper
-that commits on every pointer move. Being reproduced and diagnosed separately and
-will be folded in here.
+**They cannot be dragged at all.** A 60px drag with eight to twelve pointermove
+steps moves the marker zero pixels: `indent-left` stays at 307.141px and
+`aria-valuenow` stays 1440 across every sample, with no `setParagraphIndent`
+executed. Measured at document level with capture listeners, a whole ruler drag
+delivers **9 pointermove, 1 mousemove, 0 mouseup, 1 pointerup**. `startDrag`
+(`src/ui/ruler.ts:246`) calls `preventDefault()` on pointerdown, which makes
+Chromium suppress the compatibility mouse events for the rest of that sequence,
+and then listens for `mousemove` and `mouseup`. Its move handler never runs and
+its up handler never runs. `marginDrag` calls the same `preventDefault` but listens
+for the pointer events, which is the whole difference.
+
+**What the commissioner experienced is a leaked listener, and it is a data-loss
+bug.** `startDrag` adds `mousemove`, `mouseup` and `keydown` to the document
+(lines 273-275) and only `onUp` removes them. Since `mouseup` never fires, they
+leak permanently, one set per press. The leaked `mousemove` then fires on every
+later pointer movement anywhere on the page and commits
+`apply(delta, base)`, where `base` is the indent snapshot from the stale
+pointerdown. Measured, a single click on the marker followed by moving the pointer
+200px:
+
+```
+exec setParagraphIndent {"leftTwips":750,...}
+exec setParagraphIndent {"leftTwips":1500,...}
+exec setParagraphIndent {"leftTwips":2250,...}
+exec setParagraphIndent {"leftTwips":3000,...}
+```
+
+3000 twips is exactly the 200px travelled. No click commits anything on its own:
+the click arms the tracking, and every later mouse move is another commit and
+another undo entry.
+
+**And it edits paragraphs the user never touched.** After arming a listener in one
+paragraph, clicking into a different paragraph and moving the mouse with no button
+pressed overwrote that paragraph's indent: 2910 twips replaced by 1800,
+`aria-valuenow` 4350 to 3240, with repeated `setParagraphIndent` executions. That
+is silent data loss on a button-free mouse move, and it is the most serious
+finding in this document.
+
+**The badge is wrong in two ways.** It reports the delta rather than the value, and
+it treats pixel travel as millipoints, `formatRulerValue(deltaPx * 1000, units)`
+(line 258), so a 200px travel displayed "7.1 Centimetres" for a resulting indent of
+5.29cm, about 33 percent high and ignoring zoom. It also stays on screen
+afterwards, because the handler that would hide it never runs.
+
+**Two hit-target defects.** `indent-hanging` is **unreachable whenever the first
+line is not negative**: it sits at exactly the same x as `indent-left`, which
+paints later, so all five probes returned `indent-left` or the page. This is the
+same class of bug as the old margin-marker-under-the-corner problem.
+`indent-first-line` is a triangle whose effective target tapers to a point at its
+bottom, so probes at its left and right edges miss.
+
+**And a value-model bug the drag fix will expose.** `setParagraphIndent` with
+`{leftTwips:-600, firstLineTwips:-300}` returns `ok` and writes
+`<w:ind w:left="-600" w:right="0" w:firstLine="-300"/>`, but both attributes are
+unsigned in OOXML, so a leftward drag produces a file Word will interpret
+differently. `applyIndent` (`src/ui/ruler.ts:58-61`) assigns absolute values with
+no clamp. A negative first line should become `w:hanging`.
+
+**The fix, and why it is a deletion.** Replace the `startDrag` call in the indent
+pointerdown handler with an `indentDrag` shaped exactly like `marginDrag`: snapshot
+the base and the start x on pointerdown; on document `pointermove` compute the
+pending value, show the guide and the badge with the *absolute* resulting value,
+and commit nothing; on `pointerup` remove the listeners and commit once, and only
+if the value changed; on Escape revert and clean up, and register a cancel hook
+for disposal. Keep the existing `indentApply` table for the value math, add
+clamping inside `commitIndent`, and **delete `startDrag`**, so both marker families
+share one interaction and the guide, the badge formatting and the single-commit
+semantics are literally one piece of code. The two genuinely differ only in the
+value math, which is already parameterised per marker.
+
+Verified page-side without touching the repository: a pointer-event drag with a
+deferred commit produced a clean linear ramp of 150, 300, 450, 600, 750, 900 twips
+for 10 to 60px of travel, exactly one commit of 900 twips on release, and the
+marker moved 307.141px to 367.141px.
+
+A one-token alternative, changing six strings from the mouse events to the pointer
+events, makes the drag track and terminate but keeps one undo entry per move and
+the wrong badge, so it does not give the interaction being asked for.
 
 ### The context menu is poor
 
