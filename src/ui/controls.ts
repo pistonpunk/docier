@@ -368,6 +368,10 @@ export const createControl = (
   applyResolved(element, resolved, role);
   if (node.kind === 'toggle' && role === 'button') element.setAttribute('data-docier-toggle', 'true');
 
+  element.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+  });
+
   element.addEventListener('click', (event) => {
     event.preventDefault();
     if (isDisabled(element)) {

@@ -950,6 +950,10 @@ export const createEditor = (
     revision += 1;
     paint();
     input = attachInput(inputHost);
+    if (settings.document.autoFocus) {
+      input.focus();
+      input.reveal();
+    }
   };
 
   const mountDocument = (loaded: DocumentModel): void => {
@@ -1085,7 +1089,7 @@ export const createEditor = (
     setZoom: (value) => {
       zoom = value;
       renderedDocument?.setZoom(value);
-      input?.refresh();
+      input?.reveal();
     },
     getDiagnostics: () => diagnostics,
     destroy: () => {

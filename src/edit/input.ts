@@ -240,17 +240,18 @@ export const attachInput = (host: InputHost): InputHandle => {
     'background-color': '#000',
     display: 'none',
   });
-  if (typeof caret.animate === 'function') {
-    caret.animate(
-      [
-        { opacity: 1, offset: 0 },
-        { opacity: 1, offset: 0.5 },
-        { opacity: 0, offset: 0.5 },
-        { opacity: 0, offset: 1 },
-      ],
-      { duration: CARET_BLINK_MS * 2, iterations: Number.POSITIVE_INFINITY },
-    );
-  }
+  const blink =
+    typeof caret.animate === 'function'
+      ? caret.animate(
+          [
+            { opacity: 1, offset: 0 },
+            { opacity: 1, offset: 0.5 },
+            { opacity: 0, offset: 0.5 },
+            { opacity: 0, offset: 1 },
+          ],
+          { duration: CARET_BLINK_MS * 2, iterations: Number.POSITIVE_INFINITY },
+        )
+      : undefined;
   overlay.appendChild(selectionLayer);
   overlay.appendChild(caret);
   host.rendered.appendChild(overlay);
@@ -765,6 +766,7 @@ export const attachInput = (host: InputHost): InputHandle => {
       paintCaret();
       paintSelection();
       scrollCaretIntoView();
+      if (blink !== undefined) blink.currentTime = 0;
     },
     focus: () => {
       composer.focus({ preventScroll: true });

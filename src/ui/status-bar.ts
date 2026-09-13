@@ -75,6 +75,9 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
     node.setAttribute('type', 'button');
     node.className = 'docier-status-item';
     node.setAttribute('data-docier-status-item', part);
+    node.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+    });
     return node;
   };
 
