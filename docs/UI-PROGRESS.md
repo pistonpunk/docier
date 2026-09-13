@@ -12,7 +12,7 @@ and rewriting them would destroy the record of what was wrong. This file is wher
 completion against them is tracked, and `docs/READINESS.md` is the live answer to
 "is this ready", re-measured rather than remembered.
 
-Status: **A complete. Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done. **Phase D**: D1 to D4 done. **Phase E**: E1 to E3 done, wired and verified live. **Phase F**: picture, hyperlink and symbol done and verified live; five entries still refused, each for a reason named below. **View modes**: three of four now change what is on screen, recorded after Phase F.
+Status: **every phase's list is done.** A complete; B1 to B4; C1 to C5; D1 to D4; E1 to E3, wired and verified live; and Phase F's eight commands - picture, hyperlink, symbol, header creation, table of contents, comments, footnote and text box - all produce documents now. Three of them are complete on screen as well; the other four are complete in the file and each says through an engine diagnostic exactly which part of the rendering is missing. **View modes**: three of four now change what is on screen, recorded after Phase F.
 
 Every count above was re-measured in a browser on 2026-09-13. `docs/READINESS.md` is the live answer to "is this ready" and was re-measured at the same time. The four defects that sat under the phases - the table column allocation, the `markDirty` trap, the right-click that destroyed a selection and the missing Picture context menu - are closed; see the appendices.
 
@@ -510,7 +510,7 @@ still announces that it is not available.
 |---|---|---|
 | F1 | Insert a picture | **done** |
 | F2 | Hyperlink | **done, no on-screen link affordance** |
-| F3 | Comments | **done, with no on-screen marker yet** |
+| F3 | Comments | **done at the document level, no on-screen marker** |
 | F4 | Symbol | **done** |
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |

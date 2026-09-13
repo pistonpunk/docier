@@ -34,8 +34,8 @@ Console errors across those runs: none.
 
 ## What is missing, in the order it blocks real use
 
-**Re-measured 2026-09-13.** Of the six items, three are closed and three are
-partly closed. The numbers are what the built product does now, and the phase work behind
+**Re-measured 2026-09-13.** Of the six items, five are closed and one is partly
+closed. The numbers are what the built product does now, and the phase work behind
 them is recorded in `docs/UI-PROGRESS.md`. The original six are kept in their
 original order, struck through where they are done, so this still reads as a
 diff against the state it was written in.
@@ -45,13 +45,14 @@ diff against the state it was written in.
    What is still absent is a Table Properties dialog and a Page Setup dialog, and
    both are registered refusals whose reason says so rather than stubs.
 
-2. **Three of the eight refused commands are now producible.** Picture, hyperlink
-   and symbol work, verified in the browser: a 40x40 PNG inserts as a rendered
-   image at 40x40 and survives undo and redo, a hyperlink writes its address, its
-   text and its tooltip, and a symbol inserts at the caret. **Five still refuse** -
-   comments, footnote, header creation, text box and table of contents - and
-   `UI-PROGRESS.md` names for each the subsystem it would need rather than
-   restating that it is unavailable.
+2. ~~**Eight commands refuse.**~~ **Closed.** All eight now produce documents:
+   picture, hyperlink, symbol, header creation, table of contents, comments,
+   footnote and text box. Three of them are complete on screen too. The other
+   four - comments, footnote, text box, and the note bodies - are complete in the
+   file and the **engine says which part of the rendering is missing** rather than
+   drawing nothing in silence: `footnotesNotLaidOut`,
+   `shapeContentNotLaidOut`. These are layout work rather than command work, and
+   each is named with what it would take in `UI-PROGRESS.md`.
 
 3. ~~**Sixty-three ribbon controls are still text words.**~~ **Closed.** 97 of the
    103 visible ribbon buttons carry a glyph. The six that do not are the group
@@ -113,9 +114,10 @@ inserted, the icons are drawn and the ribbon holds one height. A person can open
 document, edit it, format it, draw a table to the width they want, insert a
 picture, save it and export it today.
 
-What they cannot yet do is write a contract that needs a footnote, a table of
-contents, a text box or a comment. The five refused commands are subsystems rather
-than features, and the honest statement is that they are not in this build.
+What they cannot yet do is *see* a comment, a footnote body or the text inside a
+text box on screen. Those documents are correct, round-trip through Word and show
+what they should there; in this editor three of them are invisible and each says so
+through a diagnostic rather than pretending.
 
 Ready, in the honest sense, means: nothing on the Insert tab refusing, view modes
 that change the view, and the ribbon at Word's height. The ribbon is within five
@@ -123,7 +125,10 @@ pixels of it, three of the four view modes now change what is on screen, and the
 Insert tab is down to five refusals from eight - each of them a subsystem rather
 than a command, and each named with what it would take.
 
-So the bar this document set for itself is **not yet met, and what is left is
-scope rather than polish**: five commands that need parts and layout this build
-does not have, and one view mode that would need the engine to grow a flow-to-width
-option. Both are recorded with their cost in `docs/UI-PROGRESS.md`.
+So the bar this document set for itself is **met on the Insert tab and one step
+short on the view modes**: nothing on that tab refuses any more, the ribbon is
+within five pixels of Word's, and three of four view modes change the view. What
+remains is rendering breadth rather than authoring breadth - a comment margin, a
+note area at the page foot, a text box's own text, and a Draft view that re-flows -
+all of which are layout work, each recorded with its cost in
+`docs/UI-PROGRESS.md`.
