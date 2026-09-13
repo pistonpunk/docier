@@ -34,29 +34,58 @@ Console errors across those runs: none.
 
 ## What is missing, in the order it blocks real use
 
-1. **There are no dialogs.** Font and Paragraph both route to a stub, so the two
-   most expected dialogs in a word processor do not exist. Everything they would
-   offer has to be reached through the ribbon instead, and some of it cannot be
-   reached at all.
-2. **Eight commands refuse.** Image, footnote, header creation, hyperlink,
-   symbol, text box, table of contents and comments each return `blocked` with a
-   reason rather than failing. A document that needs any of them cannot be
-   produced.
-3. **Sixty-three ribbon controls are still text words** where Word uses icons, on
-   the Insert, Design, Layout, References, Review and View tabs. The Home tab was
-   done.
-4. **The ribbon is 112px where Word's is 84.** The cause is measured: the Styles
-   gallery needs three or four rows because its columns follow its width, and the
-   Font group needs two.
-5. **The four view-mode buttons write a state nothing reads.** Print Layout, Web
-   Layout, Draft and Read Mode render identically.
-6. **Comments and media are outside the transaction snapshot**, which is why
-   those command areas refuse rather than half-work.
+**Re-measured 2026-09-13.** Of the six items, three are closed and three are
+partly closed. The numbers are what the built product does now, and the phase work behind
+them is recorded in `docs/UI-PROGRESS.md`. The original six are kept in their
+original order, struck through where they are done, so this still reads as a
+diff against the state it was written in.
 
-Not on that list, and worth saying: the *look* is now close. The light theme
-matches Word's palette, the ribbon holds a uniform height, the title bar and
-quick access toolbar are in place, and the status bar and rulers read like
-Word's.
+1. ~~**There are no dialogs.**~~ **Closed.** Font, Paragraph, Hyperlink and Symbol
+   each open, apply and close, and the picture command opens a real file picker.
+   What is still absent is a Table Properties dialog and a Page Setup dialog, and
+   both are registered refusals whose reason says so rather than stubs.
+
+2. **Three of the eight refused commands are now producible.** Picture, hyperlink
+   and symbol work, verified in the browser: a 40x40 PNG inserts as a rendered
+   image at 40x40 and survives undo and redo, a hyperlink writes its address, its
+   text and its tooltip, and a symbol inserts at the caret. **Five still refuse** -
+   comments, footnote, header creation, text box and table of contents - and
+   `UI-PROGRESS.md` names for each the subsystem it would need rather than
+   restating that it is unavailable.
+
+3. ~~**Sixty-three ribbon controls are still text words.**~~ **Closed.** 97 of the
+   103 visible ribbon buttons carry a glyph. The six that do not are the group
+   launchers, which is what Word has there.
+
+4. ~~**The ribbon is 112px where Word's is 84.**~~ **Closed.** Every one of the
+   seven tabs is **79px**, measured live, uniform, with nothing clipped and no
+   control overlapping. The five pixels to Word are 28px glyphs over 26px controls
+   against Word's 32 over 22, plus Word's adaptive menu, which this build has no
+   equivalent of.
+
+5. **Three view modes write a state nothing reads.** Print Layout, Web Layout and
+   Draft render identically - measured: the ribbon is 79px, the ruler is shown and
+   the canvas sits at 223px in all three. Read Mode does something real: it hides
+   the ribbon and the ruler and the document moves up to 124px. **This is now the
+   largest gap on the list.**
+
+6. **Half closed: media is inside the transaction snapshot, comments are not.**
+   The snapshot now carries every media part's name, content type and bytes, so
+   inserting a picture is one undo entry and undoing it takes the part with it
+   instead of leaving an orphan in the saved package. Comments are still outside it,
+   which is why `comment.create` remains a registered refusal rather than a
+   half-working command.
+
+Not on the original list, and worth adding: **seventy-one commands are registered
+refusals.** That count is up from the eight this document used to name because the
+rest were added deliberately - each carries a sentence saying what specifically is
+missing, so a menu row renders disabled with a reason rather than lying about being
+available. A higher number here is better than a lower one.
+
+Also not on the list, and now fixed: the table-column defect this document grew out
+of. The sample's first column is 77.4px and no cell in the header row spills its
+text, where before the column was 62px and the heading printed as
+"ColumnEvidence".
 
 ## Three false negatives worth not repeating
 
@@ -77,11 +106,21 @@ absence in that subset as breakage. Prefer measuring the thing itself.
 
 ## The verdict
 
-The engine and the editing surface are usable. What is missing is authoring
-breadth: dialogs, the eight refused commands, and the remaining icons. A person
-could open a document, edit it, format it, save it and export it today. They
-could not write a document from scratch that needs a picture, a link or a
-comment, and they would notice the missing Font dialog within a minute.
+The engine and the editing surface are usable, and as of 2026-09-13 so is most of
+the authoring breadth: the dialogs are there, a picture, a link and a symbol can be
+inserted, the icons are drawn and the ribbon holds one height. A person can open a
+document, edit it, format it, draw a table to the width they want, insert a
+picture, save it and export it today.
 
-Ready, in the honest sense, means: no dialogs missing, no refused commands on the
-Insert tab, view modes that change the view, and the ribbon at Word's height.
+What they cannot yet do is write a contract that needs a footnote, a table of
+contents, a text box or a comment, and three of the four view modes still change
+nothing on screen. The five refused commands are subsystems rather than features,
+and the honest statement is that they are not in this build.
+
+Ready, in the honest sense, means: nothing on the Insert tab refusing, view modes
+that change the view, and the ribbon at Word's height. The ribbon is within five
+pixels of it and the Insert tab is down to five refusals from eight, each of them a
+subsystem rather than a command. **View modes are what now stands between this and
+the bar this document set for itself** - three of the four write a state nothing
+reads, and that is a smaller piece of work than any of the five remaining
+refusals.
