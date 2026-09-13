@@ -11,6 +11,7 @@ export type DocierErrorCode =
   | 'ENCRYPTED_ENTRY'
   | 'ZIP64_UNSUPPORTED'
   | 'PART_NOT_FOUND'
+  | 'PART_NOT_READ'
   | 'PART_EXISTS'
   | 'DUPLICATE_PART_NAME'
   | 'PART_NAME_INVALID'

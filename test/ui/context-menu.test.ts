@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ATTR } from '../../src/render/dom.js';
-import { SURFACE_LABEL_KEYS } from '../../src/ui/context-menu.js';
+import { SURFACE_LABEL_KEYS, surfaceAt } from '../../src/ui/context-menu.js';
 import { CONTEXT_SURFACES } from '../../src/ui/types.js';
 import { PAGE } from '../layout/support.js';
 import { BORDERS, FIXED, cell, grid, para, row, table } from '../layout/table-support.js';
@@ -194,5 +194,31 @@ describe('right-click routing', () => {
     block!.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(chrome.contextMenus!.current).toBe('text');
+  });
+});
+
+describe('the surface a click lands on', () => {
+  const elementWith = (...attributes: readonly string[]): HTMLElement => {
+    const node = document.createElement('div');
+    for (const attribute of attributes) node.setAttribute(attribute, '');
+    return node;
+  };
+
+  it('reads a picture surface from an image, a placeholder or an object wrapper', () => {
+    expect(surfaceAt(elementWith('data-docier-image'))).toBe('image');
+    expect(surfaceAt(elementWith('data-docier-image-missing'))).toBe('image');
+    expect(surfaceAt(elementWith('data-docier-object'))).toBe('image');
+    expect(surfaceAt(elementWith('data-docier-object-id'))).not.toBe('image');
+  });
+
+  it('takes the innermost surface, and falls back to the document', () => {
+    const cell = elementWith('data-docier-cell');
+    const image = elementWith('data-docier-image');
+    cell.appendChild(image);
+    document.body.appendChild(cell);
+    expect(surfaceAt(image)).toBe('image');
+    expect(surfaceAt(cell)).toBe('table');
+    expect(surfaceAt(document.body)).toBe('pasteboard');
+    document.body.removeChild(cell);
   });
 });

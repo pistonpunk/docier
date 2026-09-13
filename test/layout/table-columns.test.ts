@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_CELL_MARGIN_MP } from '../../src/layout/table-ingest.js';
 import {
   BORDERS,
   BORDER_WIDTH_MP,
@@ -20,6 +21,10 @@ import {
 } from './table-support.js';
 
 const oneRow = (cells: readonly string[]): readonly string[] => [row('', cells)];
+
+const MARGIN_PAIR = DEFAULT_CELL_MARGIN_MP * 2;
+const PREFERRED_AAAA = 20000;
+const MIN_AA_AA = 10000;
 
 describe('table column resolution', () => {
   it('scales a fixed grid to the declared table width', async () => {
@@ -87,15 +92,23 @@ describe('table column resolution', () => {
     expect(tableDiags(result)).toContain('tableGridInconsistent');
   });
 
-  it('keeps autofit columns at their preferred widths when they fit', async () => {
+  it('keeps autofit columns at their preferred content width plus their padding', async () => {
     const result = await layoutOf(
       bodyOf(
         table('', grid([400, 600]), oneRow([cell('', para('aaaa')), cell('', para('aaaa'))])),
       ),
     );
     const fragment = tableOn(result, 0);
-    expect(fragment?.columns).toEqual([20000, 20000]);
-    expect(boxOf(fragment?.box)).toEqual([50000, 25000, 40000, EXACT_LINE_HEIGHT_MP]);
+    expect(fragment?.columns).toEqual([
+      PREFERRED_AAAA + MARGIN_PAIR,
+      PREFERRED_AAAA + MARGIN_PAIR,
+    ]);
+    expect(boxOf(fragment?.box)).toEqual([
+      50000,
+      25000,
+      (PREFERRED_AAAA + MARGIN_PAIR) * 2,
+      EXACT_LINE_HEIGHT_MP,
+    ]);
   });
 
   it('spreads autofit slack in proportion to preferred widths', async () => {
@@ -107,13 +120,13 @@ describe('table column resolution', () => {
     expect(tableOn(result, 0)?.columns).toEqual([25000, 25000]);
   });
 
-  it('shrinks autofit columns proportionally toward their minimums', async () => {
+  it('shrinks autofit columns toward their minimums and stops at the content plus padding', async () => {
     const result = await layoutOf(
       bodyOf(
         table(DXA(700), grid([500, 500]), oneRow([cell('', para('aa aa')), cell('', para('aa aa'))])),
       ),
     );
-    expect(tableOn(result, 0)?.columns).toEqual([17500, 17500]);
+    expect(tableOn(result, 0)?.columns).toEqual([MIN_AA_AA + MARGIN_PAIR, MIN_AA_AA + MARGIN_PAIR]);
   });
 
   it('freezes a column at its minimum once scaling would go below it', async () => {
@@ -122,7 +135,10 @@ describe('table column resolution', () => {
         table(DXA(700), grid([500, 500]), oneRow([cell('', para('aaaa')), cell('', para('aa aa aa'))])),
       ),
     );
-    expect(tableOn(result, 0)?.columns).toEqual([20000, 15000]);
+    expect(tableOn(result, 0)?.columns).toEqual([
+      PREFERRED_AAAA + MARGIN_PAIR,
+      MIN_AA_AA + MARGIN_PAIR,
+    ]);
   });
 
   it('keeps the minimum widths and reports overflow when the target is too small', async () => {
@@ -131,7 +147,10 @@ describe('table column resolution', () => {
         table(DXA(600), grid([500, 500]), oneRow([cell('', para('aaaa')), cell('', para('aaaa'))])),
       ),
     );
-    expect(tableOn(result, 0)?.columns).toEqual([20000, 20000]);
+    expect(tableOn(result, 0)?.columns).toEqual([
+      PREFERRED_AAAA + MARGIN_PAIR,
+      PREFERRED_AAAA + MARGIN_PAIR,
+    ]);
     expect(tableDiags(result)).toContain('tableOverflow');
   });
 
@@ -202,5 +221,55 @@ describe('table column resolution', () => {
       25000,
       EXACT_LINE_HEIGHT_MP + BORDER_WIDTH_MP,
     ]);
+  });
+});
+
+describe('a column is never narrower than its content plus its padding', () => {
+  const fixtures: readonly (readonly [string, string])[] = [
+    ['preferred fits', bodyOf(table('', grid([400, 600]), oneRow([cell('', para('aaaa')), cell('', para('aaaa'))])))],
+    ['shrunk below preferred', bodyOf(table(DXA(700), grid([500, 500]), oneRow([cell('', para('aa aa')), cell('', para('aa aa'))])))],
+    ['one column frozen', bodyOf(table(DXA(700), grid([500, 500]), oneRow([cell('', para('aaaa')), cell('', para('aa aa aa'))])))],
+    ['target too small', bodyOf(table(DXA(600), grid([500, 500]), oneRow([cell('', para('aaaa')), cell('', para('aaaa'))])))],
+  ];
+
+  it('holds the floor the autofit algorithm is allowed to shrink to', async () => {
+    for (const [name, body] of fixtures) {
+      const fragment = tableOn(await layoutOf(body), 0);
+      expect(fragment, name).toBeDefined();
+      for (const column of fragment!.columns) {
+        expect(column, `${name}: ${String(column)}`).toBeGreaterThanOrEqual(MIN_AA_AA + MARGIN_PAIR - 1);
+      }
+    }
+  });
+
+  it('gives a column enough room for its own text, which is the defect it fixes', async () => {
+    const result = await layoutOf(
+      bodyOf(
+        table('', grid([200, 800]), oneRow([cell('', para('word')), cell('', para('word'))])),
+      ),
+    );
+    const fragment = tableOn(result, 0)!;
+    expect(fragment.columns[0]).toBeGreaterThanOrEqual(PREFERRED_AAAA + MARGIN_PAIR);
+  });
+
+  it('holds the same floor however small the declared table width is', async () => {
+    const columnsFor = async (declared: string): Promise<readonly number[]> => {
+      const result = await layoutOf(
+        bodyOf(
+          table(declared, grid([300, 300, 300]), oneRow([
+            cell('', para('a')),
+            cell('', para('aaaa')),
+            cell('', para('aa aa')),
+          ])),
+        ),
+      );
+      return tableOn(result, 0)!.columns as readonly number[];
+    };
+    const atNineHundred = await columnsFor(DXA(900));
+    const atOneHundred = await columnsFor(DXA(100));
+    expect(atOneHundred).toEqual(atNineHundred);
+    expect(atNineHundred.reduce((sum, value) => sum + value, 0)).toBeGreaterThanOrEqual(
+      PREFERRED_AAAA + MARGIN_PAIR + MIN_AA_AA + MARGIN_PAIR,
+    );
   });
 });

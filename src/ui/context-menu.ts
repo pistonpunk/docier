@@ -15,7 +15,7 @@ const SELECTOR_BY_SURFACE: readonly (readonly [ContextSurface, string])[] = [
   ['ribbon', '[data-docier-part="ribbon"]'],
   ['headerFooter', `[${ATTR.header}],[${ATTR.footer}]`],
   ['table', `[${ATTR.table}]`],
-  ['image', 'img,[data-docier-image]'],
+  ['image', `img,[${ATTR.image}],[${ATTR.imageMissing}],[${ATTR.object}]`],
   ['field', '[data-docier-token],[data-docier-field]'],
 ];
 

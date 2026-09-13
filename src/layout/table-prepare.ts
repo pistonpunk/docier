@@ -157,7 +157,12 @@ const cellIntrinsic = (
     min = Math.max(min, widths.min);
     preferred = Math.max(preferred, widths.preferred);
   }
-  return { min: mp(min), preferred: mp(preferred) };
+  const padding =
+    (cell.margins.left as number) +
+    (cell.margins.right as number) +
+    (borderHalf(cell.borders.left) as number) +
+    (borderHalf(cell.borders.right) as number);
+  return { min: mp(min + padding), preferred: mp(preferred + padding) };
 };
 
 export const tableIntrinsic = (

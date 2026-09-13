@@ -381,56 +381,60 @@ D8 forbids `src/render` importing `src/pdf`, so the dispatcher belongs wherever 
 
 ---
 
-## Micro-iteration loop (adapted for a no-compiler environment)
+## Diagnosed defects, all closed
+
+The table column allocation defect and the `markDirty` trap were the last two open
+here; both are fixed and verified. The full account is in `docs/UI-PROGRESS.md`
+appendices A5 and A6.
+
+**The table column.** `cellIntrinsic` in `src/layout/table-prepare.ts` derived a
+cell's minimum and preferred widths from its paragraphs alone, while `contentWidth`
+at the other end of the same comparison was a box width with the margins and border
+halves already subtracted - so a column could be allocated less than its content
+plus padding and the text overflowed into the next cell. Both figures now carry the
+margins and the border halves. The four expectations the previous attempt could not
+re-derive move by exactly `DEFAULT_CELL_MARGIN_MP * 2`, and the test derives each
+one as content plus padding rather than pinning the observed number. Verified in the
+browser: the sample's first column is 77.4px where the diagnosis asked for 78, and
+no cell in the header row spills its text, where before the heading printed as
+"ColumnEvidence".
+
+**The `markDirty` trap.** `Part.markDirty()` set a flag `writePlan()` never read, so
+marking an unread part dirty saved it as its original bytes and a caller could
+believe it had edited a part that never changed. It now throws `PART_NOT_READ`.
+
+---
+
+## Micro-iteration loop
 
 1. **Sync** - read this file before starting.
-2. **Scope** - one file or one function. No multi-file rewrites in a single step.
-3. **Verify** - there is no local build. Substitute: re-read the changed file in full, check every import
-   resolves, every type is satisfied by hand, and no unused symbol remains. Then push, and ask for CI or a
-   local `npm run typecheck` when the change is large enough to be worth a round trip.
-4. **Persist** - update this file: check off what is done, record what is now active.
-5. **Commit** - concise, descriptive message.
+2. **Scope** - one file or one function.
+3. **Verify** - `cd /home/daniel/work/docier` and run, in order:
+   `npx tsc --noEmit -p tsconfig.json`, `npx tsc -p tsconfig.test.json --noEmit`,
+   `npm run build`, `npx vitest run`. All four must be green. Node and npm are
+   present; the old belief that they were not cost a whole session, and the
+   correction is recorded above.
+4. **Persist** - update this file and `docs/UI-PROGRESS.md`.
+5. **Commit** - descriptive message, no co-author trailer.
 
-**Infinite-loop protection:** if the same failure repeats three times, stop. Run `git diff`, write the
-failure under Blockers, and change approach rather than retrying.
+**Infinite-loop protection:** if the same failure repeats three times, stop. Run
+`git diff`, write the failure under Blockers, and change approach rather than
+retrying.
 
 ---
 
 ## Current active sub-task
 
-**The interface phases in `docs/UI-PROGRESS.md` are the live plan, not the numbered phases above.**
-That file is the working record. As of 2026-09-13: A complete; B1-B3 done with B4 (table width handles)
-open; C1-C5 done with the table menu still short of Word's contents; D1, D3 and D4 done with D2 (large
-buttons) open; **E complete - the dialog surface and the Font and Paragraph dialogs are built, wired to
-the ribbon launchers and Ctrl+D, and verified in a real browser**; F not started.
+**The interface phases in `docs/UI-PROGRESS.md` are the live plan, not the numbered
+phases above.** That file is the working record and the appendices there are the
+findings log.
 
-Next action: **B4**, then the C table-menu remainder, then D2, then F1-F4. The four drawing/web defects
-the sections above record are still open: the table-column allocation (`table-prepare.ts` `cellIntrinsic`
-does not add `cell.margins`, so a column can be allocated less than its content), and the `markDirty`
-trap in `src/ooxml/part.ts`.
+As of 2026-09-13 every interface phase is closed: A, B (B1-B4), C (C1-C5), D
+(D1-D4), and E (E1-E3) complete and verified in a browser. Phase F delivered its
+picture, hyperlink and symbol commands, verified live; five of its entries - comments,
+footnote, header creation, text box and table of contents - remain refused, and
+`docs/UI-PROGRESS.md` names for each one the subsystem it would need.
 
-## Diagnosed defect: a table column can be allocated less than its own content
-
-Found by measuring the sample document in a browser. The table's first column is
-62px wide while its header text "Column" needs 64px, so the text overflows into
-the next cell and the header prints as "ColumnEvidence".
-
-Cause, with the line references:
-
-- `src/layout/table-prepare.ts:344` sets `boxWidth` from the resolved column
-  widths, so the algorithm's numbers are **cell box** widths.
-- `src/layout/table-prepare.ts:350` computes `contentWidth` as
-  `boxWidth - margins.left - margins.right - halfLeft - halfRight`, so the
-  margins are subtracted from the box.
-- `src/layout/table-prepare.ts` `cellIntrinsic` derives `min` and `preferred`
-  from the cell's paragraphs only, and never adds `cell.margins`. The requirement
-  therefore describes the content, while it is compared against a box.
-
-The fix is to add `cell.margins.left + cell.margins.right` to both `min` and
-`preferred` in `cellIntrinsic`. It was written and it resolves the overflow, but
-it moves the numbers in four cases of `test/layout/table-columns.test.ts` and
-those expectations were not re-derived, so the change was reverted rather than
-committed with numbers taken from observed output. Do it properly: re-derive each
-expectation as content + padding, and confirm the sample's first column allocates
-78px so its 64px of text fits.
-
+The diagnosed defects that sat under all of this are closed: the table column
+allocation, the `markDirty` trap, the right-click that destroyed a selection, and
+the missing Picture context menu. The account is in the appendices there.

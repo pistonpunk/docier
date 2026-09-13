@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocierError } from '../src/ooxml/index.js';
 import { DocxPackage, isDocierError } from '../src/ooxml/index.js';
 
-import { BROKEN_CORPUS } from './harness/corpus.js';
+import { BROKEN_CORPUS, CORPUS, fixtureBytes } from './harness/corpus.js';
 import { compareArchives, sameBytes } from './harness/roundtrip.js';
 import { readZipMemberHeaders, readZipMembers } from './harness/zip-read.js';
 
@@ -206,5 +206,39 @@ describe('a malformed secondary part is preserved opaquely', () => {
       sameBytes(after?.bytes ?? new Uint8Array(0), before?.bytes ?? new Uint8Array(1)),
       'decompressed header bytes',
     ).toBe(true);
+  });
+});
+
+describe('the markDirty trap', () => {
+  const readable = (): Uint8Array => {
+    const fixture = CORPUS[0];
+    if (fixture === undefined) throw new Error('no fixture to open');
+    return fixtureBytes(fixture);
+  };
+
+  it('refuses to mark a part dirty that was never read, rather than dropping the write', async () => {
+    const pkg = await DocxPackage.open(readable());
+    const unread = pkg
+      .partNames()
+      .map((name) => pkg.getPart(name))
+      .filter((part) => part !== undefined)
+      .find((part) => {
+        try {
+          part!.markDirty();
+          return false;
+        } catch {
+          return true;
+        }
+      });
+    expect(unread, 'every part was already read, so the trap cannot be shown').toBeDefined();
+    expect(() => unread!.markDirty()).toThrow(/without being read/);
+  });
+
+  it('marks it dirty once it has been read, and the part is then reported dirty', async () => {
+    const pkg = await DocxPackage.open(readable());
+    const part = pkg.getPart(pkg.mainDocumentPartName);
+    await part!.document();
+    part!.markDirty();
+    expect(pkg.dirtyPartNames()).toContain(pkg.mainDocumentPartName);
   });
 });

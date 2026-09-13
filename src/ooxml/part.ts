@@ -153,8 +153,19 @@ export class Part {
   markDirty(): void {
     if (this.opaqueFlag) return;
     const parsed = this.parsed;
-    if (parsed !== undefined) this.content = { kind: 'document', document: parsed };
-    this.dirtyFlag = true;
+    if (parsed !== undefined) {
+      this.content = { kind: 'document', document: parsed };
+      this.dirtyFlag = true;
+      return;
+    }
+    if (this.content.kind !== 'original') {
+      this.dirtyFlag = true;
+      return;
+    }
+    throw new DocierError(
+      `Part "${this.name}" was marked dirty without being read, so there is nothing to write and the change would be lost; await part.document() or set its bytes first`,
+      { code: 'PART_NOT_READ' },
+    );
   }
 
   markClean(): void {

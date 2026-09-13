@@ -326,10 +326,11 @@ the audit predicted, sitting there since C4.
 
 ### A finding that is not a C defect, and belongs to the layout
 
-A cell's text cannot be aligned when its column has no slack, and on an autofit
-table every column is allocated very close to its own content width - so on the
-demo's sample document, centring a cell moves it by a few points and looks like it
-did nothing. Measured in the engine rather than in pixels: the same command on a
+A cell's text cannot be aligned when its column has no slack. On an autofit table
+that is what the column-allocation defect caused, and **that defect is now fixed**
+(see appendix A5), so a column has its margins' worth of slack and alignment has
+room. The measurement below was taken before the fix and is kept because it is
+what showed the alignment arithmetic itself was right. Measured in the engine rather than in pixels: the same command on a
 fixed-layout 8000-twip cell moves the ink from 55760 to 228750 millipoints, which
 is the exact centre of a 388480-wide content box holding 42500 of text. The
 alignment arithmetic is right; the autofit table is simply already tight. This is
@@ -671,10 +672,20 @@ and verified, and the ones that are not are named with what they would take.
 Findings that belong to a phase other than the one being worked on. Each says
 which phase owns it.
 
-### A1. Right-clicking inside a selection collapses it
+### A1. Right-clicking inside a selection collapses it - CLOSED
 
-Found while verifying C4. Owner: **Phase B3's agent**, which holds
-`src/edit/input.ts`, and it has been asked to fix it.
+**Fixed.** `onPointerDown` returns before touching the caret when the button is
+not the primary one and the point is inside the selection, so a right-click inside
+a selection leaves it alone.
+
+Verified the way the finding was written - by the user path rather than by
+inspecting the handler. Select eight characters, right-click inside the
+selection, click Copy in the context menu, click past the end and press Ctrl+V:
+the paragraph goes from `docier demo document` to
+`docier demo documentocier de`, so the selection survived the right-click and the
+menu's Copy read it. **C4's blocked verification is unblocked.**
+
+The original text follows.
 
 The context menu's Cut, Copy and Paste were wired to their real commands, and
 neither command fires when you use them, because the right-click that opens the
@@ -689,7 +700,17 @@ the right-click is outside it. Until this is fixed the menu's clipboard entries
 cannot work however correctly they are wired, which is why C4 is marked done but
 not verified.
 
-### A2. The context menu has no Picture surface for an unresolvable image
+### A2. The context menu has no Picture surface for an unresolvable image - CLOSED
+
+**Fixed.** The selector was `img,[data-docier-image]`, which never matched the
+missing-image wrapper. It now reads
+`img,[data-docier-image],[data-docier-image-missing],[data-docier-object]`, so a
+picture with no bytes, a picture with bytes and the object wrapper the overlay
+draws all route to the Picture menu. Pinned by a test over the four attributes, and
+by one that a cell containing a picture takes the picture surface rather than the
+table's.
+
+The original text follows.
 
 Owner: **Phase C**. `SURFACE_ATLAS` (`src/ui/context-menu.ts:18`) detects an image
 surface with `img,[data-docier-image]`, which never matches the wrapper the
@@ -737,7 +758,53 @@ Vitest did not care, because the type error is invisible at runtime; the test
 typecheck did. Changed to `'api'`, which is what the test is actually doing -
 driving the editor through its public surface.
 
-### A5. A full `vitest run` failed 531 tests once, and passed on a re-run
+### A5. The table column defect, closed - the one open since the audit began
+
+**Fixed and verified.** The diagnosis in `agent_progress.md` was right in every
+particular: `cellIntrinsic` derived a cell's minimum and preferred widths from its
+paragraphs alone, while `contentWidth` at the other end of the same comparison was
+a **box** width with the cell's margins and border halves already subtracted. So a
+column could be allocated less than its own content plus its padding, and the text
+overflowed into the next cell.
+
+The fix adds `cell.margins.left + cell.margins.right` and the two border halves to
+both figures, so the requirement and the comparison are in the same units.
+
+The four expectations the previous attempt could not re-derive are now derived
+rather than observed. Each moves by exactly `DEFAULT_CELL_MARGIN_MP * 2`, the
+5760-millipoint default margin on each side, and the test says so:
+
+| Case | Before | After | What it is |
+|---|---|---|---|
+| preferred fits | 20000 | 31520 | preferred content 20000 + 11520 padding |
+| shrunk | 17500 | 21520 | minimum content 10000 + 11520 padding |
+| one frozen | 20000, 15000 | 31520, 21520 | preferred and minimum, each plus padding |
+| target too small | 20000 | 31520 | the floor, with `tableOverflow` still reported |
+
+Verified in the browser against the document the audit measured: the sample's
+first column is **77.4px** where the diagnosis asked for 78, its `Column` heading
+needs 62px, and **no cell in the header row spills its text** - where before the
+column was 62px and the heading printed as "ColumnEvidence".
+
+Two tests guard it rather than the four numbers: every column in five fixtures
+holds the same floor however small the declared table width is, and one asserts
+the floor is content plus padding by name.
+
+### A6. The `markDirty` trap, closed
+
+**Fixed.** `Part.markDirty()` set a dirty flag that `writePlan()` never consulted:
+a part whose content was still `original` went down the passthrough path, so
+marking an unread part dirty marked nothing and the part saved as its original
+bytes. A caller could believe it had edited a part and find the file unchanged -
+the same shape as the Phase 1 bug that silently dropped every model edit.
+
+It now throws `PART_NOT_READ` when the part was never read, because in that state
+there is nothing to write and the only honest outcomes are an error at the call
+site or a lie at save time. The three existing callers all `await part.document()`
+first, so none of them changed behaviour. A new error code rather than reusing
+`PART_NOT_FOUND`: the part exists, it has simply never been materialised.
+
+### A7. A full `vitest run` failed 531 tests once, and passed on a re-run
 
 Owner: **whoever next sees a red suite and reaches for `git bisect`.** Recorded so
 it is not chased. One invocation of `npx vitest run` - both projects, while a
@@ -746,3 +813,4 @@ with `Not implemented: HTMLCanvasElement.prototype.getContext` out of the
 divergence detector. Run separately the same two projects passed 810 and 555, and
 the next combined run passed 1365. Treat a sudden mass failure with that canvas
 error as resource contention, not a regression, and re-run before believing it.
+
