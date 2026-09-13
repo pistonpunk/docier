@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B in progress** (B1, B2 done, B3 with an agent), **Phase C started** (C1, C2 done).
+Status: **Phase B**: B1, B2 done, B3 with an agent. **Phase C**: C1 to C5 done, table menu partly. **Phase D**: D1 and D4 done, D2 and D3 to do.
 
 Done and verified in the browser:
 
@@ -184,10 +184,10 @@ Rows; of those, only the delete nesting and New Comment need no new command.
 
 | # | Item | State |
 |---|---|---|
-| D1 | The Styles gallery as one scrolling row of preview tiles | to do |
+| D1 | The Styles gallery as one scrolling row of preview tiles | **done** |
 | D2 | Large buttons for the important commands | to do |
 | D3 | The remaining 63 icons | to do |
-| D4 | Remove the forced ribbon height | to do |
+| D4 | Remove the forced ribbon height | **done, uniformity still needs D2** |
 
 ## Phase E - Dialogs
 
@@ -205,6 +205,33 @@ Rows; of those, only the delete nesting and New Comment need no new command.
 | F2 | Hyperlink | to do |
 | F3 | Comments | to do |
 | F4 | Footnote, header creation, symbol, text box, table of contents | to do |
+
+### Phase D notes
+
+**D1 done.** The ribbon's Styles gallery was a wrapping grid whose column count
+followed its width, so eight tiles rendered as four rows in a 146px column and made
+that group the tallest on the tab, which is what held the ribbon at 112px. It is a
+single horizontally scrolling row of 88px tiles now, set in the document font so a
+style reads as itself rather than as a word in the interface font. Verified on
+screen: one row of tiles, the Editing group clear of them, and the gallery
+scrolling its 727px of content inside a 430px box.
+
+**D4 done, with an honest number.** The forced ribbon height is gone, because the
+commissioner's correction is that the ribbon should fit its contents. Measured after:
+Home is **107px** and the other eight tabs are **51px**. So it fits its contents and
+the document still moves 56px when a tab changes, from 195px down to 139px.
+
+That gap is not a layout problem to be papered over with another token: it is what
+the content needs. Home needs two rows of controls plus a header, and every other
+tab needs one. Word's tabs are all the same height because Word's tabs are all
+designed to need the same height, which is what **D2**, large buttons for the
+principal commands, is for. Until D2 is done, fitting the contents and holding one
+height are mutually exclusive, and fitting the contents is what was asked for.
+
+An overlap count of two on Home is a **probe artefact**, recorded so nobody chases
+it: the gallery's clipped tiles still report their full bounding rectangles, so a
+rectangle comparison sees them overlapping the Editing group when `overflow-x: auto`
+is in fact clipping them. Confirmed on screen.
 
 ## Appendices
 

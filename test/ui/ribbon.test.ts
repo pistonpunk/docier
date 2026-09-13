@@ -258,13 +258,16 @@ describe('ribbon layout rules', () => {
     expect(css).toContain(
       '.docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content',
     );
-    expect(css).toContain('.docier-group[data-docier-grow="true"]{flex:1 1 auto}');
+    expect(css).toContain('.docier-group[data-docier-grow="true"]{flex:0 1 auto;min-width:0}');
   });
 
   it('keeps a gallery label inside its own item', () => {
     expect(css).toContain('.docier-menu-gallery > .docier-control{min-width:0;overflow:hidden}');
     expect(css).toContain('.docier-menu-gallery .docier-control-label{display:block;overflow:hidden;text-overflow:ellipsis}');
-    expect(css).toContain('.docier-ribbon .docier-menu-gallery{min-width:132px');
+    expect(css).toContain(
+      '.docier-ribbon .docier-menu-gallery{display:grid;grid-auto-flow:column;grid-auto-columns:88px;grid-template-columns:none;overflow-x:auto',
+    );
+    expect(css).toContain('.docier-ribbon .docier-menu-gallery .docier-control{min-height:22px');
   });
 
   it('clears a ribbon too narrow for its content by wrapping the groups', () => {
