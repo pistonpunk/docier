@@ -51,6 +51,7 @@ interface DataTransferEventLike {
 const DRAG_THRESHOLD_PX = 4;
 const CARET_BLINK_MS = 530;
 const CARET_RETRY_MS = 16;
+const CARET_WATCHDOG_MS = 250;
 const COLUMN_EDGE_PX = 5;
 const MIN_COLUMN_WIDTH_MP = mp(120 * MP_PER_TWIP);
 const MIN_ROW_HEIGHT_MP = mp(120 * MP_PER_TWIP);
@@ -281,6 +282,7 @@ const pageBox = (
 
 export const attachInput = (host: InputHost): InputHandle => {
   const owner = host.root.ownerDocument;
+  let disposed = false;
   const overlay = owner.createElement('div');
   overlay.className = 'docier-overlay';
   applyStyle(overlay, {
@@ -1103,6 +1105,26 @@ export const attachInput = (host: InputHost): InputHandle => {
   paintSelection();
   paintObjectHandles();
 
+  let caretStrikes = 0;
+  const caretWatchdog = owner.defaultView?.setInterval(() => {
+    if (disposed) return;
+    if (owner.activeElement !== composer) {
+      caretStrikes = 0;
+      return;
+    }
+    const hidden = caret.style.display === 'none';
+    const dark = blink !== undefined && Number(blink.currentTime ?? 0) >= CARET_BLINK_MS;
+    caretStrikes = hidden || dark ? caretStrikes + 1 : 0;
+    if (caretStrikes < 2) return;
+    caretStrikes = 0;
+    paintCaret();
+    paintSelection();
+    if (blink !== undefined) {
+      blink.currentTime = 0;
+      if (blink.playState === 'finished' || blink.playState === 'idle') blink.play();
+    }
+  }, CARET_WATCHDOG_MS);
+
   return {
     refresh: () => {
       paintCaret();
@@ -1120,6 +1142,8 @@ export const attachInput = (host: InputHost): InputHandle => {
       composer.focus({ preventScroll: true });
     },
     dispose: () => {
+      disposed = true;
+      if (caretWatchdog !== undefined) owner.defaultView?.clearInterval(caretWatchdog);
       host.rendered.removeEventListener('pointermove', onHover);
       host.rendered.removeEventListener('pointerdown', onPointerDown);
       composer.removeEventListener('keydown', onKeyDown);
