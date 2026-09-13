@@ -53,6 +53,7 @@ describe('the paint coordinate contract', () => {
 
   it('scales object and image geometry on that one scale and never in millipoints', () => {
     const object = {
+      objectId: 'docPr-1',
       relationshipId: 'rId1',
       width: mp(20000),
       height: mp(10000),

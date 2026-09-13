@@ -105,13 +105,138 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="3" y="2.5" width="10" height="7" rx="1"/><path d="M6.5 6h3"/><path d="M8.5 10.5V14"/><path d="M7 12.8 8.5 14.3 10 12.8"/>',
   'token.insert':
     '<path d="M6 3.5H4.8A1.3 1.3 0 0 0 3.5 4.8v6.4a1.3 1.3 0 0 0 1.3 1.3H6"/><path d="M10 3.5h1.2a1.3 1.3 0 0 1 1.3 1.3v6.4a1.3 1.3 0 0 1-1.3 1.3H10"/><path d="M8 6v4"/><path d="M6.5 8h3"/>',
+  'insert.coverPage':
+    '<rect x="3" y="2" width="10" height="12" rx="1"/><path d="M3 5.5h10"/><path d="M5.8 7.8h4.4"/><path d="M5.8 10.4h4.4"/>',
+  'insert.table':
+    '<rect x="2.5" y="3" width="11" height="10" rx="1"/><path d="M2.5 6.3h11"/><path d="M2.5 9.7h11"/><path d="M6.2 3v10"/><path d="M9.8 3v10"/>',
+  'object.insertImage':
+    '<rect x="2" y="3" width="12" height="10" rx="1"/><circle cx="5.6" cy="6.2" r="1.1"/><path d="M2.3 11.6 6 8.2l2.4 2.2 2.2-1.8 3.1 2.9"/>',
+  'object.insertShape':
+    '<path d="M5.4 2.6 8.4 7.4H2.4z"/><circle cx="11" cy="5" r="2.8"/><rect x="2.6" y="8.6" width="4.8" height="4.8" rx=".8"/>',
+  'object.insertChart':
+    '<rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 10.6V7.4"/><path d="M8 10.6V5.4"/><path d="M11 10.6V8.6"/>',
+  'insert.link':
+    '<path d="M6.6 9.4 9.4 6.6"/><path d="M7.4 4.6 9 3a2.6 2.6 0 0 1 3.7 3.7l-1.6 1.6"/><path d="M8.6 11.4 7 13a2.6 2.6 0 0 1-3.7-3.7l1.6-1.6"/>',
+  'insert.header':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M5 5h6"/><path d="M3 8h10" stroke-dasharray="2 1.6"/>',
+  'insert.footer':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M5 11h6"/><path d="M3 8h10" stroke-dasharray="2 1.6"/>',
+  'insert.pageNumber':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M7.1 5.6 6.5 10.4"/><path d="M9.5 5.6 8.9 10.4"/><path d="M5.4 7.4h5.2"/><path d="M5.4 9h5.2"/>',
+  'insert.textBox':
+    '<rect x="2.5" y="3.5" width="11" height="9" rx="1" stroke-dasharray="3 1.8"/><path d="M5.8 6.2h4.4"/><path d="M8 6.2v4.2"/>',
+  'insert.symbol':
+    '<path d="M6.3 9.8a2.8 2.8 0 1 1 3.4 0"/><path d="M6.3 9.8v2.8"/><path d="M9.7 9.8v2.8"/><path d="M5.3 12.6h2.4"/><path d="M8.3 12.6h2.4"/>',
+  'theme.setFonts':
+    '<path d="M2.4 12 5.2 5.5 8 12"/><path d="M3.5 9.7h3.4"/><circle cx="11.4" cy="10" r="2"/><path d="M13.4 8v4"/>',
+  'theme.setColors':
+    '<circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11"/><path d="M3.2 5.2 12.8 10.8"/><path d="M3.2 10.8 12.8 5.2"/>',
+  'theme.setSpacing':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M5 6h6"/><path d="M5 10.5h6"/><path d="M8 7.1v2.4"/><path d="m6.9 8.2 1.1-1.1 1.1 1.1"/><path d="m6.9 8.4 1.1 1.1 1.1-1.1"/>',
+  'ui.control.margins':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1.2"/><path d="M5.5 5.5h5v5h-5z"/>',
+  'doc.setPageBackground':
+    '<rect x="2.5" y="2.5" width="9.5" height="11" rx="1"/><rect x="9.6" y="9.6" width="4" height="4" rx="1"/><path d="m10.3 13 2.9-2.9"/>',
+  'doc.setWatermark':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M4.6 10.2 10.2 4.6"/><path d="M6.4 11.9 11.9 6.4"/>',
+  'doc.setPageBorders':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M4.4 7.6V4.4h3.2"/><path d="M11.6 8.4v3.2H8.4"/>',
+  'doc.setColumns':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M6.2 3.5v9"/><path d="M9.8 3.5v9"/>',
+  'object.bringForward':
+    '<rect x="4" y="8" width="8" height="5.5" rx="1"/><path d="M8 6V2.5"/><path d="m6.3 4.2 1.7-1.7 1.7 1.7"/>',
+  'object.sendBackward':
+    '<rect x="4" y="2.5" width="8" height="5.5" rx="1"/><path d="M8 10v3.5"/><path d="m6.3 11.8 1.7 1.7 1.7-1.7"/>',
+  'object.align':
+    '<path d="M2.5 2.5v11"/><rect x="5" y="4.5" width="8" height="3" rx=".8"/><rect x="5" y="9" width="5.5" height="3" rx=".8"/>',
+  'object.group':
+    '<path d="M3.5 2.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z" stroke-dasharray="2.4 1.6"/><rect x="4.4" y="4.4" width="4" height="4" rx=".8"/><circle cx="10.9" cy="10.9" r="1.9"/>',
+  'insert.tableOfContents':
+    '<path d="M2.5 3.5h11"/><path d="M2.5 6.8h6.5"/><path d="M11.5 6.8h2"/><path d="M2.5 10h4.5"/><path d="M11.5 10h2"/><path d="M2.5 13h6"/><path d="M11.5 13h2"/>',
+  'insert.updateTable':
+    '<rect x="2.5" y="2.5" width="6" height="6" rx="1"/><path d="M2.5 4.9h6"/><path d="M5.5 2.5v6"/><path d="M13.1 9.6a2.8 2.8 0 1 1-3.9 3.8"/><path d="M13.1 7v2.6h-2.6"/>',
+  'insert.footnote':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M5.2 5.4h5.6"/><path d="M5.2 7.6h4"/><path d="M4.6 9.8h6.8"/><path d="M5.4 12.2h3.4"/>',
+  'insert.endnote':
+    '<rect x="3" y="2" width="10" height="8.5" rx="1"/><path d="M5.2 4.6h5.6"/><path d="M5.2 6.8h3.6"/><path d="M8 10.6v3"/><path d="m6.4 12.2 1.6 1.6 1.6-1.6"/>',
+  'insert.caption':
+    '<rect x="2.5" y="2.8" width="11" height="6.6" rx="1"/><path d="M5 11.6h6"/><path d="M5 13.4h3.5"/>',
+  'insert.crossReference':
+    '<rect x="2.5" y="2.5" width="7" height="11" rx="1"/><path d="M4.2 5.6h3.6"/><path d="M4.2 8h2"/><path d="M10.2 8h3.2"/><path d="m11.8 6.4 1.6 1.6-1.6 1.6"/>',
+  'insert.index':
+    '<rect x="2.5" y="3" width="9.5" height="10.5" rx="1"/><path d="M4.4 6.2h5.7"/><path d="M4.4 8.7h5.7"/><path d="M4.4 11.2h3.4"/><path d="M12.6 6.4h1.4"/><path d="M12.6 8.9h1.4"/><path d="M12.6 11.4h1.4"/>',
+  'insert.bibliography':
+    '<path d="M2.4 13.6h11.2"/><rect x="2.6" y="4.6" width="3" height="9" rx=".6"/><rect x="6.4" y="3.6" width="3" height="10" rx=".6"/><rect x="10.2" y="5.4" width="3" height="8.2" rx=".6"/>',
+  'proof.spelling':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M5 6h6"/><path d="M5 8c.7-1.2 1.4 1.2 2.1 0s1.4 1.2 2.1 0 1.4 1.2 2.1 0"/>',
+  'proof.setLanguage':
+    '<circle cx="8" cy="8" r="5.5"/><path d="M8 2.5c1.9 1.6 2.9 3.4 2.9 5.5s-1 3.9-2.9 5.5"/><path d="M8 2.5c-1.9 1.6-2.9 3.4-2.9 5.5s1 3.9 2.9 5.5"/><path d="M2.8 6.2h10.4"/><path d="M2.8 9.8h10.4"/>',
+  'comment.create':
+    '<path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H7.5L4.6 13.4V11H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M8.2 5.4v2.8"/><path d="M6.8 6.8h2.8"/>',
+  'comment.delete':
+    '<path d="M2.5 4.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H7.5L4.6 13.4V11H4a1.5 1.5 0 0 1-1.5-1.5z"/><path d="m6.7 5.4 2.8 2.8"/><path d="m9.5 5.4-2.8 2.8"/>',
+  'doc.acceptChange':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="m5.2 8.4 2.2 2.2 3.6-4.4"/>',
+  'doc.rejectChange':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="m5.4 5.8 5.2 5.2"/><path d="m10.6 5.8-5.2 5.2"/>',
+  'setViewMode:print':
+    '<rect x="3" y="2" width="10" height="12" rx="1"/><path d="M5.4 5h5.2"/><path d="M5.4 7.6h5.2"/><path d="M5.4 10.2h3.4"/>',
+  'setViewMode:web':
+    '<rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 5.8h12"/><circle cx="3.9" cy="4.4" r=".7"/><circle cx="6" cy="4.4" r=".7"/><path d="M8 4.4h3.6"/><path d="M4.4 8h7.2"/><path d="M4.4 10.4h4.6"/>',
+  'setViewMode:draft':
+    '<path d="M2.5 4h11" stroke-dasharray="2 1.6"/><path d="M2.5 8h11"/><path d="M2.5 12h11" stroke-dasharray="2 1.6"/>',
+  'setViewMode:read':
+    '<rect x="2" y="3" width="5.6" height="10" rx="1"/><rect x="8.4" y="3" width="5.6" height="10" rx="1"/><path d="M4 6.2h1.6"/><path d="M4 8.4h1.6"/><path d="M10.4 6.2H12"/><path d="M10.4 8.4H12"/>',
+  'toggleRuler':
+    '<rect x="2" y="5" width="12" height="6" rx="1"/><path d="M4.6 5v1.6"/><path d="M7 5v2.4"/><path d="M9.4 5v1.6"/><path d="M11.8 5v2.4"/>',
+  'view.setGridlines':
+    '<path d="M2.5 5.5h11" stroke-dasharray="2 1.6"/><path d="M2.5 10.5h11" stroke-dasharray="2 1.6"/><path d="M5.5 2.5v11" stroke-dasharray="2 1.6"/><path d="M10.5 2.5v11" stroke-dasharray="2 1.6"/>',
+  'view.setNavigation':
+    '<rect x="2" y="2.5" width="12" height="11" rx="1"/><path d="M6.8 2.5v11"/><path d="M4 5.6h1.4"/><path d="M4 8h1.4"/><path d="M4 10.4h1.4"/><path d="M8.6 5.6h3.8"/><path d="M8.6 8h3.8"/><path d="M8.6 10.4h2.4"/>',
+  'zoomIn':
+    '<circle cx="7" cy="7" r="4.2"/><path d="m10.2 10.2 3.3 3.3"/><path d="M7 5.2v3.6"/><path d="M5.2 7h3.6"/>',
+  'zoomOut':
+    '<circle cx="7" cy="7" r="4.2"/><path d="m10.2 10.2 3.3 3.3"/><path d="M5.2 7h3.6"/>',
+  'zoomSet':
+    '<rect x="4.5" y="2.5" width="9" height="9" rx="1"/><circle cx="6" cy="9.5" r="3.4"/><path d="m3.6 12.4-1.1 1.1"/>',
+  'zoomFit:pageWidth':
+    '<rect x="3.5" y="2.5" width="9" height="11" rx="1"/><path d="M4.9 8h6.2"/><path d="m6.5 6.5-1.6 1.5 1.6 1.5"/><path d="m9.5 6.5 1.6 1.5-1.6 1.5"/>',
+  'zoomFit:wholePage':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="m5.5 5.5 5 5"/><path d="M7.4 5.5H5.5V7.4"/><path d="M8.6 10.5h1.9V8.6"/>',
+  'ribbonToggle':
+    '<path d="M2.5 3h11"/><path d="m5.3 11.6 2.7-2.7 2.7 2.7"/><path d="m5.3 8.2 2.7-2.7 2.7 2.7"/>',
+  'table.mergeCells':
+    '<rect x="2" y="4.5" width="4.2" height="7" rx=".9"/><rect x="9.8" y="4.5" width="4.2" height="7" rx=".9"/><path d="M6.7 6.7h2.6"/><path d="m8.3 5.9 1 .8-1 .8"/><path d="M9.3 9.3H6.7"/><path d="m7.7 8.5-1 .8 1 .8"/>',
+  'table.splitCells':
+    '<rect x="2" y="2.5" width="4.2" height="11" rx=".9"/><rect x="9.8" y="2.5" width="4.2" height="5" rx=".9"/><rect x="9.8" y="8.5" width="4.2" height="5" rx=".9"/><path d="M6.7 6.4h2.6"/><path d="m8.3 5.6 1 .8-1 .8"/><path d="M6.7 9.6h2.6"/><path d="m8.3 8.8 1 .8-1 .8"/>',
+  'table.delete':
+    '<rect x="2.5" y="2.5" width="8" height="8" rx="1"/><path d="M2.5 5.6h8"/><path d="M6.5 2.5v8"/><path d="m10.4 10.4 3.2 3.2"/><path d="m13.6 10.4-3.2 3.2"/>',
+  'table.setProperties':
+    '<rect x="2.5" y="2.5" width="11" height="6.5" rx="1"/><path d="M2.5 5.8h11"/><path d="M6.5 2.5v6.5"/><path d="M2.5 12.6h11"/><circle cx="6.2" cy="12.6" r="1.6"/>',
+  'object.setWrap':
+    '<path d="M2.5 3h11"/><path d="M2.5 6.2h2.6"/><path d="M9.5 6.2h4"/><path d="M2.5 9.4h2.6"/><path d="M9.5 9.4h4"/><path d="M2.5 12.6h11"/><rect x="5.8" y="4.9" width="3.2" height="6" rx=".6"/>',
+  'object.changeImage':
+    '<rect x="4.5" y="3" width="9.5" height="10" rx="1"/><circle cx="7.8" cy="6.2" r="1.1"/><path d="M4.8 11.4 8.2 8.2l2.2 2 1.6-1.4 1.8 1.7"/><path d="M1.4 8h2.7"/><path d="m2.6 6.6 1.4 1.4-1.4 1.4"/>',
+  'object.compress':
+    '<rect x="2" y="2.5" width="12" height="11" rx="1"/><path d="M8 4.4v2"/><path d="m6.8 5.5 1.2 1.2 1.2-1.2"/><path d="M8 11.6v-2"/><path d="m6.8 10.5 1.2-1.2 1.2 1.2"/>',
+  'object.setSize':
+    '<rect x="3.5" y="5.5" width="9" height="8" rx="1"/><path d="M3.5 3.2h9"/><path d="M3.5 2.4v1.6"/><path d="M12.5 2.4v1.6"/>',
+  'object.delete':
+    '<rect x="1.5" y="3" width="9" height="9" rx="1"/><circle cx="4.4" cy="5.9" r=".9"/><path d="M1.8 10.6 4.4 8.2l2 1.9 1.3-1.2 1.8 1.7"/><path d="m10.4 10.4 3.2 3.2"/><path d="m13.6 10.4-3.2 3.2"/>',
   'token.toggleCodes':
     '<path d="M6 3.5H4.8A1.3 1.3 0 0 0 3.5 4.8v6.4a1.3 1.3 0 0 0 1.3 1.3H6"/><path d="M10 3.5h1.2a1.3 1.3 0 0 1 1.3 1.3v6.4a1.3 1.3 0 0 1-1.3 1.3H10"/><path d="M7 8h2"/>',
 };
 
+const modeOf = (node: UiNode): string | undefined => {
+  const mode = node.actionArgs?.['mode'];
+  return typeof mode === 'string' && mode !== '' ? mode : undefined;
+};
+
 const keyOf = (node: UiNode): string | undefined => {
   const source = node.command ?? node.id;
-  return source.startsWith('docier.command.') ? source.slice('docier.command.'.length) : source;
+  const key = source.startsWith('docier.command.') ? source.slice('docier.command.'.length) : source;
+  const mode = node.command === undefined ? modeOf(node) : undefined;
+  return mode === undefined ? key : `${key}:${mode}`;
 };
 
 export const iconFor = (node: UiNode): string | undefined => {

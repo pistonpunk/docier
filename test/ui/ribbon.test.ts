@@ -5,6 +5,7 @@ import { iconFor, iconKeys } from '../../src/ui/icons.js';
 import { STYLE_ELEMENT_ATTRIBUTE, renderStyles } from '../../src/ui/styles.js';
 import { contentRun, paragraphOf, text } from '../layout/support.js';
 import { paragraphMarksAt } from '../../src/edit/inspect.js';
+import { ALL_RIBBON_TABS } from '../../src/ui/menu-model.js';
 import type { UiNode } from '../../src/ui/menu-model.js';
 import { bodyOf, chromeOf, chromeOfDocx, disposeChromes, longBody } from './support.js';
 import { emptyEditorOf, disposeEditors } from '../api/support.js';
@@ -179,19 +180,46 @@ describe('icons', () => {
   const nodeFor = (key: string): UiNode =>
     ({ id: `docier.command.${key}`, kind: 'button', command: `docier.command.${key}` }) as UiNode;
 
-  it('draws an inline glyph for every key it publishes', () => {
+  it('draws one stroked inline svg of paths for every key it publishes', () => {
     expect(iconKeys().length).toBeGreaterThan(0);
     for (const key of iconKeys()) {
       const glyph = iconFor(nodeFor(key));
       expect(glyph, key).toBeDefined();
       expect(glyph!.startsWith('<svg '), key).toBe(true);
       expect(glyph!.endsWith('</svg>'), key).toBe(true);
+      expect(glyph!.split('<svg ').length, key).toBe(2);
+      expect(glyph!.split('</svg>').length, key).toBe(2);
+      expect(glyph!, key).toContain('<path ');
+      expect(glyph!.match(/fill=/g)?.length, key).toBe(1);
+      expect(glyph!, key).toContain('fill="none"');
+      expect(glyph!.match(/stroke="/g)?.length, key).toBe(1);
     }
   });
 
   it('leaves an action without a glyph to its text label', () => {
     expect(iconFor(nodeFor('format.lineSpacing'))).toBeUndefined();
     expect(iconFor({ id: 'docier.command.nope', kind: 'button', command: 'docier.command.nope' } as UiNode)).toBeUndefined();
+  });
+
+  it('draws a glyph for every ribbon button except the group launchers', () => {
+    const walk = (nodes: readonly UiNode[]): UiNode[] =>
+      nodes.flatMap((entry) =>
+        entry.kind === 'separator' ? [] : [entry, ...walk(entry.items ?? [])],
+      );
+    const buttons = ALL_RIBBON_TABS.flatMap((tab) =>
+      tab.groups.flatMap((group) => walk(group.nodes)),
+    ).filter((entry) => entry.kind === 'button' || entry.kind === 'toggle');
+    expect(buttons.length).toBeGreaterThan(90);
+
+    const launchers = ALL_RIBBON_TABS.flatMap((tab) =>
+      tab.groups.flatMap((group) => (group.launcher === undefined ? [] : [group.launcher])),
+    );
+    for (const launcher of launchers) {
+      expect(iconFor(launcher), launcher.id).toBeUndefined();
+    }
+
+    const missing = buttons.filter((entry) => iconFor(entry) === undefined);
+    expect(missing.map((entry) => entry.id)).toEqual([]);
   });
 
   it('never reaches for an external asset and inherits the theme colour', () => {
