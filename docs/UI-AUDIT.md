@@ -612,16 +612,23 @@ phases in `WORD-UI.md`, which cover appearance; these cover behaviour, and the
 two interleave: A and D want doing first because they are what a person meets
 first.
 
-### Phase A - Text editing correctness
+### Phase A - The editor must accept input, and formatting must work
 
-The cluster that makes the editor feel broken rather than unfinished: applying a
-format to a selection, and the caret being findable while working.
+This phase is first because everything else is unusable until it is done, and it
+is the cluster the commissioner described as unusable. Three of its items are one
+line each.
 
-- Range formatting, once the model-level diagnosis lands.
-- Pending marks for text typed after a toggle, if the diagnosis shows they do not
-  survive.
-- The caret: bring it on screen from every path that moves it, and make it
-  possible to see at a glance while typing.
+- **Focus on mount**, so `autoFocus` stops being dead code and typing works
+  without clicking first.
+- **Ribbon and status-bar controls must not steal focus**, so typing after
+  touching a control still reaches the document.
+- **Ctrl+A must not produce an uneditable selection**, and a click inside a
+  selection must collapse it.
+- **Range formatting**: the stale-cache fix in `splitBoundary`, plus the
+  run-at-the-caret convention that makes a toggle survive the keystroke.
+- **The caret**: shift the region stops so a header or footer caret is where its
+  text is, reveal on zoom, reset the blink phase on input, and stop
+  `scrollCaretIntoView` locking itself out.
 
 Acceptance: selecting a word and pressing Ctrl+B bolds exactly that word and
 nothing else; typing after toggling bold produces bold text and leaves the button
@@ -632,25 +639,30 @@ change.
 
 Everything a person expects to grab and move.
 
-- The indent markers drag like the margin markers already do.
+- **Delete `startDrag` and give the indent markers the margin interaction.** That
+  also ends the listener leak which silently rewrites other paragraphs.
+- **Make pictures visible at all**, by giving the renderer the media parts, before
+  a resize can be seen or tested.
 - Objects get selection and resize handles: corner handles preserving the aspect
-  ratio, edge handles not, with the cursor changing per handle.
-- Tables resize as a whole in addition to by cell.
-- Inserting a picture, if the diagnosis shows the snapshot is not the gate.
+  ratio with the opposite corner fixed, edge handles not, with the cursor changing
+  per handle.
+- **Tables resize by width only**, as decided, with the proportional write that
+  sets `tblLayout` to fixed.
 
 Acceptance: every handle a person expects is present and drags continuously, with
 one commit per gesture.
 
 ### Phase C - The menu surface
 
-- Context menu items styled as menu rows, at Word's height, with visible
-  separators, hover and disabled states that read.
-- Disabled reasons moved out of the items and into the accessible name and
-  tooltip.
-- Submenus opening at the menu's edge, and the menu positioned so its first item
-  is not under the pointer.
-- The text and table menus filled out to Word's contents, using commands that
-  already exist.
+- Style the rows. It is one shared reset the items never receive, and it is also
+  what makes labels invisible in dark mode.
+- Make items fill the row, so hover is a band rather than a ragged patch.
+- Move the disabled reasons out of the items.
+- Fix the four behavioural defects in `menu.ts`: the submenu anchor, the parent
+  menu destroying itself, the clamp measuring the wrong size, and the menu glued
+  to the pointer.
+- **Wire Cut, Copy and Paste and the table's four insert rows to the commands that
+  already exist**, instead of the stubs that only print a message.
 
 Acceptance: no menu item renders as a user-agent button; the text menu carries
 Word's entries; no menu runs off the viewport.
