@@ -140,26 +140,94 @@ disagreement but invert which run the button toggles, so it is the worse option.
 ### The caret is lost during work
 
 **Reported:** "the intermittent cursor that shows where the text is, disappears
-once i start typing or do anything! then idk where it is".
+once i start typing or do anything! then idk where it is". **Confirmed, and the
+cause is not what it looks like.**
 
-Not reproduced as stated. Measured by sampling the caret's computed opacity over
-1.3 seconds: after clicking into text it takes both values (blinking), and after
-typing it still takes both, with `display: block` and a real box on screen at the
-caret's position. So the caret exists and blinks in the paths I tried.
+The caret element is almost never *hidden*. In a 25-step instrumented walkthrough
+it never received `display:none` in any normal path. What a person meets is worse
+and simpler: **the caret keeps blinking as a lie while the editor has stopped
+listening, or cannot edit.** Six conditions, each reproduced, in the order they
+are likely to be met.
 
-Two things about it are nonetheless worth acting on, and may be what is meant:
+**1. Focus is never taken on mount, so the caret blinks at position 0 while
+keystrokes go nowhere.** Load the demo and type without clicking: `activeElement`
+is `BODY`, not the composer, and the typed text produces nothing and moves
+nothing, while the caret is painted and blinking at the document start. Every key
+listener is attached to the hidden composer (`src/edit/input.ts:744-754`) and the
+composer is only focused by a pointer down inside the page
+(`src/edit/input.ts:614`). The mount path never focuses it
+(`src/api/editor.ts:943-953`). **The demo asks for the behaviour that does not
+happen**: `example/src/main.ts:107` sets `autoFocus: true`, the option is
+declared (`src/api/types.ts:470`), defaulted (`src/api/config.ts:19`), typed
+(`src/api/config.ts:103`) and documented as working in the spec, and **nothing in
+`src/` reads it**. It is dead code. Fix: read it in `mountSession` after
+`attachInput` and call `input.focus()` then `input.reveal()`.
 
-- It is 1px of pure black blinking with a 50 percent duty cycle, so for half of
-  every second there is nothing at the insertion point. Word's caret blinks too,
-  but a person rarely complains about Word's, which suggests the difference is
-  contrast and width rather than the blink itself.
-- Nothing hides it when the document loses focus, and nothing guarantees it is on
-  screen after keyboard navigation, undo, a programmatic selection, a zoom change
-  or a layout change: `scrollCaretIntoView` runs only from `reveal()`. Each of
-  those is a path where the caret can be painted off screen with the view never
-  moved to it. That is a plausible source of "then I don't know where it is".
+**2. Clicking any chrome blurs the composer and nothing restores it.** This is
+almost certainly the reported experience. Click in the text, type to prove it
+works, click a ribbon control, then type again: nothing, while the caret is still
+on screen and still blinking. Only the floating toolbar
+(`src/ui/floating-toolbar.ts:149-151`) and the menus (`src/ui/menu.ts:222-225`)
+cancel the focus-stealing mousedown; the ribbon's control factory
+(`src/ui/controls.ts`, around line 371) and the status-bar buttons do not. So
+mousedown moves DOM focus to the button, blur takes the keyboard from the
+composer, and because all key handling lives on that one element there is no
+fallback and no blur handler. Word does the opposite: the document keeps the
+caret and the ribbon never steals it. Fix: the same mousedown `preventDefault`
+on ribbon and status-bar controls. Hiding the caret on blur would remove the lie
+but not fix the typing.
 
-Being gathered separately at the model level and will be folded in here.
+**3. Ctrl+A over a table wedges the editor, and clicking inside the selection
+cannot get you out.** Press Ctrl+A in the sample and type: the selection is
+`[0, 877]`, the text length does not change, and the caret is painted and
+blinking while every edit is refused. `selectAll` selects the whole *story*
+including cell containers (`src/edit/selection.ts:119-123`), any range crossing a
+cell boundary is uneditable (`src/edit/session.ts:400-413`), and so `insertText`
+is disabled with `CROSSES_CELLS` and each keystroke is swallowed silently
+(`src/edit/commands.ts:120-130`, `:367-374`). The trap is the escape: a click
+inside the selection only *arms a drag* instead of collapsing it
+(`src/edit/input.ts:614-616`), so the wedged state survives the obvious recovery.
+Only an arrow key gets out. Fix: clamp `selectAll` to the anchor's container, or
+collapse the selection when a click lands inside it.
+
+**4. The header and footer caret is painted at the top of the page.** After
+inserting a footer, the caret box measured top 253 while the footer text sat at y
+1306: painted horizontally right, vertically wrong, by exactly the region
+placement offset. `placeBlocks` shifts `block.box.y`, `line.box.y` and
+`line.baselineY` by `dy` (`src/layout/pipeline.ts:58,65,66`) but leaves
+`line.caretStops` untouched, so the stops stay region-local while everything else
+moves. Fix: shift the stops by the same `dy`.
+
+**5. Zoom moves the caret without revealing it, and the zoom control also steals
+focus.** Click mid-text, then zoom to 150 percent: the caret's top becomes 994
+while the scroll view ends at 973, with `scrollTop` unchanged. `setZoom` ends in
+`input?.refresh()` (`src/api/editor.ts:1088`), and `refresh` paints without
+scrolling, where the transaction path calls `reveal()`
+(`src/api/editor.ts:745-746`, `:393`). Zoom is the outlier. Fix: call `reveal()`
+there instead.
+
+**6. The blink is free-running at a 50 percent duty cycle, never reset on
+input.** Typing one character every 110 to 130ms and sampling the computed
+opacity right after each keystroke gives an on-fraction of **0.49**, with a
+longest off interval of 540ms, and the animation's `currentTime` shows the phase
+is never reset by input. So the caret is genuinely absent about half the time,
+including while you are typing, and stopping mid-cycle leaves it dark. Word's
+caret goes solid while you type and restarts its blink from the visible phase on
+each keystroke. Contrast is not the problem: 1px of black on white is the maximum
+available, about 21:1.
+
+**Two things that turn a transient state into a permanent one.** The print
+stylesheet's `!important` hide (`src/render/print-style.ts:86`) beats the caret's
+inline `display`, verified in the browser, though it is reachable only for a host
+that starts a print preview. And `scrollCaretIntoView`
+(`src/edit/input.ts:345-356`) returns early when the caret's display is `none`,
+so once anything hides it, nothing can reveal it again.
+
+**What I could not reproduce, having tried:** a caret hidden at the very end of a
+document, in an empty paragraph, in a table cell, or on an unrendered page (there
+is no such page: the DOM holds every laid-out page in every measurement). The
+only genuine no-caret case found is a body with no paragraphs at all, which the
+engine's own edits make unreachable.
 
 ### The indent controls cannot be dragged, and they corrupt other paragraphs
 
