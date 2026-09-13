@@ -398,12 +398,16 @@ failure under Blockers, and change approach rather than retrying.
 
 ## Current active sub-task
 
-**Phase 3's editing surface and public API are complete and verified; Phase 3's chrome is not started.**
-Next action: build the minimum viable chrome (toolbar, status bar, context menu, selection handles) on top
-of `commands.list()` for enablement and `commands.execute()` for dispatch, then close Phase 3. All 49 ids in
-`editCommandIds` are registered and none is declared-but-unimplemented; the empty areas a toolbar will
-reach for are `insert`, `table`, `clipboard`, `view` and `style`, which `COMMAND_AREAS` reserves but
-nothing registers into yet.
+**The interface phases in `docs/UI-PROGRESS.md` are the live plan, not the numbered phases above.**
+That file is the working record. As of 2026-09-13: A complete; B1-B3 done with B4 (table width handles)
+open; C1-C5 done with the table menu still short of Word's contents; D1, D3 and D4 done with D2 (large
+buttons) open; **E complete - the dialog surface and the Font and Paragraph dialogs are built, wired to
+the ribbon launchers and Ctrl+D, and verified in a real browser**; F not started.
+
+Next action: **B4**, then the C table-menu remainder, then D2, then F1-F4. The four drawing/web defects
+the sections above record are still open: the table-column allocation (`table-prepare.ts` `cellIntrinsic`
+does not add `cell.margins`, so a column can be allocated less than its content), and the `markDirty`
+trap in `src/ooxml/part.ts`.
 
 ## Diagnosed defect: a table column can be allocated less than its own content
 

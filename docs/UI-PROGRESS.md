@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B**: B1, B2 done, B3 with an agent. **Phase C**: C1 to C5 done, table menu partly. **Phase D**: D1 and D4 done, D2 and D3 to do.
+Status: **Phase B**: B1, B2, B3 done, B4 to do. **Phase C**: C1 to C5 done, table menu partly. **Phase D**: D1, D3 and D4 done, D2 to do. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
 
 Done and verified in the browser:
 
@@ -225,16 +225,92 @@ Rows; of those, only the delete nesting and New Comment need no new command.
 |---|---|---|
 | D1 | The Styles gallery as one scrolling row of preview tiles | **done** |
 | D2 | Large buttons for the important commands | to do |
-| D3 | The remaining icons | **in progress, with an agent** |
+| D3 | The remaining icons | **done** |
 | D4 | Remove the forced ribbon height | **done, uniformity still needs D2** |
 
 ## Phase E - Dialogs
 
 | # | Item | State |
 |---|---|---|
-| E1 | A dialog surface | to do |
-| E2 | The Font dialog | to do |
-| E3 | The Paragraph dialog | to do |
+| E1 | A dialog surface | **done** |
+| E2 | The Font dialog | **done** |
+| E3 | The Paragraph dialog | **done** |
+
+### Phase E notes
+
+**E1 done.** `src/ui/dialog.ts` is the surface: a modal overlay at z-index 1400 in
+the chrome portal, a titled `role="dialog"` box at 430px, a tab strip, scrolling
+panels, an optional preview band, and a footer with a live status region, OK and
+Cancel. It traps Tab and Shift+Tab, closes on Escape, applies on Enter from any
+control that is not a button or a textarea, refuses to close on an overlay click,
+and returns focus to whatever opened it. `openEditorDialog` keeps one dialog per
+`ChromeContext` in a `WeakMap`, so opening a second dialog replaces the first
+instead of stacking them.
+
+**E2 done.** `src/ui/font-dialog.ts`, in Word's two tabs. **Font** carries the
+family (with a datalist of twelve families), the size, the four style
+check boxes, and the colour with an Automatic box; **Advanced** carries the
+position and the two effect boxes. The preview band renders the sample in the
+family, size, weight, slant, decoration, position and colour the controls
+currently hold, and names them beside it, live on every `input` and `change`.
+
+Apply is a difference, not a write: the dialog reads the state on open, compares
+the controls against it on OK, and issues only the commands that moved. The whole
+apply is one transaction under `docier.dialog.font`, so a Font dialog edit is one
+undo entry. Colour is compared through `colourOf`, so `automatic` and a hex that
+happens to be the same colour do not produce a spurious write. If the family
+cannot be set, the dialog renders honestly disabled with the command's own reason
+in the status region rather than accepting an edit it cannot make.
+
+**E3 done.** `src/ui/paragraph-dialog.ts`: alignment, the three indent fields in
+the document's ruler unit, the hanging indent derived so it and the first-line
+value cannot contradict each other, space before and after in points, and line
+spacing. Same difference-apply rule, one transaction under
+`docier.dialog.paragraph`.
+
+**The wiring, which is what made them reachable.** Every `openDialog` in the menu
+model landed on one stub that printed `is not available yet`, so the Font and
+Paragraph dialogs existed and nothing could open them. `dialogNameFor` now maps
+the dialog names the chrome publishes - `font`, `paragraph`, and the formatting
+command ids that Word routes to them - onto the dialogs that exist, and
+`chrome.ts` opens the mapped one. Anything unmapped still gets the honest
+message, which is what keeps `styles`, `pageSetup` and the rest from lying.
+
+`context.invoke` takes the control element as an optional second argument now, so
+a dialog opens anchored under the control that asked for it - the ribbon's group
+launcher passes itself and the dialog lands 6px below it, Word's placement. The
+`dialogs` chrome slot is honoured if the host claimed it.
+
+Ctrl+D opens the Font dialog, skipped while a field has focus and while a dialog
+is already open.
+
+### Phase E verification, live in the browser
+
+Built the demo, served it, and drove the real chrome with Playwright. No console
+or page errors in any of it.
+
+| Check | Measured |
+|---|---|
+| Font dialog opens from the ribbon's Font group launcher | yes, `role="dialog"`, `aria-modal="true"` |
+| Anchored under the launcher | dx = 0, dy = 6px below it |
+| Focus on open | the first tab button, inside the dialog |
+| Tab and Shift+Tab | cycle within the dialog, 14 stops forward, 3 back |
+| Preview follows the controls | family Georgia, size 22pt, weight 700, sample `AaBbCc 123` |
+| Applying reaches the document | run font-family `"DejaVu Sans"` to `Georgia`, size 21.33px to 29.33px |
+| One undo entry | the transaction key is the dialog's |
+| Ctrl+D reopens, prefilled | yes, Georgia and 22 |
+| Escape closes | yes; focus returns to the launcher |
+| Paragraph dialog, alignment | run moved x=239 to x=402 on Center |
+| Paragraph dialog re-read | reopens showing `center` |
+| An unmapped dialog stays honest | clicking Styles opens nothing and announces it |
+
+Not done, recorded rather than implied: the Paragraph dialog has **no tabs**,
+where Word's has Indents and Spacing plus Line and Page Breaks, and the audit
+names tabs only for the surface and the Font dialog. Ctrl+D returns focus to the
+launcher rather than to the document, which is the accessible pattern but not
+Word's. Every other `openDialog` target - Styles, Page Setup, Quick Access,
+Customize Ribbon, Diagnostics, the numbering dialogs, the table cell alignments -
+still announces that it is not available.
 
 ## Phase F - The refused commands
 
@@ -277,12 +353,31 @@ it: the gallery's clipped tiles still report their full bounding rectangles, so 
 rectangle comparison sees them overlapping the Editing group when `overflow-x: auto`
 is in fact clipping them. Confirmed on screen.
 
-**D3 in progress.** Measured on the build: **51 of 119 ribbon buttons carry an
-icon**, and the group launchers are separate from that count. An earlier pass of
-mine added 23 glyphs for the commands the menus reference through `command('...')`
-and missed the ones they declare through `pending(name, ...)`, whose key is a bare
-name rather than a command id. An agent is drawing the rest; the number to check its
-work against is the 51 of 119.
+**D3 done.** Measured on the build: **97 of the 103 visible ribbon buttons carry a
+glyph**, and the six that do not are the group launchers - the small chevron in a
+group's label - which is what Word has there too, so that is the whole count and
+not a remainder.
+
+The first pass added 23 glyphs for the commands the menus reference through
+`command('...')` and missed the ones they declare through `pending(name, ...)`,
+whose key is a bare name rather than a command id. The second pass drew the rest:
+the Insert tab's pages, tables, illustrations, links, headers, numbers, text boxes,
+symbols and the four reference builders; Design's fonts, colours, spacing and page
+furniture; the object z-order, align and group commands; the proofing and comment
+commands; and the accept/reject pair.
+
+Where an icon key already existed the second pass reused it rather than adding a
+near-duplicate drawing, so several `pending(name, ...)` entries now resolve through
+an alias to a glyph that was already drawn.
+
+Pinned by a census test rather than by the number in this file: `ribbon.test.ts`
+walks every button and toggle in `ALL_RIBBON_TABS`, fails on any without a glyph,
+and asserts the group launchers have none. A keyboard-only count would have been
+easy to leave half true; the walk covers the tabs a person cannot click.
+
+Not done, and belonging to D2 rather than here: the glyphs are all drawn on the
+same 16-unit grid, and there are no 32px variants yet, because the large-button
+variant that would use them does not exist.
 
 ## Appendices
 
@@ -315,3 +410,38 @@ missing-image path produces, because that carries `data-docier-image-missing`. A
 image with no bytes therefore gets the ordinary text menu. Adding
 `[data-docier-object]` to the selector fixes it. B2 removed the missing-image case
 from the demo by supplying the bytes, so this now only bites a host that does not.
+
+### A3. The committed tree did not typecheck its own tests
+
+Owner: **nothing; fixed here.** Found while verifying Phase E, and worth recording
+because it means CI has been red since B3 and nobody read it.
+
+`npx tsc -p tsconfig.test.json` fails at `HEAD`, not because of anything Phase E
+did. B3 added `objectId` to `ObjectPlacement` (`src/layout/types.ts:93`) and the
+layout populates it, but left two test fixtures building the old shape:
+`test/render/contract.test.ts` (three object literals) and
+`test/render/images.test.ts:102` (the `imageBoxOf` fallback argument). Proved by
+extracting the committed tree with `git archive HEAD` and running the test
+typecheck against it: four `TS2345`s, all `objectId is missing`.
+
+Fixed by giving each fixture an `objectId`. The suite is unchanged by it, which
+is the point - the fixtures only exercise geometry.
+
+### A4. A test passed a source the event bus does not accept
+
+Owner: **nothing; fixed here.** `test/ui/paragraph-dialog.test.ts` called
+`handle.commands.execute(..., { source: 'test' })` twice, and `EventSource`
+(`src/api/types.ts:22`) is `'ui' | 'api' | 'undo' | 'collab' | 'auto' | 'plugin'`.
+Vitest did not care, because the type error is invisible at runtime; the test
+typecheck did. Changed to `'api'`, which is what the test is actually doing -
+driving the editor through its public surface.
+
+### A5. A full `vitest run` failed 531 tests once, and passed on a re-run
+
+Owner: **whoever next sees a red suite and reaches for `git bisect`.** Recorded so
+it is not chased. One invocation of `npx vitest run` - both projects, while a
+vite preview server and a Playwright browser were also running - failed 42 files
+with `Not implemented: HTMLCanvasElement.prototype.getContext` out of the
+divergence detector. Run separately the same two projects passed 810 and 555, and
+the next combined run passed 1365. Treat a sudden mass failure with that canvas
+error as resource contention, not a regression, and re-run before believing it.
