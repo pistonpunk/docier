@@ -193,10 +193,14 @@ export const paintPageSheet = (
 ): HTMLElement => {
   const sheet = box('docier-page');
   stamp(sheet, { [ATTR.page]: String(page.index), [ATTR.pageKind]: page.kind });
+  const frames = context.options.viewMode === 'print' || context.options.viewMode === 'read';
   const extra: Record<string, string> = {
-    'background-color': context.options.pageBackground,
+    'background-color': frames ? context.options.pageBackground : 'transparent',
   };
-  if (context.options.pageShadow) extra['box-shadow'] = 'var(--docier-page-shadow, 0 2px 6px rgba(0, 0, 0, 0.10))';
+  if (frames && context.options.pageShadow) {
+    extra['box-shadow'] = 'var(--docier-page-shadow, 0 2px 6px rgba(0, 0, 0, 0.10))';
+  }
+
   applyStyle(
     sheet,
     positionStyle(

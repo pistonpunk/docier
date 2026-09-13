@@ -11,6 +11,7 @@ export const ATTR = {
   pages: 'data-docier-pages',
   page: 'data-docier-page',
   pageKind: 'data-docier-page-kind',
+  viewMode: 'data-docier-view-mode',
   version: 'data-docier-result-version',
   hash: 'data-docier-document-hash',
   zoom: 'data-docier-zoom',

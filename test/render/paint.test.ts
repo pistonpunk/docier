@@ -366,3 +366,53 @@ describe('control character advance evidence', () => {
     );
   });
 });
+
+describe('the view mode', () => {
+  const topsOf = (target: HTMLElement): readonly number[] =>
+    [...target.querySelectorAll<HTMLElement>(`[${ATTR.page}]`)].map((sheet) =>
+      Number.parseFloat(sheet.style.top),
+    );
+
+  it('separates the sheets in the paged views and stacks them in the flowing ones', async () => {
+    const result = await layoutOf(bodyOf(paragraphs(30, 'aaaa bbbb')));
+    expect(result.pages.length).toBeGreaterThan(1);
+
+    const paged = host();
+    renderDocument(result, paged, { pageGapPx: 24, viewMode: 'print' });
+    const printed = topsOf(paged);
+    const height = Number.parseFloat(px(result.pages[0]?.page.height ?? mp(0)));
+    const printedGap = printed[1]! - printed[0]! - height;
+
+    const flowed = host();
+    renderDocument(result, flowed, { pageGapPx: 24, viewMode: 'web' });
+    const webTops = topsOf(flowed);
+    const webGap = webTops[1]! - webTops[0]! - height;
+
+    expect(webGap).toBe(0);
+    expect(printedGap).toBeGreaterThan(0);
+  });
+
+  it('drops the paper frame in the flowing views and keeps it in the paged ones', async () => {
+    const result = await layoutOf(bodyOf(paragraphs(30, 'aaaa bbbb')));
+    const sheetStyle = (mode: 'print' | 'web' | 'draft'): CSSStyleDeclaration => {
+      const target = host();
+      renderDocument(result, target, { viewMode: mode });
+      const sheet = target.querySelector<HTMLElement>(`[${ATTR.page}]`);
+      if (sheet === null) throw new Error('no sheet');
+      return sheet.style;
+    };
+    expect(sheetStyle('print').boxShadow).not.toBe('');
+    expect(sheetStyle('web').boxShadow).toBe('');
+    expect(sheetStyle('draft').boxShadow).toBe('');
+    expect(sheetStyle('web').backgroundColor).toBe('transparent');
+    expect(sheetStyle('draft').backgroundColor).toBe('transparent');
+  });
+
+  it('names the mode on the surface so a host can style against it', async () => {
+    const result = await layoutOf(bodyOf(paragraphs(4, 'aaaa')));
+    const target = host();
+    renderDocument(result, target, { viewMode: 'draft' });
+    const surface = target.querySelector<HTMLElement>(`[${ATTR.surface}]`);
+    expect(surface?.getAttribute(ATTR.viewMode)).toBe('draft');
+  });
+});

@@ -563,6 +563,51 @@ Not done, and belonging to D2 rather than here: the glyphs are all drawn on the
 same 16-unit grid, and there are no 32px variants yet, because the large-button
 variant that would use them does not exist.
 
+## View modes, closed after Phase F
+
+`READINESS.md` named three view modes writing a state nothing read as the largest
+gap between the build and its own bar, and it was a smaller piece of work than any
+of the five refusals left in Phase F, so it is closed here.
+
+**What a paint-only renderer can honestly do about a view mode.** Word's Draft view
+re-flows the text to the window, which is a *layout* change, and D2 says the engine
+owns layout and the DOM only paints. So the four modes are divided by what they
+change:
+
+| Mode | What changes |
+|---|---|
+| Print Layout | nothing; this is the framed, paged view |
+| Read Mode | the chrome: ribbon and rulers hidden, document moves up 99px |
+| Web Layout | the paint: no page gap, no paper frame, one continuous column |
+| Draft | the same as Web Layout, and see below |
+
+The flowing modes paint each sheet with a transparent background and no shadow and
+place the sheets end to end, so the document reads as one column instead of a
+stack of paper. Verified live in Chromium: the sheet's computed `box-shadow` is
+`none` and its background is transparent under Web Layout and Draft, and present
+under Print Layout and Read Mode.
+
+**Draft and Web Layout render the same, and that is stated rather than papered
+over.** Word distinguishes them by re-flowing Draft to the window and dropping the
+margins, which needs a layout pass with a different content box. This build could
+do that - the engine takes the section's page size - but it would mean the paint
+layer asking for a second layout, and the whole reason this library exists is that
+nothing but the engine lays text out. Doing it properly is a layout feature rather
+than a view mode: the engine would need a "flow to width" option and a
+re-pagination rule, and until it has one, the honest paint-only difference is the
+one above.
+
+**The paint contract caught the first attempt.** The initial implementation set
+`border: 0` on the sheet to remove its frame, and `assertPaintOnly` rejected it:
+`border` participates in layout, so the renderer may not emit it. The frame is a
+background and a shadow, so dropping those two is both sufficient and legal. The
+guard is the D2 property working exactly as intended, in a place nobody was
+looking for it.
+
+The mode is stamped on the surface as `data-docier-view-mode`, so a host can style
+against it and a probe can read it, and `renderDocument` takes it as an option with
+`print` as the default.
+
 ## Phase F notes
 
 The phase's own framing is the test: each of these refused "with a reason today,

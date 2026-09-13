@@ -95,9 +95,12 @@ export interface RenderServices {
   paintDefault(): RenderedDocument;
 }
 
+export type RenderViewMode = 'print' | 'web' | 'draft' | 'read';
+
 export interface RenderOptions {
   readonly zoom?: number;
   readonly zoomMode?: ZoomMode;
+  readonly viewMode?: RenderViewMode;
   readonly pageGapPx?: number;
   readonly pageBackground?: string;
   readonly surfaceBackground?: string;
@@ -118,6 +121,7 @@ export interface RenderOptions {
 export interface ResolvedRenderOptions {
   readonly zoom: number;
   readonly zoomMode: ZoomMode;
+  readonly viewMode: RenderViewMode;
   readonly pageGapPx: number;
   readonly pageBackground: string;
   readonly surfaceBackground: string;

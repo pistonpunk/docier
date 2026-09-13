@@ -419,6 +419,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
           store.set({ viewMode: target, collapse: 'hidden', rulerVisible: false });
           ruler?.refresh();
           verticalRuler?.refresh();
+          handle.setViewMode(target);
           return;
         }
         if (target !== 'read' && readingRestore !== undefined) {
@@ -431,8 +432,10 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
           });
           ruler?.refresh();
           verticalRuler?.refresh();
+          handle.setViewMode(target);
           return;
         }
+        handle.setViewMode(target);
         store.set({ viewMode: target });
         return;
       }

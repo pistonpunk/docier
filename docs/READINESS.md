@@ -63,11 +63,12 @@ diff against the state it was written in.
    against Word's 32 over 22, plus Word's adaptive menu, which this build has no
    equivalent of.
 
-5. **Three view modes write a state nothing reads.** Print Layout, Web Layout and
-   Draft render identically - measured: the ribbon is 79px, the ruler is shown and
-   the canvas sits at 223px in all three. Read Mode does something real: it hides
-   the ribbon and the ruler and the document moves up to 124px. **This is now the
-   largest gap on the list.**
+5. ~~**Three view modes write a state nothing reads.**~~ **Mostly closed.** Web
+   Layout and Draft now paint a continuous column - no page gap, no paper frame -
+   where Print Layout and Read Mode keep the framed sheets, measured live by the
+   sheet's computed shadow and background. What remains is that Draft and Web
+   Layout render *the same*, because Word's Draft re-flows the text to the window
+   and that is a layout change this paint-only renderer is not allowed to make.
 
 6. **Half closed: media is inside the transaction snapshot, comments are not.**
    The snapshot now carries every media part's name, content type and bytes, so
@@ -113,14 +114,16 @@ document, edit it, format it, draw a table to the width they want, insert a
 picture, save it and export it today.
 
 What they cannot yet do is write a contract that needs a footnote, a table of
-contents, a text box or a comment, and three of the four view modes still change
-nothing on screen. The five refused commands are subsystems rather than features,
-and the honest statement is that they are not in this build.
+contents, a text box or a comment. The five refused commands are subsystems rather
+than features, and the honest statement is that they are not in this build.
 
 Ready, in the honest sense, means: nothing on the Insert tab refusing, view modes
 that change the view, and the ribbon at Word's height. The ribbon is within five
-pixels of it and the Insert tab is down to five refusals from eight, each of them a
-subsystem rather than a command. **View modes are what now stands between this and
-the bar this document set for itself** - three of the four write a state nothing
-reads, and that is a smaller piece of work than any of the five remaining
-refusals.
+pixels of it, three of the four view modes now change what is on screen, and the
+Insert tab is down to five refusals from eight - each of them a subsystem rather
+than a command, and each named with what it would take.
+
+So the bar this document set for itself is **not yet met, and what is left is
+scope rather than polish**: five commands that need parts and layout this build
+does not have, and one view mode that would need the engine to grow a flow-to-width
+option. Both are recorded with their cost in `docs/UI-PROGRESS.md`.

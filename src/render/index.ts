@@ -12,6 +12,7 @@ export type {
   RenderedPage,
   RenderOptions,
   RenderServices,
+  RenderViewMode,
   ResolvedRenderOptions,
   RunFontSpec,
   SlotCatalog,

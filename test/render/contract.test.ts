@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { resolveRenderOptions } from '../../src/render/index.js';
 import type { DivergenceKind, DocumentRenderer, SlotError } from '../../src/render/index.js';
 import * as render from '../../src/render/index.js';
 import {
@@ -375,5 +376,21 @@ describe('the page overlay slot', () => {
     const placeholder = target.querySelector<HTMLElement>(`[${ATTR.slotError}="page.overlay:bad"]`);
     expect(placeholder?.textContent).toBe('SLOT_RENDERER_FAILED: boom');
     expect(target.querySelectorAll('[data-overlay="good"]').length).toBe(result.pages.length);
+  });
+});
+
+describe('the view mode the renderer is asked for', () => {
+  const pageState = (mode: 'print' | 'web' | 'draft' | 'read') =>
+    resolveRenderOptions({ viewMode: mode });
+
+  it('defaults to the paged view', () => {
+    expect(resolveRenderOptions().viewMode).toBe('print');
+    expect(pageState('print').pageGapPx).toBeGreaterThan(0);
+  });
+
+  it('carries the mode through for every value, so a host can style on it', () => {
+    for (const mode of ['print', 'web', 'draft', 'read'] as const) {
+      expect(pageState(mode).viewMode, mode).toBe(mode);
+    }
   });
 });

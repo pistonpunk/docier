@@ -6,7 +6,7 @@ import type { PackageSource } from '../ooxml/package.js';
 import type { DocumentModel } from '../model/index.js';
 import { DocumentModel as DocumentModelClass, Paragraph, isWElement } from '../model/index.js';
 import { renderDocument } from '../render/index.js';
-import type { RenderOptions, RenderedDocument } from '../render/index.js';
+import type { RenderOptions, RenderViewMode, RenderedDocument } from '../render/index.js';
 import type { EditSession, EditSnapshot, ParagraphSlot } from '../edit/session.js';
 import { createEditSession } from '../edit/session.js';
 import { paragraphLength } from '../edit/mutation.js';
@@ -96,6 +96,8 @@ export interface EditorHandle {
   whenReady(): Promise<void>;
   updateConfig(patch: EditorConfigPatch): ConfigApplyReport;
   setZoom(zoom: number): void;
+  setViewMode(mode: RenderViewMode): void;
+  readonly viewMode: RenderViewMode;
   getDiagnostics(): readonly Diagnostic[];
   destroy(): void;
 }
@@ -321,6 +323,7 @@ export const createEditor = (
   let renderedDocument: RenderedDocument | undefined = undefined;
   let input: InputHandle | undefined = undefined;
   let zoom = options.zoom ?? DEFAULT_ZOOM;
+  let viewMode: RenderViewMode = options.render?.viewMode ?? 'print';
   let destroyed = false;
   let current: TransactionState | undefined = undefined;
   let pending: EditSelection | undefined = undefined;
@@ -387,6 +390,7 @@ export const createEditor = (
     renderedDocument = renderDocument(active.layout, rendered, {
       ...options.render,
       zoom,
+      viewMode,
       ariaLabel: options.render?.ariaLabel ?? settings.ui.ariaLabel ?? settings.document.docId,
     });
     previous?.destroy();
@@ -1090,6 +1094,14 @@ export const createEditor = (
       zoom = value;
       renderedDocument?.setZoom(value);
       input?.reveal();
+    },
+    setViewMode: (value) => {
+      if (viewMode === value) return;
+      viewMode = value;
+      paint();
+    },
+    get viewMode(): RenderViewMode {
+      return viewMode;
     },
     getDiagnostics: () => diagnostics,
     destroy: () => {

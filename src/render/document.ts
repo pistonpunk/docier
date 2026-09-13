@@ -27,6 +27,7 @@ import { createImageRegistry } from './images.js';
 export const resolveRenderOptions = (options: RenderOptions = {}): ResolvedRenderOptions => ({
   zoom: clampZoom(options.zoom ?? DEFAULT_ZOOM),
   zoomMode: options.zoomMode ?? 'transform',
+  viewMode: options.viewMode ?? 'print',
   pageGapPx: options.pageGapPx ?? DEFAULT_PAGE_GAP_PX,
   pageBackground: options.pageBackground ?? DEFAULT_PAGE_BACKGROUND,
   surfaceBackground: options.surfaceBackground ?? DEFAULT_SURFACE_BACKGROUND,
@@ -81,7 +82,11 @@ const paintDefault = (
   });
 
   const surface = box('docier-surface');
-  stamp(surface, { [ATTR.surface]: '', [ATTR.zoom]: String(options.zoom) });
+  stamp(surface, {
+    [ATTR.surface]: '',
+    [ATTR.zoom]: String(options.zoom),
+    [ATTR.viewMode]: renderOptions.viewMode,
+  });
   applyStyle(surface, { position: 'relative', 'background-color': options.surfaceBackground });
 
   const scaleLayer = box('docier-scale-layer');
@@ -120,7 +125,10 @@ const paintDefault = (
   const paintPages = (scale: PaintScale): void => {
     clear(pagesLayer);
     const context: PagePaintContext = { result, scale, options: renderOptions, images };
-    const gapPx = options.zoomMode === 'transform' ? options.pageGapPx : options.pageGapPx * zoom;
+    const gapBase = renderOptions.viewMode === 'print' || renderOptions.viewMode === 'read'
+      ? renderOptions.pageGapPx
+      : 0;
+    const gapPx = options.zoomMode === 'transform' ? gapBase : gapBase * zoom;
     const pages: RenderedPage[] = [];
     let layerWidth = 0;
     let layerBottom = 0;
