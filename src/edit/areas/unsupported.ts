@@ -79,7 +79,6 @@ const REFUSALS: readonly Refusal[] = [
   },
 
   { id: 'docier.command.insert.textBox', label: 'Text box', category: 'insert', reason: NO_DRAWING },
-  { id: 'docier.command.insert.footnote', label: 'Footnote', category: 'insert', reason: NO_PART('footnotes') },
   { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },
   {
     id: 'docier.command.insert.coverPage',

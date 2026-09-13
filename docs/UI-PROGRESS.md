@@ -514,7 +514,8 @@ still announces that it is not available.
 | F4 | Symbol | **done** |
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
-| F4 | Footnote, text box | **refused, with the reason named** |
+| F4 | Footnote | **done at the document level, bodies not laid out** |
+| F4 | Text box | **refused, with the reason named** |
 
 ### Phase D notes
 
@@ -699,7 +700,7 @@ rather than a generic refusal, which is the state the phase asked for.
 | Command | What it needs |
 |---|---|
 | ~~Comments~~ | **Done.** See below. |
-| Footnote | A `word/footnotes.xml` part, the `w:footnoteReference` run, and **footnote layout**: the note area has to be measured, reserved at the foot of the page and paginated against, which is a second page-fitting pass this build does not have. |
+| Footnote | **Done at the document level.** See below. |
 | Header creation | **Done.** See the note below. |
 | Text box | A drawing with a text body: `wps:wsp` inside a `wps:txbx`, whose content is a whole nested story. This build authors exactly one kind of drawing, a picture from host bytes. |
 | ~~Table of contents~~ | **Done.** See below. |
@@ -827,6 +828,36 @@ this editor. That is a layout-and-paint change - ingest the markers, tag the run
 they span, paint them - and it is the same kind of gap as the hyperlink's missing
 click target, recorded in the same way rather than half-built.
 
+### Footnote, done at the document level
+
+`docier.command.insert.footnote` writes the whole part Word expects: a
+`word/footnotes.xml` with the two entries Word requires before any real note - the
+`separator` at id -1 and the `continuationSeparator` at id 0 - then the note
+itself, plus a `w:footnoteReference` at the caret pointing at it. The relationship
+and the content type go with it, and the whole thing is one undo entry that takes
+the part away again.
+
+An existing footnotes part is added to rather than replaced, and the next id is
+taken past the highest real note, ignoring the negative and zero ids the
+separators occupy.
+
+**The engine already knew, and says so.** The layout has carried a
+`footnotesNotLaidOut` diagnostic since Phase 2 - "footnote and endnote bodies are
+not laid out by this slice" - and inserting a footnote in the demo makes it appear
+in the diagnostics panel. That is the difference between this item and a silent
+half-feature: the document is right, and the engine tells the person looking at it
+exactly which part of the rendering is missing rather than drawing nothing and
+saying nothing.
+
+Two things follow from that and are recorded rather than implied. A footnote
+reference carries **no visible mark** in the text, because the layout ingests it as
+a `noteRef` item with an empty glyph, so the reader sees the sentence and not the
+number. And the note body is not drawn at the page foot. Both need the same piece
+of work: give the reference its number in the text - which is the substitution
+`fields.ts` already does for `PAGE` and its siblings, applied to a note counter -
+and then measure, reserve and paginate a note area at the page foot, which is the
+bounded fixpoint the header and footer reserve already implements.
+
 ### Phase F verification, live in the browser
 
 | Check | Measured |
@@ -843,6 +874,8 @@ click target, recorded in the same way rather than half-built.
 | The contract's two headings | one TOC entry each, in order |
 | Inserting a TOC into it | 14 body blocks to 18: begin, two entries, end |
 | Undo | back to 14 |
+| Inserting a footnote | the command runs, and the layout reports `footnotesNotLaidOut` |
+| The footnote written | the separators, the reference and the note text are all in the saved package |
 | Console and page errors | none, in any of it |
 
 ## Appendices
