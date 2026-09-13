@@ -88,12 +88,6 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'Cover pages need a built-in gallery, which this build does not ship',
   },
   {
-    id: 'docier.command.insert.tableOfContents',
-    label: 'Table of contents',
-    category: 'insert',
-    reason: 'A table of contents needs field evaluation over headings, which this build does not implement',
-  },
-  {
     id: 'docier.command.insert.updateTable',
     label: 'Update table',
     category: 'insert',

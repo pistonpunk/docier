@@ -1,12 +1,16 @@
-import type { CommandDefinition } from '../../api/types.js';
+import type { CommandDefinition, LocalizedString } from '../../api/types.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { R_NAMESPACE, xml } from '../../ooxml/index.js';
-import { createWElement, setWAttr } from '../../model/index.js';
+import { Paragraph, Table, createWElement, setWAttr } from '../../model/index.js';
+import type { BlockNode, DocumentModel } from '../../model/index.js';
 import { appendRun, insertContainerAt, insertRunChildAt } from './content.js';
 import { areaCommand, writingAt } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
 const HYPERLINK_RELATIONSHIP = `${R_NAMESPACE}/hyperlink`;
+
+const NOT_ALIGNED: LocalizedString =
+  'This document lays out in a way the editing layer cannot map onto paragraphs, so this command is unavailable';
 
 export const HYPERLINK_STYLE = 'Hyperlink';
 
@@ -143,9 +147,166 @@ const fieldSpec = (id: string, label: string, instruction: string): AreaSpec<Fie
   },
 });
 
+export interface TocArgs {
+  readonly levels?: string | undefined;
+  readonly title?: string | undefined;
+}
+
+export interface TocEntry {
+  readonly text: string;
+  readonly level: number;
+}
+
+const DEFAULT_TOC_LEVELS = '1-3';
+const TOC_LEVELS = /^(\d+)(?:\s*-\s*(\d+))?$/;
+const HEADING_STYLE = /^heading\s*([1-9])$/i;
+
+export const tocLevelRange = (
+  levels: string | undefined,
+): { readonly first: number; readonly last: number } => {
+  const match = TOC_LEVELS.exec((levels ?? DEFAULT_TOC_LEVELS).trim());
+  if (match === null) return { first: 1, last: 3 };
+  const first = Math.max(1, Math.min(9, Number(match[1])));
+  const last = match[2] === undefined ? first : Math.max(first, Math.min(9, Number(match[2])));
+  return { first, last };
+};
+
+export const headingLevelOf = (paragraph: Paragraph): number | undefined => {
+  const outline = paragraph.properties.outlineLevel;
+  if (outline !== undefined && outline >= 0 && outline <= 8) return outline + 1;
+  const styleId = paragraph.properties.styleId;
+  if (styleId === undefined) return undefined;
+  const match = HEADING_STYLE.exec(styleId.replace(/[-_]/g, ' ').trim());
+  return match === null ? undefined : Number(match[1]);
+};
+
+export const tocEntriesOf = (
+  model: DocumentModel,
+  levels: string | undefined,
+): readonly TocEntry[] => {
+  const { first, last } = tocLevelRange(levels);
+  const entries: TocEntry[] = [];
+  const visit = (blocks: readonly BlockNode[]): void => {
+    for (const block of blocks) {
+      if (block instanceof Paragraph) {
+        const level = headingLevelOf(block);
+        const text = block.logicalText.trim();
+        if (level !== undefined && level >= first && level <= last && text !== '') {
+          entries.push({ text, level });
+        }
+        continue;
+      }
+      if (block instanceof Table) {
+        for (const row of block.rows()) {
+          for (const cell of row.cells()) visit(cell.blocks());
+        }
+      }
+    }
+  };
+  visit(model.body().blocks());
+  return entries;
+};
+
+const insertAfter = (parent: XmlElement, reference: XmlElement, block: XmlElement): XmlElement => {
+  const index = parent.children.indexOf(reference) + 1;
+  block.parent = parent;
+  parent.children.splice(index, 0, block);
+  parent.selfClosing = false;
+  return block;
+};
+
+const paragraphWith = (
+  parent: XmlElement,
+  build: (paragraph: XmlElement) => void,
+  style?: string,
+): XmlElement => {
+  const paragraph = createWElement(parent, 'p');
+  paragraph.selfClosing = false;
+  if (style !== undefined) {
+    const properties = createWElement(paragraph, 'pPr');
+    const applied = createWElement(properties, 'pStyle');
+    setWAttr(applied, 'val', style);
+    properties.children.push(applied);
+    paragraph.children.push(properties);
+  }
+  build(paragraph);
+  return paragraph;
+};
+
+const fieldCharacter = (paragraph: XmlElement, kind: 'begin' | 'separate' | 'end'): void => {
+  const run = appendRun(paragraph, '');
+  const character = createWElement(run, 'fldChar');
+  setWAttr(character, 'fldCharType', kind);
+  run.children.push(character);
+};
+
+const fieldInstruction = (paragraph: XmlElement, instruction: string): void => {
+  const run = appendRun(paragraph, '');
+  const text = createWElement(run, 'instrText');
+  xml.setAttribute(text, 'space', 'preserve', 'xml', 'http://www.w3.org/XML/1998/namespace');
+  text.children.push({ kind: 'text', value: instruction, parent: text });
+  run.children.push(text);
+};
+
+const tocInstruction = (first: number, last: number): string =>
+  [' TOC', `\\o "${String(first)}-${String(last)}"`, '\\h '].join(' ');
+
+const tocSpec: AreaSpec<TocArgs> = {
+  id: 'docier.command.insert.tableOfContents',
+  label: 'Table of contents',
+  category: 'insert',
+  permissions: ['insert'],
+  enabledIn: (host) =>
+    host.session.aligned && host.session.index.storyAt(host.selection.focus)?.kind === 'body',
+  reason: (host) =>
+    host.session.aligned ? 'Place the caret in the body to insert a table of contents' : NOT_ALIGNED,
+  run: (host, args) => {
+    const target = caretOf(host);
+    const parent = target?.element.parent;
+    if (target === undefined || parent === undefined) return false;
+    const model = host.session.model;
+    const { first, last } = tocLevelRange(args?.levels);
+    const entries = tocEntriesOf(model, args?.levels);
+    const changed = writingAt(host, () => {
+      let cursor = target.element;
+      const title = args?.title;
+      if (title !== undefined && title !== '') {
+        cursor = insertAfter(parent, cursor, paragraphWith(parent, (node) => appendRun(node, title)));
+      }
+      cursor = insertAfter(
+        parent,
+        cursor,
+        paragraphWith(parent, (node) => {
+          fieldCharacter(node, 'begin');
+          fieldInstruction(node, tocInstruction(first, last));
+          fieldCharacter(node, 'separate');
+        }),
+      );
+      for (const entry of entries) {
+        cursor = insertAfter(
+          parent,
+          cursor,
+          paragraphWith(
+            parent,
+            (node) => appendRun(node, entry.text),
+            `TOC${String(entry.level)}`,
+          ),
+        );
+      }
+      insertAfter(parent, cursor, paragraphWith(parent, (node) => fieldCharacter(node, 'end')));
+      model.context.forgetSubtree(parent);
+      return true;
+    });
+    if (!changed) return false;
+    host.session.relayout();
+    return true;
+  },
+};
+
 export const insertCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<SymbolArgs>(host, symbolSpec),
   areaCommand<LinkArgs>(host, linkSpec),
   areaCommand<FieldArgs>(host, fieldSpec('docier.command.insert.pageNumber', 'Page number', 'PAGE')),
   areaCommand<FieldArgs>(host, fieldSpec('docier.command.insert.dateTime', 'Date and time', 'DATE')),
+  areaCommand<TocArgs>(host, tocSpec),
 ];
