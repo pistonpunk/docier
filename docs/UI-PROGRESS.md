@@ -186,7 +186,7 @@ Rows; of those, only the delete nesting and New Comment need no new command.
 |---|---|---|
 | D1 | The Styles gallery as one scrolling row of preview tiles | **done** |
 | D2 | Large buttons for the important commands | to do |
-| D3 | The remaining 63 icons | to do |
+| D3 | The remaining icons | **in progress, with an agent** |
 | D4 | Remove the forced ribbon height | **done, uniformity still needs D2** |
 
 ## Phase E - Dialogs
@@ -237,6 +237,13 @@ An overlap count of two on Home is a **probe artefact**, recorded so nobody chas
 it: the gallery's clipped tiles still report their full bounding rectangles, so a
 rectangle comparison sees them overlapping the Editing group when `overflow-x: auto`
 is in fact clipping them. Confirmed on screen.
+
+**D3 in progress.** Measured on the build: **51 of 119 ribbon buttons carry an
+icon**, and the group launchers are separate from that count. An earlier pass of
+mine added 23 glyphs for the commands the menus reference through `command('...')`
+and missed the ones they declare through `pending(name, ...)`, whose key is a bare
+name rather than a command id. An agent is drawing the rest; the number to check its
+work against is the 51 of 119.
 
 ## Appendices
 

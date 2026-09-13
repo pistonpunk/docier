@@ -59,6 +59,54 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<path d="M3 5.5V4a1 1 0 0 1 1-1h1.5"/><path d="M10.5 3H12a1 1 0 0 1 1 1v1.5"/>' +
     '<path d="M13 10.5V12a1 1 0 0 1-1 1h-1.5"/><path d="M5.5 13H4a1 1 0 0 1-1-1v-1.5"/>' +
     '<rect x="5.5" y="5.5" width="5" height="5" rx="1"/>',
+  'clipboard.pastePlain':
+    '<path d="M6 3.5H4.5A1.5 1.5 0 0 0 3 5v8a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 13V5a1.5 1.5 0 0 0-1.5-1.5H10"/>' +
+    '<rect x="6" y="2" width="4" height="3" rx="1"/><path d="M5.5 8.5h5"/><path d="M6.5 11.5 8 10l1.5 1.5"/>',
+  'clipboard.pasteSpecial':
+    '<path d="M6 3.5H4.5A1.5 1.5 0 0 0 3 5v8a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 13 13V5a1.5 1.5 0 0 0-1.5-1.5H10"/>' +
+    '<rect x="6" y="2" width="4" height="3" rx="1"/><path d="M8 8.2 8.7 9.7l1.6.2-1.2 1.1.3 1.6L8 11.8l-1.4.8.3-1.6-1.2-1.1 1.6-.2z"/>',
+  'doc.setLineNumbers':
+    '<path d="M6 4h7"/><path d="M6 8h7"/><path d="M6 12h4"/><path d="M3 3.5v9"/><path d="M3 4h.01"/><path d="M3 8h.01"/><path d="M3 12h.01"/>',
+  'doc.setMargins':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1.2"/><path d="M5.5 5.5h5v5h-5z"/>',
+  'doc.setOrientation':
+    '<rect x="3" y="2.5" width="7" height="11" rx="1.2"/><path d="M12 8.5a3 3 0 0 1-1.4 2.5"/><path d="M12.6 7.5l-.6 1-.9-.5"/>',
+  'doc.setPageSize':
+    '<rect x="2.5" y="2.5" width="8" height="11" rx="1.2"/><path d="M12.5 5.5v5"/><path d="M11.6 6.4 12.5 5.5l.9.9"/><path d="M13.4 9.6l-.9.9-.9-.9"/>',
+  'doc.toggleTrackChanges':
+    '<path d="M10.5 2.5 13.5 5.5 6 13H3v-3z"/><path d="M9 4 12 7"/>',
+  'edit.insertPageBreak':
+    '<path d="M4 2.5h5l3 3V8"/><path d="M4 2.5V13.5h4"/><path d="M2.5 8h11" stroke-dasharray="2 1.6"/><path d="M11 10.5v3"/><path d="M9.5 12 11 13.5 12.5 12"/>',
+  'format.setFontFamily':
+    '<path d="M3 12.5 7 4l4 8.5"/><path d="M4.4 10h5.2"/><path d="M12.5 7.5l1.5 1.5-1.5 1.5"/>',
+  'format.setFontSize':
+    '<path d="M2.5 11.5 5.5 5l3 6.5"/><path d="M3.6 9.6h3.8"/><path d="M12 5v6.5"/><path d="M10.8 6.2 12 5l1.2 1.2"/>',
+  'format.setParagraphIndent':
+    '<path d="M6 4h7.5"/><path d="M6 8h7.5"/><path d="M6 12h7.5"/><path d="M2.5 6.5 4.5 8l-2 1.5z"/>',
+  'format.setSpaceAfter':
+    '<path d="M3 4h10"/><path d="M3 7.5h10"/><path d="M3 11h10" stroke-dasharray="2 1.6"/><path d="M8 12.5v2"/><path d="M6.8 13.7 8 14.9l1.2-1.2"/>',
+  'format.setSpaceBefore':
+    '<path d="M3 5h10" stroke-dasharray="2 1.6"/><path d="M3 8.5h10"/><path d="M3 12h10"/><path d="M8 4.5v-2"/><path d="M6.8 3.7 8 2.5l1.2 1.2"/>',
+  'insert.dateTime':
+    '<rect x="2.5" y="3.5" width="11" height="10" rx="1.2"/><path d="M2.5 6.5h11"/><path d="M5.5 2.5v2"/><path d="M10.5 2.5v2"/><path d="M5.5 9h1"/><path d="M9.5 9h1"/><path d="M5.5 11.2h1"/>',
+  'proof.thesaurus':
+    '<path d="M3 3.2h4a2 2 0 0 1 2 2v7.6a1.6 1.6 0 0 0-1.6-1.6H3z"/><path d="M13 3.2H9a2 2 0 0 0-2 2v7.6a1.6 1.6 0 0 1 1.6-1.6H13z"/>',
+  'proof.wordCount':
+    '<path d="M2.5 4.5h11"/><path d="M2.5 8h11"/><path d="M2.5 11.5h7"/><circle cx="12" cy="12" r="2.2"/>',
+  'style.apply':
+    '<rect x="2.5" y="3" width="11" height="4" rx="1"/><path d="M3.5 9.5h4"/><path d="M3.5 12h7"/>',
+  'table.insertColumnsLeft':
+    '<rect x="6.5" y="3" width="7" height="10" rx="1"/><path d="M10 6.5v3"/><path d="M2 8.5h3.5"/><path d="M4.2 7 2.7 8.5l1.5 1.5"/>',
+  'table.insertColumnsRight':
+    '<rect x="2.5" y="3" width="7" height="10" rx="1"/><path d="M6 6.5v3"/><path d="M10.5 8.5H14"/><path d="M11.8 7l1.5 1.5-1.5 1.5"/>',
+  'table.insertRowsAbove':
+    '<rect x="3" y="6.5" width="10" height="7" rx="1"/><path d="M6.5 10h3"/><path d="M8.5 2v3.5"/><path d="M7 4.2 8.5 2.7 10 4.2"/>',
+  'table.insertRowsBelow':
+    '<rect x="3" y="2.5" width="10" height="7" rx="1"/><path d="M6.5 6h3"/><path d="M8.5 10.5V14"/><path d="M7 12.8 8.5 14.3 10 12.8"/>',
+  'token.insert':
+    '<path d="M6 3.5H4.8A1.3 1.3 0 0 0 3.5 4.8v6.4a1.3 1.3 0 0 0 1.3 1.3H6"/><path d="M10 3.5h1.2a1.3 1.3 0 0 1 1.3 1.3v6.4a1.3 1.3 0 0 1-1.3 1.3H10"/><path d="M8 6v4"/><path d="M6.5 8h3"/>',
+  'token.toggleCodes':
+    '<path d="M6 3.5H4.8A1.3 1.3 0 0 0 3.5 4.8v6.4a1.3 1.3 0 0 0 1.3 1.3H6"/><path d="M10 3.5h1.2a1.3 1.3 0 0 1 1.3 1.3v6.4a1.3 1.3 0 0 1-1.3 1.3H10"/><path d="M7 8h2"/>',
 };
 
 const keyOf = (node: UiNode): string | undefined => {
