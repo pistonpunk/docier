@@ -138,8 +138,7 @@ describe('right-click routing', () => {
     expect(close!.getAttribute('aria-disabled')).toBe('true');
     expect(close!.getAttribute('aria-description') ?? '').toContain('not in a header');
     const footer = itemFor('insert.footer');
-    expect(footer!.getAttribute('aria-disabled')).toBe('true');
-    expect(footer!.getAttribute('aria-description') ?? '').toContain('no footer');
+    expect(footer!.getAttribute('aria-disabled')).not.toBe('true');
     const entered = await chrome.context.commands.execute('docier.command.insert.header');
     expect(entered.status).toBe('ok');
     chrome.contextMenus!.close();

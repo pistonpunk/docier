@@ -2,7 +2,7 @@ import type { CellRef, DocPos, DocRange, LayoutResult, StoryId } from '../layout
 import { docPos, layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
 import type { XmlElement, XmlNode } from '../ooxml/xml/index.js';
-import { serializeXmlNode } from '../ooxml/xml/index.js';
+import { createDeclaration, createDocument, serializeXmlNode } from '../ooxml/xml/index.js';
 import { cloneNode } from '../ooxml/xml/tree.js';
 import type { Relationship } from '../ooxml/relationships.js';
 import type { DocumentModel, Story } from '../model/index.js';
@@ -187,6 +187,38 @@ const captureRegions = (model: DocumentModel): readonly RegionSnapshot[] =>
     partName: story.partName,
     root: cloneElement(story.element),
   }));
+
+const regionPartNamesOf = (model: DocumentModel): readonly string[] =>
+  model.package
+    .partNames()
+    .filter((name) => /\/header[0-9]*\.xml$/.test(name) || /\/footer[0-9]*\.xml$/.test(name));
+
+const kindOfRegionPart = (partName: string): 'header' | 'footer' =>
+  partName.includes('/footer') ? 'footer' : 'header';
+
+const restoreRegionParts = (
+  model: DocumentModel,
+  snapshot: readonly RegionSnapshot[],
+): boolean => {
+  const known = new Map(snapshot.map((entry) => [entry.partName, entry]));
+  let changed = false;
+  for (const name of regionPartNamesOf(model)) {
+    if (known.has(name)) continue;
+    model.dropStory(name);
+    if (model.package.removePart(name)) changed = true;
+  }
+  for (const entry of snapshot) {
+    if (model.package.getPart(entry.partName) !== undefined) continue;
+    const kind = kindOfRegionPart(entry.partName);
+    const document = createDocument(createDeclaration());
+    const root = cloneElement(entry.root);
+    document.children.push(root);
+    model.package.createDocumentPart(entry.partName, document, { role: kind });
+    model.adoptStory(kind, entry.partName, root);
+    changed = true;
+  }
+  return changed;
+};
 
 const sameNodeAt = (left: XmlNode, right: XmlNode): boolean =>
   left.kind === right.kind && serializeXmlNode(left) === serializeXmlNode(right);
@@ -639,6 +671,7 @@ export const createEditSession = (
       for (const child of body.children) child.parent = undefined;
       body.children = snapshot.body.map((node) => cloneNode(node));
       for (const child of body.children) child.parent = body;
+      if (restoreRegionParts(model, snapshot.regions)) regionsStale = true;
       restoreRelationships(model, snapshot.relationships);
       restoreMedia(model, snapshot.media);
       if (restoreNumbering(model, snapshot.numbering)) {
@@ -663,8 +696,12 @@ export const createEditSession = (
     changeRegions: (write) => {
       const stories = regionStoriesOf(model);
       const before = stories.map((story) => serializeXmlNode(story.element));
+      const beforeNames = stories.map((story) => story.partName);
       write();
-      let changed = false;
+      const after = regionStoriesOf(model);
+      let changed =
+        after.length !== beforeNames.length ||
+        after.some((story, at) => story.partName !== beforeNames[at]);
       for (let at = 0; at < stories.length; at += 1) {
         const story = stories[at];
         if (story === undefined) continue;

@@ -403,17 +403,56 @@ describe('a region of its own height', () => {
 });
 
 describe('what a region refuses', () => {
-  it('reports a page with no header and enters the footer instead', async () => {
+  it('creates the header a document does not have, and enters it', async () => {
     const handle = await editorOf({ footer: paragraphText('Foot') });
 
-    expect(handle.commands.isEnabled('docier.command.insert.header')).toBe(false);
-    expect(reasonOf(handle, 'docier.command.insert.header')).toContain('no header');
-    expect(handle.commands.isEnabled('docier.command.insert.footer')).toBe(true);
+    expect(handle.commands.isEnabled('docier.command.insert.header')).toBe(true);
+    await run(handle, 'insert.header');
+    expect(focusStory(handle)).toBe(HEADER_ID);
+    await type(handle, 'X');
+    expect(slotTexts(handle, HEADER_ID)).toEqual(['X']);
 
+    expect(handle.commands.isEnabled('docier.command.insert.footer')).toBe(true);
     await run(handle, 'insert.footer');
     expect(focusStory(handle)).toBe(FOOTER_ID);
+    await type(handle, 'Y');
+    expect(slotTexts(handle, FOOTER_ID)).toEqual(['YFoot']);
+  });
+
+  it('writes the header it created into the saved package', async () => {
+    const handle = await editorOf({ footer: paragraphText('Foot') });
+    await run(handle, 'insert.header');
     await type(handle, 'X');
-    expect(slotTexts(handle, FOOTER_ID)).toEqual(['XFoot']);
+
+    const bytes = await modelOf(handle).save();
+    expect(member(bytes, HEADER_MEMBER)).toContain('X');
+    expect(member(bytes, 'word/_rels/document.xml.rels')).toContain('header1.xml');
+  });
+
+  it('takes the whole header away again on undo, and brings it back on redo', async () => {
+    const handle = await editorOf({ footer: paragraphText('Foot') });
+    const hasHeader = (): boolean => modelOf(handle).package.hasPart('word/header1.xml');
+
+    expect(hasHeader()).toBe(false);
+    await run(handle, 'insert.header');
+    expect(hasHeader()).toBe(true);
+
+    await run(handle, 'history.undo');
+    expect(hasHeader()).toBe(false);
+    expect(modelOf(handle).stories().some((story) => story.kind === 'header')).toBe(false);
+
+    await run(handle, 'history.redo');
+    expect(hasHeader()).toBe(true);
+    expect(modelOf(handle).stories().some((story) => story.kind === 'header')).toBe(true);
+  });
+
+  it('enters the header it already has rather than making a second one', async () => {
+    const handle = await editorOf({ header: paragraphText('Head') });
+    await run(handle, 'insert.header');
+    expect(focusStory(handle)).toBe(HEADER_ID);
+    await run(handle, 'insert.header');
+    expect(focusStory(handle)).toBe(HEADER_ID);
+    expect(modelOf(handle).package.hasPart('word/header2.xml')).toBe(false);
   });
 
   it('reports a header part that holds no paragraph to place a caret in', async () => {

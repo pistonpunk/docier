@@ -96,8 +96,8 @@ export class DocumentModel {
   private readonly declaredParts: ModelParts;
   private numberingPart: NumberingPart | undefined;
   private numberingPartName: string | undefined;
-  private readonly storyList: readonly Story[];
-  private readonly storyById: Map<string, Story>;
+  private storyList: readonly Story[];
+  private storyById: Map<string, Story>;
 
   private constructor(init: DocumentInit) {
     this.package = init.pkg;
@@ -116,6 +116,27 @@ export class DocumentModel {
 
   get numbering(): NumberingPart | undefined {
     return this.numberingPart;
+  }
+
+  adoptStory(kind: StoryKind, partName: string, element: XmlElement): Story {
+    const id = kind === 'body' ? 'body' : `${kind}:${partName}`;
+    const existing = this.storyById.get(id);
+    if (existing !== undefined) return existing;
+    const story = new Story({ kind, id, partName, element, context: this.context });
+    this.storyList = [...this.storyList, story];
+    this.storyById = new Map(this.storyList.map((entry) => [entry.id, entry]));
+    return story;
+  }
+
+  dropStory(partName: string): boolean {
+    const kept = this.storyList.filter((story) => story.partName !== partName);
+    if (kept.length === this.storyList.length) return false;
+    for (const story of this.storyList) {
+      if (story.partName === partName) this.context.forgetSubtree(story.element);
+    }
+    this.storyList = kept;
+    this.storyById = new Map(kept.map((entry) => [entry.id, entry]));
+    return true;
   }
 
   get parts(): ModelParts {
