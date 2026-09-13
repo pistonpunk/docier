@@ -246,18 +246,141 @@ A one-token alternative, changing six strings from the mouse events to the point
 events, makes the drag track and terminate but keeps one undo entry per move and
 the wrong badge, so it does not give the interaction being asked for.
 
-### The context menu is poor
+### The context menu is poor, and two of its entries do nothing
 
-**Reported:** "rightclick menu is ass".
+**Reported:** "rightclick menu is ass". **Confirmed.** An earlier audit of mine
+concluded that every context menu item worked, because clicking each one changed
+something. That verdict was wrong in a specific way worth recording: an item that
+opens a dialog stub sets a status message, which changed my fingerprint and read
+as alive. Measured properly, **Cut, Copy and Paste in the text menu are built as
+`openDialog` stubs and do nothing but print a message**, even though
+`clipboard.cut`, `clipboard.copy` and `clipboard.paste` are all registered in
+`src/edit/clipboard/commands.ts`. The same wiring bug affects the table menu's
+four insert rows, which are `pending(...)` stubs although
+`table.insertRowsAbove` and the rest exist.
 
-An earlier audit established that every context menu item does something, so this
-is presentation and content rather than dead entries. `WORD-UI.md` already
-records the specific defects found by research: items render as unstyled
-user-agent buttons, disabled-reason prose is printed inside the items, submenus
-open at the item's right edge rather than the menu's, the menu opens with its
-first item under the pointer and is about 35 percent taller than Word's, and the
-text menu is missing most of Word's entries. Being measured and designed
-separately and will be folded in here.
+**The box is fine; the rows are user-agent buttons.** At every surface the menu is
+fixed, white, 1px bordered, 4px radius, with the right shadow. The rows measure:
+
+```
+display:flex  padding:5px 12px  min-height:24px  height:29px
+font:13.3333px Arial          <- the UA button font, not the 12px UI font
+background-color:rgb(239,239,239)   <- UA buttonface
+border:2px outset rgb(0,0,0)        border-radius:0px   appearance:auto
+```
+
+The cause is one omission: `createControl` gives a plain item only the class
+`docier-menu-item` (`src/ui/controls.ts:328`), and the reset that would fix it
+(`appearance:none;background:transparent;border:1px solid transparent;font:inherit`)
+lives on `.docier-control` (`src/ui/styles.ts:65`), which menu items never receive.
+That single omission produces the grey slabs, the 29px rows, and **a dark theme
+where the labels are invisible**: enabled rows render `#f2f2f2` text on the
+`#efefef` buttonface, so only the disabled rows are readable.
+
+**Items also shrink-wrap instead of filling the row.** There is no rule at all for
+`.docier-menu-row` anywhere, and no `width:100%` on the item, so a 190px item sits
+inside a 449px row and the hover fill is a ragged patch that stops at the label.
+Measured widths across one menu: 190, 209, 284, 65, 56, 93, 73, 449, 156, 96. The
+one full-width row is what sets the menu's width.
+
+**Disabled rows print their reason inside themselves**, duplicating what is
+already in the accessible name, the tooltip and the status bar
+(`controls.ts:359-363`, styled at `styles.ts:86`). Live strings seen: "Select the
+text to cut", "The clipboard is empty or unavailable", "This build has no search
+engine, so find and replace are not implemented".
+
+**Hover barely reads and disabled gives nothing.** The fill is
+`--docier-state-hover` `#f5f5f5` on white, a 4 percent step, and the
+`:not([aria-disabled="true"])` guard means a disabled row has no feedback at all.
+Dark mode overrides neither state token, so it hovers to a light-theme fill.
+
+**Four defects in the menu's own behaviour, all in `src/ui/menu.ts`:**
+
+- **Submenus open at the trigger item's right edge**, not the menu's: measured at
+  x=376 where the item ends, while the parent menu's right edge is 770. They open
+  on click only, with no hover intent, and no chevron marks a row as having a
+  child.
+- **Clicking a submenu parent destroys the parent menu.** `openMenu` ends by
+  focusing a child row (`menu.ts:246-247`), which fires `focusin` synchronously
+  while `child` is still unassigned, so the parent's own handler
+  (`menu.ts:230-236`) sees a target outside its list and closes itself. It is
+  deterministic and reproduces on the text and ruler menus.
+- **The viewport clamp uses a size the box no longer has.** It reads
+  `offsetWidth`/`offsetHeight` before positioning, then applies `left`, which
+  constrains the width, re-wraps the long rows and grows the box past the height
+  it clamped against. Measured at 1000x700: a menu 392x334 placed at top 373,
+  bottom 707, 7px past the viewport with its last row clipped.
+- **The menu is glued to the pointer**, at exactly `clientX/clientY`, so the first
+  row sits under the cursor. At the bottom edge the clamp then slides the box up
+  and the pointer lands on the *last* row instead: measured with the pointer at
+  y=887, the menu at top 716.
+
+Two smaller ones: no `font` declaration on the menu at all, so labels are Arial
+13.33px while separators inherit 16px from the host page against the ribbon's 12px;
+and a mouse-opened menu focuses its first enabled row, so it appears with a focus
+outline already drawn.
+
+**A content defect:** the table's Cell Alignment rows are built as toggle nodes
+with an `openDialog` action and no command, so `active` is always false and the
+submenu can never show which alignment is current. It also carries three of Word's
+nine positions.
+
+#### Contents against Word
+
+The text menu is missing **Paste Options** (the page menu already builds that
+submenu, and `clipboard.pastePlain` exists), **New Comment** (`comment.create` is
+registered, so the row would render honestly disabled), **Translate** and
+**Format Painter** (neither command exists, so each needs a new
+registered-unsupported entry rather than a row that lies). Font and Paragraph are
+present as submenus where Word has dialog items, and the dialogs do not exist yet.
+
+The table menu should nest its two delete groupings under a single **Delete**
+submenu, and is missing Insert Cells, a Select submenu, Split Table, Borders and
+Shading, the other six cell alignments, Text Direction, AutoFit and Distribute,
+Sort, Formula and Repeat Header Rows. Of those, only New Comment is actionable
+today; two more could be composed from `table.setColumnWidth` and
+`table.setRowHeight`; the rest need new commands, and the Select submenu needs a
+selection helper that does not exist.
+
+#### The design
+
+- **Rows**: `min-height: var(--docier-menu-item-height)` at 22px in the comfortable
+  density, `padding: 0 12px`, `width: 100%`, `appearance: none`, `border: 0`,
+  `background: transparent`, `font: inherit`, and `cursor: default` rather than a
+  pointer. Label column at 30px from the edge (8 padding, 16 check, 6 gap),
+  `flex: 1 1 auto` with an ellipsis. Inset `4px 8px` on the label so the check
+  column does not move when a menu carries no checkmarks.
+- **Hover**: `--docier-state-selected` `#ebebeb`, an 8 percent step, across the
+  full row. Disabled rows keep a flat colour with no fill.
+- **Separators**: `margin: 4px 8px` so the line is inset rather than full bleed.
+- **Submenus**: anchor at the parent menu's right edge less 2px, vertically
+  aligned to the row, flipping to the left when they would overflow, with a 12px
+  chevron in the right-hand column and hover intent.
+- **Positioning**: anchor at the pointer plus 2px so the cursor is never inside the
+  box, and measure *after* positioning rather than before, which removes the
+  clamp defect and the overflow in one change.
+- **Focus**: do not focus a row on a mouse open; focus the list itself and move to
+  the first enabled row only for the keyboard path.
+- **Type**: 12px `var(--docier-ui-font)` for labels and shortcuts, and no text in
+  separators, which removes the inherited 16px.
+
+Net effect on the text menu: **327px tall to about 257px**, and 451px wide to
+about 200px once the disabled prose is gone.
+
+New tokens: `--docier-menu-item-height` per density (20/22/44),
+`--docier-menu-min-width: 200px` with the JavaScript `|| 220` fallback removed so
+there is one source of truth, and dark-theme values for `--docier-state-hover` and
+`--docier-state-selected`, which are currently missing and make dark mode hover to
+a light fill.
+
+#### Fix order
+
+The visual complaint is almost entirely CSS: the four rules for the row, the hover
+selector, the separator inset, the type, and the dark tokens. Then the five-line
+deletion of the disabled prose in `controls.ts:359-363`. Then the four behavioural
+defects in `menu.ts` and `context-menu.ts`. Then the contents, where Cut, Copy and
+Paste and the table's four insert rows should be switched from stubs to the
+commands that already exist.
 
 ### Objects cannot be resized like Word's, and a picture cannot even be seen
 
