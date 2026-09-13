@@ -411,10 +411,9 @@ image with no bytes therefore gets the ordinary text menu. Adding
 `[data-docier-object]` to the selector fixes it. B2 removed the missing-image case
 from the demo by supplying the bytes, so this now only bites a host that does not.
 
-### A3. The committed tree did not typecheck its own tests
+### A3. The committed tree did not typecheck its own tests, and CI could not have said so
 
-Owner: **nothing; fixed here.** Found while verifying Phase E, and worth recording
-because it means CI has been red since B3 and nobody read it.
+Owner: **nothing; fixed here.** Found while verifying Phase E.
 
 `npx tsc -p tsconfig.test.json` fails at `HEAD`, not because of anything Phase E
 did. B3 added `objectId` to `ObjectPlacement` (`src/layout/types.ts:93`) and the
@@ -426,6 +425,21 @@ typecheck against it: four `TS2345`s, all `objectId is missing`.
 
 Fixed by giving each fixture an `objectId`. The suite is unchanged by it, which
 is the point - the fixtures only exercise geometry.
+
+**The part worth keeping is why nothing noticed.** My first account of this said
+CI had been red since B3. That was wrong, and checking it took one command: CI
+does not run the test typecheck at all. `npm run typecheck` is `tsc -b --noEmit`
+against `tsconfig.json`, whose `include` is `["src"]`, so the step covers the
+library and never the tests. Vitest transpiles without typechecking, so the same
+holds for `npm test`. The failure was invisible to the whole pipeline and to the
+verification loop in `agent_progress.md`, which lists
+`npx tsc --noEmit -p tsconfig.test.json` as a step and then claims CI runs the
+same thing on every push.
+
+So the fix is in two places, not one: the fixtures, and a `Typecheck tests` step
+in `.github/workflows/ci.yml` running the `typecheck:test` script that already
+existed and was never called. A verification step that only a person remembers to
+run is the step that stops being run.
 
 ### A4. A test passed a source the event bus does not accept
 
