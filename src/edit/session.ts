@@ -62,6 +62,13 @@ export interface EditSnapshot {
   readonly relationships: readonly Relationship[];
   readonly numbering: NumberingSnapshot;
   readonly regions: readonly RegionSnapshot[];
+  readonly media: readonly MediaSnapshot[];
+}
+
+export interface MediaSnapshot {
+  readonly partName: string;
+  readonly contentType: string | undefined;
+  readonly bytes: Uint8Array | undefined;
 }
 
 export type Crossing = 'none' | 'story' | 'container';
@@ -247,6 +254,37 @@ const restoreRelationships = (
       type: relationship.type,
       target: relationship.target,
       targetMode: relationship.targetMode,
+    });
+  }
+};
+
+const capturedMedia = (model: DocumentModel): readonly MediaSnapshot[] => {
+  const names = model.package.mediaPartNames();
+  if (names.length === 0) return [];
+  return names.map((partName) => {
+    const part = model.package.getPart(partName);
+    let bytes: Uint8Array | undefined;
+    try {
+      bytes = part?.toBytes();
+    } catch {
+      bytes = undefined;
+    }
+    return { partName, contentType: model.package.contentTypes.getContentType(partName), bytes };
+  });
+};
+
+const restoreMedia = (model: DocumentModel, before: readonly MediaSnapshot[]): void => {
+  const known = new Set(before.map((entry) => entry.partName));
+  for (const name of model.package.mediaPartNames()) {
+    if (known.has(name)) continue;
+    model.package.removePart(name);
+  }
+  for (const entry of before) {
+    if (entry.bytes === undefined) continue;
+    if (model.package.getPart(entry.partName) !== undefined) continue;
+    model.package.createPart(entry.partName, entry.bytes, {
+      contentType: entry.contentType ?? 'application/octet-stream',
+      role: 'media',
     });
   }
 };
@@ -594,6 +632,7 @@ export const createEditSession = (
       relationships: [...relationshipsOf(model)],
       numbering: numberedCapture(),
       regions: capturedRegions(),
+      media: capturedMedia(model),
     }),
     restore: (snapshot) => {
       const body = model.body().element;
@@ -601,6 +640,7 @@ export const createEditSession = (
       body.children = snapshot.body.map((node) => cloneNode(node));
       for (const child of body.children) child.parent = body;
       restoreRelationships(model, snapshot.relationships);
+      restoreMedia(model, snapshot.media);
       if (restoreNumbering(model, snapshot.numbering)) {
         model.invalidateNumbering();
         numberingStale = true;

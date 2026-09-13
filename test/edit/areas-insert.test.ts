@@ -73,12 +73,16 @@ describe('insert.symbol', () => {
     expect(handle.commands.isEnabled('docier.command.history.undo')).toBe(false);
   });
 
-  it('accepts a literal character code and a font', async () => {
+  it('writes a character as its code point, and takes a code point directly', async () => {
     const handle = await editorOf(FIXTURE);
     await run(handle, 'selection.setCaret', { pos: pos(3) });
-    await run(handle, 'insert.symbol', { char: 'F0B7', font: 'Wingdings' });
-    expect(xmlOf(handle)).toContain('w:char="F0B7"');
+    await run(handle, 'insert.symbol', { char: '\u2022', font: 'Wingdings' });
+    expect(xmlOf(handle)).toContain('w:char="2022"');
     expect(xmlOf(handle)).toContain('w:font="Wingdings"');
+
+    await run(handle, 'selection.setCaret', { pos: pos(3) });
+    await run(handle, 'insert.symbol', { codePoint: 0xf0b7, font: 'Wingdings' });
+    expect(xmlOf(handle)).toContain('w:char="F0B7"');
   });
 
   it('reports the missing symbol instead of inserting nothing', async () => {

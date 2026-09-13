@@ -1,6 +1,13 @@
 import type { Disposable } from '../api/types.js';
 import { MP_PER_TWIP } from '../units/index.js';
 import { FONT_DIALOG_NAME, createFontDialog } from './font-dialog.js';
+import {
+  LINK_DIALOG_NAME,
+  SYMBOL_DIALOG_NAME,
+  createLinkDialog,
+  createSymbolDialog,
+} from './insert-dialogs.js';
+import type { InsertDialogOptions } from './insert-dialogs.js';
 import { PARAGRAPH_DIALOG_NAME, createParagraphDialog } from './paragraph-dialog.js';
 import { createDisposableStore, markPart, make, setText } from './dom.js';
 import type { DisposableStore } from './dom.js';
@@ -783,11 +790,20 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
   return handle;
 };
 
-export const OPENABLE_DIALOGS: readonly string[] = [FONT_DIALOG_NAME, PARAGRAPH_DIALOG_NAME];
+export const PICTURE_DIALOG = 'picture';
+
+export const OPENABLE_DIALOGS: readonly string[] = [
+  FONT_DIALOG_NAME,
+  PARAGRAPH_DIALOG_NAME,
+  PICTURE_DIALOG,
+  LINK_DIALOG_NAME,
+  SYMBOL_DIALOG_NAME,
+];
 
 export const DIALOG_ALIASES: Readonly<Record<string, string>> = {
   [FONT_DIALOG_NAME]: FONT_DIALOG_NAME,
   [PARAGRAPH_DIALOG_NAME]: PARAGRAPH_DIALOG_NAME,
+  [PICTURE_DIALOG]: PICTURE_DIALOG,
   'docier.command.format.setFontFamily': FONT_DIALOG_NAME,
   'docier.command.format.setFontSize': FONT_DIALOG_NAME,
   'docier.command.format.setColor': FONT_DIALOG_NAME,
@@ -795,6 +811,12 @@ export const DIALOG_ALIASES: Readonly<Record<string, string>> = {
   'docier.command.format.setLineSpacing': PARAGRAPH_DIALOG_NAME,
   'docier.command.format.setSpaceBefore': PARAGRAPH_DIALOG_NAME,
   'docier.command.format.setSpaceAfter': PARAGRAPH_DIALOG_NAME,
+  'docier.command.object.insertImage': PICTURE_DIALOG,
+  'object.insertImage': PICTURE_DIALOG,
+  'docier.command.insert.link': LINK_DIALOG_NAME,
+  'insert.link': LINK_DIALOG_NAME,
+  'docier.command.insert.symbol': SYMBOL_DIALOG_NAME,
+  'insert.symbol': SYMBOL_DIALOG_NAME,
 };
 
 export const dialogNameFor = (dialog: string): string | undefined => DIALOG_ALIASES[dialog];
@@ -832,6 +854,12 @@ export const createEditorDialog = (
   };
   if (request.dialog === FONT_DIALOG_NAME) return createFontDialog(options);
   if (request.dialog === PARAGRAPH_DIALOG_NAME) return createParagraphDialog(options);
+  if (request.dialog === LINK_DIALOG_NAME || request.dialog === SYMBOL_DIALOG_NAME) {
+    const insert: InsertDialogOptions = options;
+    return request.dialog === LINK_DIALOG_NAME
+      ? createLinkDialog(insert)
+      : createSymbolDialog(insert);
+  }
   return undefined;
 };
 

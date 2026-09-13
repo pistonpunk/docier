@@ -5,8 +5,10 @@ import { toCssPx, mp } from '../units/index.js';
 import { createContextMenus } from './context-menu.js';
 import type { ContextMenuController } from './context-menu.js';
 import { createResolver } from './controls.js';
-import { dialogNameFor, openEditorDialog } from './dialog.js';
+import { PICTURE_DIALOG, dialogNameFor, openEditorDialog } from './dialog.js';
 import type { EditorDialogHandle } from './dialog.js';
+import { createImagePicker } from './image-picker.js';
+import type { ImagePickerHandle } from './image-picker.js';
 import { createDisposableStore, markPart, markSlot, make } from './dom.js';
 import { createFloatingToolbar } from './floating-toolbar.js';
 import type { FloatingToolbarHandle } from './floating-toolbar.js';
@@ -376,6 +378,18 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         }
         const anchor = args?.anchor;
         setMessage('');
+        if (name === PICTURE_DIALOG) {
+          imagePicker ??= createImagePicker({
+            context,
+            insert: (request) => {
+              void handle.commands.execute('docier.command.object.insertImage', request, {
+                source: 'ui',
+              });
+            },
+          });
+          imagePicker.open();
+          return;
+        }
         editorDialog = openEditorDialog(context, {
           dialog: name,
           mount: dialogHost(),
@@ -520,6 +534,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   let floating: FloatingToolbarHandle | undefined;
   let contextMenus: ContextMenuController | undefined;
   let editorDialog: EditorDialogHandle | undefined;
+  let imagePicker: ImagePickerHandle | undefined;
   let dialogSlot: HTMLElement | undefined;
   let portal: HTMLElement | undefined;
 
@@ -818,6 +833,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       ownerDocument.removeEventListener('keydown', fontDialogKey);
       editorDialog?.dispose();
       editorDialog = undefined;
+      imagePicker?.dispose();
+      imagePicker = undefined;
       if (dialogSlot !== undefined && dialogSlot.parentNode !== null) {
         dialogSlot.parentNode.removeChild(dialogSlot);
       }

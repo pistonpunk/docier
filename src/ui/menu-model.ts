@@ -84,6 +84,24 @@ const menu = (labelKey: string, items: readonly UiNode[], extra?: Partial<UiNode
 
 const separator = (id = 'separator'): UiNode => node('separator', { labelKey: '', id });
 
+const picturePicker = (labelKey: string, keytip: string): UiNode =>
+  button({
+    id: 'docier.command.object.insertImage',
+    labelKey,
+    keytip,
+    action: 'openDialog',
+    actionArgs: { dialog: 'object.insertImage' },
+  });
+
+const opensDialog = (id: string, name: string, labelKey: string, keytip: string): UiNode =>
+  button({
+    id,
+    labelKey,
+    keytip,
+    action: 'openDialog',
+    actionArgs: { dialog: name },
+  });
+
 const pending = (name: string, labelKey: string, keytip: string): UiNode =>
   button({
     labelKey,
@@ -445,7 +463,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         labelKey: 'ui.group.illustrations',
         large: true,
         nodes: [
-          pending('object.insertImage', 'ui.control.insertImage', 'P'),
+          picturePicker('ui.control.insertImage', 'P'),
           pending('object.insertShape', 'ui.control.insertShape', 'SH'),
           pending('object.insertChart', 'ui.control.insertChart', 'CH'),
         ],
@@ -454,7 +472,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         id: 'links',
         labelKey: 'ui.group.links',
         large: true,
-        nodes: [pending('insert.link', 'ui.control.insertLink', 'L')],
+        nodes: [opensDialog('docier.command.insert.link', 'insert.link', 'ui.control.insertLink', 'L')],
       },
       {
         id: 'headerFooter',
@@ -486,7 +504,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         labelKey: 'ui.group.symbols',
         large: true,
         nodes: [
-          pending('insert.symbol', 'ui.control.insertSymbol', 'SY'),
+          opensDialog('docier.command.insert.symbol', 'insert.symbol', 'ui.control.insertSymbol', 'SY'),
           button({
             labelKey: 'ui.control.insertDate',
             command: command('insert.dateTime'),
@@ -902,7 +920,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
       button({ labelKey: 'ui.control.numbering', id: 'ctx:text:numbers', command: command('numbering.numbers'), action: 'openDialog', actionArgs: { dialog: command('numbering.numbers') } }),
     ]),
     separator('ctx:text:sep2'),
-    menu('ui.menu.insert', [pending('insert.table', 'ui.control.insertTable', 'T'), pending('insert.link', 'ui.control.insertLink', 'L'), pending('insert.symbol', 'ui.control.insertSymbol', 'SY')]),
+    menu('ui.menu.insert', [pending('insert.table', 'ui.control.insertTable', 'T'), opensDialog('ctx:page:link', 'insert.link', 'ui.control.insertLink', 'L'), opensDialog('ctx:page:symbol', 'insert.symbol', 'ui.control.insertSymbol', 'SY')]),
     separator('ctx:text:sep3'),
     node('menu', {
       id: 'ctx:text:synonyms',
@@ -970,7 +988,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     pending('object.bringForward', 'ui.control.arrangeBringForward', 'BF'),
     pending('object.sendBackward', 'ui.control.arrangeSendBackward', 'BK'),
     separator('ctx:image:sep3'),
-    menu('ui.menu.insert', [pending('object.insertImage', 'ui.control.insertImage', 'P')]),
+    menu('ui.menu.insert', [picturePicker('ui.control.insertImage', 'P')]),
     pending('object.delete', 'ui.menu.delete', 'DL'),
   ],
   field: [

@@ -658,6 +658,43 @@ export class DocxPackage {
     return { part, relationship: this.imageRelationship(sourcePartName, part), created: true };
   }
 
+  mediaPartNames(): readonly string[] {
+    return [...this.parts.keys()].filter((name) => isMediaPartName(name) || isEmbeddingPartName(name));
+  }
+
+  addMediaPartNow(
+    sourcePartName: string,
+    bytes: Uint8Array,
+    contentType: string,
+    extension: string,
+  ): MediaPartResult {
+    const digest = sha256(bytes);
+    for (const [name, part] of this.parts) {
+      if (!isMediaPartName(name)) continue;
+      if (this.contentTypes.getContentType(name) !== contentType) continue;
+      const size = part.uncompressedSize;
+      if (size !== undefined && size !== bytes.byteLength) continue;
+      let candidate: Uint8Array;
+      try {
+        candidate = part.toBytes();
+      } catch {
+        continue;
+      }
+      if (!bytesEqual(sha256(candidate), digest)) continue;
+      if (!bytesEqual(candidate, bytes)) continue;
+      this.diagnostics.push({
+        code: 'mediaReused',
+        severity: 'info',
+        message: `Reused media part "${name}" for identical bytes`,
+        partName: name,
+      });
+      return { part, relationship: this.imageRelationship(sourcePartName, part), created: false };
+    }
+    const name = this.allocateName('media', { extension });
+    const part = this.createPart(name, bytes, { contentType, role: 'media' });
+    return { part, relationship: this.imageRelationship(sourcePartName, part), created: true };
+  }
+
   async findMediaPart(bytes: Uint8Array, contentType: string): Promise<Part | undefined> {
     const digest = sha256(bytes);
     for (const [name, part] of this.parts) {

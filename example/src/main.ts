@@ -315,6 +315,39 @@ const collectImages = async (bytes: Uint8Array): Promise<number> => {
   return imageSources.size;
 };
 
+const refreshImages = (): number => {
+  const model = handle.document;
+  if (model === undefined) return imageSources.size;
+  const pkg = model.package;
+  for (const partName of pkg.relationships.sourceParts()) {
+    const relationships = pkg.relationships.get(partName);
+    if (relationships === undefined) continue;
+    for (const relationship of relationships.entries) {
+      if (!relationship.type.endsWith('/image')) continue;
+      if (imageSources.has(relationship.id)) continue;
+      const part = pkg.getPart(relationship.resolvedTarget);
+      if (part === undefined) continue;
+      let data: Uint8Array;
+      try {
+        data = part.toBytes();
+      } catch {
+        continue;
+      }
+      const extension = relationship.resolvedTarget.split('.').pop()?.toLowerCase() ?? '';
+      imageSources.set(relationship.id, {
+        id: relationship.id,
+        bytes: data,
+        mimeType: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream',
+      });
+    }
+  }
+  return imageSources.size;
+};
+
+handle.events.on('docier:doc:change', () => {
+  refreshImages();
+});
+
 const loadBytes = async (bytes: Uint8Array, name: string): Promise<void> => {
   const started = performance.now();
   try {

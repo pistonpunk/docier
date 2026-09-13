@@ -34,9 +34,22 @@ const GENERIC_REASONS = [
   'No document is loaded',
 ];
 
+const DIALOG_COMMANDS: Readonly<Record<string, string>> = {
+  'insert.link': 'docier.command.insert.link',
+  'insert.symbol': 'docier.command.insert.symbol',
+  'object.insertImage': 'docier.command.object.insertImage',
+};
+
 const collect = (nodes: readonly UiNode[], into: Set<string>): void => {
   for (const node of nodes) {
     if (node.command !== undefined) into.add(node.command);
+    if (node.action === 'openDialog') {
+      const name = node.actionArgs?.dialog;
+      if (typeof name === 'string') {
+        const command = DIALOG_COMMANDS[name] ?? name;
+        if (DIALOG_COMMANDS[name] !== undefined) into.add(command);
+      }
+    }
     if (node.items !== undefined) collect(node.items, into);
   }
 };
@@ -204,7 +217,7 @@ describe('deliberately unavailable commands', () => {
     expect(reasonOf(handle, 'docier.command.table.insertRowsBelow')).toContain(
       'Place the caret inside a table',
     );
-    expect(reasonOf(handle, 'docier.command.object.insertImage')).toContain('drawing content');
+    expect(reasonOf(handle, 'docier.command.object.insertImage')).toContain('needs the bytes of a picture');
     expect(reasonOf(handle, 'docier.command.insert.header')).toContain('no header');
     expect(reasonOf(handle, 'docier.command.insert.closeHeaderFooter')).toContain('not in a header');
     expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');

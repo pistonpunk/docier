@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done. **Phase D**: D1 to D4 done. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: not started.
+Status: **Phase B**: B1 to B4 done. **Phase C**: C1 to C5 done. **Phase D**: D1 to D4 done. **Phase E**: E1, E2, E3 done, wired and verified live. **Phase F**: picture, hyperlink and symbol done and verified live; five entries still refused, each for a reason named below.
 
 Done and verified in the browser:
 
@@ -498,10 +498,11 @@ still announces that it is not available.
 
 | # | Item | State |
 |---|---|---|
-| F1 | Insert a picture | to do |
-| F2 | Hyperlink | to do |
-| F3 | Comments | to do |
-| F4 | Footnote, header creation, symbol, text box, table of contents | to do |
+| F1 | Insert a picture | **done** |
+| F2 | Hyperlink | **done, no on-screen link affordance** |
+| F3 | Comments | **refused, with the reason named** |
+| F4 | Symbol | **done** |
+| F4 | Footnote, header creation, text box, table of contents | **refused, with the reason named** |
 
 ### Phase D notes
 
@@ -560,6 +561,110 @@ easy to leave half true; the walk covers the tabs a person cannot click.
 Not done, and belonging to D2 rather than here: the glyphs are all drawn on the
 same 16-unit grid, and there are no 32px variants yet, because the large-button
 variant that would use them does not exist.
+
+## Phase F notes
+
+The phase's own framing is the test: each of these refused "with a reason today,
+which is honest but is still a document that cannot be produced". Three of the
+eight can now be produced. Five cannot, and the section below says what each one
+actually needs rather than restating that it is unavailable.
+
+### F1 done: a picture
+
+The command `docier.command.object.insertImage` takes bytes the host supplies and
+does the whole job: it writes the media part, the relationship and the
+`w:drawing`, and it works in a header or footer only where the layout places one,
+refusing otherwise.
+
+**The undo snapshot was the blocker, and the audit was right about why.** Undo
+runs the stored closure rather than the commit hooks, so a part created by an
+insert has to be inside the snapshot or it survives the undo as an orphan. The
+snapshot now carries media: each part's name, content type and bytes.
+
+Two things about that are worth keeping. The bytes are taken through
+`Part.toBytes()`, which returns the array without copying when the part is already
+materialised and throws when it is not - a part still sitting undecoded in the
+archive stays a name with no bytes, and those are exactly the parts an edit never
+removed, so the throw is caught and the entry is names-only. And restore puts a
+part back **under its original name** rather than allocating a fresh one, which is
+the difference between a redo that works and a redo that leaves the document
+pointing at a relationship whose target no longer exists.
+
+`DocxPackage.addMediaPart` was asynchronous because its dedupe path awaits part
+bytes. `addMediaPartNow` is the synchronous twin, with the same digest-and-compare
+dedupe over the parts whose bytes are already in hand: inserting the same picture
+twice gives one part, two different pictures give two.
+
+The chrome side is a real file picker: `object.insertImage` is an `openDialog`
+target that opens a hidden `<input type="file" accept="image/*">`, reads the
+bytes, measures the picture's natural size and fits it to six centimetres wide
+keeping the ratio, falling back to a default when the browser cannot decode it.
+
+### F2 done, with a gap recorded rather than glossed
+
+The command and the relationship plumbing already existed; what was missing was
+any way to supply an address, so the row rendered disabled forever. There is now
+an Insert Hyperlink dialog: address, text to display and screen tip, with Insert
+gated on the address and the fields left typable while it is gated. Applying
+writes the `w:hyperlink` with the relationship, the text and the tooltip, and
+applies Word's `Hyperlink` run style so a document that defines that style shows
+the link as one.
+
+**The gap.** Nothing in the layout or the renderer knows what a hyperlink is:
+there is no `data-docier-hyperlink` node, no pointer cue, and no way to open one.
+A hyperlink renders as its own characters - styled if the document defines the
+`Hyperlink` style and plain text if it does not - and it is only a link in the
+file and in Word. That is recorded here rather than fixed, because a click target
+and a Ctrl+click to open are a different piece of work from producing the markup,
+and the acceptance this phase was written against is that the document can be
+produced.
+
+### F4, symbol: done, and a real bug fixed on the way
+
+`docier.command.insert.symbol` writes `w:sym`, and it always wrote `w:char` as the
+**literal character** it was handed. `w:char` is a hexadecimal code point, so a
+caller passing `§` produced `w:char="§"`, which is not a symbol Word can resolve.
+It now reads `char` as a character and `codePoint` as a number, and converts to
+the four-digit hex both need. The old test that pinned the literal-hex reading was
+written against the bug and now pins the two correct forms.
+
+The dialog is a 52-symbol palette in five groups - legal marks, currency,
+punctuation, mathematics, arrows and shapes - each button named for assistive
+technology, and clicking one inserts it and closes. It is small on purpose: this
+is a convenience palette for the symbols a contract actually uses, not Word's
+character map with its font browser.
+
+### The five that are still refused, and what each actually needs
+
+Every one of these now carries a reason that names its own missing machinery
+rather than a generic refusal, which is the state the phase asked for.
+
+| Command | What it needs |
+|---|---|
+| Comments | A `word/comments.xml` part, a comments part type and content type, a relationship per comment, `w:commentReference` and `w:commentRangeStart/End` runs, and a surface to read them in. The editing layer creates no part of its own except media, and none of the layout or the chrome knows a comment exists. |
+| Footnote | A `word/footnotes.xml` part, the `w:footnoteReference` run, and **footnote layout**: the note area has to be measured, reserved at the foot of the page and paginated against, which is a second page-fitting pass this build does not have. |
+| Header creation | The document may only be edited through parts it already has. Creating one means a new `word/headerN.xml`, its content type, its relationship and the `w:headerReference` in the section - and then the region has to accept a first paragraph, which `region.ts` refuses today by design. The undo snapshot would need to cover arbitrary parts rather than the media parts it now covers. |
+| Text box | A drawing with a text body: `wps:wsp` inside a `wps:txbx`, whose content is a whole nested story. This build authors exactly one kind of drawing, a picture from host bytes. |
+| Table of contents | Field evaluation. A TOC is a `TOC` field whose result is generated by walking the headings, and this build substitutes `PAGE`, `NUMPAGES`, `SECTION` and `SECTIONPAGES` before measuring but evaluates nothing that depends on the document's structure. |
+
+Each of these is a subsystem rather than a command. Recording them as such is the
+honest end of this phase: the ones that were a command's worth of work are done
+and verified, and the ones that are not are named with what they would take.
+
+### Phase F verification, live in the browser
+
+| Check | Measured |
+|---|---|
+| The Insert tab's Picture opens a file picker | yes, a real `input[type=file]` |
+| Inserting a 40x40 PNG | one `data-docier-image` rendered, zero placeholders |
+| The size it lands at | 40x40 pixels, from the picture's own dimensions |
+| Undo | the picture goes and the media part with it |
+| Redo | the picture comes back, rendered, not a placeholder |
+| The hyperlink dialog | opens from the Link row, three fields, Insert gated on the address |
+| Applying it | the address, the text and the tooltip are written |
+| The symbol dialog | 52 buttons, each with its name |
+| Clicking Section | `§` lands in the paragraph at the caret |
+| Console and page errors | none, in any of it |
 
 ## Appendices
 

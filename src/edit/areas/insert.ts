@@ -8,6 +8,8 @@ import type { AreaHost, AreaSpec } from './support.js';
 
 const HYPERLINK_RELATIONSHIP = `${R_NAMESPACE}/hyperlink`;
 
+export const HYPERLINK_STYLE = 'Hyperlink';
+
 export interface SymbolArgs {
   readonly char?: string | undefined;
   readonly codePoint?: number | undefined;
@@ -43,12 +45,11 @@ const caretOf = (host: AreaHost): CaretTarget | undefined => {
   };
 };
 
-const hexOf = (args: SymbolArgs): string | undefined => {
-  if (args.char !== undefined && args.char !== '') {
-    if (args.codePoint === undefined) return args.char;
-  }
-  const point = args.codePoint;
-  if (point === undefined) return undefined;
+export const hexOf = (args: SymbolArgs): string | undefined => {
+  const point =
+    args.codePoint ??
+    (args.char === undefined || args.char === '' ? undefined : args.char.codePointAt(0));
+  if (point === undefined || !Number.isFinite(point) || point < 0) return undefined;
   return point.toString(16).toUpperCase().padStart(4, '0');
 };
 
@@ -109,7 +110,12 @@ const linkSpec: AreaSpec<LinkArgs> = {
         (container) => {
           xml.setAttribute(container, 'id', relationshipId, 'r', R_NAMESPACE);
           if (args.tooltip !== undefined) setWAttr(container, 'tooltip', args.tooltip);
-          appendRun(container, args.text ?? url);
+          const run = appendRun(container, args.text ?? url);
+          const properties = createWElement(run, 'rPr');
+          const style = createWElement(properties, 'rStyle');
+          setWAttr(style, 'val', HYPERLINK_STYLE);
+          properties.children.push(style);
+          run.children.unshift(properties);
         },
       ),
     );

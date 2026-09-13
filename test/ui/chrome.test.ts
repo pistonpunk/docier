@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerLanguage, messagesFor } from '../../src/ui/i18n.js';
 import { mountChrome } from '../../src/ui/chrome.js';
-import { dialogNameFor } from '../../src/ui/dialog.js';
+import { PICTURE_DIALOG, dialogNameFor } from '../../src/ui/dialog.js';
 import { FONT_DIALOG_NAME } from '../../src/ui/font-dialog.js';
 import { PARAGRAPH_DIALOG_NAME } from '../../src/ui/paragraph-dialog.js';
 import { ZOOM_MAX, ZOOM_MIN, positionOfZoom, zoomAtPosition } from '../../src/ui/status-bar.js';
@@ -298,7 +298,9 @@ describe('dialogs', () => {
     expect(dialogNameFor('docier.command.format.setLineSpacing')).toBe(PARAGRAPH_DIALOG_NAME);
     expect(dialogNameFor('styles')).toBeUndefined();
     expect(dialogNameFor('')).toBeUndefined();
-    expect(dialogNameFor('docier.command.object.insertImage')).toBeUndefined();
+    expect(dialogNameFor('docier.command.object.insertImage')).toBe(PICTURE_DIALOG);
+    expect(dialogNameFor('object.insertImage')).toBe(PICTURE_DIALOG);
+    expect(dialogNameFor('docier.command.object.insertShape')).toBeUndefined();
   });
 
   it('opens the Font dialog from the ribbon launcher, anchored under it', async () => {

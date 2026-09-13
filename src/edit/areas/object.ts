@@ -16,6 +16,7 @@ import {
   Paragraph,
   resolvedRunContents,
 } from '../../model/index.js';
+import { buildInlineDrawing } from '../../ooxml/drawing.js';
 import { objectIdOfDrawing } from '../../layout/objects.js';
 import type { Mp } from '../../units/index.js';
 import { mpToTwip, twip, twipToEmu } from '../../units/index.js';
@@ -23,7 +24,8 @@ import type { ObjectBox } from '../objects.js';
 import { clearObjectSelection, findObjectBox, objectSelectionOf, selectObject } from '../objects.js';
 import { MIN_OBJECT_TWIPS } from '../object-resize.js';
 import type { AreaHost, AreaSpec } from './support.js';
-import { areaCommand, changedBy } from './support.js';
+import { insertRunChildAt } from './content.js';
+import { areaCommand, changedBy, writingAt } from './support.js';
 
 export interface ObjectSizeArgs {
   readonly objectId?: string;
@@ -33,6 +35,17 @@ export interface ObjectSizeArgs {
 
 export interface ObjectSelectArgs {
   readonly objectId?: string;
+}
+
+export interface InsertImageArgs {
+  readonly bytes?: Uint8Array | undefined;
+  readonly contentType?: string | undefined;
+  readonly extension?: string | undefined;
+  readonly widthTwips?: number | undefined;
+  readonly heightTwips?: number | undefined;
+  readonly name?: string | undefined;
+  readonly alt?: string | undefined;
+  readonly docPrId?: number | undefined;
 }
 
 interface ObjectSize {
@@ -46,6 +59,15 @@ const NO_PICTURE: LocalizedString =
   'That picture is not in this document, or the layout did not place it';
 const NEEDS_SIZE: LocalizedString = 'Give a width, a height, or both';
 const BAD_SIZE: LocalizedString = 'A picture must be at least 1pt on each side';
+const NO_IMAGE_BYTES: LocalizedString =
+  'This control needs the bytes of a picture to insert';
+const NO_IMAGE_TYPE: LocalizedString =
+  'A picture needs its content type and its file extension, so the package can declare the part';
+const IMAGE_TOO_BIG: LocalizedString = 'This build inserts pictures up to 32MB';
+const NOT_IN_BODY: LocalizedString =
+  'This build has no layout for a picture in a header or footer, so it cannot insert one there';
+const NOT_ALIGNED: LocalizedString =
+  'This document lays out in a way the editing layer cannot map onto paragraphs, so picture insertion is unavailable';
 
 const childrenOf = (element: XmlElement): readonly XmlElement[] =>
   element.children.filter((child): child is XmlElement => child.kind === 'element');
@@ -216,6 +238,79 @@ const setSizeSpec: AreaSpec<ObjectSizeArgs> = {
   },
 };
 
+const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
+const DEFAULT_IMAGE_TWIPS = { width: 2880, height: 1920 } as const;
+
+const imageReasonOf = (host: AreaHost, args: InsertImageArgs | undefined): LocalizedString | undefined => {
+  const bytes = args?.bytes;
+  if (bytes === undefined || bytes.byteLength === 0) return NO_IMAGE_BYTES;
+  if (bytes.byteLength > MAX_IMAGE_BYTES) return IMAGE_TOO_BIG;
+  if (args?.contentType === undefined || args.contentType === '') return NO_IMAGE_TYPE;
+  const extension = args.extension;
+  if (extension === undefined || extension === '') return NO_IMAGE_TYPE;
+  if (host.session.index.storyAt(host.selection.focus)?.kind !== 'body') return NOT_IN_BODY;
+  return undefined;
+};
+
+const insertImageSpec: AreaSpec<InsertImageArgs> = {
+  id: 'docier.command.object.insertImage',
+  label: 'Picture',
+  category: 'object',
+  permissions: ['insert'],
+  enabledIn: (host, args) => host.session.aligned && imageReasonOf(host, args) === undefined,
+  reason: (host, args) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    return imageReasonOf(host, args) ?? NO_IMAGE_BYTES;
+  },
+  run: (host, args) => {
+    const bytes = args?.bytes;
+    const contentType = args?.contentType;
+    const extension = args?.extension;
+    if (bytes === undefined || contentType === undefined || extension === undefined) return false;
+    if (imageReasonOf(host, args) !== undefined) return false;
+    const doc = host.session.resolve(host.selection.focus);
+    if (doc === undefined) return false;
+    const partName = host.session.model.story(doc.slot.story)?.partName;
+    const owner = partName ?? host.session.model.package.mainDocumentPartName;
+    const media = host.session.model.package.addMediaPartNow(owner, bytes, contentType, extension);
+    const width = Math.max(MIN_OBJECT_TWIPS, Math.floor(args?.widthTwips ?? DEFAULT_IMAGE_TWIPS.width));
+    const height = Math.max(MIN_OBJECT_TWIPS, Math.floor(args?.heightTwips ?? DEFAULT_IMAGE_TWIPS.height));
+    const name = args?.name ?? `Picture ${String(media.relationship.id)}`;
+    const drawing = buildInlineDrawing({
+      relationshipId: media.relationship.id,
+      cx: twipToEmu(twip(width)),
+      cy: twipToEmu(twip(height)),
+      docPrId: args?.docPrId ?? nextDocPrId(host.session.model),
+      name,
+      alt: args?.alt ?? name,
+    });
+    const inserted = writingAt(host, () =>
+      insertRunChildAt(host.session.model, doc.slot.element, doc.offset, (run) => {
+        run.children.push(drawing);
+        drawing.parent = run;
+      }),
+    );
+    if (!inserted) return false;
+    host.session.model.context.forgetSubtree(doc.slot.element);
+    return true;
+  },
+};
+
+const nextDocPrId = (model: DocumentModel): number => {
+  let highest = 0;
+  const visit = (element: XmlElement): void => {
+    for (const child of childrenOf(element)) {
+      if (child.localName === 'docPr') {
+        const value = Number(child.attributes.find((a) => a.localName === 'id')?.value ?? '');
+        if (Number.isFinite(value) && value > highest) highest = value;
+      }
+      visit(child);
+    }
+  };
+  for (const paragraph of model.paragraphs()) visit(paragraph.element);
+  return highest + 1;
+};
+
 const selectSpec: AreaSpec<ObjectSelectArgs> = {
   id: 'docier.command.object.select',
   label: 'Select picture',
@@ -243,4 +338,5 @@ const selectSpec: AreaSpec<ObjectSelectArgs> = {
 export const objectCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<ObjectSizeArgs>(host, setSizeSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
+  areaCommand<InsertImageArgs>(host, insertImageSpec),
 ];

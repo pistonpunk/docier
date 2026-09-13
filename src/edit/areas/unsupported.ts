@@ -13,7 +13,7 @@ interface Refusal {
 const NO_OBJECT_SELECTION =
   'There is no object selection in this build, so drawing commands cannot act';
 const NO_DRAWING =
-  'This build cannot author drawing content: the editing layer cannot create media parts or w:drawing runs';
+  'This build authors a picture from bytes the host supplies and nothing else: it has no shape, chart or text-box geometry';
 const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const HOST_OWNED = (action: string): string =>
@@ -174,7 +174,6 @@ const REFUSALS: readonly Refusal[] = [
       'List numbers come from w:numFmt/w:lvlText rather than from w:t, so this build cannot turn them into literal text',
   },
 
-  { id: 'docier.command.object.insertImage', label: 'Picture', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.insertShape', label: 'Shape', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.changeImage', label: 'Change picture', category: 'object', reason: NO_DRAWING },
@@ -182,7 +181,7 @@ const REFUSALS: readonly Refusal[] = [
     id: 'docier.command.object.compress',
     label: 'Compress pictures',
     category: 'object',
-    reason: 'Compression rewrites media parts, which the editing layer cannot reach',
+    reason: 'Compression re-encodes media bytes, and this build inserts and scales them but never rewrites them',
   },
   { id: 'docier.command.object.align', label: 'Align objects', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.bringForward', label: 'Bring forward', category: 'object', reason: NO_OBJECT_SELECTION },
