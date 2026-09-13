@@ -21,6 +21,7 @@ export interface MenuOptions {
   readonly mount?: HTMLElement | undefined;
   readonly rtl?: boolean | undefined;
   readonly onClose?: (() => void) | undefined;
+  readonly focusFirst?: boolean | undefined;
 }
 
 export interface MenuHandle extends Disposable {
@@ -136,7 +137,8 @@ export const openMenu = (options: MenuOptions): MenuHandle => {
         return;
       }
       const bounds = control.getBoundingClientRect();
-      child = openMenu({
+      const menuBounds = list.getBoundingClientRect();
+      const opened = openMenu({
         context,
         items: node.items ?? [],
         label: context.describe({
@@ -144,26 +146,38 @@ export const openMenu = (options: MenuOptions): MenuHandle => {
           action: node.action,
           labelKey: node.labelKey,
         }).label,
-        anchor: { x: bounds.right, y: bounds.top },
+        anchor: { x: menuBounds.right - 2, y: bounds.top },
         mount,
         rtl: options.rtl,
       });
+      child = opened;
       control.setAttribute('aria-expanded', 'true');
     });
   }
 
+  list.style.left = '0px';
+  list.style.top = '0px';
+  list.style.visibility = 'hidden';
   mount.appendChild(list);
 
   const anchor = options.anchor ?? { x: 0, y: 0 };
-  const width = list.offsetWidth || 220;
-  const height = list.offsetHeight || 0;
   const viewWidth = doc.defaultView?.innerWidth ?? 0;
   const viewHeight = doc.defaultView?.innerHeight ?? 0;
-  const right = options.rtl === true ? anchor.x - width : anchor.x;
-  const left = viewWidth === 0 ? right : clamp(right, 0, Math.max(0, viewWidth - width));
-  const top = viewHeight === 0 ? anchor.y : clamp(anchor.y, 0, Math.max(0, viewHeight - height));
+  const MARGIN = 8;
+  const width = list.offsetWidth || 0;
+  const height = list.offsetHeight || 0;
+  const desired = options.rtl === true ? anchor.x - width : anchor.x;
+  const left =
+    viewWidth === 0
+      ? desired
+      : clamp(desired, MARGIN, Math.max(MARGIN, viewWidth - width - MARGIN));
+  const top =
+    viewHeight === 0
+      ? anchor.y
+      : clamp(anchor.y, MARGIN, Math.max(MARGIN, viewHeight - height - MARGIN));
   list.style.left = `${String(left)}px`;
   list.style.top = `${String(top)}px`;
+  list.style.visibility = '';
 
   list.addEventListener('keydown', (event) => {
     const key = event.key;
@@ -243,8 +257,12 @@ export const openMenu = (options: MenuOptions): MenuHandle => {
     if (event.key === 'Escape' && doc.activeElement === doc.body) close(false);
   });
 
-  const focusIndex = (): number => rows.findIndex((row) => row.getAttribute('aria-disabled') !== 'true');
-  focusItem(focusIndex());
+  list.tabIndex = -1;
+  if (options.focusFirst === true) {
+    const focusIndex = (): number =>
+      rows.findIndex((row) => row.getAttribute('aria-disabled') !== 'true');
+    focusItem(focusIndex());
+  }
   own();
 
   return {

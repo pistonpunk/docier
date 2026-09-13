@@ -56,6 +56,8 @@ export interface ContextMenuOptions {
   readonly onSurface?: ((surface: ContextSurface, target: Element | null) => void) | undefined;
 }
 
+const POINTER_OFFSET_PX = 2;
+
 export interface ContextMenuController extends Disposable {
   readonly current: ContextSurface | null;
   open(surface: ContextSurface, x: number, y: number): MenuHandle | null;
@@ -77,6 +79,7 @@ export const createContextMenus = (options: ContextMenuOptions): ContextMenuCont
     surface: ContextSurface,
     x: number,
     y: number,
+    focusFirst = false,
   ): MenuHandle | null => {
     close();
     const items = itemsFor(surface);
@@ -87,7 +90,8 @@ export const createContextMenus = (options: ContextMenuOptions): ContextMenuCont
       context,
       items,
       label: context.i18n.text(SURFACE_LABEL_KEYS[surface]),
-      anchor: { x, y },
+      anchor: { x: x + POINTER_OFFSET_PX, y: y + POINTER_OFFSET_PX },
+      focusFirst: focusFirst,
       mount: options.mount,
       onClose: () => {
         menu = null;

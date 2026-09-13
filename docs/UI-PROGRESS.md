@@ -117,7 +117,7 @@ placeholders, three sources handed over.
 |---|---|---|
 | C1 | Style the rows, and make items fill the row | **done** |
 | C2 | Move the disabled reasons out of the items | **done** |
-| C3 | The four behavioural defects in `menu.ts` and `context-menu.ts` | to do |
+| C3 | The four behavioural defects in `menu.ts` and `context-menu.ts` | **done** |
 | C4 | Wire Cut, Copy, Paste and the table insert rows to the commands that exist | **done, verification blocked** |
 | C5 | Fill the menus out to Word's contents | to do |
 
@@ -141,6 +141,29 @@ gone and the reason stays in `aria-description` and `title`. The test that cover
 this asserted the prose was in the row; it now asserts the row carries the reason
 accessibly and does *not* print it, plus a new test that an item is as wide as its
 row.
+
+**C3 done.** Four defects, all verified in the browser after the fix.
+
+- **Submenus opened at the trigger item's right edge** rather than the menu's, so
+  they jumped. They anchor to the parent menu's edge now, two pixels overlapped,
+  aligned with the row.
+- **Clicking a submenu parent destroyed the parent menu.** `openMenu` ends by
+  focusing a child row, which fires `focusin` synchronously, and the parent's own
+  handler ran while its `child` field was still unassigned, concluded the focus had
+  left its list, and closed itself. Assigning the field before the child can focus
+  anything fixes it. Verified: after clicking a submenu parent, two menus are open
+  and the parent is still shown.
+- **The clamp measured the box before placing it**, so applying `left` constrained
+  the width, long rows re-wrapped, and the box grew past the height it had clamped
+  against: measured 7px past the viewport with its last row clipped. It measures
+  where the box will actually be drawn now. Verified: bottom at 686 in a 700px
+  viewport.
+- **The menu opened with its first row under the pointer**, at exactly the cursor
+  position, and at an edge the clamp then slid the box so the pointer landed on the
+  last row instead. It anchors two pixels off the cursor now, and it no longer
+  focuses a row when a pointer opened it, which also removes the focus outline that
+  used to appear on a row the moment the menu opened. Verified: the menu sits at
+  +2,+2 and the focus stays outside it.
 
 ## Phase D - Ribbon content design
 
