@@ -50,6 +50,7 @@ interface DataTransferEventLike {
 
 const DRAG_THRESHOLD_PX = 4;
 const CARET_BLINK_MS = 530;
+const CARET_RETRY_MS = 16;
 const COLUMN_EDGE_PX = 5;
 const MIN_COLUMN_WIDTH_MP = mp(120 * MP_PER_TWIP);
 const MIN_ROW_HEIGHT_MP = mp(120 * MP_PER_TWIP);
@@ -443,16 +444,29 @@ export const attachInput = (host: InputHost): InputHandle => {
     scroller.scrollTop += above > 0 ? -above : below;
   };
 
+  let caretRetry: number | undefined;
+  const retryCaret = (): void => {
+    if (caretRetry !== undefined) return;
+    const win = owner.defaultView;
+    if (win === null) return;
+    caretRetry = win.setTimeout(() => {
+      caretRetry = undefined;
+      paintCaret();
+    }, CARET_RETRY_MS);
+  };
+
   const paintCaret = (): boolean => {
     const geometry = caretOf();
     if (geometry === undefined) {
       caret.style.display = 'none';
+      retryCaret();
       return false;
     }
     const page = pageFragmentOf(geometry.page);
     const sheet = sheetFor(geometry.page);
     if (page === undefined || sheet === undefined) {
       caret.style.display = 'none';
+      retryCaret();
       return false;
     }
     const zoom = host.zoom;
@@ -460,6 +474,11 @@ export const attachInput = (host: InputHost): InputHandle => {
     const point = pageToViewport(page, offset, geometry.x, geometry.y, zoom);
     const height = toCssPx(geometry.height, zoom);
     caret.style.display = selectedObject() === undefined ? 'block' : 'none';
+    if (caret.style.display === 'block' && blink !== undefined) {
+      const at = Number(blink.currentTime ?? 0);
+      if (!Number.isFinite(at) || at >= CARET_BLINK_MS) blink.currentTime = 0;
+      if (blink.playState === 'finished' || blink.playState === 'idle') blink.play();
+    }
     applyStyle(caret, {
       left: `${String(point.left)}px`,
       top: `${String(point.top)}px`,

@@ -1064,6 +1064,36 @@ clicking, typing and drag-selecting in the body and in a table cell: **142 sampl
 zero with the composer hidden**, focus on the composer throughout, the caret
 `block`, and each drag producing its selection. No console or page errors.
 
+## The caret, second pass: it can no longer be placed while invisible
+
+The first fix removed the composer being hidden. The owner reported it still
+disappearing when a new location is picked and typing starts, so the caret itself
+was looked at again.
+
+**What was left.** The caret's blink is a Web Animations animation over `opacity`,
+half on and half off. The painter moved the caret and left the animation wherever it
+happened to be, so **a caret could be placed in the off half of its own cycle** - and
+because nothing reset the phase on a plain paint (only `reveal()` did, and not every
+path that places a caret goes through it), a caret placed at that moment stayed
+invisible until the animation happened to come round again. Under fast typing, where
+each keystroke re-places the caret, the odds of landing in the off half are the
+odds of it looking like the caret vanished.
+
+**Fix.** Placing the caret now resets the blink phase whenever the animation is past
+the on-half, and restarts it if it has been left idle or finished. A caret that is
+*placed* is therefore always visible, and can only go dark at the next half-cycle
+like a normal blink.
+
+**And a caret that cannot be placed now retries.** If there is no geometry for the
+caret - no layout, or a position with no stop yet - the painter hides the mark and
+schedules one more attempt on the next frame. The mark can no longer be left hidden
+because a single paint landed in a bad moment.
+
+**Verified live:** twelve consecutive keystrokes, sampling the caret's computed
+display and opacity immediately after each - **0 of 12 invisible**, every sample
+`block` with `opacity: 1` and the animation's `currentTime` back under 40ms, where
+before it freelanced anywhere in its 1060ms cycle.
+
 ## Appendices
 
 Findings that belong to a phase other than the one being worked on. Each says
