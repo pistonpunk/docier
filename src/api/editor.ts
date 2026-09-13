@@ -1,5 +1,6 @@
 import type { DocPos, LayoutOptions, LayoutResult } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
+import { fromCssPx, mp } from '../units/index.js';
 import type { XmlNode } from '../ooxml/xml/index.js';
 import { DocxPackage } from '../ooxml/package.js';
 import type { PackageSource } from '../ooxml/package.js';
@@ -324,6 +325,7 @@ export const createEditor = (
   let input: InputHandle | undefined = undefined;
   let zoom = options.zoom ?? DEFAULT_ZOOM;
   let viewMode: RenderViewMode = options.render?.viewMode ?? 'print';
+  let flowWidth: Mp | undefined;
   let destroyed = false;
   let current: TransactionState | undefined = undefined;
   let pending: EditSelection | undefined = undefined;
@@ -381,6 +383,12 @@ export const createEditor = (
 
   const relayout = (): LayoutResult => {
     return requireSession('relayout').relayout();
+  };
+
+  const draftFlowWidth = (): Mp | undefined => {
+    const canvas = rendered.closest<HTMLElement>('.docier-canvas') ?? handle.element;
+    const width = canvas.clientWidth;
+    return width <= 0 ? undefined : mp(fromCssPx(width, 1));
   };
 
   const paint = (): void => {
@@ -941,7 +949,10 @@ export const createEditor = (
 
   const layoutOptions = (): LayoutOptions => {
     const measurer = settings.layout.measurer;
-    return measurer === undefined ? {} : { measurer };
+    return {
+      ...(measurer === undefined ? {} : { measurer }),
+      ...(flowWidth === undefined ? {} : { flowWidth }),
+    };
   };
 
   const mountSession = (): void => {
@@ -1098,6 +1109,11 @@ export const createEditor = (
     setViewMode: (value) => {
       if (viewMode === value) return;
       viewMode = value;
+      flowWidth = value === 'draft' ? draftFlowWidth() : undefined;
+      if (session !== undefined) {
+        session.setLayoutOptions(layoutOptions());
+        session.relayout();
+      }
       paint();
     },
     get viewMode(): RenderViewMode {

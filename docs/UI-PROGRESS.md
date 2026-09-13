@@ -640,14 +640,37 @@ One gap remains, and it is a view rather than a document feature, recorded below
 with the shape of the change it needs. Everything else in every phase's list is done
 and verified.
 
-**Draft view.** Web Layout and Draft paint the same continuous column. They differ in
-Word because Draft re-flows the text to the window, which is a layout change, and
-the honest way to do it is an engine option that lays the sections out at a flow
-width on one variable-height page. No paint-only difference exists: hiding drawn
-content would be wrong, because Word shows inline pictures in Draft.
+## Draft view, and the end of the list
 
-It is the only gap left, and it is a view preference rather than a document feature:
-everything a document can *contain* now round-trips, is laid out, and is drawn.
+Draft was the last item and the only one that needed the *engine* to do something
+new rather than a command or a painter: Word's Draft re-flows the text to the window,
+which no paint can imitate. Hiding drawn content would have been the cheap
+imitation, and it is wrong - Word shows inline pictures in Draft.
+
+So the engine grew a **flow width**. `LayoutOptions.flowWidth` replaces every
+section's content box with one of that width and unbounded height, and sizes each
+page to its own content instead of to paper. Everything else is unchanged: the same
+passes, the same line breaking, the same fragments - the engine is being asked to
+lay out to a different box, which is the engine's job.
+
+The editor computes the width from its own canvas when the mode becomes Draft and
+drops back to paper for every other mode, relaying out on the way in and out.
+
+**One detail cost a probe.** The first version overrode the section's per-variant
+content boxes and left the singular `contentBox` alone - and `sectionsWithReserve`
+reads the singular one, so the override was discarded and the document still broke
+across 45 pages. Measured rather than guessed: 45 pages, a 50000-wide content box
+and a 300000-wide page, which is a page rect that had been flowed and a box that had
+not.
+
+Verified live in Chromium, driving the View tab's ribbon buttons: the sample's sheet
+is **794 by 1123** on paper and **1214 by 620** in Draft - the canvas width, and only
+as tall as its content - and returns to 794 by 1123 for Web Layout and Print Layout.
+All three modes now differ. No console or page errors.
+
+**The list is done.** Every phase's items are complete and verified, every defect the
+audit found is closed, and the three pieces of machinery this work was missing - a
+per-page reserve, a nested story, and a flow width - are all in the engine now.
 
 ## View modes, closed after Phase F
 

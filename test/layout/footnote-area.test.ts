@@ -4,6 +4,7 @@ import { footnotesRelationship } from '../model/support.js';
 import type { DocxSpec } from '../model/support.js';
 import { bodyOf, layoutOf } from './table-support.js';
 import { layoutDocument } from '../../src/layout/index.js';
+import { mp } from '../../src/units/index.js';
 import { createDeterministicMeasurer } from '../../src/layout/index.js';
 
 const spec = (noteText: string, fillers = 0): DocxSpec => ({
@@ -89,5 +90,32 @@ describe('the area a footnote is drawn in', () => {
     expect(result.pages[0]?.footnotes).toBeUndefined();
     expect(bodyOf).toBeDefined();
     expect(layoutOf).toBeDefined();
+  });
+});
+
+describe('a flow layout', () => {
+  it('puts everything on one page as wide as the flow width and as tall as its content', async () => {
+    const model = await openModel({
+      body: bodyOf(
+        ...Array.from({ length: 60 }, (_value, index) =>
+          `<w:p><w:r><w:t>line ${String(index)} of a long document that would otherwise break</w:t></w:r></w:p>`,
+        ),
+      ),
+    });
+    const paged = layoutDocument(model, { measurer: createDeterministicMeasurer() });
+    const flowed = layoutDocument(model, {
+      measurer: createDeterministicMeasurer(),
+      flowWidth: mp(300000),
+    });
+
+    expect(paged.pages.length).toBeGreaterThan(1);
+    expect(flowed.pages.length).toBe(1);
+
+    const page = flowed.pages[0]!;
+    expect(page.page.width).toBe(300000);
+    expect(page.contentBox.width).toBe(300000);
+    expect(mp(page.page.height)).toBeGreaterThan(mp(paged.pages[0]!.page.height));
+    expect(page.page.height).toBe(page.contentBox.height);
+    expect(page.blocks.length).toBe(60);
   });
 });

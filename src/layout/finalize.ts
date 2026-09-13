@@ -53,6 +53,7 @@ export interface FinalizeInput {
   readonly blockCount: number;
   readonly headerFooters: readonly PageHeaderFooter[];
   readonly objectText: ReadonlyMap<string, readonly BlockFragment[]>;
+  readonly flowWidth: Mp | undefined;
   readonly stories: readonly StoryLayout[];
   readonly lineIdBase: number;
 }
@@ -238,6 +239,21 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
   const caretStops: CaretStop[] = [];
   const refs: LineRef[] = [];
   const pages: PageFragment[] = [];
+
+const flowedHeight = (page: PageState, blocks: readonly BlockFragment[]): Mp => {
+  let bottom = page.contentBox.y as number;
+  for (const block of blocks) {
+    bottom = Math.max(bottom, (block.box.y + block.box.height) as number);
+  }
+  return mp(Math.max(1, Math.round(bottom - (page.contentBox.y as number))));
+};
+
+const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]): Rect => ({
+  x: page.page.x,
+  y: page.page.y,
+  width,
+  height: flowedHeight(page, blocks),
+});
   const tableById = new Map<number, PlacedTable>();
   const tableOrder = new Map<number, number>();
   for (const table of input.tables) {
@@ -312,9 +328,12 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
     pages.push({
       index: page.index,
       kind: page.kind,
-      page: page.page,
+      page: input.flowWidth === undefined ? page.page : flowedPage(page, input.flowWidth, blocks),
+      contentBox:
+        input.flowWidth === undefined
+          ? page.contentBox
+          : { ...page.contentBox, height: flowedHeight(page, blocks) },
       origin: origins[pages.length] ?? { x: mp(0), y: mp(0) },
-      contentBox: page.contentBox,
       footnotes: regions?.footnotes,
       column: page.column,
       section: page.section,

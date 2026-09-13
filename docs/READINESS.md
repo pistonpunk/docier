@@ -64,12 +64,11 @@ diff against the state it was written in.
    against Word's 32 over 22, plus Word's adaptive menu, which this build has no
    equivalent of.
 
-5. ~~**Three view modes write a state nothing reads.**~~ **Mostly closed.** Web
-   Layout and Draft now paint a continuous column - no page gap, no paper frame -
-   where Print Layout and Read Mode keep the framed sheets, measured live by the
-   sheet's computed shadow and background. What remains is that Draft and Web
-   Layout render *the same*, because Word's Draft re-flows the text to the window
-   and that is a layout change this paint-only renderer is not allowed to make.
+5. ~~**Three view modes write a state nothing reads.**~~ **Closed.** All four differ
+   now. Web Layout paints a continuous, unframed column; Print Layout and Read Mode
+   keep the framed sheets; and **Draft re-flows the text to the window**, which the
+   engine does through a flow width - the sample's sheet is 794 by 1123 on paper and
+   1214 by 620 in Draft, measured live.
 
 6. **Half closed: media is inside the transaction snapshot, comments are not.**
    The snapshot now carries every media part's name, content type and bytes, so
@@ -127,12 +126,10 @@ pixels of it, three of the four view modes now change what is on screen, and the
 Insert tab is down to five refusals from eight - each of them a subsystem rather
 than a command, and each named with what it would take.
 
-So the bar this document set for itself is **met on the Insert tab and one step
-short on the view modes**: nothing on that tab refuses any more, the ribbon is
-within five pixels of Word's, and three of four view modes change the view.
+So the bar this document set for itself is **met**: nothing on the Insert tab
+refuses any more, the ribbon is within five pixels of Word's, and all four view modes
+change the view.
 
-One gap is left, and it is a view rather than a document feature: a flow-width
-option so Draft can re-flow. Everything a document can contain now round-trips, is
-laid out and is drawn - pictures, tables, headers and footers, footnotes, comments,
-hyperlinks, text boxes and a table of contents. `docs/UI-PROGRESS.md` has the
-remaining one with the shape of the change it needs.
+**Nothing on this list is open.** Every document feature round-trips, is laid out and
+is drawn - pictures, tables, headers and footers, footnotes, comments, hyperlinks,
+text boxes and a table of contents - and all four view modes differ.

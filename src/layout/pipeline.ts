@@ -43,7 +43,10 @@ export const FOOTNOTE_SEPARATOR_MP = 12000;
 
 export const FOOTNOTE_RULE_MP = 500;
 
+export const FLOW_HEIGHT_MP = 1_000_000_000;
+
 export interface LayoutOptions {
+  readonly flowWidth?: Mp;
   readonly measurer?: TextMeasurer;
   readonly defaultFontFamily?: string;
   readonly defaultTabStop?: Twip;
@@ -116,6 +119,21 @@ const fallbackRunFormat = (family: string): RunFormat => ({
   rightToLeft: false,
 });
 
+const flowSections = (
+  sections: readonly Section[],
+  flowWidth: Mp | undefined,
+): readonly Section[] => {
+  if (flowWidth === undefined || flowWidth <= 0) return sections;
+  return sections.map((section) => {
+    const box: Rect = { x: mp(0), y: mp(0), width: flowWidth, height: mp(FLOW_HEIGHT_MP) };
+    return {
+      ...withContentBoxes(section, { default: box, first: box, even: box }),
+      contentBox: box,
+      page: { x: section.page.x, y: section.page.y, width: flowWidth, height: box.height },
+    };
+  });
+};
+
 const contentBoxOf = (section: Section | undefined): { x: Mp; width: Mp } => ({
   x: section?.contentBox.x ?? mp(0),
   width: section?.contentBox.width ?? mp(0),
@@ -132,7 +150,10 @@ export const layoutDocument = (
   const diagnostics: LayoutDiagnostic[] = [];
 
   const ingested = ingest(model, { defaultFontFamily, defaultTabStop: defaultTabStopMp });
-  const sections: readonly Section[] = buildSections(ingested, diagnostics);
+  const sections: readonly Section[] = flowSections(
+    buildSections(ingested, diagnostics),
+    options.flowWidth,
+  );
   const fonts = new FontResolver(measurer, diagnostics);
   const paint = new PaintRegistry();
   const hash = ingested.hash;
@@ -582,6 +603,7 @@ export const layoutDocument = (
     pieces: paginated.pieces,
     pages: paginated.pages,
     objectText,
+    flowWidth: options.flowWidth,
     paint: paint.list(),
     diagnostics: dedupe(diagnostics),
     hash: hash.digest(),

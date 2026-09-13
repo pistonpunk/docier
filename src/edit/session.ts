@@ -130,6 +130,7 @@ export interface EditSession {
   rememberBodyPosition(pos: DocPos): void;
   rememberedBodyPosition(): DocPos;
   readonly layoutOptions: LayoutOptions;
+  setLayoutOptions(options: LayoutOptions): void;
 }
 
 const NUMBERING_KEY_ATTRIBUTES: readonly string[] = ['abstractNumId', 'numId', 'numPicBulletId'];
@@ -392,8 +393,9 @@ const pairContainers = (
 
 export const createEditSession = (
   model: DocumentModel,
-  layoutOptions: LayoutOptions = {},
+  initialLayoutOptions: LayoutOptions = {},
 ): EditSession => {
+  let layoutOptions = initialLayoutOptions;
   let result: LayoutResult = layoutDocument(model, layoutOptions);
   let index: PositionIndex = buildPositionIndex(result);
   let cachedSlots: readonly ParagraphSlot[] | undefined;
@@ -733,6 +735,9 @@ export const createEditSession = (
       const span = index.storySpan(bodyStoryId);
       if (span === undefined || pos < span.start || pos > span.end) return;
       bodyPosition = pos;
+    },
+    setLayoutOptions: (next: LayoutOptions) => {
+      layoutOptions = next;
     },
     rememberedBodyPosition: () => {
       const span = index.storySpan(bodyStoryId);
