@@ -185,7 +185,7 @@ const itemFromContent = (
       start,
       'none',
       0,
-      objectPlacementOf(content.element),
+      objectPlacementOf(content.element, content.id),
     );
   }
   if (content instanceof NoteReferenceContent && content.kind === 'noteReference') {

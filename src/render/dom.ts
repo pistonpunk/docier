@@ -18,6 +18,7 @@ export const ATTR = {
   line: 'data-docier-line',
   run: 'data-docier-run',
   object: 'data-docier-object',
+  objectId: 'data-docier-object-id',
   image: 'data-docier-image',
   imageMissing: 'data-docier-image-missing',
   highlight: 'data-docier-highlight',

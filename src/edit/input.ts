@@ -9,6 +9,17 @@ import type { SheetOffset } from './caret.js';
 import type { EditSession } from './session.js';
 import type { EditSelection } from './selection.js';
 import { endOf, isCollapsed, rangeAsDocRange, startOf } from './selection.js';
+import type { ObjectBox } from './objects.js';
+import { clearObjectSelection, findObjectBox, objectBoxAt, objectSelectionOf } from './objects.js';
+import type { HandleBox, ObjectHandle } from './object-resize.js';
+import {
+  HANDLE_CURSORS,
+  HANDLE_SIZE_PX,
+  OBJECT_HANDLES,
+  handleAtPoint,
+  handlePointsOf,
+  startObjectResize,
+} from './object-resize.js';
 import type { ClipboardDataLike } from './clipboard/types.js';
 
 export interface InputHost {
@@ -124,6 +135,11 @@ const clipboardDataOf = (event: Event): ClipboardDataLike | undefined =>
 const dataTransferOf = (event: Event): ClipboardDataLike | undefined =>
   (event as unknown as DataTransferEventLike).dataTransfer;
 
+const buttonOf = (event: Event): number => {
+  const value = (event as unknown as { readonly button?: number }).button;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+};
+
 const clientPointOf = (
   event: Event,
 ): { readonly x: number; readonly y: number } | undefined => {
@@ -181,6 +197,8 @@ const KEY_RULES: readonly KeyRule[] = [
   { key: 'r', ctrl: true, command: `${PREFIX}format.alignRight` },
   { key: 'j', ctrl: true, command: `${PREFIX}format.alignJustify` },
 ];
+
+const CLEARING_PREFIXES: readonly string[] = [`${PREFIX}edit.`, `${PREFIX}selection.`];
 
 const INPUT_COMMANDS: Readonly<Record<string, string>> = {
   insertText: `${PREFIX}edit.insertText`,
@@ -252,8 +270,36 @@ export const attachInput = (host: InputHost): InputHandle => {
           { duration: CARET_BLINK_MS * 2, iterations: Number.POSITIVE_INFINITY },
         )
       : undefined;
+  const objectLayer = owner.createElement('div');
+  objectLayer.className = 'docier-object-layer';
+  applyStyle(objectLayer, { position: 'absolute', left: '0', top: '0' });
+  const objectFrame = owner.createElement('div');
+  objectFrame.className = 'docier-object-frame';
+  applyStyle(objectFrame, {
+    position: 'absolute',
+    display: 'none',
+    outline: '1px dashed var(--docier-accent, #1f6feb)',
+  });
+  const handleNodes = new Map<ObjectHandle, HTMLElement>();
+  for (const handle of OBJECT_HANDLES) {
+    const node = owner.createElement('div');
+    node.className = `docier-object-handle docier-object-handle-${handle}`;
+    applyStyle(node, {
+      position: 'absolute',
+      display: 'none',
+      width: `${String(HANDLE_SIZE_PX)}px`,
+      height: `${String(HANDLE_SIZE_PX)}px`,
+      'background-color': 'var(--docier-surface, #ffffff)',
+      border: '1px solid var(--docier-accent, #1f6feb)',
+      'box-sizing': 'border-box',
+    });
+    handleNodes.set(handle, node);
+    objectLayer.appendChild(node);
+  }
+  objectLayer.appendChild(objectFrame);
   overlay.appendChild(selectionLayer);
   overlay.appendChild(caret);
+  overlay.appendChild(objectLayer);
   host.rendered.appendChild(overlay);
 
   const composer = owner.createElement('div');
@@ -374,7 +420,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     const offset = originOf(sheet);
     const point = pageToViewport(page, offset, geometry.x, geometry.y, zoom);
     const height = toCssPx(geometry.height, zoom);
-    caret.style.display = 'block';
+    caret.style.display = selectedObject() === undefined ? 'block' : 'none';
     applyStyle(caret, {
       left: `${String(point.left)}px`,
       top: `${String(point.top)}px`,
@@ -389,11 +435,17 @@ export const attachInput = (host: InputHost): InputHandle => {
     return true;
   };
 
+  const selectedObject = (): string | undefined => {
+    const session = host.session;
+    return session === undefined ? undefined : objectSelectionOf(session);
+  };
+
   const paintSelection = (): void => {
     clearChildren(selectionLayer);
     const positions = index();
     const current = host.selection;
     if (positions === undefined || isCollapsed(current)) return;
+    if (selectedObject() !== undefined) return;
     const start = startOf(current);
     const end = endOf(current);
     const zoom = host.zoom;
@@ -444,6 +496,125 @@ export const attachInput = (host: InputHost): InputHandle => {
       return hit === undefined ? undefined : { pos: hit.pos, affinity: hit.affinity };
     }
     return undefined;
+  };
+
+  const objectFrameBox = (): HandleBox | undefined => {
+    const id = selectedObject();
+    const session = host.session;
+    if (id === undefined || session === undefined) return undefined;
+    const found = findObjectBox(session.layout, id);
+    if (found === undefined) return undefined;
+    const page = pageFragmentOf(found.page);
+    const sheet = sheetFor(found.page);
+    if (page === undefined || sheet === undefined) return undefined;
+    const corner = pageToViewport(
+      page,
+      originOf(sheet),
+      found.box.x,
+      found.box.y,
+      host.zoom,
+    );
+    return {
+      left: corner.left,
+      top: corner.top,
+      width: toCssPx(found.box.width, host.zoom),
+      height: toCssPx(found.box.height, host.zoom),
+    };
+  };
+
+  const paintObjectHandles = (): void => {
+    const box = objectFrameBox();
+    if (box === undefined) {
+      objectFrame.style.display = 'none';
+      for (const node of handleNodes.values()) node.style.display = 'none';
+      return;
+    }
+    applyStyle(objectFrame, {
+      display: 'block',
+      left: `${String(box.left)}px`,
+      top: `${String(box.top)}px`,
+      width: `${String(box.width)}px`,
+      height: `${String(box.height)}px`,
+    });
+    for (const point of handlePointsOf(box)) {
+      const node = handleNodes.get(point.handle);
+      if (node === undefined) continue;
+      applyStyle(node, {
+        display: 'block',
+        left: `${String(point.x - HANDLE_SIZE_PX / 2)}px`,
+        top: `${String(point.y - HANDLE_SIZE_PX / 2)}px`,
+      });
+    }
+  };
+
+  const surfacePointOf = (
+    clientX: number,
+    clientY: number,
+  ): { readonly x: number; readonly y: number } => {
+    const base = host.rendered.getBoundingClientRect();
+    return { x: clientX - base.left, y: clientY - base.top };
+  };
+
+  const objectHandleAt = (clientX: number, clientY: number): ObjectHandle | undefined => {
+    const box = objectFrameBox();
+    if (box === undefined) return undefined;
+    const point = surfacePointOf(clientX, clientY);
+    return handleAtPoint(box, point.x, point.y);
+  };
+
+  const objectAtPoint = (clientX: number, clientY: number): ObjectBox | undefined => {
+    if (index() === undefined) return undefined;
+    const zoom = host.zoom === 0 ? 1 : host.zoom;
+    for (const sheet of sheets()) {
+      const box = pageBox(sheet);
+      if (clientX < box.left || clientX > box.left + box.width) continue;
+      if (clientY < box.top || clientY > box.top + box.height) continue;
+      const pageIndex = Number(sheet.getAttribute(ATTR.page) ?? '-1');
+      const page = pageFragmentOf(pageIndex);
+      if (page === undefined) return undefined;
+      const point = clientToPage(page, { left: box.left, top: box.top }, clientX, clientY, zoom);
+      return objectBoxAt(page, point);
+    }
+    return undefined;
+  };
+
+  const objectElementOf = (objectId: string): HTMLElement | undefined => {
+    for (const node of host.rendered.querySelectorAll<HTMLElement>(`[${ATTR.objectId}]`)) {
+      if (node.getAttribute(ATTR.objectId) === objectId) return node;
+    }
+    return undefined;
+  };
+
+  const dropObjectSelection = (): void => {
+    const session = host.session;
+    if (session === undefined || objectSelectionOf(session) === undefined) return;
+    clearObjectSelection(session);
+    paintObjectHandles();
+    paintSelection();
+  };
+
+  const startResize = (handle: ObjectHandle, event: PointerEvent): void => {
+    const session = host.session;
+    const id = selectedObject();
+    if (session === undefined || id === undefined) return;
+    const found = findObjectBox(session.layout, id);
+    if (found === undefined) return;
+    event.preventDefault();
+    composer.focus({ preventScroll: true });
+    startObjectResize({
+      document: owner,
+      handle,
+      box: found.box,
+      zoom: host.zoom,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      target: objectElementOf(id),
+      commit: ({ widthTwips, heightTwips }) => {
+        run(`${PREFIX}object.setSize`, { objectId: id, widthTwips, heightTwips });
+        paintObjectHandles();
+        paintCaret();
+      },
+    });
   };
 
   let dragging = false;
@@ -584,6 +755,15 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const onHover = (event: PointerEvent): void => {
     if (dragging) return;
+    const handle = objectHandleAt(event.clientX, event.clientY);
+    if (handle !== undefined) {
+      host.rendered.style.cursor = HANDLE_CURSORS[handle];
+      return;
+    }
+    if (objectAtPoint(event.clientX, event.clientY) !== undefined) {
+      host.rendered.style.cursor = 'default';
+      return;
+    }
     const edge = tableEdgeAt(event.clientX, event.clientY);
     host.rendered.style.cursor =
       edge === undefined ? '' : edge.kind === 'column' ? 'col-resize' : 'row-resize';
@@ -605,13 +785,33 @@ export const attachInput = (host: InputHost): InputHandle => {
   };
 
   const onPointerDown = (event: PointerEvent): void => {
-    const edge = event.button === 0 ? tableEdgeAt(event.clientX, event.clientY) : undefined;
+    const button = buttonOf(event);
+    if (button === 0) {
+      const handle = objectHandleAt(event.clientX, event.clientY);
+      if (handle !== undefined) {
+        startResize(handle, event);
+        return;
+      }
+      const object = objectAtPoint(event.clientX, event.clientY);
+      if (object !== undefined) {
+        event.preventDefault();
+        composer.focus({ preventScroll: true });
+        run(`${PREFIX}object.select`, { objectId: object.objectId });
+        paintObjectHandles();
+        paintCaret();
+        return;
+      }
+    }
+    const edge = button === 0 ? tableEdgeAt(event.clientX, event.clientY) : undefined;
     if (edge !== undefined) {
+      dropObjectSelection();
       startEdgeDrag(edge, event);
       return;
     }
     const hit = hitTest(event.clientX, event.clientY);
     if (hit === undefined) return;
+    if (button !== 0 && inSelection(hit.pos)) return;
+    if (button === 0) dropObjectSelection();
     event.preventDefault();
     composer.focus({ preventScroll: true });
     if (!event.shiftKey && inSelection(hit.pos)) {
@@ -702,6 +902,12 @@ export const attachInput = (host: InputHost): InputHandle => {
       releasePointer();
       return;
     }
+    if (event.key === 'Escape' && selectedObject() !== undefined) {
+      event.preventDefault();
+      dropObjectSelection();
+      paintCaret();
+      return;
+    }
     if ((event.key === 'PageDown' || event.key === 'PageUp') && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       run(`${PREFIX}selection.${event.key === 'PageDown' ? 'movePageDown' : 'movePageUp'}`, {
@@ -714,6 +920,10 @@ export const attachInput = (host: InputHost): InputHandle => {
     for (const rule of KEY_RULES) {
       if (!matchesRule(rule, event, mac)) continue;
       event.preventDefault();
+      if (CLEARING_PREFIXES.some((prefix) => rule.command.startsWith(prefix))) {
+        dropObjectSelection();
+        paintCaret();
+      }
       run(rule.command, rule.movement === true ? { extend: event.shiftKey } : undefined);
       return;
     }
@@ -722,6 +932,7 @@ export const attachInput = (host: InputHost): InputHandle => {
   const onBeforeInput = (event: InputEvent): void => {
     if (event.inputType.startsWith('insertComposition')) return;
     event.preventDefault();
+    dropObjectSelection();
     const command = INPUT_COMMANDS[event.inputType];
     if (command === undefined) return;
     if (command === `${PREFIX}edit.insertText`) {
@@ -740,6 +951,7 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const onPaste = (event: ClipboardEvent): void => {
     event.preventDefault();
+    dropObjectSelection();
     run(`${PREFIX}clipboard.paste`, { data: clipboardDataOf(event) });
   };
 
@@ -757,15 +969,18 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   paintCaret();
   paintSelection();
+  paintObjectHandles();
 
   return {
     refresh: () => {
       paintCaret();
       paintSelection();
+      paintObjectHandles();
     },
     reveal: () => {
       const painted = paintCaret();
       paintSelection();
+      paintObjectHandles();
       scrollCaretIntoView(painted);
       if (blink !== undefined) blink.currentTime = 0;
     },

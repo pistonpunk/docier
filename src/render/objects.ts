@@ -100,7 +100,11 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
     if (object === undefined) continue;
     if (atom.source.start < run.source.start || atom.source.end > run.source.end) continue;
     const container = box('docier-object');
-    stamp(container, { [ATTR.object]: String(atom.atomId), [ATTR.line]: String(line.id) });
+    stamp(container, {
+      [ATTR.object]: String(atom.atomId),
+      [ATTR.objectId]: object.objectId,
+      [ATTR.line]: String(line.id),
+    });
     applyStyle(
       container,
       positionStyle(geometryAt(objectBoxOf(line, run, atom), frame, scale)),

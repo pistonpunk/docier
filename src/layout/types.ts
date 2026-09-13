@@ -90,6 +90,7 @@ export interface LayoutDiagnostic {
 }
 
 export interface ObjectPlacement {
+  readonly objectId: string;
   readonly relationshipId: string | undefined;
   readonly width: Mp;
   readonly height: Mp;

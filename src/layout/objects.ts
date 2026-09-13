@@ -87,7 +87,31 @@ const relationshipIdOf = (blip: XmlElement | undefined): string | undefined => {
   return attributeValue(blip, 'embed') ?? attributeValue(blip, 'link');
 };
 
-export const objectPlacementOf = (element: XmlElement): ObjectPlacement | undefined => {
+export const drawingObjectIdOf = (element: XmlElement): string | undefined => {
+  const docPr = descendantIn(
+    element,
+    (candidate) => isWp(candidate) && candidate.localName === 'docPr',
+  );
+  if (docPr === undefined) return undefined;
+  const raw = attributeValue(docPr, 'id');
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  return trimmed === '' ? undefined : trimmed;
+};
+
+export const objectIdOfDrawing = (
+  element: XmlElement,
+  fallbackId?: string | number,
+): string => {
+  const declared = drawingObjectIdOf(element);
+  if (declared !== undefined) return declared;
+  return fallbackId === undefined ? '' : `#${String(fallbackId)}`;
+};
+
+export const objectPlacementOf = (
+  element: XmlElement,
+  fallbackId?: string | number,
+): ObjectPlacement | undefined => {
   const inline = childrenOf(element).find(
     (child) => isWp(child) && child.localName === 'inline',
   );
@@ -109,6 +133,7 @@ export const objectPlacementOf = (element: XmlElement): ObjectPlacement | undefi
     (candidate) => isA(candidate) && candidate.localName === 'srcRect',
   );
   return {
+    objectId: objectIdOfDrawing(element, fallbackId),
     relationshipId: relationshipIdOf(blip),
     width,
     height,

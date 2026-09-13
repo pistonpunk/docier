@@ -188,7 +188,6 @@ const REFUSALS: readonly Refusal[] = [
   { id: 'docier.command.object.bringForward', label: 'Bring forward', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.sendBackward', label: 'Send backward', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.group', label: 'Group', category: 'object', reason: NO_OBJECT_SELECTION },
-  { id: 'docier.command.object.setSize', label: 'Size', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.setWrap', label: 'Wrap text', category: 'object', reason: NO_OBJECT_SELECTION },
   { id: 'docier.command.object.delete', label: 'Delete object', category: 'object', reason: NO_OBJECT_SELECTION },
 
