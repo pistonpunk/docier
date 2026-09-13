@@ -77,7 +77,7 @@ have removed drag-to-move, which works and is worth keeping.
 |---|---|---|
 | B1 | Delete `startDrag`, give the indent markers the margin interaction, clamp negative indents | **done** |
 | B2 | Make pictures visible at all, by giving the renderer the media parts | **done** |
-| B3 | Object selection and resize handles for inline pictures | to do |
+| B3 | Object selection and resize handles for inline pictures | **done** |
 | B4 | Table width handles, proportional write, `tblLayout` fixed | to do |
 
 ### Phase B notes
@@ -110,6 +110,45 @@ demo now reads the media relationships out of the package before the document
 renders and hands the renderer a provider keyed by relationship id. Verified on
 `contract.docx`: one real `img.docier-image` with a PNG data URL, zero missing
 placeholders, three sources handed over.
+
+**B3 done.** A picture could not be selected, showed no handles and could not be
+moved. It has a selection frame and eight handles now, and a drag resizes it.
+
+The first problem was identity: objects were stamped with a per-paragraph atom
+ordinal, and a resize triggers a relayout, so a selection held that way is destroyed
+by the edit it causes. Objects carry the document-declared `wp:docPr/@id` now,
+falling back to the node id, stamped beside the atom id rather than instead of it.
+Verified: the same element reports id 7 for the declared identity and 4 for the atom
+one, and the selection survives the relayout.
+
+The coordinate work was free: the overlay sits on the unscaled surface above the
+zoom transform, so handles are 8 screen pixels at every zoom, verified at 0.16, 0.25,
+0.63 and 1.0. Word's drag semantics are implemented, including the part that is the
+opposite of most web editors: a corner locks the ratio and fixes the opposite corner,
+and Shift unlocks it. A 40px corner drag took 64x64 to 84x84 on both axes. The commit
+writes both extents and never touches the media, whose bytes are identical after a
+resize. One gesture, one commit, one undo entry. It also fixed appendix A1.
+
+**B3's limits, recorded as findings rather than left implicit.** None of these is
+reachable from the demo's sample documents, and each would need a fixture to
+reproduce:
+
+- Only objects the layout gives an image relationship are hit-tested: shapes, charts,
+  text boxes and groups are filtered by that guard, which is a heuristic rather than
+  a verified type test.
+- Floating (`wp:anchor`) drawings and pictures inside headers or footers cannot be
+  selected, because the search walks the body's blocks only.
+- Rotation is out of scope, and a rotated picture would get an axis-aligned frame.
+- **At 25% zoom the eight handles' hit radii overlap**, so a corner can resolve as an
+  edge. At 50% and above they are unambiguous. This is a real limitation of a fixed
+  pixel hit radius at low zoom.
+- The commit updates `wp:extent` and `pic:spPr/a:xfrm/a:ext` only when they exist; it
+  never creates a missing one, and that path is untested.
+- A drawing with no `wp:docPr/@id` falls back to the node id, which does not survive
+  the relayout, so such a document would lose its selection across a resize.
+- No keyboard nudge, no drag-to-move, no multi-select, no rotation, no size readout.
+- `docier.command.object.select` exists but no menu or toolbar dispatches it; the
+  pointer path executes it directly.
 
 ## Phase C - The menu surface
 
