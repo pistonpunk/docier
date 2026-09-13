@@ -343,9 +343,9 @@ export const attachInput = (host: InputHost): InputHandle => {
     return undefined;
   };
 
-  const scrollCaretIntoView = (): void => {
+  const scrollCaretIntoView = (hasGeometry: boolean): void => {
     const scroller = scrollerOf();
-    if (scroller === undefined || caret.style.display === 'none') return;
+    if (scroller === undefined || !hasGeometry) return;
     const caretBox = caret.getBoundingClientRect();
     if (caretBox.height === 0) return;
     const view = scroller.getBoundingClientRect();
@@ -356,19 +356,19 @@ export const attachInput = (host: InputHost): InputHandle => {
     scroller.scrollTop += above > 0 ? -above : below;
   };
 
-  const paintCaret = (): void => {
+  const paintCaret = (): boolean => {
     const geometry = caretOf();
     if (geometry === undefined) {
       caret.style.display = 'none';
       composer.style.display = 'none';
-      return;
+      return false;
     }
     const page = pageFragmentOf(geometry.page);
     const sheet = sheetFor(geometry.page);
     if (page === undefined || sheet === undefined) {
       caret.style.display = 'none';
       composer.style.display = 'none';
-      return;
+      return false;
     }
     const zoom = host.zoom;
     const offset = originOf(sheet);
@@ -386,6 +386,7 @@ export const attachInput = (host: InputHost): InputHandle => {
       top: `${String(point.top)}px`,
       height: `${String(height)}px`,
     });
+    return true;
   };
 
   const paintSelection = (): void => {
@@ -763,9 +764,9 @@ export const attachInput = (host: InputHost): InputHandle => {
       paintSelection();
     },
     reveal: () => {
-      paintCaret();
+      const painted = paintCaret();
       paintSelection();
-      scrollCaretIntoView();
+      scrollCaretIntoView(painted);
       if (blink !== undefined) blink.currentTime = 0;
     },
     focus: () => {

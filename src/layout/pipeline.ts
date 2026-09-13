@@ -64,6 +64,10 @@ const placeBlocks = (
         id,
         box: rectOf(line.box.x, mp(line.box.y + dy), line.box.width, line.box.height),
         baselineY: mp(line.baselineY + dy),
+        caretStops: line.caretStops.map((stop) => ({
+          ...stop,
+          baselineY: mp(stop.baselineY + dy),
+        })),
       };
     }),
   }));

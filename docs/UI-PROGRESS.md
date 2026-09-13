@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase A in progress**, six of its nine items done.
+Status: **Phase A complete.** Phase B next.
 
 Done and verified in the browser:
 
@@ -43,13 +43,33 @@ Done and verified in the browser:
 |---|---|---|
 | A1 | Focus on mount, so `autoFocus` stops being dead code | **done** |
 | A2 | Ribbon and status-bar controls must not steal focus | **done** |
-| A3 | Ctrl+A must not produce an uneditable selection, and a click inside a selection must collapse it | to do |
+| A3 | Ctrl+A must not produce an uneditable selection | **done** |
 | A4 | Range formatting: the stale-cache fix in `splitBoundary` | **done** |
 | A5 | Range formatting: the run-at-the-caret convention in `insertionPoint` | **done** |
-| A6 | Caret: shift the region stops so a header or footer caret is where its text is | to do |
+| A6 | Caret: shift the region stops so a header or footer caret is where its text is | **done** |
 | A7 | Caret: reveal on zoom | **done** |
 | A8 | Caret: reset the blink phase on input | **done** |
-| A9 | Caret: stop `scrollCaretIntoView` locking itself out | to do |
+| A9 | Caret: decide the scroll from geometry rather than from the DOM | **done** |
+
+- **A3** `Ctrl+A` selected the whole *story*, which in the sample spans table cell
+  containers, and no edit command accepts a range crossing a container: every
+  keystroke was swallowed while the caret went on blinking, and clicking inside the
+  selection only armed a drag, so the obvious escape did not work. `selectAllAction`
+  now clamps to the cell when the caret is inside one. Verified: Ctrl+A in a cell
+  selects its 6 characters and typing lands, while Ctrl+A in the body still selects
+  all 872.
+- **A6** A header or footer caret was painted at the top of the page, about 35000
+  millipoints from its text, because `placeBlocks` shifted the blocks, the lines and
+  the baselines by the region offset and left `caretStops` region-local. Verified:
+  the caret is now at x=560 three pixels above its text, which is also at x=560.
+- **A9** `scrollCaretIntoView` decided whether to scroll by reading the caret's
+  computed `display`, which an injected stylesheet can override, so a print
+  stylesheet could make it believe there was nothing to scroll to. It takes the
+  answer from the paint now, which knows whether geometry existed.
+
+Not done in A3, deliberately: the alternative fix of collapsing the selection when
+a click lands inside it. The clamp removes the wedged state, and collapsing would
+have removed drag-to-move, which works and is worth keeping.
 
 ## Phase B - Direct manipulation
 

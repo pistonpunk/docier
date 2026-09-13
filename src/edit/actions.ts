@@ -31,6 +31,7 @@ import {
   isCollapsed,
   rangeAsDocRange,
   selectAll,
+  selectRange,
   selectionEquals,
   selectionOf,
   startOf,
@@ -424,8 +425,29 @@ export const clearSelectionRange = (host: EditActionHost): ActionResult => {
   return selectionAction(next, 'clear');
 };
 
+const cellExtent = (
+  host: EditActionHost,
+  container: unknown,
+): { readonly start: DocPos; readonly end: DocPos } | undefined => {
+  const inside = host.session.slots().filter((slot) => slot.container === container);
+  const first = inside[0];
+  const last = inside[inside.length - 1];
+  if (first === undefined || last === undefined) return undefined;
+  return { start: first.start, end: last.textEnd };
+};
+
 export const selectAllAction = (host: EditActionHost): ActionResult => {
-  const next = selectAll(host.session.index, host.selection.focus);
+  const focus = host.selection.focus;
+  const resolved = host.session.resolve(focus);
+  const container = resolved?.slot.container;
+  const extent =
+    resolved?.slot.cell === undefined || container === undefined
+      ? undefined
+      : cellExtent(host, container);
+  const next =
+    extent === undefined
+      ? selectAll(host.session.index, focus)
+      : selectRange(host.session.index, extent);
   if (selectionEquals(next, host.selection)) return NO_CHANGE;
   return selectionAction(next, 'set');
 };
