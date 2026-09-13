@@ -6,7 +6,7 @@ import { createDeclaration, createDocument, serializeXmlNode } from '../ooxml/xm
 import { cloneNode } from '../ooxml/xml/tree.js';
 import type { Relationship } from '../ooxml/relationships.js';
 import type { DocumentModel, Story } from '../model/index.js';
-import { Paragraph, childElements, wAttr } from '../model/index.js';
+import { Paragraph, childElements, storyKindForPartName, wAttr } from '../model/index.js';
 import type { PositionIndex, ParagraphSpan } from './positions.js';
 import { blockText, buildPositionIndex } from './positions.js';
 import type { SlotContainer } from './containers.js';
@@ -56,6 +56,25 @@ export interface RegionSnapshot {
   readonly partName: string;
   readonly root: XmlElement;
 }
+
+export type AdoptedPart = 'header' | 'footer' | 'comments' | 'footnotes' | 'endnotes';
+
+const ADOPTED_PART = /(?:^|\/)(header|footer|comments|footnotes|endnotes)[0-9]*\.xml$/;
+
+export const adoptedPartOf = (partName: string): AdoptedPart | undefined => {
+  const match = ADOPTED_PART.exec(partName);
+  const raw = match?.[1];
+  if (
+    raw === 'header' ||
+    raw === 'footer' ||
+    raw === 'comments' ||
+    raw === 'footnotes' ||
+    raw === 'endnotes'
+  ) {
+    return raw;
+  }
+  return undefined;
+};
 
 export interface EditSnapshot {
   readonly body: readonly XmlNode[];
@@ -182,19 +201,17 @@ const restoreNumbering = (model: DocumentModel, snapshot: NumberingSnapshot): bo
 const regionStoriesOf = (model: DocumentModel): readonly Story[] =>
   model.stories().filter((story) => story.isHeaderFooter);
 
+const adoptedStoriesOf = (model: DocumentModel): readonly Story[] =>
+  model.stories().filter((story) => adoptedPartOf(story.partName) !== undefined);
+
 const captureRegions = (model: DocumentModel): readonly RegionSnapshot[] =>
-  regionStoriesOf(model).map((story) => ({
+  adoptedStoriesOf(model).map((story) => ({
     partName: story.partName,
     root: cloneElement(story.element),
   }));
 
-const regionPartNamesOf = (model: DocumentModel): readonly string[] =>
-  model.package
-    .partNames()
-    .filter((name) => /\/header[0-9]*\.xml$/.test(name) || /\/footer[0-9]*\.xml$/.test(name));
-
-const kindOfRegionPart = (partName: string): 'header' | 'footer' =>
-  partName.includes('/footer') ? 'footer' : 'header';
+const adoptedPartNamesOf = (model: DocumentModel): readonly string[] =>
+  model.package.partNames().filter((name) => adoptedPartOf(name) !== undefined);
 
 const restoreRegionParts = (
   model: DocumentModel,
@@ -202,18 +219,20 @@ const restoreRegionParts = (
 ): boolean => {
   const known = new Map(snapshot.map((entry) => [entry.partName, entry]));
   let changed = false;
-  for (const name of regionPartNamesOf(model)) {
+  for (const name of adoptedPartNamesOf(model)) {
     if (known.has(name)) continue;
     model.dropStory(name);
     if (model.package.removePart(name)) changed = true;
   }
   for (const entry of snapshot) {
     if (model.package.getPart(entry.partName) !== undefined) continue;
-    const kind = kindOfRegionPart(entry.partName);
+    const role = adoptedPartOf(entry.partName);
+    const kind = storyKindForPartName(entry.partName);
+    if (role === undefined || kind === undefined) continue;
     const document = createDocument(createDeclaration());
     const root = cloneElement(entry.root);
     document.children.push(root);
-    model.package.createDocumentPart(entry.partName, document, { role: kind });
+    model.package.createDocumentPart(entry.partName, document, { role });
     model.adoptStory(kind, entry.partName, root);
     changed = true;
   }
@@ -694,11 +713,11 @@ export const createEditSession = (
       return true;
     },
     changeRegions: (write) => {
-      const stories = regionStoriesOf(model);
+      const stories = adoptedStoriesOf(model);
       const before = stories.map((story) => serializeXmlNode(story.element));
       const beforeNames = stories.map((story) => story.partName);
       write();
-      const after = regionStoriesOf(model);
+      const after = adoptedStoriesOf(model);
       let changed =
         after.length !== beforeNames.length ||
         after.some((story, at) => story.partName !== beforeNames[at]);

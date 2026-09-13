@@ -510,7 +510,7 @@ still announces that it is not available.
 |---|---|---|
 | F1 | Insert a picture | **done** |
 | F2 | Hyperlink | **done, no on-screen link affordance** |
-| F3 | Comments | **refused, with the reason named** |
+| F3 | Comments | **done, with no on-screen marker yet** |
 | F4 | Symbol | **done** |
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
@@ -698,7 +698,7 @@ rather than a generic refusal, which is the state the phase asked for.
 
 | Command | What it needs |
 |---|---|
-| Comments | A `word/comments.xml` part, a comments part type and content type, a relationship per comment, `w:commentReference` and `w:commentRangeStart/End` runs, and a surface to read them in. The editing layer creates no part of its own except media, and none of the layout or the chrome knows a comment exists. |
+| ~~Comments~~ | **Done.** See below. |
 | Footnote | A `word/footnotes.xml` part, the `w:footnoteReference` run, and **footnote layout**: the note area has to be measured, reserved at the foot of the page and paginated against, which is a second page-fitting pass this build does not have. |
 | Header creation | **Done.** See the note below. |
 | Text box | A drawing with a text body: `wps:wsp` inside a `wps:txbx`, whose content is a whole nested story. This build authors exactly one kind of drawing, a picture from host bytes. |
@@ -785,6 +785,47 @@ The result is deliberately **not** live: it is computed at insert time, and
 editing a heading afterwards does not rewrite the entry. Word behaves the same way
 until you press F9, and this build has no field-update command - which is why
 `insert.updateTable` is still a refusal with that as its reason.
+
+### Comments, done, with the rendering gap named
+
+`docier.command.comment.create` writes the whole shape Word does: a
+`word/comments.xml` part with a `w:comment` carrying its id, author, initials and
+text; the relationship and the content type; and in the body a
+`w:commentRangeStart`, the commented text, a `w:commentRangeEnd` and a run holding
+a `w:commentReference`.
+
+**The markers land on the exact characters, which took one fix.** The comment sits
+between the run boundaries, so the runs have to be split at the selection's two
+ends first. The obvious way - call the splitter for the start offset, then for the
+end offset - produced two adjacent markers around nothing, and the reason is the
+bug class Phase A was about: the first call mutates the paragraph's children
+without invalidating the view cache the span scan reads, so the second call sees
+the runs as they were. One `forgetSubtree` between them and the same document comes
+out `alpha ` | start | `beta` | end | reference | ` gamma`, which is what the test
+now asserts on both sides of the markers rather than on their presence.
+
+**A selection that crosses a paragraph is refused**, with a reason that says so,
+because the marker pair has to go inside one paragraph's child list. A selection
+inside it is exact.
+
+**Three ways to add something to a document now share one mechanism.** A header, a
+comment and (next) a footnote all create a part the document did not have, and all
+three have to be inside the undo snapshot or the undone part survives as an orphan
+and the redone one is missing. `captureRegions` and `restoreRegionParts` became the
+adopted-part snapshot: it captures every part that is a header, footer, comments,
+footnotes or endnotes, removes the ones that are not in the snapshot on restore,
+and recreates the ones that are missing under their original names, adopting their
+stories again. `changeRegions` had to widen with it - it compared only the
+header and footer stories, so a comment read as no change and the region capture
+went stale, which made redo fail in exactly the way the test for it asserts.
+
+**The gap, recorded rather than glossed.** Nothing on screen marks a commented
+range. The layout ingests `w:commentRangeStart` and `w:commentRangeEnd` as
+ignorable content, so the painter never learns a range exists: no highlight, no
+margin note, no count. A comment is real in the file and in Word and invisible in
+this editor. That is a layout-and-paint change - ingest the markers, tag the runs
+they span, paint them - and it is the same kind of gap as the hyperlink's missing
+click target, recorded in the same way rather than half-built.
 
 ### Phase F verification, live in the browser
 

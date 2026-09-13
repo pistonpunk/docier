@@ -238,13 +238,13 @@ const appendText = (run: XmlElement, value: string): void => {
   run.selfClosing = false;
 };
 
-interface InsertionPoint {
+export interface InsertionPoint {
   readonly parent: XmlElement;
   readonly index: number;
   readonly properties: XmlNode | undefined;
 }
 
-const insertionPoint = (
+export const insertionPoint = (
   model: DocumentModel,
   paragraph: XmlElement,
   at: number,

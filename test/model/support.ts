@@ -24,6 +24,12 @@ export const CONTENT_TYPE_HEADER =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml';
 export const CONTENT_TYPE_FOOTER =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml';
+export const CONTENT_TYPE_COMMENTS =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml';
+export const CONTENT_TYPE_FOOTNOTES =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml';
+export const CONTENT_TYPE_ENDNOTES =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml';
 export const CONTENT_TYPE_RELS = 'application/vnd.openxmlformats-package.relationships+xml';
 export const CONTENT_TYPE_XML = 'application/xml';
 
@@ -89,6 +95,12 @@ export const headerRelationship = (id: string, target: string): string =>
 export const footerRelationship = (id: string, target: string): string =>
   relationship(id, 'footer', target);
 
+export const commentsRelationship = (id = 'rIdComments', target = 'comments.xml'): string =>
+  relationship(id, 'comments', target);
+
+export const footnotesRelationship = (id = 'rIdFootnotes', target = 'footnotes.xml'): string =>
+  relationship(id, 'footnotes', target);
+
 export const stylesRelationship = (id = 'rIdStyles'): string =>
   relationship(id, 'styles', 'styles.xml');
 
@@ -122,6 +134,8 @@ export interface DocxSpec {
   readonly header?: string;
   readonly headers?: readonly string[];
   readonly footers?: readonly string[];
+  readonly comments?: string;
+  readonly footnotes?: string;
   readonly documentRelationships?: readonly string[];
   readonly extraParts?: readonly FixtureEntry[];
   readonly documentAttributes?: string;
@@ -144,6 +158,10 @@ export const buildDocx = (spec: DocxSpec): Uint8Array => {
   footers.forEach((_footer, index) =>
     overrides.push([`/word/footer${String(index + 1)}.xml`, CONTENT_TYPE_FOOTER]),
   );
+  if (spec.comments !== undefined) overrides.push(['/word/comments.xml', CONTENT_TYPE_COMMENTS]);
+  if (spec.footnotes !== undefined) {
+    overrides.push(['/word/footnotes.xml', CONTENT_TYPE_FOOTNOTES]);
+  }
 
   const parts: FixtureEntry[] = [
     xmlPart(
@@ -171,6 +189,22 @@ export const buildDocx = (spec: DocxSpec): Uint8Array => {
   if (spec.styles !== undefined) parts.push(xmlPart('word/styles.xml', spec.styles));
   if (spec.numbering !== undefined) parts.push(xmlPart('word/numbering.xml', spec.numbering));
   if (spec.settings !== undefined) parts.push(xmlPart('word/settings.xml', spec.settings));
+  if (spec.comments !== undefined) {
+    parts.push(
+      xmlPart(
+        'word/comments.xml',
+        `${DECLARATION}<w:comments xmlns:w="${W}">${spec.comments}</w:comments>`,
+      ),
+    );
+  }
+  if (spec.footnotes !== undefined) {
+    parts.push(
+      xmlPart(
+        'word/footnotes.xml',
+        `${DECLARATION}<w:footnotes xmlns:w="${W}">${spec.footnotes}</w:footnotes>`,
+      ),
+    );
+  }
   headers.forEach((header, index) =>
     parts.push(xmlPart(`word/header${String(index + 1)}.xml`, header)),
   );

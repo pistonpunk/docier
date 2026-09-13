@@ -236,16 +236,10 @@ const REFUSALS: readonly Refusal[] = [
   },
 
   {
-    id: 'docier.command.comment.create',
-    label: 'New comment',
-    category: 'comment',
-    reason: NO_PART('comments'),
-  },
-  {
     id: 'docier.command.comment.delete',
     label: 'Delete comment',
     category: 'comment',
-    reason: 'Comments are preserved exactly as they were loaded; this build does not edit them',
+    reason: 'This build writes a comment but does not remove one',
   },
   {
     id: 'docier.command.clipboard.formatPainter',

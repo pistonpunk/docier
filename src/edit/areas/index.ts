@@ -1,6 +1,7 @@
 import type { CommandDefinition, CommandRegistry, Disposable } from '../../api/types.js';
 import { insertCommands } from './insert.js';
 import { numberingCommands } from './numbering.js';
+import { commentCommands } from './comment.js';
 import { objectCommands } from './object.js';
 import { pageCommands } from './page.js';
 import { paragraphCommands } from './paragraph.js';
@@ -21,6 +22,7 @@ export { proofCommands } from './proof.js';
 export { regionCommands } from './region.js';
 export { insertCommands } from './insert.js';
 export { numberingCommands } from './numbering.js';
+export { commentCommands } from './comment.js';
 export { objectCommands } from './object.js';
 export { tableCommands } from './table.js';
 export { unsupportedCommands } from './unsupported.js';
@@ -34,6 +36,7 @@ export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, 
   ...numberingCommands(host),
   ...tableCommands(host),
   ...objectCommands(host),
+  ...commentCommands(host),
   ...regionCommands(host),
   ...unsupportedCommands(host),
 ];
