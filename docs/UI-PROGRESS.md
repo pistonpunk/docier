@@ -5,7 +5,7 @@ Working record for `docs/UI-AUDIT.md` (behaviour) and `docs/WORD-UI.md`
 how. Findings that turn up along the way go in the appendices at the end and are
 addressed when the phase that owns them is reached.
 
-Status: **Phase A complete.** Phase B next.
+Status: **Phase B in progress.** Phase A complete.
 
 Done and verified in the browser:
 
@@ -75,10 +75,33 @@ have removed drag-to-move, which works and is worth keeping.
 
 | # | Item | State |
 |---|---|---|
-| B1 | Delete `startDrag`, give the indent markers the margin interaction, clamp negative indents | to do |
+| B1 | Delete `startDrag`, give the indent markers the margin interaction, clamp negative indents | **done** |
 | B2 | Make pictures visible at all, by giving the renderer the media parts | to do |
 | B3 | Object selection and resize handles for inline pictures | to do |
 | B4 | Table width handles, proportional write, `tblLayout` fixed | to do |
+
+### Phase B notes
+
+**B1 done.** The indent markers could not be dragged at all: `startDrag` cancelled
+the default on pointerdown, which makes Chromium suppress the compatibility mouse
+events, and then listened for `mousemove` and `mouseup`, neither of which ever
+fired. Because `mouseup` never fired, its document-level handlers also leaked, one
+set per press, and every later mouse movement committed an indent change against a
+stale base: a click on the marker followed by 200px of pointer travel produced four
+commits and moved the indent exactly 200px, and the same leak silently overwrote
+the indents of whatever paragraph was selected, including one the user had never
+touched. `startDrag` is deleted and the markers use the same shape the margin
+markers do.
+
+Verified in the browser: the marker follows the pointer live (343, 358, 373, 393
+for 10, 25, 40, 60px of travel), the guide line follows it and both the guide and
+the badge hide on release, the badge shows the resulting indent in centimetres, and
+the whole gesture commits exactly once. Moving the pointer across the page
+afterwards with no button pressed produces **zero** commits, where before it
+produced one per movement.
+
+Negative indents are clamped: both `w:ind/@w:left` and `@w:right` are unsigned in
+OOXML, and the old code wrote `w:left="-600"` happily.
 
 ## Phase C - The menu surface
 

@@ -232,8 +232,8 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
   const commitIndent = (next: RulerIndents): void => {
     const values: RulerIndents = {
       firstLineTwips: Math.round(next.firstLineTwips),
-      leftTwips: Math.round(next.leftTwips),
-      rightTwips: Math.round(next.rightTwips),
+      leftTwips: Math.max(0, Math.round(next.leftTwips)),
+      rightTwips: Math.max(0, Math.round(next.rightTwips)),
     };
     options.onIndent?.(values);
     const command = 'docier.command.format.setParagraphIndent';
@@ -242,46 +242,6 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
       return;
     }
     context.run('setIndent', { ...values, target: 'ruler' });
-  };
-
-  const startDrag = (part: string, event: MouseEvent, apply: (deltaTwips: number) => void): void => {
-    const marker = markers.get(part);
-    const current = options.metrics();
-    if (marker === undefined || current === undefined) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const zoom = current.zoom === 0 ? 1 : current.zoom;
-    const onMove = (moveEvent: MouseEvent): void => {
-      const deltaPx = moveEvent.clientX - startX;
-      const deltaTwips = mpToTwip(fromCssPx(deltaPx, zoom));
-      apply(deltaTwips);
-      setText(badge, `${formatRulerValue(deltaPx * 1000, units())} ${unitSuffix(units())}`);
-      badge.hidden = false;
-      badge.style.left = `${String(moveEvent.clientX)}px`;
-    };
-    const onUp = (): void => {
-      badge.hidden = true;
-      doc.removeEventListener('mousemove', onMove);
-      doc.removeEventListener('mouseup', onUp);
-      doc.removeEventListener('keydown', onKey);
-    };
-    const onKey = (keyEvent: KeyboardEvent): void => {
-      if (keyEvent.key !== 'Escape') return;
-      keyEvent.preventDefault();
-      onUp();
-    };
-    doc.addEventListener('mousemove', onMove);
-    doc.addEventListener('mouseup', onUp);
-    doc.addEventListener('keydown', onKey);
-    const capture = (marker as unknown as { setPointerCapture?: (id: number) => void })
-      .setPointerCapture;
-    if (typeof capture === 'function' && 'pointerId' in event) {
-      try {
-        capture.call(marker, (event as unknown as { pointerId: number }).pointerId);
-      } catch {
-        void 0;
-      }
-    }
   };
 
   const indentApply: Readonly<
@@ -296,15 +256,66 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     'indent-right': (delta, base) => ({ ...base, rightTwips: base.rightTwips - delta }),
   };
 
+  const indentDrag = (part: string, event: PointerEvent): void => {
+    const marker = markers.get(part);
+    const apply = indentApply[part];
+    const current = options.metrics();
+    if (marker === undefined || apply === undefined || current === undefined) return;
+    event.preventDefault();
+    const zoom = current.zoom === 0 ? 1 : current.zoom;
+    const base = currentIndents();
+    const startX = event.clientX;
+    const markerX = marker.getBoundingClientRect().left;
+    let pending = base;
+
+    const onMove = (moveEvent: PointerEvent): void => {
+      const travel = moveEvent.clientX - startX;
+      pending = apply(Math.round(mpToTwip(fromCssPx(travel, zoom))), base);
+      marker.style.left = `${String(Math.round(markerX + travel))}px`;
+      showGuide(markerX + travel);
+      badge.hidden = false;
+      badge.style.left = `${String(Math.round(markerX + travel))}px`;
+      setText(badge, `${formatRulerValue(twipToMp(twip(pending.leftTwips)) as Mp, units())} ${unitSuffix(units())}`);
+    };
+    const onUp = (): void => {
+      hideGuide();
+      badge.hidden = true;
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('keydown', onKey);
+      cancelDrag = undefined;
+      const moved =
+        pending.leftTwips !== base.leftTwips ||
+        pending.firstLineTwips !== base.firstLineTwips ||
+        pending.rightTwips !== base.rightTwips;
+      if (moved) commitIndent(pending);
+      else refresh();
+    };
+    const onKey = (keyEvent: KeyboardEvent): void => {
+      if (keyEvent.key !== 'Escape') return;
+      keyEvent.preventDefault();
+      pending = base;
+      onUp();
+    };
+    doc.addEventListener('pointermove', onMove);
+    doc.addEventListener('pointerup', onUp);
+    doc.addEventListener('keydown', onKey);
+    cancelDrag = () => {
+      hideGuide();
+      badge.hidden = true;
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('keydown', onKey);
+      cancelDrag = undefined;
+    };
+  };
+
   for (const part of Object.keys(indentApply)) {
     const marker = markers.get(part);
     const apply = indentApply[part];
     if (marker === undefined || apply === undefined) continue;
-    store.listen<MouseEvent>(marker, 'pointerdown', (event) => {
-      const base = currentIndents();
-      startDrag(part, event, (delta) => {
-        commitIndent(apply(delta, base));
-      });
+    store.listen<PointerEvent>(marker, 'pointerdown', (event) => {
+      indentDrag(part, event);
     });
     store.listen<KeyboardEvent>(marker, 'keydown', (event) => {
       const step = event.shiftKey ? 10 * MP_PER_TWIP : MP_PER_TWIP;
@@ -396,6 +407,7 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     const onMove = (moveEvent: PointerEvent): void => {
       const travel = moveEvent.clientX - startX;
       pending = Math.round(base + sign * mpToTwip(fromCssPx(travel, zoom)));
+      marker.style.left = `${String(Math.round(markerX + travel))}px`;
       showGuide(markerX + travel);
       badge.hidden = false;
       badge.style.left = `${String(Math.round(markerX + travel))}px`;
@@ -408,6 +420,7 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
       doc.removeEventListener('pointerup', onUp);
       doc.removeEventListener('keydown', onKey);
       if (pending !== base) commitMargin(side, pending);
+      else refresh();
     };
     const onKey = (keyEvent: KeyboardEvent): void => {
       if (keyEvent.key !== 'Escape') return;
