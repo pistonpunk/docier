@@ -31,7 +31,7 @@ import type { RunAnnotation } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
 import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
 import { NumberingCounters, defaultLevelText, numberTextOf } from './numbering.js';
-import { objectPlacementOf } from './objects.js';
+import { objectPlacementOf, textBoxElementOf } from './objects.js';
 import { borderSetOf, shadingOf } from './table-borders.js';
 import { Hasher } from './hash.js';
 import type { PageFieldValues } from './fields.js';
@@ -55,6 +55,7 @@ export interface IngestedItem {
   readonly codePoint: number;
   readonly object: ObjectPlacement | undefined;
   readonly noteId: number | undefined;
+  readonly drawing: XmlElement | undefined;
 }
 
 export interface IngestedRun {
@@ -100,6 +101,7 @@ export interface IngestedDocument {
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
   readonly hasShapeDrawings: boolean;
+  readonly textBoxes: ReadonlyMap<string, XmlElement>;
   readonly diagnostics: readonly LayoutDiagnostic[];
   readonly hash: Hasher;
 }
@@ -133,6 +135,7 @@ const itemOf = (
   codePoint: number,
   object: ObjectPlacement | undefined = undefined,
   noteId: number | undefined = undefined,
+  drawing: XmlElement | undefined = undefined,
 ): IngestedItem => ({
   kind,
   text,
@@ -143,6 +146,7 @@ const itemOf = (
   codePoint,
   object,
   noteId,
+  drawing,
 });
 
 const itemFromContent = (
@@ -194,6 +198,8 @@ const itemFromContent = (
       'none',
       0,
       objectPlacementOf(content.element, content.id),
+      undefined,
+      content.element,
     );
   }
   if (content instanceof NoteReferenceContent && content.kind === 'noteReference') {
@@ -221,6 +227,7 @@ interface ParagraphIngest {
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
   readonly hasShapeDrawings: boolean;
+  readonly textBoxes: ReadonlyMap<string, XmlElement>;
   readonly diagnostics: readonly LayoutDiagnostic[];
 }
 
@@ -375,6 +382,7 @@ export const ingestParagraph = (
   let hasDrawings = false;
   let hasUnresolvedDrawings = false;
   let hasShapeDrawings = false;
+  const textBoxes = new Map<string, XmlElement>();
 
   for (const wrapper of collectAlternateContent(paragraph.inlineChildren())) {
     diagnostics.push(...alternateContentDiagnostics(wrapper.selection, start));
@@ -406,7 +414,11 @@ export const ingestParagraph = (
       if (item.kind === 'object') {
         hasDrawings = true;
         if (item.object === undefined) hasUnresolvedDrawings = true;
-        else if (item.object.relationshipId === undefined) hasShapeDrawings = true;
+        else {
+          if (item.object.relationshipId === undefined) hasShapeDrawings = true;
+          const box = item.drawing === undefined ? undefined : textBoxElementOf(item.drawing);
+          if (box !== undefined) textBoxes.set(item.object.objectId, box);
+        }
       }
       if (item.kind === 'noteRef') hasNotes = true;
       items.push(item);
@@ -495,6 +507,7 @@ export const ingestParagraph = (
     hasDrawings,
     hasUnresolvedDrawings,
     hasShapeDrawings,
+    textBoxes,
     diagnostics,
   };
 };
@@ -516,6 +529,7 @@ export const ingestStory = (
     diagnostics,
     paragraphs: [],
     counters: new NumberingCounters(),
+    textBoxes: new Map<string, XmlElement>(),
     flags: {
       themeFonts: false,
       fields: false,
@@ -539,6 +553,7 @@ export const ingestStory = (
     hasDrawings: state.flags.drawings,
     hasUnresolvedDrawings: state.flags.unresolvedDrawings,
     hasShapeDrawings: state.flags.shapeDrawings,
+    textBoxes: state.textBoxes,
     diagnostics,
     hash,
   };

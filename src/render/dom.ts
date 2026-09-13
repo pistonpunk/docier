@@ -29,6 +29,7 @@ export const ATTR = {
   cellContent: 'data-docier-cell-content',
   border: 'data-docier-border',
   footnotes: 'data-docier-footnotes',
+  textBox: 'data-docier-textbox',
   footnote: 'data-docier-footnote',
   hyperlink: 'data-docier-hyperlink',
   comment: 'data-docier-comment',

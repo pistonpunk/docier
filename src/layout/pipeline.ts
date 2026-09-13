@@ -224,10 +224,7 @@ export const layoutDocument = (
   for (const diagnostic of coverageDiagnostics(
     ingested.hasThemeFonts,
     ingested.hasFields,
-    false,
     ingested.hasUnresolvedDrawings,
-    ingested.hasShapeDrawings,
-    false,
   )) {
     diagnostics.push(diagnostic);
   }
@@ -530,12 +527,61 @@ export const layoutDocument = (
     hash.field(paintEntry.faceId);
   }
 
+  const objectText = new Map<string, readonly BlockFragment[]>();
+  let objectLineId = -1;
+  for (const [objectId, element] of ingested.textBoxes) {
+    const object = prepared
+      .flatMap((entry) => entry.atoms)
+      .find((atom) => atom.object?.objectId === objectId)?.object;
+    if (object === undefined) continue;
+    {
+      const story = new Story({
+        kind: 'body',
+        id: `textbox:${objectId}`,
+        partName: model.mainPartName,
+        element,
+        context: model.context,
+      });
+      const laid = layoutRegion({
+        model,
+        story,
+        page: 0,
+        values: { page: 1, pages: 1, section: 1, sectionPages: 1 },
+        x: mp(0),
+        width: object.width,
+        blockIdBase: blockIdBase(story.id, story.paragraphCount),
+        lineIdBase: 0,
+        measurer,
+        fonts,
+        paint,
+        hash,
+        defaultFontFamily,
+        defaultTabStop: defaultTabStopMp,
+        diagnostics,
+      });
+      const placed = placeBlocks(laid.blocks, mp(0), objectLineId);
+      objectLineId = placed.nextLineId;
+      objectText.set(objectId, placed.blocks);
+    }
+  }
+
+  if (ingested.hasShapeDrawings && objectText.size === 0) {
+    diagnostics.push({
+      code: 'shapeContentNotLaidOut',
+      severity: 'warning',
+      message:
+        'a drawing that is not a picture is placed at its declared extent, and the text or shape inside it is not laid out by this slice',
+      docPos: undefined,
+    });
+  }
+
   return finalize({
     blocks: paragraphBlocks,
     rows: paginated.rows,
     tables: paginated.tables,
     pieces: paginated.pieces,
     pages: paginated.pages,
+    objectText,
     paint: paint.list(),
     diagnostics: dedupe(diagnostics),
     hash: hash.digest(),
@@ -631,10 +677,7 @@ interface ReservedSections {
 const coverageDiagnostics = (
   hasThemeFonts: boolean,
   hasFields: boolean,
-  hasNotes: boolean,
   hasUnresolvedDrawings: boolean,
-  hasShapeDrawings: boolean,
-  footnotesLaidOut: boolean,
 ): readonly LayoutDiagnostic[] => {
   const out: LayoutDiagnostic[] = [];
   if (hasThemeFonts) {
@@ -650,24 +693,6 @@ const coverageDiagnostics = (
       code: 'fieldContentNotLaidOut',
       severity: 'info',
       message: 'field instructions and field results are not laid out by this slice',
-      docPos: undefined,
-    });
-  }
-  if (hasNotes && !footnotesLaidOut) {
-    out.push({
-      code: 'footnotesNotLaidOut',
-      severity: 'warning',
-      message:
-        'this document carries footnote or endnote bodies that no reference in the body points at, so they are not laid out',
-      docPos: undefined,
-    });
-  }
-  if (hasShapeDrawings) {
-    out.push({
-      code: 'shapeContentNotLaidOut',
-      severity: 'warning',
-      message:
-        'a drawing that is not a picture is placed at its declared extent, and the text or shape inside it is not laid out by this slice',
       docPos: undefined,
     });
   }

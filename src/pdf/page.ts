@@ -151,6 +151,16 @@ const paintObject = (
   frame: PdfFrame,
   context: PagePaintContext,
 ): void => {
+  const text = context.result.objectText.get(object.objectId);
+  if (text !== undefined) {
+    const area = objectBoxOf(line, run, atom);
+    const inner: PdfFrame = {
+      dx: mp(frame.dx + area.x),
+      dy: mp(frame.dy + area.y),
+      height: frame.height,
+    };
+    for (const block of text) paintBlock(block, inner, context);
+  }
   const id = object.relationshipId;
   const name = context.images.nameFor(id);
   if (name === undefined) {

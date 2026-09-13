@@ -515,7 +515,7 @@ still announces that it is not available.
 | F4 | Header creation | **done** |
 | F4 | Table of contents | **done** |
 | F4 | Footnote | **done, drawn at the page foot** |
-| F4 | Text box | **done at the document level, content not laid out** |
+| F4 | Text box | **done, its own text drawn inside it** |
 
 ### Phase D notes
 
@@ -624,16 +624,21 @@ page and above the bottom margin.
 
 ## What is left, and why it is not a command's worth of work
 
-Two gaps remain, both in the layout rather than in a command, and each is recorded
-here with the shape of the change it needs. Everything else in every phase's list is
-done and verified.
+**Text boxes are done.** The last content gap was the text inside one, and like the
+footnote it turned out to be the region machinery once more: the box's
+`w:txbxContent` is a story, so each box gets a transient `Story` over it and is laid
+out through `layoutRegion`, at the object's own extent. What that needed was a place
+to put the result - and the first attempt put the *element* on `ObjectPlacement`,
+which is inside the frozen `LayoutResult`, so freezing the result froze the live
+document and every later edit failed with "Cannot assign to read only property
+'parent'". Ingest now collects the text-box elements into a side map instead, the
+pipeline lays them out, and the result publishes only the laid-out blocks keyed by
+object id. Both painters draw them inside the object's box, and
+`shapeContentNotLaidOut` retires when the content was laid out.
 
-**The text inside a text box.** The drawing, its geometry and its nested
-`w:txbxContent` are written and the box is placed at its extent. Laying its text out
-is contained - the object's box is known before pagination and never changes, so
-there is no circularity - but it is a nested story, so it needs its own ingest and
-its own place in `ObjectPlacement` before both painters can draw it and the
-`shapeContentNotLaidOut` diagnostic can be retired.
+One gap remains, and it is a view rather than a document feature, recorded below
+with the shape of the change it needs. Everything else in every phase's list is done
+and verified.
 
 **Draft view.** Web Layout and Draft paint the same continuous column. They differ in
 Word because Draft re-flows the text to the window, which is a layout change, and
@@ -641,11 +646,8 @@ the honest way to do it is an engine option that lays the sections out at a flow
 width on one variable-height page. No paint-only difference exists: hiding drawn
 content would be wrong, because Word shows inline pictures in Draft.
 
-None of the three is a case of a feature that was started and stopped. Each is a
-piece of the layout engine that does not exist yet, and each is named here with what
-it would take rather than left as a silent absence - which is also what the engine
-itself does, in `footnotesNotLaidOut` and `shapeContentNotLaidOut`, in the
-diagnostics a person can read in the demo.
+It is the only gap left, and it is a view preference rather than a document feature:
+everything a document can *contain* now round-trips, is laid out, and is drawn.
 
 ## View modes, closed after Phase F
 

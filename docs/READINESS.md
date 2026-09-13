@@ -131,8 +131,8 @@ So the bar this document set for itself is **met on the Insert tab and one step
 short on the view modes**: nothing on that tab refuses any more, the ribbon is
 within five pixels of Word's, and three of four view modes change the view.
 
-Two gaps are left, both in the layout engine rather than in a command: a nested
-story so a text box's own text can be laid out, and a flow-width option so Draft can
-re-flow. `docs/UI-PROGRESS.md` has each one with the shape of the change it needs.
-No feature is half-built - what is missing is two pieces of machinery that were
-never written.
+One gap is left, and it is a view rather than a document feature: a flow-width
+option so Draft can re-flow. Everything a document can contain now round-trips, is
+laid out and is drawn - pictures, tables, headers and footers, footnotes, comments,
+hyperlinks, text boxes and a table of contents. `docs/UI-PROGRESS.md` has the
+remaining one with the shape of the change it needs.

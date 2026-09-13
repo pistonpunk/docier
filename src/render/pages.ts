@@ -15,6 +15,7 @@ import { applyStyle, positionStyle } from './style.js';
 import { ATTR, box, frameOf, geometryAt, stamp } from './dom.js';
 import { paintBorders, paintShading } from './decoration.js';
 import { paintLine } from './runs.js';
+import { objectBoxOf } from './inline-object.js';
 import { appendSlotContent } from './registry.js';
 import type { ImageRegistry } from './images.js';
 
@@ -52,8 +53,34 @@ export const paintBlock = (
       images: context.images,
     });
   }
+  paintObjectText(node, block, inner, context);
   parent.appendChild(node);
   return node;
+};
+
+const paintObjectText = (
+  parent: HTMLElement,
+  block: BlockFragment,
+  frame: Frame,
+  context: PagePaintContext,
+): void => {
+  if (context.result.objectText.size === 0) return;
+  for (const line of block.lines) {
+    for (const run of line.runs) {
+      if (run.object === undefined) continue;
+      const blocks = context.result.objectText.get(run.object.objectId);
+      if (blocks === undefined || blocks.length === 0) continue;
+      const atom = line.atoms.find((entry) => entry.object?.objectId === run.object?.objectId);
+      if (atom === undefined) continue;
+      const container = box('docier-textbox');
+      stamp(container, { [ATTR.textBox]: run.object.objectId });
+      applyStyle(container, positionStyle(geometryAt(objectBoxOf(line, run, atom), frame, context.scale)));
+      const area = objectBoxOf(line, run, atom);
+      const inner = frameOf({ x: area.x, y: area.y, width: area.width, height: area.height });
+      for (const entry of blocks) paintBlock(container, entry, inner, context);
+      parent.appendChild(container);
+    }
+  }
 };
 
 const paintCell = (

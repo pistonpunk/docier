@@ -11,6 +11,7 @@ import type {
   TableRow,
 } from '../model/index.js';
 import type { BorderSet, CellMergeRole, CellVerticalAlignment, DocPos, LayoutDiagnostic, Shading } from './types.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
 import { docPos } from './types.js';
 import type { NumberingCounters } from './numbering.js';
 import type { IngestedBlock, IngestedParagraph, IngestOptions } from './ingest.js';
@@ -107,6 +108,7 @@ export interface IngestState {
   readonly paragraphs: IngestedParagraph[];
   readonly counters: NumberingCounters;
   readonly flags: IngestFlags;
+  readonly textBoxes: Map<string, XmlElement>;
   cursor: number;
 }
 
@@ -392,6 +394,7 @@ export const ingestBlockList = (
       state.flags.drawings = state.flags.drawings || result.hasDrawings;
       state.flags.unresolvedDrawings = state.flags.unresolvedDrawings || result.hasUnresolvedDrawings;
       state.flags.shapeDrawings = state.flags.shapeDrawings || result.hasShapeDrawings;
+      for (const [id, element] of result.textBoxes) state.textBoxes.set(id, element);
       out.push({ kind: 'paragraph', paragraph: result.paragraph });
       continue;
     }

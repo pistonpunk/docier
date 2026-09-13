@@ -52,6 +52,7 @@ export interface FinalizeInput {
   readonly storyKind: string;
   readonly blockCount: number;
   readonly headerFooters: readonly PageHeaderFooter[];
+  readonly objectText: ReadonlyMap<string, readonly BlockFragment[]>;
   readonly stories: readonly StoryLayout[];
   readonly lineIdBase: number;
 }
@@ -345,6 +346,7 @@ export const finalize = (input: FinalizeInput): LayoutResult => {
     pages,
     stories,
     paint: input.paint,
+    objectText: input.objectText,
     indices: buildIndices({ lines: refs, caretStops, pageCount: pages.length }),
     diagnostics: input.diagnostics,
   });

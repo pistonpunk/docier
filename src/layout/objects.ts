@@ -141,3 +141,11 @@ export const objectPlacementOf = (
     rotationMilliDegrees: rotationOf(element),
   };
 };
+
+export const textBoxElementOf = (element: XmlElement): XmlElement | undefined =>
+  descendantIn(
+    element,
+    (candidate) =>
+      candidate.localName === 'txbxContent' &&
+      candidate.uri === 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+  );

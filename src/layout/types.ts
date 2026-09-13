@@ -346,5 +346,6 @@ export interface LayoutResult {
   readonly stories: ReadonlyMap<StoryId, StoryLayout>;
   readonly paint: readonly RunPaint[];
   readonly indices: LayoutIndices;
+  readonly objectText: ReadonlyMap<string, readonly BlockFragment[]>;
   readonly diagnostics: readonly LayoutDiagnostic[];
 }
