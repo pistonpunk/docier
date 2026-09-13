@@ -1,6 +1,6 @@
 import './styles.css';
 
-import { createEditor, ui } from 'docier';
+import { DocxPackage, createEditor, ui } from 'docier';
 import type { Diagnostic, EditorHandle, LayoutEnd } from 'docier';
 import { exportPdf } from 'docier/pdf';
 import type { TextMeasurer } from 'docier/layout';
@@ -115,6 +115,7 @@ try {
       render: {
         zoom: 1,
         pageGapPx: 24,
+        imageProvider: (id) => imageSources.get(id),
         detectDivergence: true,
         onDivergence: (report) => {
           panel.removeWhere((code) => code.startsWith('divergence.'));
@@ -269,9 +270,63 @@ const setTitle = (name: string): void => {
   document.title = `docier — ${name}`;
 };
 
+const MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+};
+
+const imageSources = new Map<string, { id: string; bytes: Uint8Array; mimeType: string }>();
+
+const collectImages = async (bytes: Uint8Array): Promise<number> => {
+  imageSources.clear();
+  try {
+    const pkg = await DocxPackage.open(bytes);
+    for (const partName of pkg.relationships.sourceParts()) {
+      const relationships = pkg.relationships.get(partName);
+      if (relationships === undefined) continue;
+      for (const relationship of relationships.entries) {
+        if (!relationship.type.endsWith('/image')) continue;
+        const data = await pkg.readPartBytes(relationship.resolvedTarget);
+        if (data === undefined) continue;
+        const extension = relationship.resolvedTarget.split('.').pop()?.toLowerCase() ?? '';
+        imageSources.set(relationship.id, {
+          id: relationship.id,
+          bytes: data,
+          mimeType: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream',
+        });
+      }
+    }
+  } catch (error) {
+    panel.add({
+      code: 'host.images',
+      severity: 'warning',
+      message: 'the media parts could not be read, so pictures will render as placeholders',
+      detail: stackOf(error),
+      source: 'example/src/main.ts',
+    });
+  }
+  return imageSources.size;
+};
+
 const loadBytes = async (bytes: Uint8Array, name: string): Promise<void> => {
   const started = performance.now();
   try {
+    const images = await collectImages(bytes);
+    if (images > 0) {
+      panel.add({
+        code: 'host.images',
+        severity: 'info',
+        message: `${String(images)} picture(s) handed to the renderer`,
+        source: 'example/src/main.ts',
+      });
+    }
     await handle.load(bytes);
     await handle.whenReady();
     setTitle(name);

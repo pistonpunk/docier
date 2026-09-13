@@ -76,7 +76,7 @@ have removed drag-to-move, which works and is worth keeping.
 | # | Item | State |
 |---|---|---|
 | B1 | Delete `startDrag`, give the indent markers the margin interaction, clamp negative indents | **done** |
-| B2 | Make pictures visible at all, by giving the renderer the media parts | to do |
+| B2 | Make pictures visible at all, by giving the renderer the media parts | **done** |
 | B3 | Object selection and resize handles for inline pictures | to do |
 | B4 | Table width handles, proportional write, `tblLayout` fixed | to do |
 
@@ -102,6 +102,14 @@ produced one per movement.
 
 Negative indents are clamped: both `w:ind/@w:left` and `@w:right` are unsigned in
 OOXML, and the old code wrote `w:left="-600"` happily.
+
+**B2 done.** No picture rendered in the demo at all: `images` and `imageProvider`
+are host-supplied render options, the demo passed neither, and nothing extracted
+media parts, so every picture drew a dashed red "missing image" placeholder. The
+demo now reads the media relationships out of the package before the document
+renders and hands the renderer a provider keyed by relationship id. Verified on
+`contract.docx`: one real `img.docier-image` with a PNG data URL, zero missing
+placeholders, three sources handed over.
 
 ## Phase C - The menu surface
 
