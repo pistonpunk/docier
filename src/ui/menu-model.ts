@@ -841,8 +841,11 @@ export const ALL_RIBBON_TABS: readonly UiTab[] = [...RIBBON_TABS, TABLE_TAB, PIC
 export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> = {
   text: [
     ...editSubmenuFor('ctx:text'),
+    menu('ui.menu.pasteOptions', [
+      button({ labelKey: 'ui.control.paste', id: 'ctx:text:paste', command: command('clipboard.paste') }),
+      button({ labelKey: 'ui.control.pasteSpecial', id: 'ctx:text:pasteSpecial', command: command('clipboard.pastePlain') }),
+    ]),
     separator('ctx:text:sep1'),
-    menu('ui.menu.insert', [pending('insert.table', 'ui.control.insertTable', 'T'), pending('insert.link', 'ui.control.insertLink', 'L'), pending('insert.symbol', 'ui.control.insertSymbol', 'SY')]),
     fontSubmenu('ctx:text'),
     paragraphSubmenu('ctx:text'),
     menu('ui.menu.bullets', [
@@ -850,14 +853,17 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
       button({ labelKey: 'ui.control.numbering', id: 'ctx:text:numbers', command: command('numbering.numbers'), action: 'openDialog', actionArgs: { dialog: command('numbering.numbers') } }),
     ]),
     separator('ctx:text:sep2'),
-    button({ labelKey: 'ui.control.find', id: 'ctx:text:find', command: command('find.find'), action: 'openDialog', actionArgs: { dialog: command('find.find') } }),
-    button({ labelKey: 'ui.control.selectAll', id: 'ctx:text:all', command: command('edit.selectAll') }),
+    menu('ui.menu.insert', [pending('insert.table', 'ui.control.insertTable', 'T'), pending('insert.link', 'ui.control.insertLink', 'L'), pending('insert.symbol', 'ui.control.insertSymbol', 'SY')]),
     separator('ctx:text:sep3'),
     node('menu', {
       id: 'ctx:text:synonyms',
       labelKey: 'ui.menu.synonyms',
       items: [button({ labelKey: 'ui.control.thesaurus', id: 'ctx:text:thesaurus', command: command('proof.thesaurus'), action: 'openDialog', actionArgs: { dialog: command('proof.thesaurus') } })],
     }),
+    pending('comment.create', 'ui.control.newComment', 'NC'),
+    separator('ctx:text:sep4'),
+    button({ labelKey: 'ui.control.find', id: 'ctx:text:find', command: command('find.find'), action: 'openDialog', actionArgs: { dialog: command('find.find') } }),
+    button({ labelKey: 'ui.control.selectAll', id: 'ctx:text:all', command: command('edit.selectAll') }),
   ],
   table: [
     menu('ui.menu.insertRows', [

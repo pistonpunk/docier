@@ -119,7 +119,7 @@ placeholders, three sources handed over.
 | C2 | Move the disabled reasons out of the items | **done** |
 | C3 | The four behavioural defects in `menu.ts` and `context-menu.ts` | **done** |
 | C4 | Wire Cut, Copy, Paste and the table insert rows to the commands that exist | **done, verification blocked** |
-| C5 | Fill the menus out to Word's contents | to do |
+| C5 | Fill the menus out to Word's contents | **text menu done, table menu partly** |
 
 ### Phase C notes
 
@@ -164,6 +164,21 @@ row.
   focuses a row when a pointer opened it, which also removes the focus outline that
   used to appear on a row the moment the menu opened. Verified: the menu sits at
   +2,+2 and the focus stays outside it.
+
+**C5, the text menu.** Rebuilt in Word's order and filled out: Cut, Copy, Paste,
+Paste Options, Font, Paragraph, Bullets, Insert, Synonyms, New Comment, Find,
+Select All. Paste Options is new and reaches the plain-text paste that already
+existed; New Comment is new and renders honestly disabled, because comments cannot
+be created in this build and the row says so; Font and Paragraph moved above Insert,
+which is Word's order. The menu measures 200 by 310.
+
+**Still to add, and why they are not there yet.** Translate and Format Painter need
+registered-unsupported commands to render honestly, and the file that holds those
+(`src/edit/areas/unsupported.ts`) is held by the running object-resize agent. The
+table menu should nest its two delete groupings under one Delete submenu and add
+Cell Alignment's other six positions, Insert Cells, Split Table, Borders and
+Shading, Text Direction, AutoFit and Distribute, Sort, Formula and Repeat Header
+Rows; of those, only the delete nesting and New Comment need no new command.
 
 ## Phase D - Ribbon content design
 
