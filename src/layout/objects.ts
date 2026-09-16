@@ -14,6 +14,7 @@ import type {
   AnchorRelativeTo,
   ObjectAnchor,
   ObjectPlacement,
+  ObjectShape,
   ObjectWrap,
   Rect,
 } from './types.js';
@@ -248,6 +249,7 @@ export const objectPlacementOf = (
   const children = groupChildrenOf(element);
   return {
     objectId: objectIdOfDrawing(element, fallbackId),
+    shape: shapeOf(element),
     children,
     relationshipId: children.length > 0 ? undefined : relationshipIdOf(blip),
     width,
@@ -256,6 +258,42 @@ export const objectPlacementOf = (
     rotationMilliDegrees: rotationOf(element),
     anchor:
       inline.localName === 'anchor' ? anchorOf(inline) : undefined,
+  };
+};
+
+const WPS_NAMESPACE = 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape';
+
+const isWps = (element: XmlElement): boolean => element.uri === WPS_NAMESPACE;
+
+const colourOfFill = (element: XmlElement | undefined): string | undefined => {
+  if (element === undefined) return undefined;
+  const colour = descendantIn(
+    element,
+    (candidate) =>
+      isA(candidate) && (candidate.localName === 'srgbClr' || candidate.localName === 'sysClr'),
+  );
+  if (colour === undefined) return undefined;
+  return attributeValue(colour, 'val') ?? attributeValue(colour, 'lastClr');
+};
+
+// a preset shape is placed by the layout already: what it adds is the geometry
+// and the paint, which the renderers read from here
+const shapeOf = (element: XmlElement): ObjectShape | undefined => {
+  const wsp = descendantIn(
+    element,
+    (candidate) => isWps(candidate) && candidate.localName === 'wsp',
+  );
+  if (wsp === undefined) return undefined;
+  const geometry = descendantIn(wsp, (candidate) => isA(candidate) && candidate.localName === 'prstGeom');
+  const preset = geometry === undefined ? undefined : attributeValue(geometry, 'prst');
+  if (preset === undefined) return undefined;
+  const line = descendantIn(wsp, (candidate) => isA(candidate) && candidate.localName === 'ln');
+  const width = line === undefined ? undefined : integerAttribute(line, 'w');
+  return {
+    preset,
+    fill: colourOfFill(descendantIn(wsp, (candidate) => isA(candidate) && candidate.localName === 'solidFill')),
+    outline: colourOfFill(line),
+    outlineWidthMp: width === undefined ? mp(0) : emuToMp(emu(width)),
   };
 };
 

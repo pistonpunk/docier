@@ -36,6 +36,7 @@ export type {
   ObjectWrap,
   LineRun,
   ObjectPlacement,
+  ObjectShape,
   PageFragment,
   PageKind,
   PageOrigin,

@@ -4,6 +4,7 @@ import type {
   LineFragment,
   LineRun,
   ObjectPlacement,
+  ObjectShape,
   PageFragment,
 } from '../layout/index.js';
 import { mp } from '../units/index.js';
@@ -133,6 +134,33 @@ export interface ObjectPaintInput {
   readonly images: ImageRegistry;
 }
 
+// a preset shape is already placed by the layout; what it was missing was the
+// paint, so the container it already has is filled and stroked. Only paint-only
+// properties are touched, so nothing about the placement moves
+const paintShape = (
+  container: HTMLElement,
+  shape: ObjectShape,
+  scale: PaintScale,
+): void => {
+  // only the rectangle can be drawn faithfully: the paint contract allows
+  // outline and per-side border properties, and neither border-radius nor
+  // clip-path, so an ellipse has nothing to round it with. It is left as it was
+  // rather than drawn as the box around it, which would be a wrong shape rather
+  // than a missing one
+  if (shape.preset !== 'rect') return;
+  stamp(container, { [ATTR.objectShape]: shape.preset });
+  const styles: Record<string, string> = {};
+  if (shape.fill !== undefined) styles['background-color'] = `#${shape.fill}`;
+  if (shape.outline !== undefined && shape.outlineWidthMp > 0) {
+    const width = formatPx(scale.px(shape.outlineWidthMp));
+    styles['outline-color'] = `#${shape.outline}`;
+    styles['outline-style'] = 'solid';
+    styles['outline-width'] = width;
+    styles['outline-offset'] = `-${width}`;
+  }
+  applyStyle(container, styles);
+};
+
 export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void => {
   const { line, run, frame, scale, images } = input;
   if (run.object === undefined) return;
@@ -154,6 +182,7 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
         object.anchor === undefined ? {} : { ...rotationStyle(object.rotationMilliDegrees) },
       ),
     );
+    if (object.shape !== undefined) paintShape(container, object.shape, scale);
     if (object.relationshipId === undefined) {
       for (const child of object.children) paintChild(container, child, images, scale);
       parent.appendChild(container);

@@ -114,8 +114,16 @@ export interface ObjectChild {
   readonly relationshipId: string | undefined;
 }
 
+export interface ObjectShape {
+  readonly preset: string;
+  readonly fill: string | undefined;
+  readonly outline: string | undefined;
+  readonly outlineWidthMp: Mp;
+}
+
 export interface ObjectPlacement {
   readonly objectId: string;
+  readonly shape?: ObjectShape | undefined;
   readonly children: readonly ObjectChild[];
   readonly relationshipId: string | undefined;
   readonly width: Mp;

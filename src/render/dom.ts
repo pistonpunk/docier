@@ -20,6 +20,7 @@ export const ATTR = {
   run: 'data-docier-run',
   object: 'data-docier-object',
   objectId: 'data-docier-object-id',
+  objectShape: 'data-docier-object-shape',
   image: 'data-docier-image',
   imageMissing: 'data-docier-image-missing',
   highlight: 'data-docier-highlight',

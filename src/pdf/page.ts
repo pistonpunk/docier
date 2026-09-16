@@ -31,7 +31,7 @@ import {
 import type { PageOrigin, PlacedFloat } from '../render/inline-object.js';
 import { dashPatternOf } from '../render/decoration.js';
 import type { ContentStream } from './content.js';
-import { insetted } from './content.js';
+import { formatNumber, insetted } from './content.js';
 import type { PdfFrame } from './geometry.js';
 import { pdfBaseline, pdfFrame, pdfLength, pdfRect, pdfTop, pdfX } from './geometry.js';
 import { hasBorders, paintBorders, paintShading } from './decoration.js';
@@ -157,6 +157,24 @@ const paintObject = (
   frame: PdfFrame,
   context: PagePaintContext,
 ): void => {
+  const shape = object.shape;
+  if (shape !== undefined) {
+    const outline = shape.outline === undefined ? undefined : rgbOfHex(shape.outline);
+    const rect = pdfRect(frame, objectBoxOf(line, run, atom));
+    if (shape.fill !== undefined) {
+      const fill = rgbOfHex(shape.fill);
+      if (fill !== undefined) {
+        context.content.fillRgb(fill);
+        context.content.fillRect(rect);
+      }
+    }
+    if (outline !== undefined && shape.outlineWidthMp > 0) {
+      const width = pdfLength(shape.outlineWidthMp);
+      context.content.strokeRgb(outline);
+      context.content.raw(`${formatNumber(width)} w`);
+      context.content.strokeRect(insetted(rect, width / 2));
+    }
+  }
   const text = context.result.objectText.get(object.objectId);
   if (text !== undefined) {
     const area = objectBoxOf(line, run, atom);
