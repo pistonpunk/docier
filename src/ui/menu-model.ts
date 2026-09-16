@@ -895,7 +895,26 @@ export const PICTURE_TAB: UiTab = {
       id: 'pictureTools',
       labelKey: 'ui.group.pictureTools',
       nodes: [
-        menu('ui.menu.wrapText', [
+        menu('ui.menu.alignObjects', [
+      ...(
+        [
+          ['left', 'ui.align.left'],
+          ['center', 'ui.align.center'],
+          ['right', 'ui.align.right'],
+          ['top', 'ui.align.top'],
+          ['middle', 'ui.align.middle'],
+          ['bottom', 'ui.align.bottom'],
+        ] as const
+      ).map(([edge, labelKey]) =>
+        button({
+          labelKey,
+          id: `align:${edge}`,
+          command: command('object.align'),
+          args: { edge },
+        }),
+      ),
+    ]),
+    menu('ui.menu.wrapText', [
       ...(
         [
           ['square', 'ui.wrap.square'],

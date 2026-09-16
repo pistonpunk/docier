@@ -533,6 +533,72 @@ describe('resizing a picture through the surface', () => {
   });
 });
 
+describe('aligning a floating picture', () => {
+  const ANCHORED = bodyOf(
+    wrap(
+      '<w:r>' +
+        '<w:drawing>' +
+        `<wp:anchor xmlns:wp="${WP}" behindDoc="0" relativeHeight="1">` +
+        '<wp:positionH relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionH>' +
+        '<wp:positionV relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionV>' +
+        '<wp:extent cx="609600" cy="609600"/><wp:wrapNone/>' +
+        `<wp:docPr id="${PICTURE_ID}" name="Float"/>` +
+        `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">` +
+        `<pic:pic xmlns:pic="${PIC}">` +
+        '<pic:nvPicPr><pic:cNvPr id="0" name="image1.png"/><pic:cNvPicPr/></pic:nvPicPr>' +
+        '<pic:blipFill><a:blip r:embed="rId4"/></pic:blipFill>' +
+        '</pic:pic></a:graphicData></a:graphic>' +
+        '</wp:anchor></w:drawing>' +
+        '</w:r>',
+    ),
+  );
+
+  const xmlOf = (handle: EditorHandle): string =>
+    serializeXmlNode(handle.document!.body().element);
+
+  it('refuses while nothing is selected, and refuses for an inline picture', async () => {
+    const handle = await editorOf(ANCHORED);
+    await handle.commands.execute('docier.command.object.select', { objectId: PICTURE_ID });
+    expect(handle.commands.isEnabled('docier.command.object.align', { edge: 'right' })).toBe(true);
+
+    const inline = await editorOf(bodyOf(wrap(`<w:r>${picture({ blip: BLIP })}</w:r>`)));
+    await inline.commands.execute('docier.command.object.select', { objectId: PICTURE_ID });
+    expect(inline.commands.isEnabled('docier.command.object.align', { edge: 'right' })).toBe(false);
+    expect(String(inline.commands.disabledReason('docier.command.object.align'))).toContain(
+      'floating object',
+    );
+  });
+
+  it('moves the anchor to the margin edge it is given', async () => {
+    const handle = await editorOf(ANCHORED);
+    await handle.commands.execute('docier.command.object.select', { objectId: PICTURE_ID });
+
+    const result = await handle.commands.execute('docier.command.object.align', {
+      edge: 'right',
+      relativeTo: 'margin',
+    });
+    expect(result.status).toBe('ok');
+
+    const xml = xmlOf(handle);
+    expect(xml).toContain('<wp:positionH relativeFrom="margin">');
+    // the content box is 1000 twips wide and the picture is 960, so a right
+    // alignment leaves 40 twips of slack, which is 25400 EMU at 635 per twip
+    expect(xml).toContain('<wp:posOffset>25400</wp:posOffset>');
+    // a horizontal alignment leaves the vertical offset exactly as it was
+    expect(xml).toContain('<wp:positionV relativeFrom="margin"><wp:posOffset>0</wp:posOffset>');
+  });
+
+  it('is one undo entry', async () => {
+    const handle = await editorOf(ANCHORED);
+    await handle.commands.execute('docier.command.object.select', { objectId: PICTURE_ID });
+    const before = xmlOf(handle);
+
+    await handle.commands.execute('docier.command.object.align', { edge: 'left' });
+    await handle.commands.execute('docier.command.history.undo');
+    expect(xmlOf(handle)).toBe(before);
+  });
+});
+
 describe('deleting the selected picture', () => {
   const BODY_WITH_TEXT = bodyOf(
     wrap(`<w:r>${picture({ blip: BLIP })}</w:r>`),

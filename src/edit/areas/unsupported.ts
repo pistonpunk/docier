@@ -10,8 +10,6 @@ interface Refusal {
   readonly live?: (host: AreaHost) => string;
 }
 
-const NO_FLOATING =
-  'This build aligns and groups the objects it places in the line they sit in, and it has no command that moves a floating object to a page or margin edge';
 const NO_DRAWING =
   'This build authors a picture from bytes the host supplies and nothing else: it has no shape, chart or text-box geometry';
 const NO_PART = (part: string): string =>
@@ -152,7 +150,6 @@ const REFUSALS: readonly Refusal[] = [
     category: 'object',
     reason: 'Compression re-encodes media bytes, and this build inserts and scales them but never rewrites them',
   },
-  { id: 'docier.command.object.align', label: 'Align objects', category: 'object', reason: NO_FLOATING },
   {
     id: 'docier.command.object.group',
     label: 'Group',

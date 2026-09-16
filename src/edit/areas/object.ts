@@ -22,7 +22,7 @@ import { buildInlineDrawing } from '../../ooxml/drawing.js';
 import { createWElement } from '../../model/index.js';
 import { objectIdOfDrawing } from '../../layout/objects.js';
 import type { Mp } from '../../units/index.js';
-import { mpToTwip, twip, twipToEmu } from '../../units/index.js';
+import { mp, mpToTwip, twip, twipToEmu } from '../../units/index.js';
 import type { ObjectBox } from '../objects.js';
 import { clearObjectSelection, findObjectBox, objectSelectionOf, selectObject } from '../objects.js';
 import { MIN_OBJECT_TWIPS } from '../object-resize.js';
@@ -55,6 +55,9 @@ interface ObjectSize {
   readonly widthTwips: number;
   readonly heightTwips: number;
 }
+
+const NO_ANCHOR: LocalizedString =
+  'This command needs a floating object, and the selected one sits in the line';
 
 const NO_SELECTION: LocalizedString =
   'No picture is selected; click one first, or name it with objectId';
@@ -455,6 +458,90 @@ const setWrapSpec: AreaSpec<ObjectWrapArgs> = {
   },
 };
 
+export type AlignEdge = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+
+export interface AlignArgs {
+  readonly objectId?: string;
+  readonly edge?: AlignEdge;
+  readonly relativeTo?: 'page' | 'margin';
+}
+
+const HORIZONTAL_EDGES: readonly AlignEdge[] = ['left', 'center', 'right'];
+
+const positionElement = (anchor: XmlElement, axis: 'positionH' | 'positionV'): XmlElement => {
+  const existing = childElements(anchor).find((child) => child.localName === axis);
+  if (existing !== undefined) {
+    existing.children = existing.children.filter(
+      (child) =>
+        child.kind !== 'element' ||
+        (child.localName !== 'posOffset' && child.localName !== 'align'),
+    );
+    return existing;
+  }
+  const created = xml.createElement(axis, 'wp', WP_NAMESPACE);
+  created.parent = anchor;
+  anchor.children.push(created);
+  return created;
+};
+
+const alignOffset = (edge: AlignEdge, span: number, extent: number): number => {
+  if (edge === 'left' || edge === 'top') return 0;
+  if (edge === 'center' || edge === 'middle') return Math.round((span - extent) / 2);
+  return Math.max(0, span - extent);
+};
+
+const alignSpec: AreaSpec<AlignArgs> = {
+  id: 'docier.command.object.align',
+  label: 'Align objects',
+  category: 'object',
+  permissions: ['format'],
+  enabledIn: (host, args) => {
+    const objectId = args?.objectId ?? objectSelectionOf(host.session);
+    if (objectId === undefined || args?.edge === undefined) return false;
+    const drawing = drawingWithId(host, objectId);
+    return drawing !== undefined && anchorElementOf(drawing) !== undefined;
+  },
+  reason: (host, args) =>
+    (args?.objectId ?? objectSelectionOf(host.session)) === undefined ? NO_SELECTION : NO_ANCHOR,
+  run: (host, args) => {
+    const objectId = args?.objectId ?? objectSelectionOf(host.session);
+    const edge = args?.edge;
+    if (objectId === undefined || edge === undefined) return false;
+    const drawing = drawingWithId(host, objectId);
+    if (drawing === undefined) return false;
+    const anchor = anchorElementOf(drawing);
+    if (anchor === undefined) return false;
+    const box = findObjectBox(host.session.layout, objectId);
+    if (box === undefined) return false;
+    const page = host.session.layout.pages.find((candidate) => candidate.index === box.page);
+    if (page === undefined) return false;
+    const relativeTo = args?.relativeTo ?? 'margin';
+    const frame = relativeTo === 'page' ? page.page : page.contentBox;
+    const horizontal = HORIZONTAL_EDGES.includes(edge);
+    const span = horizontal ? frame.width : frame.height;
+    const extent = horizontal ? box.box.width : box.box.height;
+    const offset = alignOffset(edge, span as number, extent as number);
+    const axis = horizontal ? 'positionH' : 'positionV';
+    const changed = changedBy([anchor], () => {
+      const holder = positionElement(anchor, axis);
+      xml.setAttribute(holder, 'relativeFrom', relativeTo === 'page' ? 'page' : 'margin');
+      const parsed = xml.createElement('posOffset', 'wp', WP_NAMESPACE);
+      parsed.parent = holder;
+      parsed.children.push({
+        kind: 'text',
+        value: String(twipToEmu(mpToTwip(mp(offset)))),
+        parent: parsed,
+      });
+      holder.children.push(parsed);
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(drawing);
+    host.session.relayout();
+    selectObject(host.session, objectId);
+    return true;
+  },
+};
+
 const deleteSpec: AreaSpec<ObjectSelectArgs> = {
   id: 'docier.command.object.delete',
   label: 'Delete object',
@@ -509,6 +596,7 @@ export const objectCommands = (host: AreaHost): readonly CommandDefinition<never
     stackingSpec('docier.command.object.sendBackward', 'Send backward', false),
   ),
   areaCommand<ObjectWrapArgs>(host, setWrapSpec),
+  areaCommand<AlignArgs>(host, alignSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),
 ];

@@ -68,6 +68,18 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'toggleMarks':
     '<path d="M9 2.5h4v11"/><path d="M11 2.5v11"/><path d="M4 2.5h3.5a3 3 0 0 1 0 6H4z"/>' +
     '<path d="M4 8.5h3.5a3 3 0 0 1 0 6H4z"/>',
+  'align:left':
+    '<path d="M2.5 2.5v11"/><rect x="4.5" y="4" width="8" height="3" rx="1"/><rect x="4.5" y="9" width="5" height="3" rx="1"/>',
+  'align:center':
+    '<path d="M8 2.5v11"/><rect x="3" y="4" width="10" height="3" rx="1"/><rect x="4.5" y="9" width="7" height="3" rx="1"/>',
+  'align:right':
+    '<path d="M13.5 2.5v11"/><rect x="3.5" y="4" width="8" height="3" rx="1"/><rect x="6.5" y="9" width="5" height="3" rx="1"/>',
+  'align:top':
+    '<path d="M2.5 2.5h11"/><rect x="4" y="4.5" width="3" height="8" rx="1"/><rect x="9" y="4.5" width="3" height="5" rx="1"/>',
+  'align:middle':
+    '<path d="M2.5 8h11"/><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="4.5" width="3" height="7" rx="1"/>',
+  'align:bottom':
+    '<path d="M2.5 13.5h11"/><rect x="4" y="3.5" width="3" height="8" rx="1"/><rect x="9" y="6.5" width="3" height="5" rx="1"/>',
   'wrap:square':
     '<rect x="2" y="3" width="5" height="5" rx="1"/><path d="M9 3.5h5"/>' +
     '<path d="M9 6h4"/><path d="M9 8.5h5"/><path d="M2.5 11h11"/>',
