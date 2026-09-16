@@ -828,6 +828,18 @@ export const TABLE_TAB: UiTab = {
       ],
     },
     {
+      id: 'tableData',
+      labelKey: 'ui.group.tableData',
+      nodes: [
+        button({
+          labelKey: 'ui.menu.sort',
+          id: 'table:sort',
+          command: command('table.sort'),
+          keytip: 'SO',
+        }),
+      ],
+    },
+    {
       id: 'tableProperties',
       labelKey: 'ui.group.tableProperties',
       nodes: [

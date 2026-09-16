@@ -56,6 +56,9 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'table:properties':
     '<rect x="2" y="3" width="12" height="10" rx="1"/>' +
     '<path d="M2 6.6h12"/><path d="M6 6.6V13"/><path d="M10 6.6V13"/>',
+  'table.sort':
+    '<path d="M2.5 4h6"/><path d="M2.5 7h4"/><path d="M2.5 10h6"/>' +
+    '<path d="M11 3v9"/><path d="m8.8 9.8 2.2 2.2 2.2-2.2"/>',
   'table:borders':
     '<rect x="2" y="3" width="12" height="10" rx="1"/>' +
     '<path d="M2 6.6h12"/><path d="M6 6.6V13"/><path d="M10 6.6V13"/>' +

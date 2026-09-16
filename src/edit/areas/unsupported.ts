@@ -278,12 +278,6 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'This build reads w:textDirection and never writes it',
   },
   {
-    id: 'docier.command.table.sort',
-    label: 'Sort',
-    category: 'table',
-    reason: 'This build has no sort over table rows, and sorting would reorder blocks the undo history tracks one at a time',
-  },
-  {
     id: 'docier.command.table.formula',
     label: 'Formula',
     category: 'table',

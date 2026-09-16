@@ -570,6 +570,97 @@ const setBordersSpec: AreaSpec<BordersArgs> = {
   },
 };
 
+export type SortType = 'text' | 'number';
+
+export interface SortArgs {
+  readonly column?: number;
+  readonly descending?: boolean;
+  readonly headerRow?: boolean;
+  readonly type?: SortType;
+}
+
+const sortKeyOf = (row: TableRow, column: number, type: SortType): string | number => {
+  const cell = row.cells()[column];
+  const text = cell === undefined ? '' : cell.logicalText.trim();
+  if (type !== 'number') return text.toLowerCase();
+  const value = Number.parseFloat(text.replace(/[^0-9.eE+-]/g, ''));
+  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+};
+
+const compareRows = (
+  first: TableRow,
+  second: TableRow,
+  column: number,
+  type: SortType,
+): number => {
+  const left = sortKeyOf(first, column, type);
+  const right = sortKeyOf(second, column, type);
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left).localeCompare(String(right));
+};
+
+const reorderRows = (element: XmlElement, order: readonly XmlElement[]): void => {
+  let at = 0;
+  element.children = element.children.map((child) => {
+    if (child.kind !== 'element' || child.localName !== 'tr') return child;
+    const next = order[at];
+    at += 1;
+    return next ?? child;
+  });
+  for (const child of element.children) child.parent = element;
+};
+
+const sortReason = (args: SortArgs | undefined): LocalizedString | undefined => {
+  const column = args?.column;
+  if (column !== undefined && (!Number.isInteger(column) || column < 0)) return NEEDS_PROPERTY;
+  if (args?.type !== undefined && args.type !== 'text' && args.type !== 'number') {
+    return NEEDS_PROPERTY;
+  }
+  return undefined;
+};
+
+const sortSpec: AreaSpec<SortArgs> = {
+  id: 'docier.command.table.sort',
+  label: 'Sort',
+  category: 'table',
+  permissions: ['edit'],
+  code: 'INAPPLICABLE',
+  enabledIn: (host, args) => host.session.aligned && sortReason(args) === undefined && targetAt(host) !== undefined,
+  reason: (host) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    return targetAt(host) === undefined ? PLACE_CARET : NEEDS_PROPERTY;
+  },
+  run: (host, args) => {
+    if (sortReason(args) !== undefined) return false;
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const table = target.table;
+    const rows = [...table.rows()];
+    if (rows.length < 2) return false;
+    const header = args?.headerRow ?? true;
+    const first = header ? 1 : 0;
+    if (rows.length - first < 2) return false;
+    const column = args?.column ?? target.column;
+    const type: SortType = args?.type ?? 'text';
+    const descending = args?.descending ?? false;
+
+    const head = rows.slice(0, first);
+    const body = rows.slice(first);
+    const sorted = [...body].sort((left, right) => {
+      const order = compareRows(left, right, column, type);
+      return descending ? -order : order;
+    });
+    if (sorted.every((row, index) => row === body[index])) return false;
+
+    const ordered = [...head, ...sorted].map((row) => row.element);
+    const changed = changedBy([table.element], () => reorderRows(table.element, ordered));
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(table.element);
+    placeCaret(host, firstParagraphOf(target.cell.element));
+    return true;
+  },
+};
+
 export interface ColumnWidthArgs {
   readonly column?: number;
   readonly widthTwips?: number;
@@ -1108,6 +1199,7 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<CountArgs>(host, splitSpec),
   areaCommand<TablePropertiesArgs>(host, setPropertiesSpec),
   areaCommand<BordersArgs>(host, setBordersSpec),
+  areaCommand<SortArgs>(host, sortSpec),
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
   areaCommand<TableWidthArgs>(host, setTableWidthSpec),
   areaCommand<RowHeightArgs>(host, setRowHeightSpec),

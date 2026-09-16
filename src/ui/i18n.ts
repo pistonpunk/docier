@@ -269,6 +269,7 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.menu.mergeCells': 'Merge Cells',
   'ui.menu.splitCells': 'Split Cells',
   'ui.menu.tableProperties': 'Table Properties',
+  'ui.group.tableData': 'Data',
   'ui.borders.title': 'Borders and Shading',
   'ui.borders.borders': 'Borders',
   'ui.borders.preset': 'Setting',

@@ -536,6 +536,86 @@ describe('borders and shading', () => {
   });
 });
 
+describe('sorting rows', () => {
+  const sortable = (): string =>
+    bodyOf(
+      paragraphText('alpha'),
+      '<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="2000"/></w:tblPr>' +
+        '<w:tblGrid><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/></w:tblGrid>' +
+        `<w:tr>${cell('Name')}${cell('Count')}</w:tr>` +
+        `<w:tr>${cell('pear')}${cell('10')}</w:tr>` +
+        `<w:tr>${cell('apple')}${cell('2')}</w:tr>` +
+        `<w:tr>${cell('fig')}${cell('30')}</w:tr>` +
+        '</w:tbl>',
+      paragraphText('beta'),
+    );
+
+  const columnText = (handle: EditorHandle, column: number): readonly string[] => {
+    const table = sessionOf(handle).model.body().tables()[0];
+    if (table === undefined) throw new Error('no table');
+    return table.rows().map((row) => row.cells()[column]?.logicalText ?? '');
+  };
+
+  it('leaves the header row in place and sorts the rest by the caret column', async () => {
+    const handle = await editorOf(sortable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+
+    await run(handle, 'table.sort', {});
+    expect(columnText(handle, 0)).toEqual(['Name', 'apple', 'fig', 'pear']);
+  });
+
+  it('sorts descending and sorts a numeric column by value', async () => {
+    const handle = await editorOf(sortable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 1).start });
+
+    await run(handle, 'table.sort', { column: 1, type: 'number', descending: true });
+    expect(columnText(handle, 1)).toEqual(['Count', '30', '10', '2']);
+  });
+
+  it('sorts the header too when it is told there is none', async () => {
+    const handle = await editorOf(sortable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+
+    // with no header row the first row sorts with the others, so "Name" lands
+    // between "fig" and "pear" rather than staying on top
+    await run(handle, 'table.sort', { headerRow: false });
+    expect(columnText(handle, 0)).toEqual(['apple', 'fig', 'Name', 'pear']);
+  });
+
+  it('is one undo entry and restores the original order', async () => {
+    const handle = await editorOf(sortable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    const before = bodyXml(handle);
+
+    await run(handle, 'table.sort', {});
+    expect(bodyXml(handle)).not.toBe(before);
+    await undo(handle);
+    expect(bodyXml(handle)).toBe(before);
+  });
+
+  it('reports no change when the rows are already in that order', async () => {
+    const handle = await editorOf(sortable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    await run(handle, 'table.sort', {});
+    const sorted = bodyXml(handle);
+    await run(handle, 'table.sort', {});
+    expect(bodyXml(handle)).toBe(sorted);
+  });
+
+  it('reports where it can act and refuses a column that is not one', async () => {
+    const outside = await editorOf(PLAIN);
+    await run(outside, 'selection.setCaret', { pos: pos(0) });
+    expect(isEnabled(outside, 'table.sort')).toBe(false);
+    expect(reasonOf(outside, 'table.sort')).toContain('Place the caret inside a table');
+
+    const handle = await editorOf(sortable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    expect(isEnabled(handle, 'table.sort', { column: -1 })).toBe(false);
+    expect(isEnabled(handle, 'table.sort', { type: 'date' })).toBe(false);
+    expect(isEnabled(handle, 'table.sort', { column: 1, type: 'number' })).toBe(true);
+  });
+});
+
 describe('a table inside a cell', () => {
   it('nests, edits and unwinds a table in a cell', async () => {
     const handle = await editorOf(FIXTURE);
