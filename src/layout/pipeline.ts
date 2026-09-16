@@ -17,7 +17,7 @@ import { buildParagraphBlock, intrinsicWidths, prepareParagraphs } from './parag
 import type { SideBand } from './assembly.js';
 import type { PreparedTable, TablePrepareRequest } from './table-prepare.js';
 import { prepareTables } from './table-prepare.js';
-import type { FlowBlock, PaginateBlock, PaginationResult } from './paginate.js';
+import type { FlowBlock, PageState, PaginateBlock, PaginationResult } from './paginate.js';
 import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
 import type { PageHeaderFooter } from './finalize.js';
 import { finalize } from './finalize.js';
@@ -528,25 +528,42 @@ export const layoutDocument = (
       readonly page: number;
       readonly top: Mp;
       readonly bottom: Mp;
+      readonly left: Mp;
+      readonly right: Mp;
       readonly side: 'left' | 'right';
       readonly extent: Mp;
     }[] = [];
+    const pageState = (index: number): PageState | undefined =>
+      paginated.pages.find((candidate) => candidate.index === index);
+
     for (const piece of paginated.pieces) {
       const block = paragraphBlocks[piece.block];
       if (block === undefined) continue;
+      const state = pageState(piece.page);
       for (const line of block.lines) {
         for (const item of line.placed) {
           const object = item.measured.atom.object;
           const anchor = object?.anchor;
           if (object === undefined || anchor === undefined) continue;
           if (!REBUILDABLE.has(anchor.wrap)) continue;
-          if (anchor.vertical !== 'paragraph') continue;
-          const top = mp(piece.boxTop + anchor.y);
+          const originY =
+            anchor.vertical === 'paragraph'
+              ? piece.boxTop
+              : anchor.vertical === 'page'
+                ? (state?.page.y ?? mp(0))
+                : (state?.contentBox.y ?? mp(0));
+          const originX = anchor.horizontal === 'page' ? (state?.page.x ?? mp(0)) : (state?.contentBox.x ?? mp(0));
+          const top = mp(originY + anchor.y);
+          const left = mp(originX + anchor.x);
+          const centre = mp(left + object.width / 2);
+          const boxCentre = mp((state?.contentBox.x ?? mp(0)) + (state?.contentBox.width ?? mp(0)) / 2);
           placedFloats.push({
             page: piece.page,
             top,
             bottom: mp(top + object.height),
-            side: anchor.x <= 0 ? 'left' : 'right',
+            left,
+            right: mp(left + object.width),
+            side: centre <= boxCentre ? 'left' : 'right',
             extent: mp(object.width + 1000),
           });
         }

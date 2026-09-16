@@ -69,8 +69,13 @@ export interface SideBand {
 
 const WRAPPING: ReadonlySet<string> = new Set(['square', 'tight', 'through']);
 
-const sideBandsOf = (measured: readonly MeasuredAtom[]): readonly SideBand[] => {
+const sideBandsOf = (
+  measured: readonly MeasuredAtom[],
+  contentX: Mp,
+  contentWidth: Mp,
+): readonly SideBand[] => {
   const bands: SideBand[] = [];
+  const boxCentre = mp(contentX + contentWidth / 2);
   for (const item of measured) {
     const object = item.atom.object;
     const anchor = object?.anchor;
@@ -78,8 +83,9 @@ const sideBandsOf = (measured: readonly MeasuredAtom[]): readonly SideBand[] => 
     if (!WRAPPING.has(anchor.wrap)) continue;
     if (anchor.vertical !== 'paragraph') continue;
     const top = mp(anchor.y);
+    const centre = mp(contentX + anchor.x + object.width / 2);
     bands.push({
-      side: anchor.x <= 0 ? 'left' : 'right',
+      side: centre <= boxCentre ? 'left' : 'right',
       top,
       bottom: mp(top + object.height),
       extent: mp(object.width + SIDE_GAP_MP),
@@ -99,7 +105,10 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
     mp(0),
   );
 
-  const floatBands = [...sideBandsOf(measured), ...(request.externalBands ?? [])];
+  const floatBands = [
+    ...sideBandsOf(measured, contentX, contentWidth),
+    ...(request.externalBands ?? []),
+  ];
   const bandFor =
     floatBands.length === 0
       ? undefined

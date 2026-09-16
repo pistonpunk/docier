@@ -202,7 +202,9 @@ describe('top and bottom wrap', () => {
     expect(lineTops(await layoutOf(floatIn({ wrap: 'Square' })))).toEqual(await baseline());
   });
 
-  it('leaves the text alone when the float is anchored to the page, which has no page yet', async () => {
+  it('leaves the text alone for a top-and-bottom float past the end of the text', async () => {
+    // top-and-bottom wrap is applied inside the float's own block, so a band that
+    // starts below the whole paragraph displaces nothing
     expect(
       lineTops(await layoutOf(floatIn({ wrap: 'TopAndBottom', relativeV: 'page', offsetY: 100000 }))),
     ).toEqual(await baseline());
@@ -278,6 +280,28 @@ describe('square wrap', () => {
     );
     const after = withFloat.pages[0]?.blocks[1]?.lines[0]?.atoms[0]?.x ?? 0;
     const plain = without.pages[0]?.blocks[1]?.lines[0]?.atoms[0]?.x ?? 0;
+    expect(after).toBeGreaterThan(plain);
+  });
+
+  it('wraps a paragraph around a float anchored to the page', async () => {
+    const NARROW = 100000;
+    const paged = anchorDrawing({
+      wrap: 'Square',
+      relativeV: 'page',
+      relativeH: 'page',
+      offsetX: 0,
+      offsetY: 0,
+      widthEmu: NARROW,
+      heightEmu: 2000000,
+    });
+    const withFloat = await layoutOf(
+      bodyOf(`<w:p><w:r>${paged}<w:t xml:space="preserve">float</w:t></w:r></w:p>`),
+    );
+    const without = await layoutOf(
+      bodyOf('<w:p><w:r><w:t xml:space="preserve">float</w:t></w:r></w:p>'),
+    );
+    const after = withFloat.pages[0]?.blocks[0]?.lines[0]?.atoms[0]?.x ?? 0;
+    const plain = without.pages[0]?.blocks[0]?.lines[0]?.atoms[0]?.x ?? 0;
     expect(after).toBeGreaterThan(plain);
   });
 
