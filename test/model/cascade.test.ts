@@ -257,9 +257,12 @@ describe('numbering layer', () => {
     const paragraph = model.paragraphs()[0];
     if (paragraph === undefined) throw new Error('no paragraph');
     const resolved = model.resolveRunProperties(paragraph, firstRunProperties(paragraph));
-    expect(resolved.size).toBe(20);
+    // the numbering level carries sz 30 and color 008000 and neither reaches the
+    // paragraph body. What does reach it is the default paragraph style, which a
+    // paragraph that names no style is formatted with, and docDefaults below it.
+    expect(resolved.size).toBe(22);
     expect(resolved.color).toBe('111111');
-    expect(resolved.describe('sz')).toBe('docDefaults');
+    expect(resolved.describe('sz')).toBe('style:Normal');
     expect(resolved.describe('color')).toBe('docDefaults');
     const block = model.resolveParagraphProperties(paragraph);
     expect(block.indentStart).toBe(720);
@@ -527,7 +530,7 @@ describe('broken style references', () => {
 });
 
 describe('doc defaults', () => {
-  it('supplies values when no style is named', async () => {
+  it('supplies what the default style leaves unsaid', async () => {
     const model = await openModel({
       body: '<w:p><w:r><w:t>a</w:t></w:r></w:p>',
       styles: BASE_STYLES,
@@ -536,8 +539,12 @@ describe('doc defaults', () => {
     const paragraph = model.paragraphs()[0];
     if (paragraph === undefined) throw new Error('no paragraph');
     const resolved = model.resolveRunProperties(paragraph, firstRunProperties(paragraph));
-    expect(resolved.size).toBe(20);
+    // a paragraph that names no style takes the default paragraph style, as it
+    // does in Word, and only what that leaves unsaid comes from docDefaults
+    expect(resolved.size).toBe(22);
+    expect(resolved.describe('sz')).toBe('style:Normal');
     expect(resolved.fontAscii).toBe('Georgia');
+    expect(resolved.originOf('rFonts', 'ascii')?.layer).toBe('docDefaults');
     expect(resolved.bold).toBeUndefined();
   });
 });

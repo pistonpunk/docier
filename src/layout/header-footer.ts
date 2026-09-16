@@ -8,6 +8,7 @@ import type { FontResolver } from './fonts.js';
 import type { PaintRegistry } from './paint.js';
 import type { Hasher } from './hash.js';
 import { ingestStory } from './ingest.js';
+import { themeResolutionOf } from './theme-resolution.js';
 import { buildParagraphBlock, prepareParagraphs } from './paragraph-blocks.js';
 import { spaceAfterOf, spaceBeforeOf } from './paginate.js';
 import { blockFragmentOf } from './finalize.js';
@@ -124,6 +125,7 @@ export const layoutRegion = (request: RegionRequest): RegionLayout => {
     defaultFontFamily: request.defaultFontFamily,
     defaultTabStop: request.defaultTabStop,
     pageFields: request.values,
+    theme: themeResolutionOf(request.model),
     hash: request.hash,
   });
   for (const diagnostic of ingested.diagnostics) request.diagnostics.push(diagnostic);

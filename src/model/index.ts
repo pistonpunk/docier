@@ -14,6 +14,15 @@ export { ModelNode, ViewCache } from './view.js';
 
 export { ModelContext } from './context.js';
 
+export type { ThemeColourKey, ThemeColours, ThemeFonts } from './theme.js';
+export {
+  EMPTY_THEME_FONTS,
+  THEME_COLOUR_KEYS,
+  ThemePart,
+  applyTintShade,
+  majorOrMinorFont,
+} from './theme.js';
+
 export {
   W,
   childElements,

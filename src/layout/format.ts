@@ -2,7 +2,8 @@ import type { Mp, Twip } from '../units/index.js';
 import { halfPoint, halfPointToMp, mp, twipToMp } from '../units/index.js';
 import type { LineSpacing } from '../measure/index.js';
 import { SINGLE_LINE_MULTIPLE, atLeastSpacing, autoSpacing, exactSpacing } from '../measure/index.js';
-import type { ResolvedProperties } from '../model/index.js';
+import type { ResolvedProperties, ThemeColours, ThemeFonts } from '../model/index.js';
+import { applyTintShade, majorOrMinorFont } from '../model/index.js';
 import { emptyBorderSet } from './table-borders.js';
 import type { BorderSet, Justification, Shading, TextDirection, VerticalAlign } from './types.js';
 
@@ -88,8 +89,53 @@ export const spacingOf = (resolved: ResolvedProperties): LineSpacing => {
   return autoSpacing(SINGLE_LINE_MULTIPLE);
 };
 
-export const fontFamilyOf = (resolved: ResolvedProperties): string | undefined =>
-  resolved.fontAscii ?? resolved.fontHighAnsi ?? resolved.fontComplexScript ?? resolved.fontEastAsia;
+export interface ThemeResolution {
+  readonly fonts: ThemeFonts;
+  readonly colours: ThemeColours;
+}
+
+const THEME_COLOUR_ALIASES: Readonly<Record<string, string>> = {
+  background1: 'lt1',
+  text1: 'dk1',
+  background2: 'lt2',
+  text2: 'dk2',
+  hyperlink: 'hlink',
+  followedHyperlink: 'folHlink',
+};
+
+export const resolveThemeColour = (
+  resolved: ResolvedProperties,
+  theme?: ThemeResolution | undefined,
+): string | undefined => {
+  const explicit = resolved.color;
+  const reference = resolved.colorTheme;
+  if (reference === undefined || theme === undefined) return explicit;
+  const key = THEME_COLOUR_ALIASES[reference] ?? reference;
+  const base = theme.colours[key as keyof ThemeColours];
+  if (base === undefined) return explicit;
+  return applyTintShade(base, resolved.colorTint, resolved.colorShade);
+};
+
+const themeFamily = (
+  reference: string | undefined,
+  theme: ThemeFonts | undefined,
+): string | undefined => {
+  if (reference === undefined || theme === undefined) return undefined;
+  return majorOrMinorFont(reference, theme);
+};
+
+export const fontFamilyOf = (
+  resolved: ResolvedProperties,
+  theme?: ThemeFonts | undefined,
+): string | undefined =>
+  resolved.fontAscii ??
+  themeFamily(resolved.fontAsciiTheme, theme) ??
+  resolved.fontHighAnsi ??
+  themeFamily(resolved.fontHighAnsiTheme, theme) ??
+  resolved.fontComplexScript ??
+  themeFamily(resolved.fontComplexScriptTheme, theme) ??
+  resolved.fontEastAsia ??
+  themeFamily(resolved.fontEastAsiaTheme, theme);
 
 export const hasThemeFont = (resolved: ResolvedProperties): boolean =>
   resolved.fontAsciiTheme !== undefined ||
@@ -97,10 +143,14 @@ export const hasThemeFont = (resolved: ResolvedProperties): boolean =>
   resolved.fontComplexScriptTheme !== undefined ||
   resolved.fontEastAsiaTheme !== undefined;
 
-export const runFormatOf = (resolved: ResolvedProperties, fallbackFamily: string): RunFormat => {
+export const runFormatOf = (
+  resolved: ResolvedProperties,
+  fallbackFamily: string,
+  theme?: ThemeResolution | undefined,
+): RunFormat => {
   const size = resolved.size;
   return {
-    requestedFamily: fontFamilyOf(resolved) ?? fallbackFamily,
+    requestedFamily: fontFamilyOf(resolved, theme?.fonts) ?? fallbackFamily,
     size: size === undefined ? DEFAULT_FONT_SIZE : halfPointToMp(size),
     bold: resolved.bold ?? false,
     italic: resolved.italic ?? false,
@@ -109,7 +159,7 @@ export const runFormatOf = (resolved: ResolvedProperties, fallbackFamily: string
     allCaps: resolved.allCaps ?? false,
     smallCaps: resolved.smallCaps ?? false,
     hidden: resolved.hidden ?? false,
-    color: resolved.color,
+    color: resolveThemeColour(resolved, theme),
     highlight: resolved.highlight,
     verticalAlign: verticalAlignOf(resolved.verticalAlign),
     position: halfPointToMp(resolved.position ?? halfPoint(0)),

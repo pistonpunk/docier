@@ -140,25 +140,6 @@ const REFUSALS: readonly Refusal[] = [
   },
 
   {
-    id: 'docier.command.theme.setColors',
-    label: 'Theme colours',
-    category: 'theme',
-    reason: 'The theme part is not modelled in this build, so theme colours cannot be written',
-  },
-  {
-    id: 'docier.command.theme.setFonts',
-    label: 'Theme fonts',
-    category: 'theme',
-    reason: 'The theme part is not modelled in this build, so theme fonts cannot be written',
-  },
-  {
-    id: 'docier.command.theme.setSpacing',
-    label: 'Theme spacing',
-    category: 'theme',
-    reason: 'The theme part is not modelled in this build, so theme spacing cannot be written',
-  },
-
-  {
     id: 'docier.command.proof.spelling',
     label: 'Spelling',
     category: 'proof',

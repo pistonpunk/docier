@@ -29,6 +29,7 @@ import {
 } from '../model/index.js';
 import type { RunAnnotation } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
+import type { ThemeResolution } from './format.js';
 import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
 import { NumberingCounters, defaultLevelText, numberTextOf } from './numbering.js';
 import { objectPlacementOf, textBoxElementOf } from './objects.js';
@@ -110,6 +111,7 @@ export interface IngestOptions {
   readonly defaultFontFamily: string;
   readonly defaultTabStop: Mp;
   readonly pageFields?: PageFieldValues;
+  readonly theme?: ThemeResolution | undefined;
   readonly hash?: Hasher;
 }
 
@@ -343,6 +345,7 @@ const resolveNumbering = (
   const format = runFormatOf(
     model.resolveNumberingRunProperties(paragraph, context),
     options.defaultFontFamily,
+    options.theme,
   );
   return {
     numbering: {
@@ -365,7 +368,7 @@ export const ingestParagraph = (
 ): ParagraphIngest => {
   const resolvedParagraph = model.resolveParagraphProperties(paragraph);
   const markResolved = model.resolveRunProperties(paragraph, paragraph.markProperties.element);
-  const markFormat = runFormatOf(markResolved, options.defaultFontFamily);
+  const markFormat = runFormatOf(markResolved, options.defaultFontFamily, options.theme);
   const format: ParagraphFormat = {
     ...paragraphFormatOf(
       resolvedParagraph,
@@ -404,7 +407,7 @@ export const ingestParagraph = (
 
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);
-    const runFormat = runFormatOf(resolvedRun, options.defaultFontFamily);
+    const runFormat = runFormatOf(resolvedRun, options.defaultFontFamily, options.theme);
     if (hasThemeFont(resolvedRun)) hasThemeFontSeen = true;
     const runStart = docPos(cursor);
     const items: IngestedItem[] = [];
@@ -463,6 +466,7 @@ export const ingestParagraph = (
     const injectionFormat = runFormatOf(
       model.resolveRunProperties(paragraph, injection.run.properties.element),
       options.defaultFontFamily,
+      options.theme,
     );
     if (injectionFormat.hidden) continue;
     const injectionStart = docPos(cursor);

@@ -6,6 +6,7 @@ import type { EditSession } from '../../src/edit/session.js';
 import type { DocPos } from '../../src/layout/index.js';
 import type { DocumentModel } from '../../src/model/document.js';
 import { PAGE, paragraphText } from '../layout/support.js';
+import type { DocxSpec } from '../model/support.js';
 import { openModel } from '../model/support.js';
 
 export { PAGE, paragraphText };
@@ -47,6 +48,14 @@ export const editorOf = async (
   config?: EditorConfigPatch,
 ): Promise<EditorHandle> => {
   const model: DocumentModel = await openModel({ body });
+  return track(createEditor(mountPoint(), config, { document: model }));
+};
+
+export const editorOfSpec = async (
+  spec: DocxSpec,
+  config?: EditorConfigPatch,
+): Promise<EditorHandle> => {
+  const model: DocumentModel = await openModel(spec);
   return track(createEditor(mountPoint(), config, { document: model }));
 };
 

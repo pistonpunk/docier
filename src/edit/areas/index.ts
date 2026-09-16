@@ -14,6 +14,7 @@ import { regionCommands } from './region.js';
 import { styleCommands } from './style.js';
 import { installAll } from './support.js';
 import { tableCommands } from './table.js';
+import { themeCommands } from './theme.js';
 import type { AreaHost } from './support.js';
 import { unsupportedCommands } from './unsupported.js';
 
@@ -32,6 +33,7 @@ export { commentCommands } from './comment.js';
 export { noteCommands } from './note.js';
 export { objectCommands } from './object.js';
 export { tableCommands } from './table.js';
+export { themeCommands } from './theme.js';
 export { unsupportedCommands } from './unsupported.js';
 
 export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
@@ -48,6 +50,7 @@ export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, 
   ...commentCommands(host),
   ...noteCommands(host),
   ...regionCommands(host),
+  ...themeCommands(host),
   ...unsupportedCommands(host),
 ];
 

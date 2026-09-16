@@ -6,6 +6,7 @@ import type { XmlElement } from '../ooxml/xml/index.js';
 import type { TextMeasurer } from '../measure/index.js';
 import { SINGLE_LINE_MULTIPLE, autoSpacing, createDeterministicMeasurer } from '../measure/index.js';
 import { ingest } from './ingest.js';
+import { themeResolutionOf } from './theme-resolution.js';
 import type { IngestedTable } from './table-ingest.js';
 import type { Section } from './sections.js';
 import { buildSections, pageVariantOf, sectionOfBlock, withContentBoxes } from './sections.js';
@@ -154,7 +155,12 @@ export const layoutDocument = (
   const defaultTabStopMp: Mp = twipToMp(defaultTabStop);
   const diagnostics: LayoutDiagnostic[] = [];
 
-  const ingested = ingest(model, { defaultFontFamily, defaultTabStop: defaultTabStopMp });
+  const theme = themeResolutionOf(model);
+  const ingested = ingest(model, {
+    defaultFontFamily,
+    defaultTabStop: defaultTabStopMp,
+    theme,
+  });
   const sections: readonly Section[] = flowSections(
     buildSections(ingested, diagnostics),
     options.flowWidth,

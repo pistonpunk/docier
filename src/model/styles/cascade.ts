@@ -701,7 +701,7 @@ export class StyleResolver {
 
   private computeRun(input: RunResolutionInput): ResolvedProperties {
     const resolved = new ResolvedProperties();
-    const paragraphStyleId = directStyleId(input.paragraphProperties, 'pStyle');
+    const paragraphStyleId = this.effectiveParagraphStyleId(input.paragraphProperties);
     const characterStyleId = directStyleId(input.runProperties, 'rStyle');
     const paragraphMark =
       input.paragraphProperties === undefined
@@ -743,7 +743,7 @@ export class StyleResolver {
 
   private computeNumberingRun(input: NumberingRunResolutionInput): ResolvedProperties {
     const resolved = new ResolvedProperties();
-    const paragraphStyleId = directStyleId(input.paragraphProperties, 'pStyle');
+    const paragraphStyleId = this.effectiveParagraphStyleId(input.paragraphProperties);
     const characterStyleId = directStyleId(input.numbering.level.runPropertiesElement, 'rStyle');
     const paragraphMark =
       input.paragraphProperties === undefined
@@ -782,7 +782,7 @@ export class StyleResolver {
 
   private computeParagraph(input: ParagraphResolutionInput): ResolvedProperties {
     const resolved = new ResolvedProperties();
-    const paragraphStyleId = directStyleId(input.paragraphProperties, 'pStyle');
+    const paragraphStyleId = this.effectiveParagraphStyleId(input.paragraphProperties);
     for (const level of PARAGRAPH_CASCADE) {
       switch (level.id) {
         case 'docDefaults':

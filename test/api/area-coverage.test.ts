@@ -281,7 +281,15 @@ describe('deliberately unavailable commands', () => {
     expect(handle.commands.isEnabled('docier.command.insert.header')).toBe(true);
     expect(reasonOf(handle, 'docier.command.insert.closeHeaderFooter')).toContain('not in a header');
     expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');
-    expect(reasonOf(handle, 'docier.command.theme.setColors')).toContain('theme part');
+    // the theme commands are implemented now, so they refuse only for a missing
+    // argument, and the document they run against carries a theme part
+    expect(reasonOf(handle, 'docier.command.theme.setColors')).toContain('colour scheme');
+    expect(
+      handle.commands.disabledReason('docier.command.theme.setColors', { palette: 'office' }),
+    ).toBeUndefined();
+    expect(
+      handle.commands.disabledReason('docier.command.theme.setFonts', { major: 'Georgia' }),
+    ).toBeUndefined();
     expect(handle.commands.isEnabled('docier.command.doc.save')).toBe(true);
     expect(reasonOf(handle, 'docier.command.export.pdf')).toContain('exportPdf handler');
     expect(reasonOf(handle, 'docier.command.find.find')).toBe('Type something to find');

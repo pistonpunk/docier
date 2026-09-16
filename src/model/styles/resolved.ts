@@ -263,6 +263,14 @@ export class ResolvedProperties {
     return this.value('color', 'themeColor');
   }
 
+  get colorTint(): string | undefined {
+    return this.value('color', 'themeTint');
+  }
+
+  get colorShade(): string | undefined {
+    return this.value('color', 'themeShade');
+  }
+
   get highlight(): string | undefined {
     return this.value('highlight');
   }

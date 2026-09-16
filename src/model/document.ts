@@ -27,9 +27,11 @@ import { Story } from './story.js';
 import { StyleResolver, tableStyleContextOf } from './styles/cascade.js';
 import type { ResolvedProperties, ResolvedTableProperties } from './styles/resolved.js';
 import { StylesPart } from './styles/styles-part.js';
+import { ThemePart } from './theme.js';
 import { childElements, isWElement } from './xml.js';
 
 const STYLES_PART_NAME = 'word/styles.xml';
+const THEME_PART_NAME = 'word/theme/theme1.xml';
 const NUMBERING_PART_NAME = 'word/numbering.xml';
 const SETTINGS_PART_NAME = 'word/settings.xml';
 
@@ -43,6 +45,7 @@ export interface ModelParts {
   readonly styles: string | undefined;
   readonly numbering: string | undefined;
   readonly settings: string | undefined;
+  readonly theme?: string | undefined;
 }
 
 export interface NoteReference {
@@ -60,6 +63,7 @@ interface DocumentInit {
   readonly styles: StylesPart | undefined;
   readonly numbering: NumberingPart | undefined;
   readonly settings: SettingsPart | undefined;
+  theme: ThemePart | undefined;
   readonly resolver: StyleResolver;
   readonly parts: ModelParts;
 }
@@ -91,9 +95,10 @@ export class DocumentModel {
   readonly diagnostics: DiagnosticCollector;
   readonly styles: StylesPart | undefined;
   readonly settings: SettingsPart | undefined;
+  theme: ThemePart | undefined;
   readonly resolver: StyleResolver;
   readonly mainPartName: string;
-  private readonly declaredParts: ModelParts;
+  private declaredParts: ModelParts;
   private numberingPart: NumberingPart | undefined;
   private numberingPartName: string | undefined;
   private storyList: readonly Story[];
@@ -107,11 +112,18 @@ export class DocumentModel {
     this.storyList = init.stories;
     this.storyById = new Map(init.stories.map((story) => [story.id, story]));
     this.styles = init.styles;
+    this.theme = init.theme;
     this.numberingPart = init.numbering;
     this.numberingPartName = init.parts.numbering;
     this.settings = init.settings;
     this.resolver = init.resolver;
     this.declaredParts = init.parts;
+  }
+
+  adoptTheme(partName: string, element: XmlElement): ThemePart {
+    this.declaredParts = { ...this.declaredParts, theme: partName };
+    this.theme = new ThemePart(element);
+    return this.theme;
   }
 
   get numbering(): NumberingPart | undefined {
@@ -144,6 +156,7 @@ export class DocumentModel {
       styles: this.declaredParts.styles,
       numbering: this.numberingPartName,
       settings: this.declaredParts.settings,
+      theme: this.declaredParts.theme,
     };
   }
 
@@ -158,7 +171,10 @@ export class DocumentModel {
     const root = rootElement(await mainPart.document());
     if (root === undefined) throw new Error('The main document part has no root element');
 
-    const resolveDependency = (which: 'styles' | 'numbering' | 'settings', fallback: string): string | undefined => {
+    const resolveDependency = (
+      which: 'styles' | 'numbering' | 'settings' | 'theme',
+      fallback: string,
+    ): string | undefined => {
       const type = RELATIONSHIP_TYPES[which];
       const relationship =
         type === undefined ? undefined : pkg.relationships.firstRelationshipOfType(mainPartName, type);
@@ -185,6 +201,7 @@ export class DocumentModel {
     const numberingName = resolveDependency('numbering', NUMBERING_PART_NAME);
     const settingsName = resolveDependency('settings', SETTINGS_PART_NAME);
 
+    const themeName = resolveDependency('theme', THEME_PART_NAME);
     const stylesRoot = await readRootOf(stylesName);
     const numberingRoot = await readRootOf(numberingName);
     const settingsRoot = await readRootOf(settingsName);
@@ -192,6 +209,8 @@ export class DocumentModel {
     const styles = stylesRoot === undefined ? undefined : new StylesPart(stylesRoot, context);
     const numbering = numberingRoot === undefined ? undefined : new NumberingPart(numberingRoot, context);
     const settings = settingsRoot === undefined ? undefined : new SettingsPart(settingsRoot);
+    const themeRoot = await readRootOf(themeName);
+    const theme = themeRoot === undefined ? undefined : new ThemePart(themeRoot);
     const resolver = new StyleResolver(styles);
 
     const stories: Story[] = [];
@@ -261,6 +280,7 @@ export class DocumentModel {
       styles,
       numbering,
       settings,
+      theme,
       resolver,
       parts: { styles: stylesName, numbering: numberingName, settings: settingsName },
     });

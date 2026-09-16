@@ -1,3 +1,8 @@
+import {
+  THEME_FONT_PAIRS,
+  THEME_PALETTES,
+  THEME_SPACING_PRESETS,
+} from '../edit/areas/theme.js';
 import { unsupportedIds } from '../edit/areas/unsupported.js';
 import { FONT_FAMILIES as FONT_FAMILY_NAMES, FONT_SIZES as FONT_SIZE_POINTS } from './font-family.js';
 import type {
@@ -168,6 +173,39 @@ export const PAGE_BORDERS_MENU: UiNode = menu('ui.menu.pageBorders', [
       },
     }),
   ]),
+]);
+
+export const THEME_FONTS_MENU: UiNode = menu('ui.menu.themeFonts', [
+  ...THEME_FONT_PAIRS.map((pair) =>
+    button({
+      labelKey: `ui.themeFont.${pair.id}`,
+      id: `themefonts:${pair.id}`,
+      command: command('theme.setFonts'),
+      args: { major: pair.major, minor: pair.minor },
+    }),
+  ),
+]);
+
+export const THEME_COLOURS_MENU: UiNode = menu('ui.menu.themeColours', [
+  ...THEME_PALETTES.map((palette) =>
+    button({
+      labelKey: `ui.themeColour.${palette.id}`,
+      id: `themecolours:${palette.id}`,
+      command: command('theme.setColors'),
+      args: { palette: palette.id },
+    }),
+  ),
+]);
+
+export const THEME_SPACING_MENU: UiNode = menu('ui.menu.paragraphSpacing', [
+  ...THEME_SPACING_PRESETS.map((preset) =>
+    button({
+      labelKey: `ui.themeSpacing.${preset.id}`,
+      id: `themespacing:${preset.id}`,
+      command: command('theme.setSpacing'),
+      args: { preset: preset.id },
+    }),
+  ),
 ]);
 
 export const WATERMARK_MENU: UiNode = menu('ui.menu.watermark', [
@@ -717,9 +755,9 @@ export const RIBBON_TABS: readonly UiTab[] = [
         labelKey: 'ui.group.documentFormatting',
         large: true,
         nodes: [
-          pending('theme.setFonts', 'ui.control.themeFonts', 'TF'),
-          pending('theme.setColors', 'ui.control.themeColors', 'TC'),
-          pending('theme.setSpacing', 'ui.control.paragraphSpacing', 'PS'),
+          THEME_FONTS_MENU,
+          THEME_COLOURS_MENU,
+          THEME_SPACING_MENU,
         ],
       },
       {
