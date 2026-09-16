@@ -234,6 +234,8 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="4" y="2.5" width="8" height="5.5" rx="1"/><path d="M8 10v3.5"/><path d="m6.3 11.8 1.7 1.7 1.7-1.7"/>',
   'object.align':
     '<path d="M2.5 2.5v11"/><rect x="5" y="4.5" width="8" height="3" rx=".8"/><rect x="5" y="9" width="5.5" height="3" rx=".8"/>',
+  'object.ungroup':
+    '<path d="M2.5 2.5h5.5v5.5h-5.5z" stroke-dasharray="2.4 1.6"/><path d="M8 8h5.5v5.5H8z" stroke-dasharray="2.4 1.6"/><path d="M8 5.2h1.6"/><path d="M11.9 8v1.6"/>',
   'object.group':
     '<path d="M3.5 2.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z" stroke-dasharray="2.4 1.6"/><rect x="4.4" y="4.4" width="4" height="4" rx=".8"/><circle cx="10.9" cy="10.9" r="1.9"/>',
   'insert.tableOfContents':

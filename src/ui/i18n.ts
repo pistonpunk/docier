@@ -278,6 +278,7 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.control.lineNumbers': 'Line Numbers',
   'ui.control.alignObjects': 'Align Objects',
   'ui.control.groupObjects': 'Group Objects',
+  'ui.control.ungroupObjects': 'Ungroup',
   'ui.control.updateTable': 'Update Table',
   'ui.control.crossReference': 'Cross-reference',
   'ui.control.insertIndex': 'Index',

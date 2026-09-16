@@ -1,6 +1,6 @@
 {
   "name": "docier-web",
-  "version": "0.9.37",
+  "version": "0.9.38",
   "private": false,
   "type": "module",
   "description": "A Word-compatible DOCX editor for the browser. Framework-agnostic, command and event driven, with an optional tokenization module for document templates.",

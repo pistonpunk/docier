@@ -1,6 +1,6 @@
 import type { DocRange, LayoutResult, PageFragment, Rect } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
-import { objectBoxOf } from '../render/inline-object.js';
+import { objectBoxOf, pageOriginOf } from '../render/inline-object.js';
 import type { EditSession } from './session.js';
 
 export interface ObjectBox {
@@ -15,14 +15,43 @@ export interface ObjectPoint {
   readonly y: Mp;
 }
 
-const selections = new WeakMap<EditSession, string>();
+interface ObjectSelection {
+  readonly ids: readonly string[];
+  readonly anchor: string;
+}
+
+const selections = new WeakMap<EditSession, ObjectSelection>();
 
 export const objectSelectionOf = (session: EditSession): string | undefined =>
-  selections.get(session);
+  selections.get(session)?.anchor;
 
-export const selectObject = (session: EditSession, objectId: string): void => {
-  if (objectId === '') selections.delete(session);
-  else selections.set(session, objectId);
+export const objectSelectionSetOf = (session: EditSession): readonly string[] =>
+  selections.get(session)?.ids ?? [];
+
+export const selectObject = (
+  session: EditSession,
+  objectId: string,
+  options?: { readonly additive?: boolean },
+): void => {
+  if (objectId === '') {
+    selections.delete(session);
+    return;
+  }
+  const current = selections.get(session);
+  if (options?.additive !== true || current === undefined) {
+    selections.set(session, { ids: [objectId], anchor: objectId });
+    return;
+  }
+  if (current.ids.includes(objectId)) {
+    const ids = current.ids.filter((id) => id !== objectId);
+    if (ids.length === 0) {
+      selections.delete(session);
+      return;
+    }
+    selections.set(session, { ids, anchor: ids[ids.length - 1] as string });
+    return;
+  }
+  selections.set(session, { ids: [...current.ids, objectId], anchor: objectId });
 };
 
 export const clearObjectSelection = (session: EditSession): boolean =>
@@ -35,7 +64,7 @@ export const resizableObjectsInPage = (page: PageFragment): readonly ObjectBox[]
       for (const atom of line.atoms) {
         const object = atom.object;
         if (object === undefined || object.objectId === '') continue;
-        if (object.relationshipId === undefined) continue;
+        if (object.relationshipId === undefined && object.children.length === 0) continue;
         const run = line.runs.find(
           (candidate) =>
             candidate.object === object ||
@@ -46,7 +75,7 @@ export const resizableObjectsInPage = (page: PageFragment): readonly ObjectBox[]
         found.push({
           objectId: object.objectId,
           page: page.index,
-          box: objectBoxOf(line, run, atom),
+          box: objectBoxOf(line, run, atom, pageOriginOf(page)),
           range: atom.source,
         });
       }

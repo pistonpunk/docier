@@ -101,13 +101,6 @@ const REFUSALS: readonly Refusal[] = [
 
   { id: 'docier.command.object.insertShape', label: 'Shape', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
-  {
-    id: 'docier.command.object.group',
-    label: 'Group',
-    category: 'object',
-    reason:
-      'Grouping needs several objects selected at once, and this build selects one object at a time',
-  },
 
   {
     id: 'docier.command.proof.spelling',

@@ -920,6 +920,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
           pending('object.sendBackward', 'ui.control.arrangeSendBackward', 'SBK'),
           pending('object.align', 'ui.control.alignObjects', 'AO'),
           pending('object.group', 'ui.control.groupObjects', 'GO'),
+          pending('object.ungroup', 'ui.control.ungroupObjects', 'UO'),
         ],
       },
     ],

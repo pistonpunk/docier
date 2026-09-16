@@ -120,14 +120,16 @@ describe('chrome command coverage', () => {
 
     // the number rises whenever a menu entry is wired from a dialog stub to the
     // command it names, or when a menu row that named nothing gains a command.
-    // The last rise was Change Case, a new Home > Font menu of five modes, and
-    // the last fall was Table Properties: the ribbon and the context menu used to
+    // The last rise was Group and Ungroup, which became real commands rather
+    // than one refusal, and before that Change Case, a new Home > Font menu of
+    // five modes.
+    // The last fall was Table Properties: the ribbon and the context menu used to
     // name two different commands for one dialog, and both rows now open the
     // dialog through table.setProperties, which is one id instead of two.
     // Before that it was the whole field set behind Insert > Field, and before
     // that Find and Replace, which open the find dialog instead of being executed
     // from the ribbon, so the dialog dispatches them rather than the chrome
-    expect(registered).toBe(140);
+    expect(registered).toBe(141);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -154,7 +156,10 @@ describe('chrome command coverage', () => {
     // one fewer than it was: Table Properties was two commands, one of which was
     // the dialog refusal, and is now a single command that opens the dialog
     expect(areas.get('table')).toBe(32);
-    expect(areas.get('object')).toBe(12);
+    // one more than it was: the Group row was already dispatched, but resolved to
+    // a refusal in the registry. It and the new Ungroup row are both real
+    // commands now, so the pair counts one more than the single refusal did
+    expect(areas.get('object')).toBe(13);
     // one fewer than it was: Insert > Field used to dispatch token.insert, which
     // is the template-token subsystem rather than a field, and now dispatches the
     // insert.field set instead
@@ -216,7 +221,9 @@ describe('the chrome does not show placeholders', () => {
 describe('deliberately unavailable commands', () => {
   it('registers each of them with a specific reason instead of a generic one', async () => {
     const handle = await editorOf(FIXTURE);
-    expect(unsupportedIds.length).toBeGreaterThan(34);
+    // one lower than it was: Group left this list when it became a command that
+    // groups the floating pictures the selection holds
+    expect(unsupportedIds.length).toBeGreaterThan(33);
 
     const missing: string[] = [];
     const generic: string[] = [];

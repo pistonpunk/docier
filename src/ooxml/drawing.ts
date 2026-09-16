@@ -12,6 +12,13 @@ export const DRAWING_NAMESPACES = {
 
 const WORD_NAMESPACE = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+export interface DrawingPlacement {
+  readonly behind: boolean;
+  readonly relativeHeight: number;
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface DrawingRequest {
   readonly relationshipId: string;
   readonly cx: number;
@@ -19,6 +26,7 @@ export interface DrawingRequest {
   readonly docPrId: number;
   readonly name: string;
   readonly alt: string;
+  readonly anchor?: DrawingPlacement | undefined;
 }
 
 const namespaced = (localName: string, prefix: string, uri: string): XmlElement =>
@@ -34,14 +42,26 @@ const withAttributes = (
   return element;
 };
 
-export interface DrawingRequest {
-  readonly relationshipId: string;
-  readonly cx: number;
-  readonly cy: number;
-  readonly docPrId: number;
-  readonly name: string;
-  readonly alt: string;
-}
+const pagePosition = (axis: 'positionH' | 'positionV', value: number): XmlElement => {
+  const position = namespaced(axis, 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(position, [['relativeFrom', 'page', '', '']]);
+  position.selfClosing = false;
+  const offset = namespaced('posOffset', 'wp', DRAWING_NAMESPACES.wp);
+  offset.children.push({ kind: 'text', value: String(value), parent: offset });
+  position.children.push(offset);
+  offset.parent = position;
+  return position;
+};
+
+const anchorChildrenOf = (anchor: DrawingPlacement): readonly XmlElement[] => {
+  const simplePos = namespaced('simplePos', 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(simplePos, [
+    ['x', '0', '', ''],
+    ['y', '0', '', ''],
+  ]);
+  const wrap = namespaced('wrapNone', 'wp', DRAWING_NAMESPACES.wp);
+  return [simplePos, pagePosition('positionH', anchor.x), pagePosition('positionV', anchor.y), wrap];
+};
 
 export const buildInlineDrawing = (request: DrawingRequest): XmlElement => {
   const drawing = namespaced('drawing', 'w', WORD_NAMESPACE);
@@ -49,7 +69,8 @@ export const buildInlineDrawing = (request: DrawingRequest): XmlElement => {
   for (const [prefix, uri] of Object.entries(DRAWING_NAMESPACES)) {
     declareNamespace(drawing, prefix, uri);
   }
-  const inline = namespaced('inline', 'wp', DRAWING_NAMESPACES.wp);
+  const placement = request.anchor;
+  const inline = namespaced(placement === undefined ? 'inline' : 'anchor', 'wp', DRAWING_NAMESPACES.wp);
   inline.selfClosing = false;
   withAttributes(inline, [
     ['distT', '0', '', ''],
@@ -57,6 +78,16 @@ export const buildInlineDrawing = (request: DrawingRequest): XmlElement => {
     ['distL', '0', '', ''],
     ['distR', '0', '', ''],
   ]);
+  if (placement !== undefined) {
+    withAttributes(inline, [
+      ['simplePos', '0', '', ''],
+      ['relativeHeight', String(placement.relativeHeight), '', ''],
+      ['behindDoc', placement.behind ? '1' : '0', '', ''],
+      ['locked', '0', '', ''],
+      ['layoutInCell', '1', '', ''],
+      ['allowOverlap', '1', '', ''],
+    ]);
+  }
   const extent = namespaced('extent', 'wp', DRAWING_NAMESPACES.wp);
   withAttributes(extent, [
     ['cx', String(request.cx), '', ''],
@@ -138,6 +169,11 @@ export const buildInlineDrawing = (request: DrawingRequest): XmlElement => {
   pic.parent = graphicData;
   graphic.children.push(graphicData);
   graphicData.parent = graphic;
+  if (placement !== undefined) {
+    const anchored = anchorChildrenOf(placement);
+    inline.children.push(...anchored);
+    for (const element of anchored) element.parent = inline;
+  }
   inline.children.push(extent, effectExtent, docPr, graphic);
   extent.parent = inline;
   effectExtent.parent = inline;
@@ -145,6 +181,205 @@ export const buildInlineDrawing = (request: DrawingRequest): XmlElement => {
   graphic.parent = inline;
   drawing.children.push(inline);
   inline.parent = drawing;
+  return drawing;
+};
+
+export const GROUP_NAMESPACE = 'http://schemas.microsoft.com/office/word/2010/wordprocessingGroup';
+
+export interface GroupChildRequest {
+  readonly relationshipId: string;
+  readonly x: number;
+  readonly y: number;
+  readonly cx: number;
+  readonly cy: number;
+  readonly name: string;
+}
+
+export interface GroupDrawingRequest {
+  readonly cx: number;
+  readonly cy: number;
+  readonly docPrId: number;
+  readonly name: string;
+  readonly children: readonly GroupChildRequest[];
+  readonly anchor:
+    | {
+        readonly behind: boolean;
+        readonly relativeHeight: number;
+        readonly x: number;
+        readonly y: number;
+      }
+    | undefined;
+}
+
+const groupPictureOf = (child: GroupChildRequest): XmlElement => {
+  const pic = namespaced('pic', 'wpg', GROUP_NAMESPACE);
+  pic.selfClosing = false;
+  const nvPicPr = namespaced('nvPicPr', 'wpg', GROUP_NAMESPACE);
+  nvPicPr.selfClosing = false;
+  const cNvPr = namespaced('cNvPr', 'wpg', GROUP_NAMESPACE);
+  withAttributes(cNvPr, [
+    ['id', '0', '', ''],
+    ['name', child.name, '', ''],
+  ]);
+  const cNvPicPr = namespaced('cNvPicPr', 'wpg', GROUP_NAMESPACE);
+  nvPicPr.children.push(cNvPr, cNvPicPr);
+  cNvPr.parent = nvPicPr;
+  cNvPicPr.parent = nvPicPr;
+  const xfrm = namespaced('xfrm', 'a', DRAWING_NAMESPACES.a);
+  xfrm.selfClosing = false;
+  const off = namespaced('off', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(off, [
+    ['x', String(child.x), '', ''],
+    ['y', String(child.y), '', ''],
+  ]);
+  const ext = namespaced('ext', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(ext, [
+    ['cx', String(child.cx), '', ''],
+    ['cy', String(child.cy), '', ''],
+  ]);
+  xfrm.children.push(off, ext);
+  off.parent = xfrm;
+  ext.parent = xfrm;
+  const blipFill = namespaced('blipFill', 'a', DRAWING_NAMESPACES.a);
+  blipFill.selfClosing = false;
+  const blip = namespaced('blip', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(blip, [['embed', child.relationshipId, 'r', DRAWING_NAMESPACES.r]]);
+  const stretch = namespaced('stretch', 'a', DRAWING_NAMESPACES.a);
+  stretch.selfClosing = false;
+  const fillRect = namespaced('fillRect', 'a', DRAWING_NAMESPACES.a);
+  stretch.children.push(fillRect);
+  fillRect.parent = stretch;
+  blipFill.children.push(blip, stretch);
+  blip.parent = blipFill;
+  stretch.parent = blipFill;
+  pic.children.push(nvPicPr, xfrm, blipFill);
+  nvPicPr.parent = pic;
+  xfrm.parent = pic;
+  blipFill.parent = pic;
+  return pic;
+};
+
+export const buildGroupDrawing = (request: GroupDrawingRequest): XmlElement => {
+  const drawing = namespaced('drawing', 'w', WORD_NAMESPACE);
+  drawing.selfClosing = false;
+  for (const [prefix, uri] of Object.entries(DRAWING_NAMESPACES)) {
+    declareNamespace(drawing, prefix, uri);
+  }
+  declareNamespace(drawing, 'wpg', GROUP_NAMESPACE);
+
+  const anchor = request.anchor;
+  const holder = namespaced(anchor === undefined ? 'inline' : 'anchor', 'wp', DRAWING_NAMESPACES.wp);
+  holder.selfClosing = false;
+  withAttributes(holder, [
+    ['distT', '0', '', ''],
+    ['distB', '0', '', ''],
+    ['distL', '0', '', ''],
+    ['distR', '0', '', ''],
+  ]);
+  if (anchor !== undefined) {
+    withAttributes(holder, [
+      ['simplePos', '0', '', ''],
+      ['relativeHeight', String(anchor.relativeHeight), '', ''],
+      ['behindDoc', anchor.behind ? '1' : '0', '', ''],
+      ['locked', '0', '', ''],
+      ['layoutInCell', '1', '', ''],
+      ['allowOverlap', '1', '', ''],
+    ]);
+    const simplePos = namespaced('simplePos', 'wp', DRAWING_NAMESPACES.wp);
+    withAttributes(simplePos, [
+      ['x', '0', '', ''],
+      ['y', '0', '', ''],
+    ]);
+    const positioned = (
+      axis: 'positionH' | 'positionV',
+      value: number,
+    ): XmlElement => {
+      const position = namespaced(axis, 'wp', DRAWING_NAMESPACES.wp);
+      withAttributes(position, [['relativeFrom', 'page', '', '']]);
+      position.selfClosing = false;
+      const offset = namespaced('posOffset', 'wp', DRAWING_NAMESPACES.wp);
+      offset.children.push({ kind: 'text', value: String(value), parent: offset });
+      position.children.push(offset);
+      offset.parent = position;
+      return position;
+    };
+    const positionH = positioned('positionH', anchor.x);
+    const positionV = positioned('positionV', anchor.y);
+    const wrap = namespaced('wrapNone', 'wp', DRAWING_NAMESPACES.wp);
+    holder.children.push(simplePos, positionH, positionV, wrap);
+    simplePos.parent = holder;
+    positionH.parent = holder;
+    positionV.parent = holder;
+    wrap.parent = holder;
+  }
+
+  const extent = namespaced('extent', 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(extent, [
+    ['cx', String(request.cx), '', ''],
+    ['cy', String(request.cy), '', ''],
+  ]);
+  const effectExtent = namespaced('effectExtent', 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(effectExtent, [
+    ['l', '0', '', ''],
+    ['t', '0', '', ''],
+    ['r', '0', '', ''],
+    ['b', '0', '', ''],
+  ]);
+  const docPr = namespaced('docPr', 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(docPr, [
+    ['id', String(request.docPrId), '', ''],
+    ['name', request.name, '', ''],
+  ]);
+
+  const graphic = namespaced('graphic', 'a', DRAWING_NAMESPACES.a);
+  graphic.selfClosing = false;
+  const graphicData = namespaced('graphicData', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(graphicData, [['uri', GROUP_NAMESPACE, '', '']]);
+  graphicData.selfClosing = false;
+
+  const group = namespaced('wgp', 'wpg', GROUP_NAMESPACE);
+  group.selfClosing = false;
+  const groupProperties = namespaced('grpSpPr', 'wpg', GROUP_NAMESPACE);
+  groupProperties.selfClosing = false;
+  const groupTransform = namespaced('xfrm', 'a', DRAWING_NAMESPACES.a);
+  groupTransform.selfClosing = false;
+  const box = (localName: string, values: readonly number[]): XmlElement => {
+    const element = namespaced(localName, 'a', DRAWING_NAMESPACES.a);
+    withAttributes(element, [
+      [localName === 'ext' || localName === 'chExt' ? 'cx' : 'x', String(values[0]), '', ''],
+      [localName === 'ext' || localName === 'chExt' ? 'cy' : 'y', String(values[1]), '', ''],
+    ]);
+    return element;
+  };
+  const groupOff = box('off', [0, 0]);
+  const groupExt = box('ext', [request.cx, request.cy]);
+  const childOff = box('chOff', [0, 0]);
+  const childExt = box('chExt', [request.cx, request.cy]);
+  groupTransform.children.push(groupOff, groupExt, childOff, childExt);
+  for (const element of [groupOff, groupExt, childOff, childExt]) {
+    element.parent = groupTransform;
+  }
+  groupProperties.children.push(groupTransform);
+  groupTransform.parent = groupProperties;
+  group.children.push(groupProperties);
+  groupProperties.parent = group;
+  for (const child of request.children) {
+    const picture = groupPictureOf(child);
+    group.children.push(picture);
+    picture.parent = group;
+  }
+
+  graphicData.children.push(group);
+  group.parent = graphicData;
+  graphic.children.push(graphicData);
+  graphicData.parent = graphic;
+  holder.children.push(extent, effectExtent, docPr, graphic);
+  extent.parent = holder;
+  effectExtent.parent = holder;
+  docPr.parent = holder;
+  graphic.parent = holder;
+  drawing.children.push(holder);
+  holder.parent = drawing;
   return drawing;
 };
 

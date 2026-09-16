@@ -18,13 +18,22 @@ import {
   isWElement,
   resolvedRunContents,
 } from '../../model/index.js';
-import { buildInlineDrawing } from '../../ooxml/drawing.js';
+import { buildGroupDrawing, buildInlineDrawing } from '../../ooxml/drawing.js';
+import type { GroupChildRequest } from '../../ooxml/drawing.js';
 import { createWElement } from '../../model/index.js';
 import { objectIdOfDrawing } from '../../layout/objects.js';
+import type { ObjectChild } from '../../layout/types.js';
+import { indexOfChild, insertChild, removeChild } from '../../ooxml/xml/tree.js';
 import type { Mp } from '../../units/index.js';
 import { mp, mpToTwip, twip, twipToEmu } from '../../units/index.js';
 import type { ObjectBox } from '../objects.js';
-import { clearObjectSelection, findObjectBox, objectSelectionOf, selectObject } from '../objects.js';
+import {
+  clearObjectSelection,
+  findObjectBox,
+  objectSelectionOf,
+  objectSelectionSetOf,
+  selectObject,
+} from '../objects.js';
 import { MIN_OBJECT_TWIPS } from '../object-resize.js';
 import type { AreaHost, AreaSpec } from './support.js';
 import { insertRunChildAt } from './content.js';
@@ -749,6 +758,282 @@ const deleteSpec: AreaSpec<ObjectSelectArgs> = {
   },
 };
 
+export interface ObjectGroupArgs {
+  readonly objectIds?: readonly string[];
+  readonly name?: string;
+}
+
+const NO_TWO_OBJECTS: LocalizedString =
+  'Grouping needs two or more pictures selected; shift-click to add one to the selection';
+const NO_FLOATING: LocalizedString =
+  'Grouping needs floating pictures; one of these sits in the line';
+const NO_SAME_PAGE: LocalizedString =
+  'Grouping needs the pictures on the same page';
+
+const groupIdsOf = (
+  host: AreaHost,
+  args: ObjectGroupArgs | undefined,
+): readonly string[] => {
+  const declared = args?.objectIds;
+  if (declared !== undefined && declared.length > 0) return declared;
+  return objectSelectionSetOf(host.session);
+};
+
+const emuOf = (value: Mp): number => twipToEmu(twip(mpToTwip(value)));
+
+const forgetParagraphOf = (host: AreaHost, element: XmlElement): void => {
+  let node: XmlElement | undefined = element;
+  while (node !== undefined && !isWElement(node, 'p')) {
+    node = node.parent;
+  }
+  host.session.model.context.forgetSubtree(node ?? element);
+};
+
+const anchorValueOf = (drawing: XmlElement, localName: string): string | undefined =>
+  anchorElementOf(drawing)?.attributes.find(
+    (attribute) => attribute.localName === localName,
+  )?.value;
+
+interface GroupPlan {
+  readonly elements: readonly XmlElement[];
+  readonly children: readonly GroupChildRequest[];
+  readonly cx: number;
+  readonly cy: number;
+  readonly x: number;
+  readonly y: number;
+  readonly behind: boolean;
+  readonly relativeHeight: number;
+  readonly reason: LocalizedString | undefined;
+}
+
+const groupPlanOf = (
+  host: AreaHost,
+  ids: readonly string[],
+): GroupPlan | undefined => {
+  if (ids.length < 2) return undefined;
+  const elements: XmlElement[] = [];
+  const boxes: ObjectBox[] = [];
+  for (const id of ids) {
+    const element = drawingWithId(host, id);
+    const box = findObjectBox(host.session.layout, id);
+    if (element === undefined || box === undefined) return undefined;
+    if (anchorElementOf(element) === undefined) {
+      return {
+        elements: [],
+        children: [],
+        cx: 0,
+        cy: 0,
+        x: 0,
+        y: 0,
+        behind: false,
+        relativeHeight: 0,
+        reason: NO_FLOATING,
+      };
+    }
+    elements.push(element);
+    boxes.push(box);
+  }
+  const page = boxes[0]?.page;
+  if (page === undefined || boxes.some((box) => box.page !== page)) {
+    return {
+      elements: [],
+      children: [],
+      cx: 0,
+      cy: 0,
+      x: 0,
+      y: 0,
+      behind: false,
+      relativeHeight: 0,
+      reason: NO_SAME_PAGE,
+    };
+  }
+  const left = Math.min(...boxes.map((box) => box.box.x as number));
+  const top = Math.min(...boxes.map((box) => box.box.y as number));
+  const right = Math.max(...boxes.map((box) => (box.box.x as number) + (box.box.width as number)));
+  const bottom = Math.max(...boxes.map((box) => (box.box.y as number) + (box.box.height as number)));
+  const children: GroupChildRequest[] = [];
+  for (let index = 0; index < boxes.length; index += 1) {
+    const box = boxes[index] as ObjectBox;
+    const element = elements[index] as XmlElement;
+    const relationshipId = blipRelationshipOf(element);
+    if (relationshipId === undefined) return undefined;
+    children.push({
+      relationshipId,
+      x: emuOf(mp(box.box.x - left)),
+      y: emuOf(mp(box.box.y - top)),
+      cx: emuOf(box.box.width),
+      cy: emuOf(box.box.height),
+      name: `Picture ${String(index + 1)}`,
+    });
+  }
+  const heights = elements.map((element) =>
+    Number.parseInt(anchorValueOf(element, 'relativeHeight') ?? '', 10),
+  );
+  const finite = heights.filter((value) => Number.isFinite(value));
+  const first = elements[0] as XmlElement;
+  return {
+    elements,
+    children,
+    cx: emuOf(mp(right - left)),
+    cy: emuOf(mp(bottom - top)),
+    x: emuOf(mp(left)),
+    y: emuOf(mp(top)),
+    behind: anchorValueOf(first, 'behindDoc') === '1',
+    relativeHeight: (finite.length === 0 ? 0 : Math.max(...finite)) + 1,
+    reason: undefined,
+  };
+};
+
+const groupSpec: AreaSpec<ObjectGroupArgs> = {
+  id: 'docier.command.object.group',
+  label: 'Group',
+  category: 'object',
+  permissions: ['format'],
+  enabledIn: (host, args) => {
+    const ids = groupIdsOf(host, args);
+    return ids.length >= 2 && groupPlanOf(host, ids)?.reason === undefined;
+  },
+  reason: (host, args) => {
+    const ids = groupIdsOf(host, args);
+    if (ids.length < 2) return NO_TWO_OBJECTS;
+    return groupPlanOf(host, ids)?.reason ?? NO_PICTURE;
+  },
+  run: (host, args) => {
+    const plan = groupPlanOf(host, groupIdsOf(host, args));
+    if (plan === undefined || plan.reason !== undefined) return false;
+    const first = plan.elements[0];
+    const parent = first?.parent;
+    if (first === undefined || parent === undefined) return false;
+    const docPrId = nextDocPrId(host.session.model);
+    const name = args?.name ?? `Group ${String(docPrId)}`;
+    const drawing = buildGroupDrawing({
+      cx: plan.cx,
+      cy: plan.cy,
+      docPrId,
+      name,
+      children: plan.children,
+      anchor: {
+        behind: plan.behind,
+        relativeHeight: plan.relativeHeight,
+        x: plan.x,
+        y: plan.y,
+      },
+    });
+    const changed = changedBy([...plan.elements, parent], () => {
+      const at = indexOfChild(parent, first);
+      insertChild(parent, at, drawing);
+      drawing.parent = parent;
+      removeChild(parent, first);
+      for (const element of plan.elements.slice(1)) {
+        const holder = element.parent;
+        if (holder === undefined) continue;
+        removeChild(holder, element);
+      }
+      return true;
+    });
+    if (!changed) return false;
+    for (const element of [...plan.elements, drawing]) forgetParagraphOf(host, element);
+    host.session.relayout();
+    selectObject(host.session, objectIdOfDrawing(drawing, docPrId));
+    return true;
+  },
+};
+
+export interface ObjectUngroupArgs {
+  readonly objectId?: string;
+}
+
+const placedChildrenOf = (
+  host: AreaHost,
+  objectId: string,
+): readonly ObjectChild[] => {
+  for (const page of host.session.layout.pages) {
+    for (const block of page.blocks) {
+      for (const line of block.lines) {
+        for (const atom of line.atoms) {
+          if (atom.object?.objectId === objectId) return atom.object.children;
+        }
+      }
+    }
+  }
+  return [];
+};
+
+const NO_GROUP: LocalizedString = 'The selected object is not a group';
+
+interface UngroupPlan {
+  readonly drawing: XmlElement;
+  readonly replacements: readonly XmlElement[];
+}
+
+const ungroupPlanOf = (
+  host: AreaHost,
+  args: ObjectUngroupArgs | undefined,
+): UngroupPlan | undefined => {
+  const objectId = selectedId(host, args);
+  if (objectId === undefined) return undefined;
+  const drawing = drawingWithId(host, objectId);
+  const box = findObjectBox(host.session.layout, objectId);
+  if (drawing === undefined || box === undefined) return undefined;
+  const children = placedChildrenOf(host, objectId);
+  if (children.length === 0) return undefined;
+  const base = nextDocPrId(host.session.model);
+  const behind = anchorValueOf(drawing, 'behindDoc') === '1';
+  const replacements = children.map((child, index) =>
+    buildInlineDrawing({
+      relationshipId: child.relationshipId ?? '',
+      cx: emuOf(child.width),
+      cy: emuOf(child.height),
+      docPrId: base + index,
+      name: `Picture ${String(index + 1)}`,
+      alt: `Picture ${String(index + 1)}`,
+      anchor: {
+        behind,
+        relativeHeight: index + 1,
+        x: emuOf(mp((box.box.x as number) + (child.x as number))),
+        y: emuOf(mp((box.box.y as number) + (child.y as number))),
+      },
+    }),
+  );
+  return { drawing, replacements };
+};
+
+const ungroupSpec: AreaSpec<ObjectUngroupArgs> = {
+  id: 'docier.command.object.ungroup',
+  label: 'Ungroup',
+  category: 'object',
+  permissions: ['format'],
+  enabledIn: (host, args) => ungroupPlanOf(host, args) !== undefined,
+  reason: (host, args) =>
+    selectedId(host, args) === undefined ? NO_SELECTION : NO_GROUP,
+  run: (host, args) => {
+    const plan = ungroupPlanOf(host, args);
+    if (plan === undefined) return false;
+    const parent = plan.drawing.parent;
+    if (parent === undefined) return false;
+    const replaced: XmlElement[] = [];
+    const changed = changedBy([plan.drawing, parent], () => {
+      const at = indexOfChild(parent, plan.drawing);
+      removeChild(parent, plan.drawing);
+      let index = at;
+      for (const child of plan.replacements) {
+        insertChild(parent, index, child);
+        child.parent = parent;
+        index += 1;
+        replaced.push(child);
+      }
+      return true;
+    });
+    if (!changed) return false;
+    forgetParagraphOf(host, plan.drawing);
+    for (const element of replaced) forgetParagraphOf(host, element);
+    host.session.relayout();
+    const first = replaced[0];
+    if (first !== undefined) selectObject(host.session, objectIdOfDrawing(first, ''));
+    return true;
+  },
+};
+
 export const objectCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<ObjectSizeArgs>(host, setSizeSpec),
   areaCommand<ObjectSelectArgs>(host, deleteSpec),
@@ -766,4 +1051,6 @@ export const objectCommands = (host: AreaHost): readonly CommandDefinition<never
   areaCommand<AlignArgs>(host, alignSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),
+  areaCommand<ObjectGroupArgs>(host, groupSpec),
+  areaCommand<ObjectUngroupArgs>(host, ungroupSpec),
 ];
