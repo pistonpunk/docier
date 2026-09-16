@@ -4,6 +4,7 @@ import type { LaidLine } from './assembly.js';
 import type { PageState, PaginateBlock, PlacedPiece } from './paginate.js';
 import type { PlacedRow, PlacedTable } from './table-flow.js';
 import { buildIndices } from './indices.js';
+import type { LineNumbering } from './sections.js';
 import type { LineRef } from './indices.js';
 import { frozenMapOf } from './frozen-map.js';
 import type { PlacedAtom } from './line-geometry.js';
@@ -12,6 +13,7 @@ import { pageOrigins } from './page-geometry.js';
 import type {
   AtomPlacement,
   BlockFragment,
+  LineNumberMark,
   BorderSet,
   CaretStop,
   CellFragment,
@@ -65,6 +67,7 @@ export interface FinalizeInput {
   readonly marks: boolean;
   readonly pageBorders: ReadonlyMap<number, BorderSet>;
   readonly columnBoxes: ReadonlyMap<number, readonly Rect[]>;
+  readonly lineNumbering: ReadonlyMap<number, LineNumbering | undefined>;
 }
 
 const atomsOf = (
@@ -293,6 +296,32 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
   };
 };
 
+const lineNumbersFor = (
+  page: PageState,
+  blocks: readonly BlockFragment[],
+  numbering: LineNumbering | undefined,
+): readonly LineNumberMark[] => {
+  if (numbering === undefined || numbering.countBy < 1) return [];
+  const marks: LineNumberMark[] = [];
+  let lines = 0;
+  for (const block of blocks) {
+    for (const line of block.lines) {
+      lines += 1;
+      if ((lines - 1) % numbering.countBy !== 0) continue;
+      const paint = line.runs[0]?.paint;
+      if (paint === undefined) continue;
+      marks.push({
+        lineId: line.id,
+        number: numbering.start + Math.floor((lines - 1) / numbering.countBy),
+        x: mp(page.contentBox.x - numbering.distance),
+        baselineY: line.baselineY,
+        paint,
+      });
+    }
+  }
+  return marks;
+};
+
 const unionBox = (boxes: readonly Rect[]): Rect => {
   const first = boxes[0];
   if (first === undefined) return { x: mp(0), y: mp(0), width: mp(0), height: mp(0) };
@@ -455,6 +484,7 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
       footer: regions?.footer,
       blocks,
       tables,
+      lineNumbers: lineNumbersFor(page, blocks, input.lineNumbering.get(page.section)),
       pageBorders: input.pageBorders.get(page.section) ?? EMPTY_PAGE_BORDERS,
     });
   }

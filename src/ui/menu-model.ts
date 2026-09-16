@@ -175,6 +175,30 @@ export const PAGE_BORDERS_MENU: UiNode = menu('ui.menu.pageBorders', [
   ]),
 ]);
 
+export const LINE_NUMBERS_MENU: UiNode = menu('ui.control.lineNumbers', [
+  ...(
+    [
+      [1, 'ui.lineNumbers.everyLine'],
+      [5, 'ui.lineNumbers.everyFive'],
+      [10, 'ui.lineNumbers.everyTen'],
+    ] as const
+  ).map(([countBy, labelKey]) =>
+    button({
+      labelKey,
+      id: `linenumbers:${String(countBy)}`,
+      command: command('doc.setLineNumbers'),
+      args: { countBy, start: 1, restart: 'newPage' },
+    }),
+  ),
+  separator('lineNumbersNone'),
+  button({
+    labelKey: 'ui.lineNumbers.none',
+    id: 'linenumbers:none',
+    command: command('doc.setLineNumbers'),
+    args: { none: true },
+  }),
+]);
+
 export const TEXT_DIRECTION_MENU: UiNode = menu('ui.menu.textDirection', [
   button({
     labelKey: 'ui.direction.ltr',
@@ -858,12 +882,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             actionArgs: { dialog: command('doc.setPageSize') },
           }),
           COLUMNS_MENU,
-          button({
-            labelKey: 'ui.control.lineNumbers',
-            command: command('doc.setLineNumbers'),
-            action: 'openDialog',
-            actionArgs: { dialog: command('doc.setLineNumbers') },
-          }),
+          LINE_NUMBERS_MENU,
         ],
       },
       {

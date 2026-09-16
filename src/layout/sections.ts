@@ -34,8 +34,30 @@ export interface Section {
   readonly footerDistance: Mp;
   readonly columnCount: number;
   readonly columnSpace: Mp;
+  readonly lineNumbering: LineNumbering | undefined;
   readonly propertiesElement: XmlElement | undefined;
 }
+
+export type LineNumberRestart = 'newPage' | 'newSection' | 'continuous';
+
+export interface LineNumbering {
+  readonly countBy: number;
+  readonly start: number;
+  readonly restart: LineNumberRestart;
+  readonly distance: Mp;
+}
+
+const lineNumberingOf = (properties: SectionProperties | undefined): LineNumbering | undefined => {
+  if (properties === undefined || properties.lineNumbering === undefined) return undefined;
+  const restart = properties.lineNumberRestart;
+  return {
+    countBy: properties.lineNumberCountBy ?? 1,
+    start: properties.lineNumberStart ?? 1,
+    restart:
+      restart === 'newSection' || restart === 'continuous' ? restart : 'newPage',
+    distance: twipToMp(properties.lineNumberDistance ?? twip(DEFAULT_LINE_NUMBER_DISTANCE)),
+  };
+};
 
 export const columnBoxesOf = (
   contentBox: Rect,
@@ -82,6 +104,7 @@ export const pageVariantOf = (
 };
 
 const DEFAULT_COLUMN_SPACE = 720;
+const DEFAULT_LINE_NUMBER_DISTANCE = 360;
 
 const rectOf = (x: Mp, y: Mp, width: Mp, height: Mp): Rect => ({ x, y, width, height });
 
@@ -177,6 +200,7 @@ export const buildSections = (
       evenAndOddHeaders: properties?.evenAndOddHeaders === true,
       headerDistance: twipToMp(margins?.header ?? DEFAULT_HEADER_DISTANCE),
       footerDistance: twipToMp(margins?.footer ?? DEFAULT_FOOTER_DISTANCE),
+      lineNumbering: lineNumberingOf(properties),
       columnCount: properties?.columnCount ?? 1,
       columnSpace: twipToMp(properties?.columnSpacing ?? twip(DEFAULT_COLUMN_SPACE)),
       propertiesElement: element,

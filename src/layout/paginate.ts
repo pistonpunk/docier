@@ -95,6 +95,7 @@ const fallbackSection = (): Section => {
     footerDistance: mp(0),
     columnCount: 1,
     columnSpace: mp(0),
+    lineNumbering: undefined,
     propertiesElement: undefined,
   };
 };

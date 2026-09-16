@@ -2,7 +2,7 @@ import type { Twip } from '../../units/index.js';
 import { twip } from '../../units/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { ensureOrderedChild, findOrderedChild, findOrderedChildren } from '../schema-order.js';
-import { integerFrom, isOn, childElements, createWElement, setWAttr } from '../xml.js';
+import { integerFrom, isOn, childElements, createWElement, removeElement, setWAttr } from '../xml.js';
 import type { BordersProperties } from './common.js';
 import { BordersProperties as Borders } from './common.js';
 import type { PropertyContainerReader, PropertyContainerWriter } from './property.js';
@@ -225,6 +225,42 @@ export class SectionProperties {
 
   get lineNumbering(): XmlElement | undefined {
     return this.prop('lnNumType').element;
+  }
+
+  get lineNumberCountBy(): number | undefined {
+    const raw = integerFrom(this.prop('lnNumType').attribute('countBy'));
+    return raw === undefined || raw < 1 ? undefined : raw;
+  }
+
+  setLineNumbering(to: {
+    readonly countBy: number;
+    readonly start: number;
+    readonly restart: string;
+  }): void {
+    const element = this.prop('lnNumType').ensure();
+    setWAttr(element, 'countBy', String(to.countBy));
+    setWAttr(element, 'start', String(to.start));
+    setWAttr(element, 'restart', to.restart);
+  }
+
+  removeLineNumbering(): boolean {
+    const element = this.prop('lnNumType').element;
+    if (element === undefined) return false;
+    removeElement(element);
+    return true;
+  }
+
+  get lineNumberStart(): number | undefined {
+    return integerFrom(this.prop('lnNumType').attribute('start'));
+  }
+
+  get lineNumberRestart(): string | undefined {
+    return this.prop('lnNumType').attribute('restart');
+  }
+
+  get lineNumberDistance(): Twip | undefined {
+    const raw = integerFrom(this.prop('lnNumType').attribute('distance'));
+    return raw === undefined ? undefined : twip(raw);
   }
 
   get pageNumbering(): XmlElement | undefined {

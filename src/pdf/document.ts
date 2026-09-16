@@ -65,6 +65,13 @@ const collectBlockGlyphs = (
 const collectGlyphs = (result: LayoutResult, fonts: FontRegistry, images: ImageRegistry): void => {
   for (const page of result.pages) {
     for (const block of blocksOfPage(page)) collectBlockGlyphs(block, result, fonts, images);
+    // a line number is painted from the layout's own mark, not from a run, so its
+    // glyphs are collected here rather than from a block
+    for (const mark of page.lineNumbers) {
+      const paint = result.paint[mark.paint];
+      if (paint === undefined || paint.hidden) continue;
+      fonts.slotFor(paint)?.record(String(mark.number));
+    }
     // the text of a shape or text box is laid out beside the page, so its glyphs
     // have to be collected from where it is kept rather than from the blocks
     for (const blocks of result.objectText.values()) {

@@ -16,12 +16,6 @@ const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const REFUSALS: readonly Refusal[] = [
   {
-    id: 'docier.command.doc.setLineNumbers',
-    label: 'Line numbers',
-    category: 'doc',
-    reason: 'Line numbering is deferred (LE-044) and is not modelled by this build',
-  },
-  {
     id: 'docier.command.doc.toggleTrackChanges',
     label: 'Track changes',
     category: 'doc',

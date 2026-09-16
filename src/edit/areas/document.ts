@@ -2,7 +2,7 @@ import type { CommandArea, CommandDefinition, LocalizedString } from '../../api/
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { createWElement, setWAttr } from '../../model/index.js';
 import type { AreaHost, AreaSpec } from './support.js';
-import { areaCommand } from './support.js';
+import { areaCommand, documentSection, DOCUMENT_INVALIDATION } from './support.js';
 
 export interface DocumentIo {
   open(): void;
@@ -110,6 +110,58 @@ const pageBackgroundSpec: AreaSpec<PageBackgroundArgs> = {
   },
 };
 
+export interface LineNumberArgs {
+  readonly countBy?: number;
+  readonly start?: number;
+  readonly restart?: 'newPage' | 'newSection' | 'continuous';
+  readonly none?: boolean;
+}
+
+const lineNumberReason = (args: LineNumberArgs | undefined): LocalizedString | undefined => {
+  if (args === undefined) return 'This control needs a line number setting to apply';
+  if (args.none === true) return undefined;
+  if (args.countBy === undefined || args.countBy < 1) {
+    return 'This control needs how many lines to count between numbers';
+  }
+  return undefined;
+};
+
+const lineNumbersSpec: AreaSpec<LineNumberArgs> = {
+  id: 'docier.command.doc.setLineNumbers',
+  label: 'Line numbers',
+  category: 'doc',
+  invalidation: DOCUMENT_INVALIDATION,
+  permissions: ['format'],
+  enabledIn: (host, args) => host.session.aligned && lineNumberReason(args) === undefined,
+  reason: (host, args) => {
+    if (!host.session.aligned) return NO_PAGE_BACKGROUND;
+    return lineNumberReason(args) ?? 'This command is available here';
+  },
+  run: (host, args) => {
+    if (lineNumberReason(args) !== undefined) return false;
+    const section = documentSection(host);
+    if (args?.none === true) {
+      if (section.lineNumbering === undefined) return false;
+      section.removeLineNumbering();
+      host.session.relayout();
+      return true;
+    }
+    const countBy = args?.countBy ?? 1;
+    const changed =
+      section.lineNumberCountBy !== countBy ||
+      section.lineNumberStart !== (args?.start ?? 1) ||
+      section.lineNumberRestart !== (args?.restart ?? 'newPage');
+    if (!changed) return false;
+    section.setLineNumbering({
+      countBy,
+      start: args?.start ?? 1,
+      restart: args?.restart ?? 'newPage',
+    });
+    host.session.relayout();
+    return true;
+  },
+};
+
 const anyIo = (): boolean => true;
 const pdfIo = (io: DocumentIo): boolean => io.exportPdf !== undefined;
 
@@ -117,6 +169,7 @@ export const documentCommands = (
   host: DocumentAreaHost,
 ): readonly CommandDefinition<never, void>[] => [
   areaCommand<PageBackgroundArgs>(host, pageBackgroundSpec),
+  areaCommand<LineNumberArgs>(host, lineNumbersSpec),
   docSpec(host, 'docier.command.doc.open', 'Open', (io) => {
     io.open();
   }, anyIo, NO_HANDLER),

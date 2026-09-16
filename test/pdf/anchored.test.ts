@@ -121,6 +121,26 @@ describe('an anchored text box in the PDF', () => {
   });
 });
 
+describe('line numbers in the PDF', () => {
+  const NUMBERED =
+    '<w:sectPr><w:lnNumType w:countBy="1" w:start="1" w:distance="360"/>' +
+    '<w:pgSz w:w="3000" w:h="3000"/>' +
+    '<w:pgMar w:top="500" w:right="1000" w:bottom="500" w:left="1000" ' +
+    'w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>';
+
+  it('draws a number for each line the engine numbered', async () => {
+    const body = ['alpha', 'beta', 'gamma']
+      .map((line) => `<w:p><w:r><w:t>${line}</w:t></w:r></w:p>`)
+      .join('');
+    const result = await layoutOf(sampleBody(`${body}${NUMBERED}`), font.measurer);
+    const marks = result.pages[0]?.lineNumbers ?? [];
+    expect(marks.length).toBeGreaterThan(1);
+    const exported = await exportPdf(result, { fonts: [font.face], measurer: font.measurer });
+    const text = await pdfTextOf(exported.bytes);
+    for (const mark of marks.slice(0, 3)) expect(text).toContain(String(mark.number));
+  });
+});
+
 describe('an anchored object in the PDF', () => {
   it('is drawn where the layout places it, not inline', async () => {
     const png = await image();

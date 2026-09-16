@@ -39,6 +39,7 @@ import { glyphsOf } from './fonts/advance.js';
 import type { FontRegistry, FontSlot } from './fonts/registry.js';
 import type { ImageRegistry } from './images/registry.js';
 import { rgbOfHex } from './color.js';
+import { unitsOf } from './fonts/advance.js';
 import type { PdfLoss } from './types.js';
 
 export interface PagePaintContext {
@@ -356,6 +357,48 @@ export const paintFootnotes = (
   for (const block of area.blocks) paintBlock(block, frame, context);
 };
 
+const paintLineNumbers = (
+  page: PageFragment,
+  frame: PdfFrame,
+  context: PagePaintContext,
+): void => {
+  for (const mark of page.lineNumbers) {
+    const paint = context.result.paint[mark.paint];
+    if (paint === undefined || paint.hidden) continue;
+    const slot: FontSlot | undefined = context.fonts.slotFor(paint);
+    const label = String(mark.number);
+    if (slot === undefined || slot.ref === undefined) {
+      context.losses.push({
+        code: 'textNotDrawn',
+        message: 'no embedded font is available for a line number',
+        detail: paint.faceId,
+      });
+      continue;
+    }
+    const size = pdfLength(paint.size);
+    const units = unitsOf(
+      label,
+      paint.family,
+      { bold: paint.bold, italic: paint.italic },
+      context.measurer,
+      slot.font,
+    );
+    const advance = units.units.reduce((total, unit) => total + unit, 0);
+    const width = (advance / slot.unitsPerEm) * size;
+    const right = pdfX(frame, mark.x);
+    const baseline = pdfBaseline(frame, mark.baselineY);
+    context.content.save();
+    context.content.fillRgb(rgbOfHex(paint.color ?? '000000'));
+    context.content.beginText();
+    context.content.setFont(slot.name, size);
+    context.content.setTextAt(right - width, baseline);
+    context.content.showGlyphs(glyphsOf(label, slot.font), []);
+    context.content.endText();
+    context.content.restore();
+    slot.record(label);
+  }
+};
+
 export const paintPage = (page: PageFragment, context: PagePaintContext): void => {
   const frame = pdfFrame(page);
   paintFloats(page, context, true);
@@ -370,6 +413,7 @@ export const paintPage = (page: PageFragment, context: PagePaintContext): void =
   if (page.header !== undefined) paintRegion(page.header, frame, context);
   if (page.footer !== undefined) paintRegion(page.footer, frame, context);
   if (page.footnotes !== undefined) paintFootnotes(page.footnotes, frame, context);
+  paintLineNumbers(page, frame, context);
   paintFloats(page, context, false);
 };
 

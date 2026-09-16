@@ -216,7 +216,7 @@ describe('the chrome does not show placeholders', () => {
 describe('deliberately unavailable commands', () => {
   it('registers each of them with a specific reason instead of a generic one', async () => {
     const handle = await editorOf(FIXTURE);
-    expect(unsupportedIds.length).toBeGreaterThan(40);
+    expect(unsupportedIds.length).toBeGreaterThan(38);
 
     const missing: string[] = [];
     const generic: string[] = [];
@@ -301,7 +301,9 @@ describe('deliberately unavailable commands', () => {
     expect(handle.commands.disabledReason('docier.command.find.replace', { query: 'cat' })).toBe(
       'Type the replacement text',
     );
-    expect(reasonOf(handle, 'docier.command.doc.setLineNumbers')).toContain('LE-044');
+    // line numbering is implemented now, so it asks for its argument instead of
+    // naming the deferred item it used to be
+    expect(reasonOf(handle, 'docier.command.doc.setLineNumbers')).toContain('line number setting');
   });
 });
 

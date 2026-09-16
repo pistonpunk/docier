@@ -339,7 +339,16 @@ export interface PageFragment {
   readonly footnotes: FootnoteAreaFragment | undefined;
   readonly blocks: readonly BlockFragment[];
   readonly tables: readonly TableFragment[];
+  readonly lineNumbers: readonly LineNumberMark[];
   readonly pageBorders: BorderSet;
+}
+
+export interface LineNumberMark {
+  readonly lineId: number;
+  readonly number: number;
+  readonly x: Mp;
+  readonly baselineY: Mp;
+  readonly paint: number;
 }
 
 export interface StoryLayout {

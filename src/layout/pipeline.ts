@@ -826,6 +826,7 @@ export const layoutDocument = (
     marks: showMarks,
     pageBorders: sectionPageBorders(),
     columnBoxes: sectionColumnBoxes(),
+    lineNumbering: new Map(sections.map((section) => [section.index, section.lineNumbering])),
     storyKind: model.body().kind,
     blockCount: ingested.blocks.length,
     headerFooters: paginated.pages.map(

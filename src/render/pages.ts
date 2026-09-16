@@ -170,6 +170,37 @@ export const paintTable = (
   return node;
 };
 
+const paintLineNumbers = (
+  sheet: HTMLElement,
+  page: PageFragment,
+  frame: Frame,
+  context: PagePaintContext,
+): void => {
+  if (page.lineNumbers.length === 0) return;
+  const layer = box('docier-line-numbers');
+  applyStyle(layer, positionStyle({ left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) }));
+  for (const mark of page.lineNumbers) {
+    const paint = context.result.paint[mark.paint];
+    if (paint === undefined || paint.hidden) continue;
+    const node = box('docier-line-number');
+    stamp(node, { [ATTR.line]: String(mark.lineId) });
+    applyStyle(node, {
+      position: 'absolute',
+      left: formatPx(context.scale.px(mp(mark.x - frame.dx))),
+      top: formatPx(context.scale.px(mp(mark.baselineY - frame.dy - paint.size))),
+      transform: 'translateX(-100%)',
+      'white-space': 'nowrap',
+      'font-family': paint.family,
+      'font-size': formatPx(context.scale.px(paint.size)),
+      'line-height': '1',
+      color: paint.color === undefined ? 'var(--docier-text, #242424)' : `#${paint.color.toLowerCase()}`,
+    });
+    node.textContent = String(mark.number);
+    layer.appendChild(node);
+  }
+  sheet.appendChild(layer);
+};
+
 export const paintRegion = (
   sheet: HTMLElement,
   region: HeaderFooterFragment,
@@ -256,6 +287,7 @@ export const paintPage = (
   for (const table of page.tables) paintTable(sheet, table, blocks, frame, context);
   if (page.header !== undefined) paintRegion(sheet, page.header, frame, context);
   if (page.footer !== undefined) paintRegion(sheet, page.footer, frame, context);
+  paintLineNumbers(sheet, page, frame, context);
   if (page.footnotes !== undefined) paintFootnotes(sheet, page.footnotes, frame, context);
 
   const borderFrame: Frame = { dx: page.page.x, dy: page.page.y };
