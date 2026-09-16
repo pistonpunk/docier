@@ -13,6 +13,11 @@ export interface BreakLine {
   readonly hyphenated: boolean;
 }
 
+export interface LineBand {
+  readonly origin: Mp;
+  readonly available: Mp;
+}
+
 export interface BreakRequest {
   readonly measured: readonly MeasuredAtom[];
   readonly origin: Mp;
@@ -21,6 +26,7 @@ export interface BreakRequest {
   readonly firstLineAvailable: Mp;
   readonly context: MeasureContext;
   readonly skipLeadingSpaces: boolean;
+  readonly bandFor?: ((lineIndex: number, fallback: LineBand) => LineBand) | undefined;
 }
 
 export interface Breaker {
@@ -67,8 +73,14 @@ export const greedyBreaker: Breaker = {
       }
       const lineStart = cursor;
 
-      const origin = first ? request.firstLineOrigin : request.origin;
-      const limit = mp(origin + (first ? request.firstLineAvailable : request.available));
+      const fallbackBand: LineBand = {
+        origin: first ? request.firstLineOrigin : request.origin,
+        available: first ? request.firstLineAvailable : request.available,
+      };
+      const band =
+        request.bandFor === undefined ? fallbackBand : request.bandFor(lines.length, fallbackBand);
+      const origin = band.origin;
+      const limit = mp(origin + band.available);
       let x = origin;
       let forced: ForcedBreak = 'none';
       let opportunity: Opportunity | undefined;

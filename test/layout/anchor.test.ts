@@ -4,6 +4,7 @@ import { mp } from '../../src/units/index.js';
 import { layoutOf, paragraphText, bodyOf } from './support.js';
 import { parseElement } from '../model/support.js';
 
+const EMU = 457200;
 const WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
 const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
@@ -15,6 +16,8 @@ const anchorDrawing = (options: {
   readonly offsetY?: number;
   readonly behind?: boolean;
   readonly wrap?: string;
+  readonly widthEmu?: number;
+  readonly heightEmu?: number;
 }): string =>
   '<w:drawing>' +
   `<wp:anchor xmlns:wp="${WP}" distT="0" distB="0" distL="0" distR="0"` +
@@ -25,7 +28,7 @@ const anchorDrawing = (options: {
   `<wp:posOffset>${String(options.offsetX ?? 0)}</wp:posOffset></wp:positionH>` +
   `<wp:positionV relativeFrom="${options.relativeV ?? 'page'}">` +
   `<wp:posOffset>${String(options.offsetY ?? 0)}</wp:posOffset></wp:positionV>` +
-  '<wp:extent cx="914400" cy="457200"/>' +
+  `<wp:extent cx="${String(options.widthEmu ?? 914400)}" cy="${String(options.heightEmu ?? EMU)}"/>` +
   `<wp:wrap${options.wrap ?? 'None'}/>` +
   '<wp:docPr id="7" name="Floating"/>' +
   `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">` +
@@ -156,7 +159,8 @@ describe('top and bottom wrap', () => {
     expect(plainLines.length).toBeGreaterThan(2);
 
     // the first line sits above the float and the second is pushed below it
-    const floatBottom = 457200 / 360;
+    const blockTop = wrapped.pages[0]?.blocks[0]?.box.y ?? 0;
+    const floatBottom = (blockTop as number) + EMU / 12.7;
     const second = wrappedLines[1]?.box.y ?? 0;
     const plainSecond = plainLines[1]?.box.y ?? 0;
     expect(second).toBeGreaterThan(plainSecond);
@@ -167,10 +171,12 @@ describe('top and bottom wrap', () => {
     const float = anchorDrawing({ wrap: 'TopAndBottom', relativeV: 'paragraph', offsetY: 0 });
     const wrapped = await layoutOf(longParagraph(float));
     const lines = wrapped.pages[0]?.blocks[0]?.lines ?? [];
-    const floatBottom = 457200 / 360;
-    // a top-and-bottom float leaves no room beside it, so nothing sits next to it
+    const blockTop = wrapped.pages[0]?.blocks[0]?.box.y ?? 0;
+    const floatBottom = EMU / 12.7;
+    // the float's band is relative to the block, so the lines that avoid it end
+    // below the block top plus its height
     for (const line of lines) {
-      expect(line.box.y as number).toBeGreaterThanOrEqual(floatBottom);
+      expect(line.box.y as number).toBeGreaterThanOrEqual((blockTop as number) + floatBottom);
     }
   });
 
@@ -198,5 +204,65 @@ describe('top and bottom wrap', () => {
     expect(
       lineTops(await layoutOf(floatIn({ wrap: 'TopAndBottom', relativeV: 'page', offsetY: 100000 }))),
     ).toEqual(await baseline());
+  });
+});
+
+describe('square wrap', () => {
+  const paragraphWith = (wrapXml: string): string =>
+    bodyOf(`<w:p><w:r>${wrapXml}<w:t xml:space="preserve">${'word '.repeat(40)}</w:t></w:r></w:p>`);
+
+  const firstLine = async (body: string) =>
+    (await layoutOf(body)).pages[0]?.blocks[0]?.lines[0];
+
+  // a narrow float, because the test page's column is only 1000 twips wide
+  const NARROW = 100000;
+  const sideFloat = (side: 'left' | 'right'): string =>
+    anchorDrawing({
+      wrap: 'Square',
+      relativeV: 'paragraph',
+      relativeH: 'paragraph',
+      offsetX: side === 'left' ? 0 : 40000,
+      offsetY: 0,
+      widthEmu: NARROW,
+    });
+
+  it('starts the lines beside a left float further right', async () => {
+    const plain = await firstLine(paragraphWith(''));
+    const wrapped = await firstLine(paragraphWith(sideFloat('left')));
+    const plainAtoms = plain?.atoms[0]?.x ?? 0;
+    const wrappedAtoms = wrapped?.atoms[0]?.x ?? 0;
+    expect(wrappedAtoms).toBeGreaterThan(plainAtoms);
+  });
+
+  it('gives the lines beside a right float less room', async () => {
+    const plain = await firstLine(paragraphWith(''));
+    const wrapped = await firstLine(paragraphWith(sideFloat('right')));
+    const plainWords = plain?.atoms.length ?? 0;
+    const wrappedWords = wrapped?.atoms.length ?? 0;
+    expect(wrappedWords).toBeLessThan(plainWords);
+  });
+
+  it('leaves the text alone when the wrap is none', async () => {
+    const plain = await firstLine(paragraphWith(''));
+    const none = await firstLine(
+      paragraphWith(
+        anchorDrawing({ wrap: 'None', relativeV: 'paragraph', relativeH: 'paragraph', offsetX: 0, offsetY: 0 }),
+      ),
+    );
+    expect(none?.atoms[0]?.x).toBe(plain?.atoms[0]?.x);
+  });
+
+  it('leaves the lines below the float full width', async () => {
+    const wrapped = await layoutOf(paragraphWith(sideFloat('left')));
+    const lines = wrapped.pages[0]?.blocks[0]?.lines ?? [];
+    expect(lines.length).toBeGreaterThan(2);
+    const floatBottom = EMU / 12.7;
+    const blockTop = wrapped.pages[0]?.blocks[0]?.box.y ?? 0;
+    const below = lines.filter((line) => (line.box.y as number) >= (blockTop as number) + floatBottom);
+    expect(below.length).toBeGreaterThan(0);
+    const first = lines[0]?.atoms[0]?.x ?? 0;
+    for (const line of below) {
+      expect(line.atoms[0]?.x ?? 0).toBeLessThan(first);
+    }
   });
 });

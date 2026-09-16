@@ -4,7 +4,7 @@ import type { LineBox } from '../measure/index.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 import { measureAtom } from './intrinsic.js';
 import type { Atom } from './atoms.js';
-import type { BreakLine } from './breaking.js';
+import type { BreakLine, LineBand } from './breaking.js';
 import { greedyBreaker } from './breaking.js';
 import type { LineGeometry, PlacedAtom } from './line-geometry.js';
 import { geometryOfPlaced, lineEndOf, placeAtoms } from './line-geometry.js';
@@ -57,6 +57,35 @@ const hyphenAtomOf = (atom: Atom): Atom | undefined => {
 };
 
 const HYPHEN_TEXT = '-';
+const SIDE_GAP_MP = mp(1000);
+
+interface SideBand {
+  readonly side: 'left' | 'right';
+  readonly top: Mp;
+  readonly bottom: Mp;
+  readonly extent: Mp;
+}
+
+const WRAPPING: ReadonlySet<string> = new Set(['square', 'tight', 'through']);
+
+const sideBandsOf = (measured: readonly MeasuredAtom[]): readonly SideBand[] => {
+  const bands: SideBand[] = [];
+  for (const item of measured) {
+    const object = item.atom.object;
+    const anchor = object?.anchor;
+    if (object === undefined || anchor === undefined) continue;
+    if (!WRAPPING.has(anchor.wrap)) continue;
+    if (anchor.vertical !== 'paragraph') continue;
+    const top = mp(anchor.y);
+    bands.push({
+      side: anchor.x <= 0 ? 'left' : 'right',
+      top,
+      bottom: mp(top + object.height),
+      extent: mp(object.width + SIDE_GAP_MP),
+    });
+  }
+  return bands;
+};
 
 export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[] => {
   const { measured, format, contentX, contentWidth, numbering } = request;
@@ -69,6 +98,29 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
     mp(0),
   );
 
+  const floatBands = sideBandsOf(measured);
+  const bandFor =
+    floatBands.length === 0
+      ? undefined
+      : (lineIndex: number, fallback: LineBand): LineBand => {
+          const lineHeight = mp(request.fallbackBox.aboveBaseline + request.fallbackBox.belowBaseline);
+          const top = mp(lineHeight * lineIndex);
+          const bottom = mp(top + lineHeight);
+          let band = fallback;
+          for (const floatBand of floatBands) {
+            if (floatBand.bottom <= top || floatBand.top >= bottom) continue;
+            if (floatBand.side === 'left') {
+              const shifted = mp(band.origin + floatBand.extent);
+              const shrunk = mp(band.available - floatBand.extent);
+              if (shrunk > 0) band = { origin: shifted, available: shrunk };
+              continue;
+            }
+            const shrunk = mp(band.available - floatBand.extent);
+            if (shrunk > 0) band = { origin: band.origin, available: shrunk };
+          }
+          return band;
+        };
+
   const breaks: readonly BreakLine[] = greedyBreaker.breakParagraph({
     measured,
     origin,
@@ -77,6 +129,7 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
     firstLineAvailable,
     context: request.context,
     skipLeadingSpaces: true,
+    bandFor,
   });
 
   const stretching = format.justification === 'both' || format.justification === 'distribute';
@@ -85,8 +138,13 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
   for (let index = 0; index < breaks.length; index += 1) {
     const line = breaks[index];
     if (line === undefined) continue;
-    const lineOrigin = index === 0 ? firstLineOrigin : origin;
-    const lineWidth = index === 0 ? firstLineAvailable : available;
+    const fallbackBand: LineBand = {
+      origin: index === 0 ? firstLineOrigin : origin,
+      available: index === 0 ? firstLineAvailable : available,
+    };
+    const band = bandFor === undefined ? fallbackBand : bandFor(index, fallbackBand);
+    const lineOrigin = band.origin;
+    const lineWidth = band.available;
     const last = index === breaks.length - 1;
 
     let placed = placeAtoms(measured, line.start, line.end, lineOrigin, request.context);
