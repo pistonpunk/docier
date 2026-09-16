@@ -830,7 +830,15 @@ export const TABLE_TAB: UiTab = {
     {
       id: 'tableProperties',
       labelKey: 'ui.group.tableProperties',
-      nodes: [pending('table.setProperties', 'ui.menu.tableProperties', 'TP')],
+      nodes: [
+        button({
+          labelKey: 'ui.menu.tableProperties',
+          id: 'table:properties',
+          keytip: 'TP',
+          action: 'openDialog',
+          actionArgs: { dialog: 'table' },
+        }),
+      ],
     },
   ],
 };
@@ -995,7 +1003,13 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     button({ labelKey: 'ui.menu.formula', id: 'ctx:table2:formula', command: command('table.formula'), keytip: 'FM' }),
     toggle({ labelKey: 'ui.menu.repeatHeaderRows', id: 'ctx:table2:repeatHeader', command: command('table.repeatHeaderRows'), keytip: 'RH' }),
     separator('ctx:table:sep5'),
-    button({ labelKey: 'ui.menu.tableProperties', id: 'ctx:table2:properties', command: command('table.propertiesDialog'), keytip: 'TP' }),
+    button({
+    labelKey: 'ui.menu.tableProperties',
+    id: 'ctx:table2:properties',
+    keytip: 'TP',
+    action: 'openDialog',
+    actionArgs: { dialog: 'table' },
+  }),
   ],
   image: [
     pending('object.setWrap', 'ui.menu.wrapText', 'WT'),

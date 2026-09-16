@@ -1,15 +1,34 @@
 import type { Disposable } from '../api/types.js';
 import { MP_PER_TWIP } from '../units/index.js';
-import { FIND_DIALOG_NAME, createFindDialog } from './find-dialog.js';
-import { FONT_DIALOG_NAME, createFontDialog } from './font-dialog.js';
+// the names come from a leaf module, never from the dialog modules: those import
+// this one back, so reading a name through them yields undefined whenever a
+// dialog module happens to be evaluated first
 import {
+  FONT_DIALOG_NAME,
+  PARAGRAPH_DIALOG_NAME,
   LINK_DIALOG_NAME,
   SYMBOL_DIALOG_NAME,
+  FIND_DIALOG_NAME,
+  TABLE_DIALOG_NAME,
+} from './dialog-names.js';
+export {
+  FONT_DIALOG_NAME,
+  PARAGRAPH_DIALOG_NAME,
+  LINK_DIALOG_NAME,
+  SYMBOL_DIALOG_NAME,
+  PICTURE_DIALOG_NAME,
+  FIND_DIALOG_NAME,
+  TABLE_DIALOG_NAME,
+} from './dialog-names.js';
+import { createFindDialog } from './find-dialog.js';
+import { createTableDialog } from './table-dialog.js';
+import { createFontDialog } from './font-dialog.js';
+import {
   createLinkDialog,
   createSymbolDialog,
 } from './insert-dialogs.js';
 import type { InsertDialogOptions } from './insert-dialogs.js';
-import { PARAGRAPH_DIALOG_NAME, createParagraphDialog } from './paragraph-dialog.js';
+import { createParagraphDialog } from './paragraph-dialog.js';
 import { createDisposableStore, markPart, make, setText } from './dom.js';
 import type { DisposableStore } from './dom.js';
 import { UNIT_SPECS } from './ruler.js';
@@ -833,6 +852,11 @@ export const DIALOG_ALIASES: Readonly<Record<string, string>> = {
   [FIND_DIALOG_NAME]: FIND_DIALOG_NAME,
   'docier.command.find.find': FIND_DIALOG_NAME,
   'find.find': FIND_DIALOG_NAME,
+  [TABLE_DIALOG_NAME]: TABLE_DIALOG_NAME,
+  'docier.command.table.propertiesDialog': TABLE_DIALOG_NAME,
+  'table.propertiesDialog': TABLE_DIALOG_NAME,
+  'docier.command.table.setProperties': TABLE_DIALOG_NAME,
+  'table.setProperties': TABLE_DIALOG_NAME,
 };
 
 export const dialogNameFor = (dialog: string): string | undefined => DIALOG_ALIASES[dialog];
@@ -870,6 +894,15 @@ export const createEditorDialog = (
   };
   if (request.dialog === FIND_DIALOG_NAME) {
     return createFindDialog({
+      context,
+      mount: request.mount,
+      onClose: request.onClose,
+      placement: request.placement,
+      width: request.width,
+    });
+  }
+  if (request.dialog === TABLE_DIALOG_NAME) {
+    return createTableDialog({
       context,
       mount: request.mount,
       onClose: request.onClose,

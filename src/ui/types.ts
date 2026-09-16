@@ -42,6 +42,12 @@ export type ViewMode = 'print' | 'web' | 'draft' | 'read';
 
 export type StatusItemId = 'page' | 'words' | 'language' | 'save' | 'view' | 'zoom';
 
+export interface TablePropertiesState {
+  readonly alignment: 'left' | 'center' | 'right' | undefined;
+  readonly widthTwips: number | undefined;
+  readonly layout: 'autofit' | 'fixed' | undefined;
+}
+
 export interface ChromeState {
   readonly tab: string;
   readonly collapse: RibbonCollapse;
@@ -53,6 +59,7 @@ export interface ChromeState {
   readonly language: string | undefined;
   readonly surface: ContextSurface | null;
   readonly caretSurface: 'table' | 'image' | null;
+  readonly tableProperties: TablePropertiesState | undefined;
   readonly selectionEmpty: boolean;
   readonly rulerVisible: boolean;
   readonly units: RulerUnit;

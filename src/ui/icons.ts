@@ -53,6 +53,9 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'format.alignCenter': '<path d="M2.5 3.5h11"/><path d="M4.5 6.5h7"/><path d="M2.5 9.5h11"/><path d="M4.5 12.5h7"/>',
   'format.alignRight': '<path d="M2.5 3.5h11"/><path d="M6.5 6.5h7"/><path d="M2.5 9.5h11"/><path d="M6.5 12.5h7"/>',
   'format.alignJustify': '<path d="M2.5 3.5h11"/><path d="M2.5 6.5h11"/><path d="M2.5 9.5h11"/><path d="M2.5 12.5h11"/>',
+  'table:properties':
+    '<rect x="2" y="3" width="12" height="10" rx="1"/>' +
+    '<path d="M2 6.6h12"/><path d="M6 6.6V13"/><path d="M10 6.6V13"/>',
   'format.changeCase':
     '<path d="M1.5 12.5 4.6 3.5h1.2l3.1 9"/><path d="M2.6 9.4h6.2"/>' +
     '<path d="M9.8 12.5c0-2 .3-3.3 1.9-3.3s1.9 1.3 1.9 3.3" />' +

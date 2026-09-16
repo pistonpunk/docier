@@ -11,7 +11,8 @@ import {
 import type { EditorDialogHandle } from './dialog.js';
 import type { ChromeContext } from './types.js';
 
-export const FIND_DIALOG_NAME = 'find';
+import { FIND_DIALOG_NAME } from './dialog-names.js';
+export { FIND_DIALOG_NAME };
 
 export const FIND_COMMAND = 'docier.command.find.find';
 export const REPLACE_COMMAND = 'docier.command.find.replace';

@@ -11,8 +11,8 @@ import type { EditorDialogHandle } from './dialog.js';
 import { setText } from './dom.js';
 import type { ChromeContext } from './types.js';
 
-export const LINK_DIALOG_NAME = 'link';
-export const SYMBOL_DIALOG_NAME = 'symbol';
+import { LINK_DIALOG_NAME, SYMBOL_DIALOG_NAME } from './dialog-names.js';
+export { LINK_DIALOG_NAME, SYMBOL_DIALOG_NAME };
 
 export const LINK_COMMAND = 'docier.command.insert.link';
 export const SYMBOL_COMMAND = 'docier.command.insert.symbol';

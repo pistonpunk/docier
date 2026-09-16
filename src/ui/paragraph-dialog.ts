@@ -15,7 +15,8 @@ import {
 import type { DialogValueReader, EditorDialogHandle } from './dialog.js';
 import type { ChromeContext, RulerUnit } from './types.js';
 
-export const PARAGRAPH_DIALOG_NAME = 'paragraph';
+import { PARAGRAPH_DIALOG_NAME } from './dialog-names.js';
+export { PARAGRAPH_DIALOG_NAME };
 
 export const SET_PARAGRAPH_INDENT = 'docier.command.format.setParagraphIndent';
 export const SET_SPACE_BEFORE = 'docier.command.format.setSpaceBefore';

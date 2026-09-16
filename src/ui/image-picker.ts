@@ -2,7 +2,8 @@ import { createDisposableStore } from './dom.js';
 import { dialogText } from './dialog.js';
 import type { ChromeContext } from './types.js';
 
-export const PICTURE_DIALOG_NAME = 'picture';
+import { PICTURE_DIALOG_NAME } from './dialog-names.js';
+export { PICTURE_DIALOG_NAME };
 
 export {
   ALLOWED_IMAGE_TYPES,

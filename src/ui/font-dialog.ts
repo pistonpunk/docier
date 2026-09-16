@@ -18,7 +18,8 @@ import { colourSections } from './colour-picker.js';
 import type { ColourKind } from './colour-picker.js';
 import type { ChromeContext } from './types.js';
 
-export const FONT_DIALOG_NAME = 'font';
+import { FONT_DIALOG_NAME } from './dialog-names.js';
+export { FONT_DIALOG_NAME };
 
 export const SET_FONT_FAMILY = 'docier.command.format.setFontFamily';
 export const SET_FONT_SIZE = 'docier.command.format.setFontSize';

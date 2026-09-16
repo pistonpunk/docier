@@ -5,6 +5,7 @@ import { wordRuns } from '../edit/words.js';
 import type { PageFragment } from '../layout/index.js';
 import { DEFAULT_ZOOM } from '../api/constants.js';
 import { ATTR } from '../render/dom.js';
+import { tableOf } from '../edit/tables.js';
 import type { RulerIndents } from './ruler.js';
 import type { ContextSurface, SaveState } from './types.js';
 
@@ -17,6 +18,7 @@ export interface EditorQueries {
   readonly language: () => string | undefined;
   readonly selectionEmpty: () => boolean;
   readonly caretSurface: () => 'table' | 'image' | null;
+  readonly tableProperties: () => TablePropertiesSummary | undefined;
   readonly surface: () => ContextSurface | null;
   setSurface(value: ContextSurface | null): void;
   readonly indents: () => RulerIndents | undefined;
@@ -28,6 +30,34 @@ export interface EditorQueries {
 }
 
 const DEFAULT_INDENTS: RulerIndents = { firstLineTwips: 0, leftTwips: 0, rightTwips: 0 };
+
+export interface TablePropertiesSummary {
+  readonly alignment: 'left' | 'center' | 'right' | undefined;
+  readonly widthTwips: number | undefined;
+  readonly layout: 'autofit' | 'fixed' | undefined;
+}
+
+const ALIGNMENTS: readonly string[] = ['left', 'center', 'right'];
+
+const tablePropertiesOf = (handle: EditorHandle): TablePropertiesSummary | undefined => {
+  const session = handle.session;
+  if (session === undefined) return undefined;
+  const resolved = session.resolve(session.index.clamp(handle.selection.focus));
+  if (resolved === undefined || resolved.slot.cell === undefined) return undefined;
+  const table = tableOf(session.model, resolved.slot.element);
+  if (table === undefined) return undefined;
+  const justification = table.properties.justification;
+  const width = table.properties.width.twips;
+  const measurable = typeof width === 'number' && width > 0 ? width : undefined;
+  return {
+    alignment:
+      justification !== undefined && ALIGNMENTS.includes(justification)
+        ? (justification as 'left' | 'center' | 'right')
+        : undefined,
+    widthTwips: measurable,
+    layout: table.properties.layout,
+  };
+};
 
 export interface EditorQueryOptions {
   readonly indents?: ((page: number) => RulerIndents | undefined) | undefined;
@@ -135,6 +165,7 @@ export const createEditorQueries = (
       const resolved = session.resolve(session.index.clamp(handle.selection.focus));
       return resolved !== undefined && resolved.slot.cell !== undefined ? 'table' : null;
     },
+    tableProperties: () => tablePropertiesOf(handle),
     surface: () => surface,
     indents: () => options?.indents?.(self.page()) ?? DEFAULT_INDENTS,
     comments: () => documentComments(handle),
@@ -166,6 +197,7 @@ export const NO_QUERIES: EditorQueries = {
   language: () => undefined,
   selectionEmpty: () => true,
   caretSurface: () => null,
+  tableProperties: () => undefined,
   surface: () => null,
   setSurface: () => {},
   indents: () => DEFAULT_INDENTS,

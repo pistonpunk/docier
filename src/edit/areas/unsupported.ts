@@ -237,13 +237,6 @@ const REFUSALS: readonly Refusal[] = [
       'Shifting cells sideways rewrites the grid spans of the whole row, which this build does not do; insert a row or a column instead',
   },
   {
-    id: 'docier.command.table.propertiesDialog',
-    label: 'Table properties',
-    category: 'table',
-    reason:
-      'This build has no table-properties dialog; the width, the layout and the alignment are set by the commands that need them, and the row cannot enable a dialog that does not exist',
-  },
-  {
     id: 'docier.command.table.distributeRows',
     label: 'Distribute rows evenly',
     category: 'table',

@@ -774,6 +774,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       language: queries.language(),
       selectionEmpty: queries.selectionEmpty(),
       caretSurface: queries.caretSurface(),
+      tableProperties: queries.tableProperties(),
     });
   }
 
