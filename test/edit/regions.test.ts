@@ -646,10 +646,17 @@ describe('what a region refuses', () => {
     expect(reasonOf(handle, 'docier.command.insert.header')).toContain('is empty');
   });
 
-  it('reports a header whose only content is a table', async () => {
-    const handle = await editorOf({ header: '<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>' });
-    expect(handle.commands.isEnabled('docier.command.insert.header')).toBe(false);
-    expect(reasonOf(handle, 'docier.command.insert.header')).toContain('is empty');
+  it('enters a header whose only content is a table, through its cell', async () => {
+    const handle = await editorOf({
+      header: '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Head</w:t></w:r></w:p></w:tc></w:tr></w:tbl>',
+    });
+    expect(sessionOf(handle).layout.pages[0]?.header?.tables).toHaveLength(1);
+    expect(handle.commands.isEnabled('docier.command.insert.header')).toBe(true);
+
+    await run(handle, 'insert.header');
+    expect(focusStory(handle)).toBe(HEADER_ID);
+    // the caret lands in the table's cell, which is the header's only text
+    expect(slotTexts(handle, HEADER_ID)).toContain('Head');
   });
 
   it('reports that the caret is not in a region when asked to close one', async () => {

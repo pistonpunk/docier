@@ -36,8 +36,13 @@ const paragraphContainers = (
   story: StoryId,
   key: string,
   root: readonly BlockNode[],
-): readonly SlotContainer[] => {
+  cell: CellRef | undefined,
+  depth: number,
+  out: SlotContainer[],
+  counter: { next: number },
+): void => {
   const paragraphs: XmlElement[] = [];
+  const cells: { readonly key: string; readonly cell: CellRef; readonly blocks: readonly BlockNode[] }[] = [];
   const walk = (blocks: readonly BlockNode[]): void => {
     for (const block of blocks) {
       if (block.blockKind === 'paragraph') {
@@ -46,20 +51,34 @@ const paragraphContainers = (
       }
       if (block.blockKind === 'contentControl') {
         walk((block as ContentControl).blocks());
+        continue;
+      }
+      if (block.blockKind !== 'table' || depth >= MAX_TABLE_DEPTH) continue;
+      const table = block as Table;
+      const id = counter.next;
+      counter.next += 1;
+      const rows = table.rows();
+      for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+        const row = rows[rowIndex];
+        if (row === undefined) continue;
+        let position = row.gridBefore;
+        for (const tableCell of row.cells()) {
+          const column = position;
+          position += tableCell.gridSpan;
+          if (isContinuation(tableCell)) continue;
+          const ref: CellRef = { table: id, row: rowIndex, column };
+          cells.push({ key: containerKeyOf(ref), cell: ref, blocks: tableCell.blocks() });
+        }
       }
     }
   };
   walk(root);
-  if (paragraphs.length === 0) return [];
-  return [
-    {
-      key,
-      group: groupKeyOf(story, undefined),
-      story,
-      cell: undefined,
-      paragraphs,
-    },
-  ];
+  if (paragraphs.length > 0) {
+    out.push({ key, group: groupKeyOf(story, cell), story, cell, paragraphs });
+  }
+  for (const entry of cells) {
+    paragraphContainers(story, entry.key, entry.blocks, entry.cell, depth + 1, out, counter);
+  }
 };
 
 export const collectContainers = (model: DocumentModel): readonly SlotContainer[] => {
@@ -134,10 +153,11 @@ export const collectRegionContainers = (
   stories: readonly StoryId[],
 ): readonly SlotContainer[] => {
   const out: SlotContainer[] = [];
+  const counter = { next: 0 };
   for (const id of stories) {
     const story = model.story(id);
     if (story === undefined || story.id === model.body().id) continue;
-    out.push(...paragraphContainers(story.id, regionKeyOf(story.id), story.blocks()));
+    paragraphContainers(story.id, regionKeyOf(story.id), story.blocks(), undefined, 0, out, counter);
   }
   return out;
 };

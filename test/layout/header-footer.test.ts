@@ -536,26 +536,59 @@ describe('the layout hash covers the header and footer inputs', () => {
   });
 });
 
-describe('what the slice cannot do', () => {
-  it('reports a table inside a header instead of laying it out', async () => {
-    const result = await layoutSpecOf({
+describe('a table in a region', () => {
+  const HEADER_TABLE =
+    '<w:tbl><w:tblPr><w:tblW w:w="1000" w:type="dxa"/></w:tblPr>' +
+    '<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid>' +
+    '<w:tr><w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr>' +
+    '<w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>';
+
+  const withHeaderTable = async (table: string) =>
+    layoutSpecOf({
       body: `${paragraphText('body')}${sectPr(defaultHeader('rIdH1'))}`,
-      headers: [
-        headerXml(
-          '<w:tbl><w:tblPr><w:tblW w:w="1000" w:type="dxa"/></w:tblPr>' +
-            '<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid>' +
-            '<w:tr><w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr>' +
-            '<w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>',
-        ),
-      ],
+      headers: [headerXml(table)],
       documentRelationships: [headerRelationship('rIdH1', 'header1.xml')],
     });
 
-    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+  it('is laid out, with its cell text, instead of being reported', async () => {
+    const result = await withHeaderTable(HEADER_TABLE);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
       'headerFooterTableNotLaidOut',
     );
-    expect(result.pages[0]?.header?.blocks).toEqual([]);
+    const header = result.pages[0]?.header;
+    expect(header?.tables).toHaveLength(1);
+    expect(header?.tables[0]?.rows).toHaveLength(1);
+    // the cell's paragraph is laid out as a block the table's cells point at
+    const text = (header?.blocks ?? [])
+      .flatMap((block) => block.lines)
+      .flatMap((line) => line.runs.map((run) => run.text))
+      .join('');
+    expect(text).toContain('cell');
   });
+
+  it('makes the header taller, so the body starts below it', async () => {
+    const rows = (count: number): string =>
+      '<w:tbl><w:tblPr><w:tblW w:w="1000" w:type="dxa"/></w:tblPr>' +
+      '<w:tblGrid><w:gridCol w:w="1000"/></w:tblGrid>' +
+      Array.from(
+        { length: count },
+        (_value, index) =>
+          '<w:tr><w:tc><w:tcPr><w:tcW w:w="1000" w:type="dxa"/></w:tcPr>' +
+          `<w:p><w:r><w:t>row ${String(index)}</w:t></w:r></w:p></w:tc></w:tr>`,
+      ).join('') +
+      '</w:tbl>';
+
+    const short = await withHeaderTable(HEADER_TABLE);
+    const tall = await withHeaderTable(rows(4));
+    const height = (result: Awaited<ReturnType<typeof withHeaderTable>>): number =>
+      result.pages[0]?.header?.box.height as number;
+    expect(height(short)).toBeGreaterThan(0);
+    // four rows take more room than one, so the body starts further down
+    expect(height(tall)).toBeGreaterThan(height(short));
+  });
+});
+
+describe('what the slice cannot do', () => {
 
   it('reports a number format it does not produce', async () => {
     const result = await layoutSpecOf({

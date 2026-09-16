@@ -385,6 +385,7 @@ export const layoutDocument = (
       distance,
       box: rectOf(section.contentBox.x, y, section.contentBox.width, layout.height),
       blocks: placed.blocks,
+      tables: layout.tables,
     };
     regionCache.set(key, fragment);
     return fragment;

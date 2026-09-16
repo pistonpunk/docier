@@ -323,6 +323,7 @@ export interface HeaderFooterFragment {
   readonly distance: Mp;
   readonly box: Rect;
   readonly blocks: readonly BlockFragment[];
+  readonly tables: readonly TableFragment[];
 }
 
 export interface PageFragment {

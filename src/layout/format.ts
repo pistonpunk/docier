@@ -143,6 +143,25 @@ export const hasThemeFont = (resolved: ResolvedProperties): boolean =>
   resolved.fontComplexScriptTheme !== undefined ||
   resolved.fontEastAsiaTheme !== undefined;
 
+export const fallbackRunFormat = (family: string): RunFormat => ({
+  requestedFamily: family,
+  size: DEFAULT_FONT_SIZE,
+  bold: false,
+  italic: false,
+  underline: false,
+  strike: false,
+  allCaps: false,
+  smallCaps: false,
+  hidden: false,
+  color: undefined,
+  highlight: undefined,
+  verticalAlign: 'baseline',
+  position: mp(0),
+  characterSpacing: mp(0),
+  characterScale: 100,
+  rightToLeft: false,
+});
+
 export const runFormatOf = (
   resolved: ResolvedProperties,
   fallbackFamily: string,

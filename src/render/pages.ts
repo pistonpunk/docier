@@ -215,7 +215,12 @@ export const paintRegion = (
   });
   applyStyle(node, positionStyle(geometryAt(region.box, frame, context.scale)));
   const inner = frameOf(region.box);
-  for (const block of region.blocks) paintBlock(node, block, inner, context);
+  const blocks = new Map<number, BlockFragment>();
+  for (const block of region.blocks) blocks.set(block.id, block);
+  for (const block of region.blocks) {
+    if (block.cell === undefined) paintBlock(node, block, inner, context);
+  }
+  for (const table of region.tables) paintTable(node, table, blocks, inner, context);
   sheet.appendChild(node);
   return node;
 };

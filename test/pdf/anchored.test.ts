@@ -195,3 +195,27 @@ describe('an anchored object in the PDF', () => {
     expect(exported.losses.some((loss) => loss.code === 'missingImage')).toBe(true);
   });
 });
+
+describe('a table in a header in the PDF', () => {
+  const HEADER_TABLE =
+    '<w:tbl><w:tblPr><w:tblW w:w="4000" w:type="dxa"/></w:tblPr>' +
+    '<w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid>' +
+    '<w:tr><w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/></w:tcPr>' +
+    '<w:p><w:r><w:t>LETTERHEAD</w:t></w:r></w:p></w:tc></w:tr></w:tbl>';
+
+  it('draws the header table cell text', async () => {
+    const { openModel, relationship } = await import('../model/support.js');
+    const { layoutDocument } = await import('../../src/layout/index.js');
+    const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const model = await openModel({
+      body: `<w:p><w:r><w:t>body</w:t></w:r></w:p><w:sectPr><w:headerReference w:type="default" r:id="rIdH"/></w:sectPr>`,
+      headers: [`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="${W}">${HEADER_TABLE}</w:hdr>`],
+      documentRelationships: [relationship('rIdH', 'header', 'header1.xml')],
+    });
+    const result = await layoutDocument(model, { measurer: font.measurer });
+    expect(result.pages[0]?.header?.tables).toHaveLength(1);
+    const exported = await exportPdf(result, { fonts: [font.face], measurer: font.measurer });
+    const text = await pdfTextOf(exported.bytes);
+    expect(text).toContain('LETTERHEAD');
+  });
+});

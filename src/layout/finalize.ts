@@ -7,6 +7,7 @@ import { buildIndices } from './indices.js';
 import type { LineNumbering } from './sections.js';
 import type { LineRef } from './indices.js';
 import { frozenMapOf } from './frozen-map.js';
+import { tableFragmentsOf } from './table-fragments.js';
 import type { PlacedAtom } from './line-geometry.js';
 import { caretStopsOfPlaced, runsOfPlaced } from './line-geometry.js';
 import { pageOrigins } from './page-geometry.js';
@@ -29,11 +30,9 @@ import type {
   LineRun,
   PageFragment,
   Rect,
-  RowFragment,
   RunPaint,
   StoryId,
   StoryLayout,
-  TableFragment,
 } from './types.js';
 import { LAYOUT_RESULT_VERSION, docPos } from './types.js';
 import { deepFreeze } from './freeze.js';
@@ -322,56 +321,11 @@ const lineNumbersFor = (
   return marks;
 };
 
-const unionBox = (boxes: readonly Rect[]): Rect => {
-  const first = boxes[0];
-  if (first === undefined) return { x: mp(0), y: mp(0), width: mp(0), height: mp(0) };
-  let left: number = first.x;
-  let top: number = first.y;
-  let right: number = first.x + first.width;
-  let bottom: number = first.y + first.height;
-  for (const box of boxes) {
-    left = Math.min(left, box.x);
-    top = Math.min(top, box.y);
-    right = Math.max(right, box.x + box.width);
-    bottom = Math.max(bottom, box.y + box.height);
-  }
-  return { x: mp(left), y: mp(top), width: mp(right - left), height: mp(bottom - top) };
-};
 
-interface TableGroup {
-  readonly id: number;
-  readonly rows: RowFragment[];
-}
 
-const groupRows = (rows: readonly PlacedRow[]): readonly TableGroup[] => {
-  const order: number[] = [];
-  const groups = new Map<number, TableGroup>();
-  for (const row of rows) {
-    let group = groups.get(row.table);
-    if (group === undefined) {
-      group = { id: row.table, rows: [] };
-      groups.set(row.table, group);
-      order.push(row.table);
-    }
-    group.rows.push({
-      table: row.table,
-      page: row.page,
-      row: row.row,
-      box: row.box,
-      split: row.split,
-      repeat: row.repeat,
-      cantSplit: row.cantSplit,
-      header: row.header,
-      cells: row.cells,
-    });
-  }
-  const out: TableGroup[] = [];
-  for (const id of order) {
-    const group = groups.get(id);
-    if (group !== undefined) out.push(group);
-  }
-  return out;
-};
+
+
+
 
 
 export const finalize = (input: FinalizeInput): LayoutResult => {
@@ -447,24 +401,16 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
       blocks.push(result.fragment);
     }
 
-    const tables: TableFragment[] = [];
-    for (const group of groupRows(pageRows)) {
-      const placed = tableById.get(group.id);
-      if (placed === undefined) continue;
-      const seen = firstPageOf.get(group.id);
-      if (seen === undefined) firstPageOf.set(group.id, page.index);
-      tables.push({
-        table: group.id,
-        box: unionBox(group.rows.map((row) => row.box)),
-        columns: placed.columns,
-        columnOffsets: placed.offsets,
-        borders: placed.borders,
-        shading: placed.shading,
-        continuation: seen !== undefined && seen !== page.index,
-        rows: group.rows,
-      });
-    }
-    tables.sort((first, second) => orderOf(first.table) - orderOf(second.table));
+    const tables = tableFragmentsOf(
+      pageRows,
+      tableById,
+      (id) => {
+        const seen = firstPageOf.get(id);
+        if (seen === undefined) firstPageOf.set(id, page.index);
+        return seen !== undefined && seen !== page.index;
+      },
+      orderOf,
+    );
 
     const regions = input.headerFooters[page.index];
     pages.push({

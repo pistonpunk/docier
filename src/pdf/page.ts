@@ -267,7 +267,12 @@ export const paintRegion = (
   frame: PdfFrame,
   context: PagePaintContext,
 ): void => {
-  for (const block of region.blocks) paintBlock(block, frame, context);
+  const blocks = new Map<number, BlockFragment>();
+  for (const block of region.blocks) blocks.set(block.id, block);
+  for (const block of region.blocks) {
+    if (block.cell === undefined) paintBlock(block, frame, context);
+  }
+  for (const table of region.tables) paintTable(table, blocks, frame, context);
 };
 
 const paintFloat = (
@@ -424,6 +429,7 @@ export const blocksOfPage = (page: PageFragment): readonly BlockFragment[] => {
   if (page.footnotes !== undefined) out.push(...page.footnotes.blocks);
   return out;
 };
+
 
 export const drawableTokens = (result: LayoutResult): readonly string[] => {
   const ids: string[] = [];
