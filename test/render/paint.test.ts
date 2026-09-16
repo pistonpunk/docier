@@ -464,3 +464,47 @@ describe('formatting marks in the painted document', () => {
     expect(space?.style.pointerEvents).toBe('none');
   });
 });
+
+describe('an anchored drawing is painted where it was anchored', () => {
+  const WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+  const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+
+  const anchored = (offsetEmu: number): string =>
+    '<w:drawing>' +
+    `<wp:anchor xmlns:wp="${WP}" behindDoc="0">` +
+    '<wp:positionH relativeFrom="margin"><wp:posOffset>' +
+    String(offsetEmu) +
+    '</wp:posOffset></wp:positionH>' +
+    '<wp:positionV relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionV>' +
+    '<wp:extent cx="914400" cy="457200"/><wp:wrapNone/><wp:docPr id="11" name="Float"/>' +
+    `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">` +
+    `<pic:pic xmlns:pic="${PIC}">` +
+    '<pic:blipFill><a:blip r:embed="rId4"/></pic:blipFill>' +
+    '</pic:pic></a:graphicData></a:graphic>' +
+    '</wp:anchor></w:drawing>';
+
+  it('paints the object rather than dropping it', async () => {
+    const body = bodyOf(
+      `<w:p><w:r>${anchored(914400)}<w:t xml:space="preserve">tail</w:t></w:r></w:p>`,
+    );
+    const result = await layoutOf(body);
+    const target = host();
+    renderDocument(result, target);
+    const objects = target.querySelectorAll<HTMLElement>(`[${ATTR.objectId}]`);
+    expect(objects.length).toBe(1);
+    // the anchor is one inch from the margin, and the painted box is placed in
+    // the block's frame, so its left is one inch in pixels
+    expect(styleLeft(objects[0])).toBe(px(mp(72000)));
+  });
+
+  it('leaves the text where it would have been without it', async () => {
+    const withAnchor = await layoutOf(
+      bodyOf(`<w:p><w:r>${anchored(914400)}<w:t xml:space="preserve">tail</w:t></w:r></w:p>`),
+    );
+    const without = await layoutOf(bodyOf(`<w:p><w:r><w:t xml:space="preserve">tail</w:t></w:r></w:p>`));
+    const lineOf = (result: typeof withAnchor) => result.pages[0]?.blocks[0]?.lines[0];
+    expect(lineOf(withAnchor)?.box.width).toBe(lineOf(without)?.box.width);
+    expect(lineOf(withAnchor)?.box.height).toBe(lineOf(without)?.box.height);
+  });
+});

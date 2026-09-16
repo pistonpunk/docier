@@ -47,13 +47,17 @@ export const lineEndOf = (placed: readonly PlacedAtom[], offset: Mp): Mp => {
 
 export const ascentOfAtom = (atom: Atom): Mp => {
   const object = atom.object;
-  if (object !== undefined) return mp(object.height + atom.shift);
+  if (object !== undefined && object.anchor === undefined) {
+    return mp(object.height + atom.shift);
+  }
   return mp(atom.face.lineBox.aboveBaseline + atom.shift);
 };
 
 export const descentOfAtom = (atom: Atom): Mp => {
   const object = atom.object;
-  if (object !== undefined) return mp(Math.max(0, -atom.shift));
+  if (object !== undefined && object.anchor === undefined) {
+    return mp(Math.max(0, -atom.shift));
+  }
   return mp(atom.face.lineBox.belowBaseline - atom.shift);
 };
 

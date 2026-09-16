@@ -99,7 +99,7 @@ describe('an image the layout result places', () => {
     expect(image?.style.getPropertyValue('transform-origin')).toBe('50% 50%');
     expect(image?.getAttribute('src')).toBe(dataUrlOf(imageSource('rId7')));
     expect(bytesOf(image?.getAttribute('src') ?? '')).toEqual(PNG_BYTES);
-    const box = imageBoxOf(found.run.object ?? { objectId: '', relationshipId: undefined, width: mp(0), height: mp(0), crop: undefined, rotationMilliDegrees: 0 }, paintScale(1));
+    const box = imageBoxOf(found.run.object ?? { objectId: '', relationshipId: undefined, width: mp(0), height: mp(0), crop: undefined, rotationMilliDegrees: 0, anchor: undefined }, paintScale(1));
     expect(box).toEqual({ left: 0, top: 0, width: toCssPx(mp(PICTURE_MP), 1), height: toCssPx(mp(PICTURE_MP), 1) });
   });
 

@@ -8,7 +8,13 @@ import {
   WP_NAMESPACE,
   WP_STRICT_NAMESPACE,
 } from '../ooxml/namespaces.js';
-import type { ObjectPlacement, Rect } from './types.js';
+import type {
+  AnchorRelativeTo,
+  ObjectAnchor,
+  ObjectPlacement,
+  ObjectWrap,
+  Rect,
+} from './types.js';
 
 const DEGREES_60000THS = 60000;
 const MILLI_DEGREES_PER_DEGREE = 1000;
@@ -108,12 +114,105 @@ export const objectIdOfDrawing = (
   return fallbackId === undefined ? '' : `#${String(fallbackId)}`;
 };
 
+const RELATIVE_TO: Readonly<Record<string, AnchorRelativeTo>> = {
+  page: 'page',
+  margin: 'margin',
+  column: 'column',
+  character: 'column',
+  paragraph: 'paragraph',
+  line: 'paragraph',
+  text: 'paragraph',
+};
+
+const WRAP_MODES: Readonly<Record<string, ObjectWrap>> = {
+  wrapNone: 'none',
+  wrapSquare: 'square',
+  wrapTight: 'tight',
+  wrapThrough: 'through',
+  wrapTopAndBottom: 'topAndBottom',
+};
+
+const wrapOf = (anchor: XmlElement): ObjectWrap => {
+  for (const child of childrenOf(anchor)) {
+    if (!isWp(child)) continue;
+    const mode = WRAP_MODES[child.localName];
+    if (mode !== undefined) return mode;
+  }
+  return 'none';
+};
+
+const offsetOf = (
+  anchor: XmlElement,
+  axis: 'positionH' | 'positionV',
+  align: (value: string) => Mp | undefined,
+): { readonly value: Mp; readonly relative: AnchorRelativeTo } => {
+  const holder = childrenOf(anchor).find(
+    (child) => isWp(child) && child.localName === axis,
+  );
+  if (holder === undefined) return { value: mp(0), relative: 'column' };
+  const relative = RELATIVE_TO[attributeValue(holder, 'relativeFrom') ?? ''] ?? 'column';
+  const offset = childrenOf(holder).find(
+    (child) => isWp(child) && child.localName === 'posOffset',
+  );
+  const raw =
+    offset === undefined
+      ? undefined
+      : offset.children
+          .filter((child) => child.kind === 'text')
+          .map((child) => child.value)
+          .join('')
+          .trim();
+  const parsed = raw === undefined || raw === '' ? Number.NaN : Number.parseInt(raw, 10);
+  const emuOffset = Number.isFinite(parsed) ? parsed : undefined;
+  if (emuOffset !== undefined) return { value: emuToMp(emu(emuOffset)), relative };
+  const alignElement = childrenOf(holder).find(
+    (child) => isWp(child) && child.localName === 'align',
+  );
+  const named = alignElement === undefined ? undefined : attributeValue(alignElement, 'val');
+  return { value: named === undefined ? mp(0) : (align(named) ?? mp(0)), relative };
+};
+
+const horizontalAlign = (value: string, extent: Mp): Mp | undefined => {
+  if (value === 'left' || value === 'inside') return mp(0);
+  if (value === 'right' || value === 'outside') return mp(-extent);
+  if (value === 'center') return mp(-extent / 2);
+  return undefined;
+};
+
+const verticalAlign = (value: string, extent: Mp): Mp | undefined => {
+  if (value === 'top' || value === 'inside') return mp(0);
+  if (value === 'bottom' || value === 'outside') return mp(-extent);
+  if (value === 'center') return mp(-extent / 2);
+  return undefined;
+};
+
+const anchorOf = (
+  anchor: XmlElement,
+  width: Mp,
+  height: Mp,
+): ObjectAnchor => {
+  const horizontal = offsetOf(anchor, 'positionH', (value) =>
+    horizontalAlign(value, width),
+  );
+  const vertical = offsetOf(anchor, 'positionV', (value) =>
+    verticalAlign(value, height),
+  );
+  return {
+    x: horizontal.value,
+    y: vertical.value,
+    horizontal: horizontal.relative,
+    vertical: vertical.relative,
+    behind: attributeValue(anchor, 'behindDoc') === '1' || attributeValue(anchor, 'behindDoc') === 'true',
+    wrap: wrapOf(anchor),
+  };
+};
+
 export const objectPlacementOf = (
   element: XmlElement,
   fallbackId?: string | number,
 ): ObjectPlacement | undefined => {
   const inline = childrenOf(element).find(
-    (child) => isWp(child) && child.localName === 'inline',
+    (child) => isWp(child) && (child.localName === 'inline' || child.localName === 'anchor'),
   );
   if (inline === undefined) return undefined;
   const extent = childrenOf(inline).find((child) => isWp(child) && child.localName === 'extent');
@@ -139,6 +238,8 @@ export const objectPlacementOf = (
     height,
     crop: srcRect === undefined ? undefined : cropOf(srcRect, width, height),
     rotationMilliDegrees: rotationOf(element),
+    anchor:
+      inline.localName === 'anchor' ? anchorOf(inline, width, height) : undefined,
   };
 };
 

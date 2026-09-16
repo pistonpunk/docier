@@ -69,6 +69,9 @@ export const measureAtom = (atom: Atom): MeasuredAtom => {
   const positionDependent = atom.kind === 'tab';
   const object = atom.object;
   if (object !== undefined) {
+    if (object.anchor !== undefined) {
+      return { atom, width: mp(0), offsets: [mp(0)], positionDependent };
+    }
     return { atom, width: object.width, offsets: [mp(0), object.width], positionDependent };
   }
   const offsets = positionDependent ? [mp(0)] : scaledOffsets(atom);

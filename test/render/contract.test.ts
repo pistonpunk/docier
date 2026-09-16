@@ -60,6 +60,7 @@ describe('the paint coordinate contract', () => {
       height: mp(10000),
       crop: { x: mp(2000), y: mp(1000), width: mp(10000), height: mp(5000) },
       rotationMilliDegrees: 90000,
+      anchor: undefined,
     };
     const single = imageBoxOf(object, paintScale(1));
     const doubled = imageBoxOf(object, paintScale(2));

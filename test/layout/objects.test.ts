@@ -146,18 +146,21 @@ describe('an inline image the layout result places', () => {
 });
 
 describe('a drawing the layout result cannot place', () => {
-  it('keeps an anchored drawing out of flow and reports it', async () => {
+  it('places an anchored drawing out of flow, without moving the text', async () => {
     const text = paragraphOf('', run('', 'ab'));
     const anchored = paragraphOf('', run('', 'ab') + drawn({ anchored: true }));
     const plain = await layoutOf(bodyOf(text));
     const result = await layoutOf(bodyOf(anchored));
-    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+    // an anchored object is drawn where it was anchored, so it is placed rather
+    // than dropped, and the line keeps the geometry it would have without it
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
       'drawingsNotLaidOut',
     );
     const line = result.pages[0]?.blocks[0]?.lines[0];
     const plainLine = plain.pages[0]?.blocks[0]?.lines[0];
     const atom = line?.atoms.find((candidate) => candidate.kind === 'object');
-    expect(atom?.object).toBeUndefined();
+    expect(atom?.object).toBeDefined();
+    expect(atom?.object?.anchor).toBeDefined();
     expect(atom?.width).toBe(0);
     expect(line?.box.height).toBe(plainLine?.box.height);
     expect(line?.box.width).toBe(plainLine?.box.width);

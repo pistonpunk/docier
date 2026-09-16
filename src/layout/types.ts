@@ -91,6 +91,19 @@ export interface LayoutDiagnostic {
   readonly docPos: DocPos | undefined;
 }
 
+export type ObjectWrap = 'none' | 'square' | 'tight' | 'through' | 'topAndBottom';
+
+export type AnchorRelativeTo = 'page' | 'margin' | 'column' | 'paragraph';
+
+export interface ObjectAnchor {
+  readonly x: Mp;
+  readonly y: Mp;
+  readonly horizontal: AnchorRelativeTo;
+  readonly vertical: AnchorRelativeTo;
+  readonly behind: boolean;
+  readonly wrap: ObjectWrap;
+}
+
 export interface ObjectPlacement {
   readonly objectId: string;
   readonly relationshipId: string | undefined;
@@ -98,6 +111,7 @@ export interface ObjectPlacement {
   readonly height: Mp;
   readonly crop: Rect | undefined;
   readonly rotationMilliDegrees: number;
+  readonly anchor: ObjectAnchor | undefined;
 }
 
 export interface RunPaint {
