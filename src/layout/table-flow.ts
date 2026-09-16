@@ -1,7 +1,7 @@
 import type { Mp } from '../units/index.js';
 import { maxMp, minMp, mp, roundHalfEven } from '../units/index.js';
 import type { PreparedCell, PreparedRow, PreparedTable } from './table-prepare.js';
-import type { PlacedPiece } from './paginate.js';
+import type { PieceDraft } from './paginate.js';
 import type {
   BorderSet,
   CellFragment,
@@ -37,7 +37,7 @@ export interface TableSink {
   readonly contentBottom: Mp;
   registerTable(table: PlacedTable): void;
   emitRow(row: PlacedRow): void;
-  emitPiece(piece: PlacedPiece): void;
+  emitPiece(piece: PieceDraft): void;
   diagnostic(diagnostic: LayoutDiagnostic): void;
 }
 

@@ -332,6 +332,7 @@ export interface PageFragment {
   readonly origin: PageOrigin;
   readonly contentBox: Rect;
   readonly column: number;
+  readonly columnBoxes: readonly Rect[];
   readonly section: number;
   readonly header: HeaderFooterFragment | undefined;
   readonly footer: HeaderFooterFragment | undefined;

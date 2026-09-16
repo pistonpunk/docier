@@ -319,6 +319,7 @@ export const buildParagraphBlock = (
     lines,
     docRange: { start: paragraph.docStart, end: paragraph.docEnd },
     lineHeight: prepared.markBox.height,
+    originX: contentX,
   };
 };
 

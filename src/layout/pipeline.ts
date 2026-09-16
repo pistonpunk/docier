@@ -9,7 +9,13 @@ import { ingest } from './ingest.js';
 import { themeResolutionOf } from './theme-resolution.js';
 import type { IngestedTable } from './table-ingest.js';
 import type { Section } from './sections.js';
-import { buildSections, pageVariantOf, sectionOfBlock, withContentBoxes } from './sections.js';
+import {
+  buildSections,
+  columnBoxesOf,
+  pageVariantOf,
+  sectionOfBlock,
+  withContentBoxes,
+} from './sections.js';
 import { FontResolver } from './fonts.js';
 import { PaintRegistry } from './paint.js';
 import type { RunFormat } from './format.js';
@@ -140,10 +146,11 @@ const flowSections = (
   });
 };
 
-const contentBoxOf = (section: Section | undefined): { x: Mp; width: Mp } => ({
-  x: section?.contentBox.x ?? mp(0),
-  width: section?.contentBox.width ?? mp(0),
-});
+const contentBoxOf = (section: Section | undefined): { x: Mp; width: Mp } => {
+  if (section === undefined) return { x: mp(0), width: mp(0) };
+  const column = columnBoxesOf(section.contentBox, section.columnCount, section.columnSpace)[0];
+  return { x: column?.x ?? mp(0), width: column?.width ?? mp(0) };
+};
 
 export const layoutDocument = (
   model: DocumentModel,
@@ -522,6 +529,17 @@ export const layoutDocument = (
     return { byPage, reserves };
   };
 
+  const sectionColumnBoxes = (): ReadonlyMap<number, readonly Rect[]> => {
+    const boxes = new Map<number, readonly Rect[]>();
+    for (const section of sections) {
+      boxes.set(
+        section.index,
+        columnBoxesOf(section.contentBox, section.columnCount, section.columnSpace),
+      );
+    }
+    return boxes;
+  };
+
   const sectionPageBorders = (): ReadonlyMap<number, BorderSet> => {
     const out = new Map<number, BorderSet>();
     for (const section of sections) {
@@ -800,6 +818,7 @@ export const layoutDocument = (
     storyId: options.storyId ?? model.body().id,
     marks: showMarks,
     pageBorders: sectionPageBorders(),
+    columnBoxes: sectionColumnBoxes(),
     storyKind: model.body().kind,
     blockCount: ingested.blocks.length,
     headerFooters: paginated.pages.map(

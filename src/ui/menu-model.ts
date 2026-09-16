@@ -175,6 +175,23 @@ export const PAGE_BORDERS_MENU: UiNode = menu('ui.menu.pageBorders', [
   ]),
 ]);
 
+export const COLUMNS_MENU: UiNode = menu('ui.control.columns', [
+  ...(
+    [
+      [1, 'ui.columns.one'],
+      [2, 'ui.columns.two'],
+      [3, 'ui.columns.three'],
+    ] as const
+  ).map(([count, labelKey]) =>
+    button({
+      labelKey,
+      id: `columns:${String(count)}`,
+      command: command('doc.setColumns'),
+      args: { count },
+    }),
+  ),
+]);
+
 export const THEME_FONTS_MENU: UiNode = menu('ui.menu.themeFonts', [
   ...THEME_FONT_PAIRS.map((pair) =>
     button({
@@ -824,7 +841,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             action: 'openDialog',
             actionArgs: { dialog: command('doc.setPageSize') },
           }),
-          pending('doc.setColumns', 'ui.control.columns', 'CO'),
+          COLUMNS_MENU,
           button({
             labelKey: 'ui.control.lineNumbers',
             command: command('doc.setLineNumbers'),

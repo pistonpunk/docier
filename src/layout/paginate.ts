@@ -3,7 +3,13 @@ import { maxMp, mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
 import type { ParagraphFormat } from './format.js';
 import type { Section } from './sections.js';
-import { contentBoxFor, geometryChanged, pageVariantOf, sectionOfBlock } from './sections.js';
+import {
+  columnBoxesOf,
+  contentBoxFor,
+  geometryChanged,
+  pageVariantOf,
+  sectionOfBlock,
+} from './sections.js';
 import type { PreparedTable } from './table-prepare.js';
 import type { PlacedRow, PlacedTable, TableFlowHost } from './table-flow.js';
 import { flowTable } from './table-flow.js';
@@ -17,6 +23,7 @@ export interface PaginateBlock {
   readonly lines: readonly LaidLine[];
   readonly docRange: DocRange;
   readonly lineHeight: Mp;
+  readonly originX: Mp;
 }
 
 export type FlowBlock =
@@ -31,9 +38,12 @@ export const flowTableBlock = (table: PreparedTable): FlowBlock => ({
   docStart: docPos(table.docStart),
 });
 
+export type PieceDraft = Omit<PlacedPiece, 'column'>;
+
 export interface PlacedPiece {
   readonly block: number;
   readonly page: number;
+  readonly column: number;
   readonly split: 'start' | 'middle' | 'end' | 'whole';
   readonly lineStart: number;
   readonly lineEnd: number;
@@ -83,6 +93,8 @@ const fallbackSection = (): Section => {
     evenAndOddHeaders: false,
     headerDistance: mp(0),
     footerDistance: mp(0),
+    columnCount: 1,
+    columnSpace: mp(0),
     propertiesElement: undefined,
   };
 };
@@ -163,6 +175,31 @@ export const paginateFlow = (
   let pageHasContent = false;
   let pendingPageBreak = false;
   let currentSection = effectiveSections[0] ?? fallbackSection();
+  let pageBox: Rect = { x: mp(0), y: mp(0), width: mp(0), height: mp(0) };
+  let columnIndex = 0;
+  let columnBoxes: readonly Rect[] = [];
+
+  const useColumn = (index: number): void => {
+    columnIndex = index;
+    const box = columnBoxes[index] ?? pageBox;
+    contentTop = box.y;
+    cursor = contentTop;
+    bottom = mp(box.y + box.height);
+    pageHasContent = false;
+  };
+
+  const columnFull = (): void => {
+    if (!nextColumn()) openPage(currentSection, 'any');
+  };
+
+  const nextColumn = (): boolean => {
+    if (columnIndex + 1 >= columnBoxes.length) return false;
+    pageHasContent = false;
+    const page = pages[pages.length - 1];
+    if (page !== undefined) pages[pages.length - 1] = { ...page, column: columnIndex + 1 };
+    useColumn(columnIndex + 1);
+    return true;
+  };
 
   const openPage = (section: Section, parity: 'any' | 'even' | 'odd'): void => {
     if (pages.length > 0) {
@@ -190,6 +227,8 @@ export const paginateFlow = (
           };
     openedSections.add(section.index);
     currentSection = section;
+    pageBox = box;
+    columnBoxes = columnBoxesOf(box, section.columnCount, section.columnSpace);
     pages.push({
       index: pageIndex,
       kind,
@@ -198,10 +237,7 @@ export const paginateFlow = (
       column: 0,
       section: section.index,
     });
-    contentTop = box.y;
-    cursor = contentTop;
-    bottom = mp(box.y + box.height);
-    pageHasContent = false;
+    useColumn(0);
     pendingPageBreak = false;
   };
 
@@ -227,7 +263,7 @@ export const paginateFlow = (
       return !pageHasContent;
     },
     openPage(): void {
-      openPage(currentSection, 'any');
+      columnFull();
     },
     advance(height: Mp): void {
       cursor = mp(cursor + height);
@@ -240,8 +276,8 @@ export const paginateFlow = (
     emitRow(row: PlacedRow): void {
       rows.push(row);
     },
-    emitPiece(piece: PlacedPiece): void {
-      pieces.push(piece);
+    emitPiece(piece: PieceDraft): void {
+      pieces.push({ ...piece, column: columnIndex });
     },
     diagnostic(diagnostic: LayoutDiagnostic): void {
       diagnostics.push(diagnostic);
@@ -357,13 +393,13 @@ export const paginateFlow = (
             docPos: block.docRange.start,
           });
         } else {
-          openPage(currentSection, 'any');
+          columnFull();
           continue;
         }
       }
 
       if (count === 0 && !atTop) {
-        openPage(currentSection, 'any');
+        columnFull();
         continue;
       }
       if (count === 0) count = 1;
@@ -372,7 +408,7 @@ export const paginateFlow = (
       if (end === total && !atTop && reserve > 0) {
         const needed = mp(startTop + sumHeights(block.lines, lineIndex, end) + reserve);
         if (needed > bottom) {
-          openPage(currentSection, 'any');
+          columnFull();
           continue;
         }
       }
@@ -384,7 +420,7 @@ export const paginateFlow = (
         if (adjusted !== count) {
           if (adjusted === 0) {
             if (!atTop) {
-              openPage(currentSection, 'any');
+              columnFull();
               continue;
             }
             diagnostics.push({
@@ -411,6 +447,7 @@ export const paginateFlow = (
         spaceBefore,
         cell: undefined,
         repeat: false,
+        column: columnIndex,
       });
 
       cursor = mp(startTop + height + (finished ? spaceAfterOf(block) : 0));
@@ -419,7 +456,8 @@ export const paginateFlow = (
 
       const lastLine = block.lines[lineIndex - 1];
       if (lastLine !== undefined && lastLine.breakAfter === 'page') pendingPageBreak = true;
-      if (lineIndex < total) openPage(currentSection, 'any');
+      if (lineIndex < total) columnFull();
+      else if (lastLine !== undefined && lastLine.breakAfter === 'column') columnFull();
     }
   }
 

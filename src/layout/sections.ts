@@ -1,5 +1,5 @@
 import type { Mp } from '../units/index.js';
-import { mp, twipToMp } from '../units/index.js';
+import { mp, twip, twipToMp } from '../units/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
 import type { SectionBreakType, SectionProperties } from '../model/index.js';
 import {
@@ -32,8 +32,32 @@ export interface Section {
   readonly evenAndOddHeaders: boolean;
   readonly headerDistance: Mp;
   readonly footerDistance: Mp;
+  readonly columnCount: number;
+  readonly columnSpace: Mp;
   readonly propertiesElement: XmlElement | undefined;
 }
+
+export const columnBoxesOf = (
+  contentBox: Rect,
+  count: number,
+  space: Mp,
+): readonly Rect[] => {
+  if (count <= 1) return [contentBox];
+  const gap = mp(space > 0 ? space : mp(0));
+  const total = mp(contentBox.width - gap * (count - 1));
+  if (total <= 0) return [contentBox];
+  const width = mp(Math.floor((total as number) / count));
+  const boxes: Rect[] = [];
+  for (let index = 0; index < count; index += 1) {
+    boxes.push({
+      x: mp((contentBox.x as number) + index * ((width as number) + (gap as number))),
+      y: contentBox.y,
+      width,
+      height: contentBox.height,
+    });
+  }
+  return boxes;
+};
 
 export const contentBoxFor = (section: Section, variant: HeaderFooterVariant): Rect =>
   section.contentBoxes[variant];
@@ -56,6 +80,8 @@ export const pageVariantOf = (
   if (evenAndOddHeaders && kind === 'even') return 'even';
   return 'default';
 };
+
+const DEFAULT_COLUMN_SPACE = 720;
 
 const rectOf = (x: Mp, y: Mp, width: Mp, height: Mp): Rect => ({ x, y, width, height });
 
@@ -111,11 +137,11 @@ export const buildSections = (
     const margins = properties?.margins;
 
     if (properties !== undefined) {
-      if (properties.columnCount > 1) {
+      if (properties.columnCount > 1 && properties.columns?.children.some((child) => child.kind === 'element' && child.localName === 'col')) {
         diagnostics.push({
           code: 'columnsNotLaidOut',
-          severity: 'warning',
-          message: `section ${index} declares ${properties.columnCount} columns; this slice lays out a single column`,
+          severity: 'info',
+          message: `section ${index} sets individual column widths; this slice shares the width between them`,
           docPos: undefined,
         });
       }
@@ -151,6 +177,8 @@ export const buildSections = (
       evenAndOddHeaders: properties?.evenAndOddHeaders === true,
       headerDistance: twipToMp(margins?.header ?? DEFAULT_HEADER_DISTANCE),
       footerDistance: twipToMp(margins?.footer ?? DEFAULT_FOOTER_DISTANCE),
+      columnCount: properties?.columnCount ?? 1,
+      columnSpace: twipToMp(properties?.columnSpacing ?? twip(DEFAULT_COLUMN_SPACE)),
       propertiesElement: element,
     });
     firstBlock += group.length;

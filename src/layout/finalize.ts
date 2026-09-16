@@ -63,16 +63,17 @@ export interface FinalizeInput {
   readonly lineIdBase: number;
   readonly marks: boolean;
   readonly pageBorders: ReadonlyMap<number, BorderSet>;
+  readonly columnBoxes: ReadonlyMap<number, readonly Rect[]>;
 }
 
-const atomsOf = (line: LaidLine): readonly AtomPlacement[] =>
+const atomsOf = (line: LaidLine, shift: Mp): readonly AtomPlacement[] =>
   line.placed.map((item) => {
     const atom = item.measured.atom;
     return {
       atomId: atom.id,
       kind: atom.kind,
       paint: atom.paint,
-      x: item.x,
+      x: mp(item.x + shift),
       width: item.width,
       size: atom.face.size,
       object: atom.object,
@@ -148,6 +149,7 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
   const lineFragments: LineFragment[] = [];
   let lineId = request.lineIdStart;
   let y = request.boxTop;
+  const shift = mp(request.x - block.originX);
 
   const topAndBottomBands = (): readonly Rect[] => {
     const bands: Rect[] = [];
@@ -191,10 +193,12 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     const end = lineEndOf(line, markPos);
     const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
     const stops = request.collect
-      ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak, line.textOrigin)
+      ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak, mp(line.textOrigin + shift))
       : [];
     const marks = request.marks
-      ? marksOfPlaced(line, baselineY, index === block.lines.length - 1)
+      ? marksOfPlaced(line, baselineY, index === block.lines.length - 1).map((mark) =>
+          shift === 0 ? mark : { ...mark, x: mp(mark.x + shift) },
+        )
       : [];
     const runs: LineRun[] = [];
     for (const run of runsOfPlaced(line.prefix)) runs.push(run);
@@ -206,7 +210,7 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
       ascent: geometry.aboveBaseline,
       descent: geometry.belowBaseline,
       lineHeight: geometry.height,
-      atoms: atomsOf(line),
+      atoms: atomsOf(line, shift),
       runs,
       caretStops: stops,
       justified: line.justified,
@@ -359,8 +363,10 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
       const container = piece.cell === undefined
         ? undefined
         : cellFragments.get(cellKey(piece.cell.table, piece.cell.row, piece.cell.column));
-      const x = container === undefined ? page.contentBox.x : container.contentBox.x;
-      const width = container === undefined ? page.contentBox.width : container.contentBox.width;
+      const column =
+        (input.columnBoxes.get(page.section) ?? [page.contentBox])[piece.column] ?? page.contentBox;
+      const x = container === undefined ? column.x : container.contentBox.x;
+      const width = container === undefined ? column.width : container.contentBox.width;
       const result = blockFragmentOf({
         block,
         id: piece.block,
@@ -413,6 +419,7 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
       origin: origins[pages.length] ?? { x: mp(0), y: mp(0) },
       footnotes: regions?.footnotes,
       column: page.column,
+      columnBoxes: input.columnBoxes.get(page.section) ?? [page.contentBox],
       section: page.section,
       header: regions?.header,
       footer: regions?.footer,
