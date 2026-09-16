@@ -214,6 +214,29 @@ const resolveSpec = (
   },
 });
 
+export interface TrackChangesArgs {
+  readonly tracked?: boolean;
+}
+
+const trackChangesSpec: AreaSpec<TrackChangesArgs> = {
+  id: 'docier.command.doc.toggleTrackChanges',
+  label: 'Track changes',
+  category: 'doc',
+  permissions: ['format'],
+  enabledIn: (host) => host.session.aligned && host.session.model.settings !== undefined,
+  reason: (host) => (host.session.aligned ? 'This command is available here' : NO_PAGE_BACKGROUND),
+  activeIn: (host) => host.session.model.settings?.trackChanges === true,
+  run: (host, args) => {
+    const settings = host.session.model.settings;
+    if (settings === undefined) return false;
+    const wanted = args?.tracked ?? settings.trackChanges !== true;
+    if (settings.trackChanges === wanted) return false;
+    settings.trackChanges = wanted;
+    host.session.relayout();
+    return true;
+  },
+};
+
 const anyIo = (): boolean => true;
 const pdfIo = (io: DocumentIo): boolean => io.exportPdf !== undefined;
 
@@ -222,6 +245,7 @@ export const documentCommands = (
 ): readonly CommandDefinition<never, void>[] => [
   areaCommand<PageBackgroundArgs>(host, pageBackgroundSpec),
   areaCommand<LineNumberArgs>(host, lineNumbersSpec),
+  areaCommand<TrackChangesArgs>(host, trackChangesSpec),
   areaCommand<ResolveChangeArgs>(host, resolveSpec('docier.command.doc.acceptChange', 'Accept change', 'accept')),
   areaCommand<ResolveChangeArgs>(host, resolveSpec('docier.command.doc.rejectChange', 'Reject change', 'reject')),
   docSpec(host, 'docier.command.doc.open', 'Open', (io) => {

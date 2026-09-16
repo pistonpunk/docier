@@ -348,12 +348,67 @@ export const insertionPoint = (
   };
 };
 
+export interface RevisionMark {
+  readonly author: string;
+  readonly date: string;
+  readonly id: number;
+}
+
+const REVISION_KIND_ATTRIBUTE = 'author';
+
+const revisionElement = (
+  parent: XmlElement,
+  kind: 'ins' | 'del',
+  mark: RevisionMark,
+): XmlElement => {
+  const element = createWElement(parent, kind);
+  setWAttr(element, 'id', String(mark.id));
+  setWAttr(element, 'author', mark.author);
+  setWAttr(element, 'date', mark.date);
+  element.selfClosing = false;
+  return element;
+};
+
+const sameAuthor = (element: XmlElement, mark: RevisionMark): boolean =>
+  isWElement(element) && wAttr(element, REVISION_KIND_ATTRIBUTE) === mark.author;
+
+const wrapInRevision = (
+  parent: XmlElement,
+  index: number,
+  run: XmlElement,
+  event: 'ins' | 'del',
+  mark: RevisionMark,
+): void => {
+  const previous = parent.children[index - 1];
+  if (
+    previous !== undefined &&
+    previous.kind === 'element' &&
+    isWElement(previous, event) &&
+    sameAuthor(previous, mark)
+  ) {
+    previous.children.push(run);
+    run.parent = previous;
+    removeFromParent(parent, run);
+    return;
+  }
+  const wrapper = revisionElement(parent, event, mark);
+  insertChild(parent, index, wrapper);
+  wrapper.children.push(run);
+  run.parent = wrapper;
+  removeFromParent(parent, run);
+};
+
+const removeFromParent = (parent: XmlElement, child: XmlNode): void => {
+  parent.children = parent.children.filter((node) => node !== child);
+};
+
 export const insertTextAt = (
   model: DocumentModel,
   paragraph: XmlElement,
   offset: number,
   text: string,
   patch?: RunFormatPatch,
+  revision?: RevisionMark | undefined,
 ): boolean => {
   if (text === '' && patch === undefined) return false;
   const total = paragraphLength(model, paragraph);
@@ -363,6 +418,9 @@ export const insertTextAt = (
   const run = insertRunAt(point.parent, point.index, point.properties);
   appendText(run, text);
   if (patch !== undefined) applyRunPatchToElement(run, patch);
+  if (revision !== undefined) {
+    wrapInRevision(point.parent, point.index, run, 'ins', revision);
+  }
   model.context.forgetSubtree(paragraph);
   return true;
 };
@@ -406,11 +464,37 @@ const deleteFromRun = (run: XmlElement, start: number, end: number): void => {
   if (run.children.length === 0) removeElement(run);
 };
 
+const markRunDeleted = (run: XmlElement, mark: RevisionMark): void => {
+  const parent = run.parent;
+  if (parent === undefined) return;
+  const index = indexOfChild(parent, run);
+  for (const child of run.children) {
+    if (child.kind !== 'element' || !isWElement(child, 't')) continue;
+    const value = textOfElement(child);
+    const replacement = createWElement(run, 'delText');
+    setElementText(replacement, value);
+    replacement.parent = run;
+    run.children[run.children.indexOf(child)] = replacement;
+  }
+  if (run.children.length === 0) return;
+  const wrapper = revisionElement(parent, 'del', mark);
+  insertChild(parent, index, wrapper);
+  wrapper.children.push(run);
+  run.parent = wrapper;
+  removeFromParent(parent, run);
+};
+
+const isOwnInsertion = (run: XmlElement, mark: RevisionMark): boolean => {
+  const parent = run.parent;
+  return parent !== undefined && isWElement(parent, 'ins') && sameAuthor(parent, mark);
+};
+
 export const deleteRangeIn = (
   model: DocumentModel,
   paragraph: XmlElement,
   start: number,
   end: number,
+  revision?: RevisionMark | undefined,
 ): boolean => {
   if (end <= start) return false;
   const spans = [...runSpans(model, paragraph)];
@@ -419,11 +503,39 @@ export const deleteRangeIn = (
     const from = Math.max(span.start, start);
     const to = Math.min(span.end, end);
     if (to <= from) continue;
-    deleteFromRun(span.element, from - span.start, to - span.start);
+    if (revision === undefined) {
+      deleteFromRun(span.element, from - span.start, to - span.start);
+      changed = true;
+      continue;
+    }
+    // text this author has just typed is removed outright rather than marked,
+    // which is what Word does with its own unaccepted insertions
+    if (isOwnInsertion(span.element, revision)) {
+      deleteFromRun(span.element, from - span.start, to - span.start);
+      changed = true;
+      continue;
+    }
+    recordDeletionIn(span.element, from - span.start, to - span.start, revision);
     changed = true;
   }
   if (changed) model.context.forgetSubtree(paragraph);
   return changed;
+};
+
+const recordDeletionIn = (
+  run: XmlElement,
+  start: number,
+  end: number,
+  mark: RevisionMark,
+): void => {
+  const total = contentLength(run);
+  const from = Math.max(0, Math.min(total, start));
+  const to = Math.max(from, Math.min(total, end));
+  if (to <= from) return;
+  splitRunAt(run, to);
+  const target = from === 0 ? run : splitRunAt(run, from);
+  if (target === undefined) return;
+  markRunDeleted(target, mark);
 };
 
 export const splitParagraphAt = (

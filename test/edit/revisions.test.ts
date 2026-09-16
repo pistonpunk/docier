@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
-import { disposeEditors, editorOf, pos } from './support.js';
+import { settingsRelationship } from '../model/support.js';
+import { disposeEditors, editorOf, editorOfSpec, pos } from './support.js';
 
 const INS = '<w:ins w:id="1" w:author="A"><w:r><w:t>added</w:t></w:r></w:ins>';
 const DEL = '<w:del w:id="2" w:author="A"><w:r><w:delText>gone</w:delText></w:r></w:del>';
@@ -87,5 +88,71 @@ describe('resolving tracked changes', () => {
 
     await handle.commands.execute('docier.command.history.undo');
     expect(body(handle)).toContain('<w:ins');
+  });
+});
+
+describe('recording changes while tracking is on', () => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+  const settingsXml = (tracked: boolean): string =>
+    `${DECL}<w:settings xmlns:w="${W}">${tracked ? '<w:trackChanges/>' : ''}</w:settings>`;
+
+  const spec = (body: string, tracked: boolean) => ({
+    body,
+    settings: settingsXml(tracked),
+    documentRelationships: [settingsRelationship()],
+  });
+
+  const off = (text: string) => editorOfSpec(spec(`<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`, false));
+
+  it('wraps typed text in an insertion once tracking is turned on', async () => {
+    const handle = await off('alpha');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    expect(body(handle)).not.toContain('<w:ins');
+
+    const on = await handle.commands.execute('docier.command.doc.toggleTrackChanges', {
+      tracked: true,
+    });
+    expect(on.status).toBe('ok');
+    await handle.commands.execute('docier.command.edit.insertText', { text: 'XY' });
+
+    const xml = body(handle);
+    expect(xml).toContain('<w:ins');
+    expect(xml).toContain('XY');
+    expect(texts(handle)).toContain('alphaXY');
+  });
+
+  it('records a deletion instead of removing the text', async () => {
+    const handle = await editorOfSpec(spec('<w:p><w:r><w:t>alpha</w:t></w:r></w:p>', true));
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+
+    await handle.commands.execute('docier.command.edit.deleteBackward', { direction: 'backward' });
+    const xml = body(handle);
+    expect(xml).toContain('<w:del');
+    expect(xml).toContain('<w:delText');
+    // the text is still there, to be shown struck through rather than gone
+    expect(texts(handle)).toContain('alpha');
+  });
+
+  it('removes its own insertion outright rather than marking it deleted', async () => {
+    const handle = await editorOfSpec(spec('<w:p><w:r><w:t>alpha</w:t></w:r></w:p>', true));
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    await handle.commands.execute('docier.command.edit.insertText', { text: 'XY' });
+    await handle.commands.execute('docier.command.edit.deleteBackward', { direction: 'backward' });
+
+    const xml = body(handle);
+    expect(xml).not.toContain('<w:del');
+    expect(texts(handle)).toContain('alphaX');
+  });
+
+  it('leaves edits alone while tracking is off', async () => {
+    const handle = await off('alpha');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    await handle.commands.execute('docier.command.edit.insertText', { text: 'XY' });
+    await handle.commands.execute('docier.command.edit.deleteBackward', { direction: 'backward' });
+    const xml = body(handle);
+    expect(xml).not.toContain('<w:ins');
+    expect(xml).not.toContain('<w:del');
   });
 });

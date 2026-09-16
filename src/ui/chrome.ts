@@ -211,6 +211,9 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     if (session === undefined || model === undefined) return undefined;
     const marks = marksAt(model, session, handle.selection.focus);
     if (marks === undefined) return undefined;
+    if (valueKey === 'trackChanges') {
+      return model.settings?.trackChanges === true ? 'on' : 'off';
+    }
     if (valueKey === 'family') return marks.fontFamily ?? '';
     if (valueKey === 'sizePoints') {
       return marks.sizeHalfPoints === undefined

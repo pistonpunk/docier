@@ -1018,8 +1018,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             labelKey: 'ui.control.trackChanges',
             command: command('doc.toggleTrackChanges'),
             keytip: 'TC',
-            action: 'openDialog',
-            actionArgs: { dialog: command('doc.toggleTrackChanges') },
+            valueKey: 'trackChanges',
           }),
           button({
             labelKey: 'ui.control.acceptChange',

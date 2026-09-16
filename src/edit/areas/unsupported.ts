@@ -15,13 +15,6 @@ const NO_DRAWING =
 const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const REFUSALS: readonly Refusal[] = [
-  {
-    id: 'docier.command.doc.toggleTrackChanges',
-    label: 'Track changes',
-    category: 'doc',
-    reason:
-      'This build shows the revision marks a document carries, and accepts or rejects them, but does not record new ones as you type',
-  },
 
 
   { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },

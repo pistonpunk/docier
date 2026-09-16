@@ -1,3 +1,4 @@
+import type { RevisionMark } from './mutation.js';
 import type { CellRef, DocPos, DocRange, LayoutResult, StoryId } from '../layout/index.js';
 import { docPos, layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
@@ -489,10 +490,30 @@ const pairContainers = (
   return { entries, aligned };
 };
 
+export interface EditIdentity {
+  readonly name: string;
+  readonly initials: string;
+}
+
+export const DEFAULT_IDENTITY: EditIdentity = { name: 'docier', initials: 'D' };
+
 export const createEditSession = (
   model: DocumentModel,
   initialLayoutOptions: LayoutOptions = {},
+  identity: EditIdentity = DEFAULT_IDENTITY,
 ): EditSession => {
+  let author = identity;
+  let nextRevisionId = 1;
+
+  const revisionFor = (): RevisionMark | undefined => {
+    if (model.settings?.trackChanges !== true) return undefined;
+    nextRevisionId += 1;
+    return {
+      author: author.name,
+      date: new Date().toISOString(),
+      id: nextRevisionId,
+    };
+  };
   let layoutOptions = initialLayoutOptions;
   let result: LayoutResult = layoutDocument(model, layoutOptions);
   let index: PositionIndex = buildPositionIndex(result);
@@ -695,7 +716,14 @@ export const createEditSession = (
     insertText: (range, text, patch) => {
       const target = resolve(range.start);
       if (target === undefined || text === '') return false;
-      const changed = insertTextAt(model, target.slot.element, target.offset, text, patch);
+      const changed = insertTextAt(
+        model,
+        target.slot.element,
+        target.offset,
+        text,
+        patch,
+        revisionFor(),
+      );
       if (changed) markMutated(target.slot.story);
       return changed;
     },
@@ -714,9 +742,10 @@ export const createEditSession = (
       const first = bounds.first;
       const last = bounds.last;
       if (first.slot.container !== last.slot.container) return false;
+      const revision = revisionFor();
       const changed =
         first.slot.index === last.slot.index
-          ? deleteRangeIn(model, first.slot.element, first.offset, last.offset)
+          ? deleteRangeIn(model, first.slot.element, first.offset, last.offset, revision)
           : (() => {
               const bridged = [...list].filter(
                 (slot) =>
@@ -729,8 +758,9 @@ export const createEditSession = (
                 first.slot.element,
                 first.offset,
                 first.slot.length,
+                revision,
               );
-              const head = deleteRangeIn(model, last.slot.element, 0, last.offset);
+              const head = deleteRangeIn(model, last.slot.element, 0, last.offset, revision);
               for (const slot of bridged) {
                 const element = slot.element;
                 const parent = element.parent;
