@@ -114,8 +114,11 @@ describe('greedy line breaking', () => {
       ),
     );
     const placed = result.pages[0]?.blocks[0]?.lines[0]?.atoms ?? [];
-    const tab = placed.find((atom) => atom.kind === 'tab');
-    expect(tab?.width).toBe(5000);
+    // the tab is filled with dots rather than left as a tab, so what the line
+    // advances between them is what is asserted
+    const notDots = placed.filter((atom) => !/^\.+$/.test(atom.text));
+    expect(lineWidths(result)).toEqual([25000]);
+    expect(notDots.length).toBeGreaterThan(0);
     const leaders = placed.filter((atom) => atom.text !== '' && /^\.+$/.test(atom.text));
     expect(leaders.length).toBeGreaterThan(0);
     const dots = leaders.map((atom) => atom.text).join('');

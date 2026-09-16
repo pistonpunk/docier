@@ -261,7 +261,8 @@ const paintCell = (
     context.content.restore();
     return;
   }
-  // a rotated cell is centred on the cell and then turned about its own centre
+  // a rotated cell is centred on the cell and then turned about its own centre:
+  // three plain transforms, move to the centre, turn, move back
   const centreX = (clip.x as number) + (clip.width as number) / 2;
   const centreY = (clip.y as number) + (clip.height as number) / 2;
   const originX = centreX - (union.width as number) / 2;
@@ -271,21 +272,16 @@ const paintCell = (
     dy: mp(frame.dy - (union.y as number)),
     height: frame.height,
   };
+  const width = pdfLength(union.width);
+  const height = pdfLength(union.height);
+  const centrePdfX = pdfX(frame, mp(originX));
+  const centrePdfY = pdfBaseline(frame, mp(originY));
   const angle = cell.rotation === 'tbRl' ? Math.PI / 2 : -Math.PI / 2;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-  const centrePdfX = pdfX(frame, mp(centreX));
-  const centrePdfY = pdfBaseline(frame, mp(centreY));
-  const originPdfX = pdfX(frame, mp(originX));
-  const originPdfY = pdfBaseline(frame, mp(originY));
-  context.content.concat(
-    cos,
-    sin,
-    -sin,
-    cos,
-    centrePdfX - (originPdfX - centrePdfX) * cos + (originPdfY - centrePdfY) * sin,
-    centrePdfY - (originPdfX - centrePdfX) * sin - (originPdfY - centrePdfY) * cos,
-  );
+  context.content.concat(1, 0, 0, 1, centrePdfX + width / 2, centrePdfY - height / 2);
+  context.content.concat(cos, sin, -sin, cos, 0, 0);
+  context.content.concat(1, 0, 0, 1, -width / 2, height / 2);
   for (const id of cell.blocks) {
     const block = blocks.get(id);
     if (block !== undefined) paintBlock(block, placed, context);

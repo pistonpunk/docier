@@ -31,6 +31,7 @@ const leaderFill = (item: MeasuredAtom, leader: string, width: Mp): MeasuredAtom
   return {
     atom: {
       ...item.atom,
+      kind: 'word',
       text: glyph.character.repeat(count),
       units: Array.from({ length: count }, () => glyph.advance),
       lengths: Array.from({ length: count }, () => glyph.character.length),
