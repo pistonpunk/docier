@@ -895,7 +895,24 @@ export const PICTURE_TAB: UiTab = {
       id: 'pictureTools',
       labelKey: 'ui.group.pictureTools',
       nodes: [
-        pending('object.setWrap', 'ui.menu.wrapText', 'WT'),
+        menu('ui.menu.wrapText', [
+      ...(
+        [
+          ['square', 'ui.wrap.square'],
+          ['tight', 'ui.wrap.tight'],
+          ['through', 'ui.wrap.through'],
+          ['topAndBottom', 'ui.wrap.topAndBottom'],
+          ['none', 'ui.wrap.none'],
+        ] as const
+      ).map(([wrap, labelKey]) =>
+        button({
+          labelKey,
+          id: `wrap:${wrap}`,
+          command: command('object.setWrap'),
+          args: { wrap },
+        }),
+      ),
+    ]),
         pending('object.changeImage', 'ui.menu.changePicture', 'CP'),
         pending('object.compress', 'ui.menu.compressPictures', 'CM'),
       ],

@@ -102,6 +102,7 @@ export interface ObjectAnchor {
   readonly vertical: AnchorRelativeTo;
   readonly behind: boolean;
   readonly wrap: ObjectWrap;
+  readonly relativeHeight: number;
 }
 
 export interface ObjectPlacement {

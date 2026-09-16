@@ -15,6 +15,7 @@ import { formatPx } from './scale.js';
 import { applyStyle, positionStyle } from './style.js';
 import { ATTR, box, frameOf, geometryAt, stamp } from './dom.js';
 import { paintBorders, paintShading } from './decoration.js';
+import { paintFloats } from './objects.js';
 import { paintLine } from './runs.js';
 import { objectBoxOf } from './inline-object.js';
 import { appendSlotContent } from './registry.js';
@@ -215,6 +216,11 @@ export const paintPage = (
 ): void => {
   const frame: Frame = { dx: page.page.x, dy: page.page.y };
   const blocks = blocksById(page);
+  const behind = box('docier-floats-behind');
+  applyStyle(behind, positionStyle({ left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) }));
+  const behindCount = paintFloats(behind, { page, blocks: page.blocks, frame, scale: context.scale, images: context.images }, true);
+  if (behindCount > 0) sheet.appendChild(behind);
+
   for (const block of page.blocks) {
     if (block.cell === undefined) paintBlock(sheet, block, frame, context);
   }
@@ -222,6 +228,11 @@ export const paintPage = (
   if (page.header !== undefined) paintRegion(sheet, page.header, frame, context);
   if (page.footer !== undefined) paintRegion(sheet, page.footer, frame, context);
   if (page.footnotes !== undefined) paintFootnotes(sheet, page.footnotes, frame, context);
+
+  const front = box('docier-floats-front');
+  applyStyle(front, positionStyle({ left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) }));
+  const frontCount = paintFloats(front, { page, blocks: page.blocks, frame, scale: context.scale, images: context.images }, false);
+  if (frontCount > 0) sheet.appendChild(front);
 };
 
 export const paintOverlay = (

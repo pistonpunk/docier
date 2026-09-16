@@ -1,4 +1,11 @@
-import type { LineFragment, LineRun, ObjectPlacement } from '../layout/index.js';
+import type {
+  AtomPlacement,
+  BlockFragment,
+  LineFragment,
+  LineRun,
+  ObjectPlacement,
+  PageFragment,
+} from '../layout/index.js';
 import { mp } from '../units/index.js';
 import type { Frame } from './types.js';
 import type { PaintScale } from './scale.js';
@@ -98,6 +105,7 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
   for (const atom of line.atoms) {
     const object = atom.object;
     if (object === undefined) continue;
+    if (object.anchor !== undefined) continue;
     if (atom.source.start < run.source.start || atom.source.end > run.source.end) continue;
     const container = box('docier-object');
     stamp(container, {
@@ -118,4 +126,90 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
     else paintMissing(container, object.relationshipId, scale, object);
     parent.appendChild(container);
   }
+};
+
+export interface FloatPaintInput {
+  readonly page: PageFragment;
+  readonly blocks: readonly BlockFragment[];
+  readonly frame: Frame;
+  readonly scale: PaintScale;
+  readonly images: ImageRegistry;
+}
+
+interface PlacedFloat {
+  readonly line: LineFragment;
+  readonly run: LineRun;
+  readonly atom: AtomPlacement;
+  readonly height: number;
+  readonly order: number;
+}
+
+export const floatsInPage = (page: PageFragment): readonly PlacedFloat[] => {
+  const found: PlacedFloat[] = [];
+  let order = 0;
+  for (const block of page.blocks) {
+    for (const line of block.lines) {
+      for (const atom of line.atoms) {
+        const object = atom.object;
+        if (object === undefined || object.anchor === undefined) continue;
+        const run = line.runs.find(
+          (candidate) =>
+            candidate.object === object ||
+            (atom.source.start >= candidate.source.start &&
+              atom.source.end <= candidate.source.end),
+        );
+        if (run === undefined) continue;
+        found.push({
+          line,
+          run,
+          atom,
+          height: object.anchor.relativeHeight,
+          order,
+        });
+        order += 1;
+      }
+    }
+  }
+  return found;
+};
+
+const byStacking = (first: PlacedFloat, second: PlacedFloat): number =>
+  first.height === second.height ? first.order - second.order : first.height - second.height;
+
+export const paintFloats = (
+  parent: HTMLElement,
+  input: FloatPaintInput,
+  behind: boolean,
+): number => {
+  const page = input.page;
+  const origin = {
+    originX: page.page.x,
+    originY: page.page.y,
+    contentX: page.contentBox.x,
+    contentY: page.contentBox.y,
+  };
+  const floats = floatsInPage(page)
+    .filter((entry) => (entry.atom.object?.anchor?.behind ?? false) === behind)
+    .sort(byStacking);
+  for (const entry of floats) {
+    const object = entry.atom.object;
+    if (object === undefined || object.relationshipId === undefined) continue;
+    const container = box('docier-object');
+    stamp(container, {
+      [ATTR.object]: String(entry.atom.atomId),
+      [ATTR.objectId]: object.objectId,
+      [ATTR.line]: String(entry.line.id),
+    });
+    applyStyle(
+      container,
+      positionStyle(
+        geometryAt(objectBoxOf(entry.line, entry.run, entry.atom, origin), input.frame, input.scale),
+      ),
+    );
+    const url = input.images.urlFor(object.relationshipId);
+    if (url !== undefined) paintImage(container, object, url, input.scale);
+    else paintMissing(container, object.relationshipId, input.scale, object);
+    parent.appendChild(container);
+  }
+  return floats.length;
 };

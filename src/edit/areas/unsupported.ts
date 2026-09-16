@@ -11,7 +11,7 @@ interface Refusal {
 }
 
 const NO_FLOATING =
-  'This build places pictures and text boxes in the line they sit in: it has no floating objects, so there is no stacking order and no wrap to set';
+  'This build aligns and groups the objects it places in the line they sit in, and it has no command that moves a floating object to a page or margin edge';
 const NO_DRAWING =
   'This build authors a picture from bytes the host supplies and nothing else: it has no shape, chart or text-box geometry';
 const NO_PART = (part: string): string =>
@@ -153,10 +153,13 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'Compression re-encodes media bytes, and this build inserts and scales them but never rewrites them',
   },
   { id: 'docier.command.object.align', label: 'Align objects', category: 'object', reason: NO_FLOATING },
-  { id: 'docier.command.object.bringForward', label: 'Bring forward', category: 'object', reason: NO_FLOATING },
-  { id: 'docier.command.object.sendBackward', label: 'Send backward', category: 'object', reason: NO_FLOATING },
-  { id: 'docier.command.object.group', label: 'Group', category: 'object', reason: NO_FLOATING },
-  { id: 'docier.command.object.setWrap', label: 'Wrap text', category: 'object', reason: NO_FLOATING },
+  {
+    id: 'docier.command.object.group',
+    label: 'Group',
+    category: 'object',
+    reason:
+      'Grouping needs several objects selected at once, and this build selects one object at a time',
+  },
 
   {
     id: 'docier.command.theme.setColors',

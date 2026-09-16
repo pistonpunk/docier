@@ -19,6 +19,7 @@ import {
   resolvedRunContents,
 } from '../../model/index.js';
 import { buildInlineDrawing } from '../../ooxml/drawing.js';
+import { createWElement } from '../../model/index.js';
 import { objectIdOfDrawing } from '../../layout/objects.js';
 import type { Mp } from '../../units/index.js';
 import { mpToTwip, twip, twipToEmu } from '../../units/index.js';
@@ -343,6 +344,117 @@ const runElementOf = (drawing: XmlElement): XmlElement | undefined => {
   return parent;
 };
 
+const anchorElementOf = (drawing: XmlElement): XmlElement | undefined =>
+  childElements(drawing).find(
+    (child) =>
+      (child.uri === WP_NAMESPACE || child.uri === WP_STRICT_NAMESPACE) &&
+      child.localName === 'anchor',
+  );
+
+const heightOf = (anchor: XmlElement): number => {
+  const raw = anchor.attributes.find((attribute) => attribute.localName === 'relativeHeight')?.value;
+  const parsed = raw === undefined ? Number.NaN : Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const stackingSpec = (id: string, label: LocalizedString, forward: boolean): AreaSpec<ObjectSelectArgs> => ({
+  id,
+  label,
+  category: 'object',
+  permissions: ['format'],
+  enabledIn: (host, args) => {
+    const objectId = selectedId(host, args);
+    return objectId !== undefined && drawingWithId(host, objectId) !== undefined;
+  },
+  reason: (host, args) =>
+    selectedId(host, args) === undefined ? NO_SELECTION : NO_PICTURE,
+  run: (host, args) => {
+    const objectId = selectedId(host, args);
+    if (objectId === undefined) return false;
+    const drawing = drawingWithId(host, objectId);
+    if (drawing === undefined) return false;
+    const anchor = anchorElementOf(drawing);
+    if (anchor === undefined) return false;
+    const heights: number[] = [];
+    for (const slot of host.session.slots()) {
+      const paragraph = paragraphOf(host, slot.element);
+      for (const run of paragraph.runs()) {
+        for (const content of run.contents()) {
+          const element = content instanceof DrawingContent ? content.element : undefined;
+          const found = element === undefined ? undefined : anchorElementOf(element);
+          if (found !== undefined) heights.push(heightOf(found));
+        }
+      }
+    }
+    const extreme = forward
+      ? Math.max(...heights, 0)
+      : Math.min(...heights, 0);
+    const changed = changedBy([anchor], () => {
+      xml.setAttribute(anchor, 'relativeHeight', String(forward ? extreme + 1 : extreme - 1));
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(drawing);
+    host.session.relayout();
+    selectObject(host.session, objectId);
+    return true;
+  },
+});
+
+const WRAP_ELEMENTS: Readonly<Record<string, string>> = {
+  none: 'wrapNone',
+  square: 'wrapSquare',
+  tight: 'wrapTight',
+  through: 'wrapThrough',
+  topAndBottom: 'wrapTopAndBottom',
+};
+
+export interface ObjectWrapArgs {
+  readonly objectId?: string;
+  readonly wrap?: string;
+}
+
+const setWrapSpec: AreaSpec<ObjectWrapArgs> = {
+  id: 'docier.command.object.setWrap',
+  label: 'Wrap text',
+  category: 'object',
+  permissions: ['format'],
+  enabledIn: (host, args) => {
+    const objectId = args?.objectId ?? objectSelectionOf(host.session);
+    const wrap = args?.wrap;
+    if (objectId === undefined || wrap === undefined) return false;
+    if (WRAP_ELEMENTS[wrap] === undefined) return false;
+    return drawingWithId(host, objectId) !== undefined;
+  },
+  reason: (host, args) =>
+    (args?.objectId ?? objectSelectionOf(host.session)) === undefined ? NO_SELECTION : NO_PICTURE,
+  run: (host, args) => {
+    const objectId = args?.objectId ?? objectSelectionOf(host.session);
+    const wrap = args?.wrap;
+    if (objectId === undefined || wrap === undefined) return false;
+    const localName = WRAP_ELEMENTS[wrap];
+    if (localName === undefined) return false;
+    const drawing = drawingWithId(host, objectId);
+    if (drawing === undefined) return false;
+    const anchor = anchorElementOf(drawing);
+    if (anchor === undefined) return false;
+    const changed = changedBy([anchor], () => {
+      const existing = childElements(anchor).filter((child) =>
+        child.localName.startsWith('wrap'),
+      );
+      for (const child of existing) child.parent = undefined;
+      anchor.children = anchor.children.filter((child) => !existing.includes(child as XmlElement));
+      const created = createWElement(anchor, localName);
+      created.parent = anchor;
+      anchor.children.push(created);
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(drawing);
+    host.session.relayout();
+    selectObject(host.session, objectId);
+    return true;
+  },
+};
+
 const deleteSpec: AreaSpec<ObjectSelectArgs> = {
   id: 'docier.command.object.delete',
   label: 'Delete object',
@@ -388,6 +500,15 @@ const deleteSpec: AreaSpec<ObjectSelectArgs> = {
 export const objectCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<ObjectSizeArgs>(host, setSizeSpec),
   areaCommand<ObjectSelectArgs>(host, deleteSpec),
+  areaCommand<ObjectSelectArgs>(
+    host,
+    stackingSpec('docier.command.object.bringForward', 'Bring forward', true),
+  ),
+  areaCommand<ObjectSelectArgs>(
+    host,
+    stackingSpec('docier.command.object.sendBackward', 'Send backward', false),
+  ),
+  areaCommand<ObjectWrapArgs>(host, setWrapSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),
 ];

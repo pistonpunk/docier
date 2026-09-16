@@ -202,8 +202,11 @@ const anchorOf = (
     y: vertical.value,
     horizontal: horizontal.relative,
     vertical: vertical.relative,
-    behind: attributeValue(anchor, 'behindDoc') === '1' || attributeValue(anchor, 'behindDoc') === 'true',
+    behind:
+      attributeValue(anchor, 'behindDoc') === '1' ||
+      attributeValue(anchor, 'behindDoc') === 'true',
     wrap: wrapOf(anchor),
+    relativeHeight: integerAttribute(anchor, 'relativeHeight') ?? 0,
   };
 };
 

@@ -196,8 +196,17 @@ describe('the chrome does not show placeholders', () => {
     for (const tab of ALL_RIBBON_TABS) {
       for (const group of tab.groups) collectPruned(group.nodes, raw);
     }
+    for (const surface of Object.keys(CONTEXT_MENUS) as readonly (keyof typeof CONTEXT_MENUS)[]) {
+      collectPruned(CONTEXT_MENUS[surface], raw);
+    }
+    collectPruned(QUICK_ACCESS, raw);
+    collectPruned(STATUS_ITEM_MENU, raw);
+    collectPruned(FLOATING_CONTROLS, raw);
+    collectPruned(BACKSTAGE_ITEMS, raw);
     const wouldHaveBeenShown = unsupportedIds.filter((id) => raw.has(id));
-    expect(wouldHaveBeenShown.length).toBeGreaterThan(30);
+    // the floor tracks how many refusals there still are; it falls as features
+    // are built, which is the direction it is meant to fall in
+    expect(wouldHaveBeenShown.length).toBeGreaterThan(25);
     expect(prunedIds().size).toBeLessThan(raw.size);
   });
 });
@@ -205,7 +214,7 @@ describe('the chrome does not show placeholders', () => {
 describe('deliberately unavailable commands', () => {
   it('registers each of them with a specific reason instead of a generic one', async () => {
     const handle = await editorOf(FIXTURE);
-    expect(unsupportedIds.length).toBeGreaterThan(50);
+    expect(unsupportedIds.length).toBeGreaterThan(45);
 
     const missing: string[] = [];
     const generic: string[] = [];

@@ -465,6 +465,66 @@ describe('formatting marks in the painted document', () => {
   });
 });
 
+describe('stacking order for anchored drawings', () => {
+  const WPA = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+  const AA = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  const PICA = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+
+  const float = (id: number, options: { readonly behind: boolean; readonly height: number }): string =>
+    '<w:drawing>' +
+    `<wp:anchor xmlns:wp="${WPA}" behindDoc="${options.behind ? '1' : '0'}"` +
+    ` relativeHeight="${String(options.height)}">` +
+    '<wp:positionH relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionH>' +
+    '<wp:positionV relativeFrom="margin"><wp:posOffset>0</wp:posOffset></wp:positionV>' +
+    '<wp:extent cx="914400" cy="457200"/><wp:wrapNone/>' +
+    `<wp:docPr id="${String(id)}" name="F${String(id)}"/>` +
+    `<a:graphic xmlns:a="${AA}"><a:graphicData uri="${PICA}">` +
+    `<pic:pic xmlns:pic="${PICA}"><pic:blipFill><a:blip r:embed="rId4"/></pic:blipFill></pic:pic>` +
+    '</a:graphicData></a:graphic>' +
+    '</wp:anchor></w:drawing>';
+
+  const render = async (drawings: readonly string[]) => {
+    const result = await layoutOf(
+      bodyOf(`<w:p><w:r>${drawings.join('')}<w:t xml:space="preserve">text</w:t></w:r></w:p>`),
+    );
+    const target = host();
+    renderDocument(result, target);
+    return target;
+  };
+
+  it('puts a behindDoc drawing behind the text and the others in front', async () => {
+    const target = await render([float(1, { behind: true, height: 1 }), float(2, { behind: false, height: 1 })]);
+    const sheet = target.querySelector<HTMLElement>(`[${ATTR.page}="0"]`);
+    const back = sheet?.querySelectorAll('.docier-floats-behind [' + ATTR.objectId + ']');
+    const front = sheet?.querySelectorAll('.docier-floats-front [' + ATTR.objectId + ']');
+    expect(back?.length).toBe(1);
+    expect(front?.length).toBe(1);
+    expect(back?.[0]?.getAttribute(ATTR.objectId)).toBe('1');
+    expect(front?.[0]?.getAttribute(ATTR.objectId)).toBe('2');
+  });
+
+  it('orders the drawings in one layer by relativeHeight', async () => {
+    const target = await render([
+      float(3, { behind: false, height: 500 }),
+      float(4, { behind: false, height: 100 }),
+      float(5, { behind: false, height: 300 }),
+    ]);
+    const front = target.querySelectorAll('.docier-floats-front [' + ATTR.objectId + ']');
+    expect([...front].map((node) => node.getAttribute(ATTR.objectId))).toEqual(['4', '5', '3']);
+  });
+
+  it('keeps the behind layer before the text in document order', async () => {
+    const target = await render([float(6, { behind: true, height: 1 })]);
+    const sheet = target.querySelector<HTMLElement>(`[${ATTR.page}="0"]`);
+    const children = [...(sheet?.children ?? [])];
+    const layerAt = children.findIndex((child) => child.classList.contains('docier-floats-behind'));
+    const blockAt = children.findIndex((child) => child.classList.contains('docier-block'));
+    expect(layerAt).toBeGreaterThanOrEqual(0);
+    expect(blockAt).toBeGreaterThanOrEqual(0);
+    expect(layerAt).toBeLessThan(blockAt);
+  });
+});
+
 describe('an anchored drawing is painted where it was anchored', () => {
   const WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
   const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -493,9 +553,19 @@ describe('an anchored drawing is painted where it was anchored', () => {
     renderDocument(result, target);
     const objects = target.querySelectorAll<HTMLElement>(`[${ATTR.objectId}]`);
     expect(objects.length).toBe(1);
-    // the anchor is one inch from the margin, and the painted box is placed in
-    // the block's frame, so its left is one inch in pixels
-    expect(styleLeft(objects[0])).toBe(px(mp(72000)));
+    // the anchor is one inch past the margin, and the float layer is positioned
+    // at the page origin, so the left is the margin plus an inch in pixels
+    const page = result.pages[0];
+    expect(styleLeft(objects[0])).toBe(
+      px(mp(((page?.contentBox.x ?? 0) + 72000) as number)),
+    );
+    // and it lands after the text, because behindDoc is 0
+    const sheet = target.querySelector<HTMLElement>(`[${ATTR.page}="0"]`);
+    const front = sheet?.querySelector('.docier-floats-front');
+    const back = sheet?.querySelector('.docier-floats-behind');
+    expect(front).not.toBeNull();
+    expect(back).toBeNull();
+    expect(front?.querySelectorAll(`[${ATTR.objectId}]`).length).toBe(1);
   });
 
   it('leaves the text where it would have been without it', async () => {
