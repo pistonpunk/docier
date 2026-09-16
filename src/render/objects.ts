@@ -1,5 +1,4 @@
 import type {
-  AtomPlacement,
   BlockFragment,
   LineFragment,
   LineRun,
@@ -16,6 +15,9 @@ import { ATTR, box, element, geometryAt, stamp } from './dom.js';
 import {
   MISSING_IMAGE_BACKGROUND,
   cssRotationOf,
+  floatsByStacking,
+  floatsInPage,
+  pageOriginOf,
   rotationStyle,
   MISSING_IMAGE_FONT_SIZE_PX,
   MISSING_IMAGE_OUTLINE,
@@ -141,73 +143,16 @@ export interface FloatPaintInput {
   readonly images: ImageRegistry;
 }
 
-interface PlacedFloat {
-  readonly line: LineFragment;
-  readonly run: LineRun;
-  readonly atom: AtomPlacement;
-  readonly height: number;
-  readonly order: number;
-}
-
-const regionBlocks = (page: PageFragment): readonly BlockFragment[] => {
-  const out: BlockFragment[] = [...page.blocks];
-  if (page.header !== undefined) out.push(...page.header.blocks);
-  if (page.footer !== undefined) out.push(...page.footer.blocks);
-  if (page.footnotes !== undefined) out.push(...page.footnotes.blocks);
-  return out;
-};
-
-export const floatsInPage = (page: PageFragment): readonly PlacedFloat[] => {
-  const found: PlacedFloat[] = [];
-  let order = 0;
-  for (const block of regionBlocks(page)) {
-    for (const line of block.lines) {
-      for (const atom of line.atoms) {
-        const object = atom.object;
-        if (object === undefined || object.anchor === undefined) continue;
-        const run = line.runs.find(
-          (candidate) =>
-            candidate.object === object ||
-            (atom.source.start >= candidate.source.start &&
-              atom.source.end <= candidate.source.end),
-        );
-        if (run === undefined) continue;
-        found.push({
-          line,
-          run,
-          atom,
-          height: object.anchor.relativeHeight,
-          order,
-        });
-        order += 1;
-      }
-    }
-  }
-  return found;
-};
-
-const byStacking = (first: PlacedFloat, second: PlacedFloat): number =>
-  first.height === second.height ? first.order - second.order : first.height - second.height;
-
 export const paintFloats = (
   parent: HTMLElement,
   input: FloatPaintInput,
   behind: boolean,
 ): number => {
   const page = input.page;
-  const origin = {
-    originX: page.page.x,
-    originY: page.page.y,
-    originWidth: page.page.width,
-    originHeight: page.page.height,
-    contentX: page.contentBox.x,
-    contentY: page.contentBox.y,
-    contentWidth: page.contentBox.width,
-    contentHeight: page.contentBox.height,
-  };
+  const origin = pageOriginOf(page);
   const floats = floatsInPage(page)
     .filter((entry) => (entry.atom.object?.anchor?.behind ?? false) === behind)
-    .sort(byStacking);
+    .sort(floatsByStacking);
   for (const entry of floats) {
     const object = entry.atom.object;
     if (object === undefined) continue;

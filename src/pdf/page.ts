@@ -21,14 +21,18 @@ import {
   MISSING_IMAGE_OUTLINE,
   MISSING_IMAGE_OUTLINE_WIDTH_PX,
   clockwiseRadians,
+  floatsByStacking,
+  floatsInPage,
   missingImageLabel,
   objectBoxOf,
+  pageOriginOf,
 } from '../render/inline-object.js';
+import type { PageOrigin, PlacedFloat } from '../render/inline-object.js';
 import { dashPatternOf } from '../render/decoration.js';
 import type { ContentStream } from './content.js';
 import { insetted } from './content.js';
 import type { PdfFrame } from './geometry.js';
-import { pdfBaseline, pdfFrame, pdfLength, pdfRect, pdfX } from './geometry.js';
+import { pdfBaseline, pdfFrame, pdfLength, pdfRect, pdfTop, pdfX } from './geometry.js';
 import { hasBorders, paintBorders, paintShading } from './decoration.js';
 import { paintRun } from './runs.js';
 import { glyphsOf } from './fonts/advance.js';
@@ -182,6 +186,7 @@ const objectsOfRun = (line: LineFragment, run: LineRun): readonly AtomPlacement[
   line.atoms.filter(
     (atom) =>
       atom.object !== undefined &&
+      atom.object.anchor === undefined &&
       atom.source.start >= run.source.start &&
       atom.source.end <= run.source.end,
   );
@@ -264,6 +269,74 @@ export const paintRegion = (
   for (const block of region.blocks) paintBlock(block, frame, context);
 };
 
+const paintFloat = (
+  entry: PlacedFloat,
+  frame: PdfFrame,
+  origin: PageOrigin,
+  context: PagePaintContext,
+): void => {
+  const object = entry.atom.object;
+  if (object === undefined) return;
+  const area = objectBoxOf(entry.line, entry.run, entry.atom, origin);
+  const left = pdfX(frame, area.x);
+  const bottom = pdfTop(frame, area.y, area.height);
+  const width = pdfLength(area.width);
+  const height = pdfLength(area.height);
+  const milli = object.rotationMilliDegrees;
+  context.content.save();
+  if (milli === 0) {
+    context.content.concat(1, 0, 0, 1, left, bottom);
+  } else {
+    const angle = clockwiseRadians(milli);
+    const cos = Math.cos(angle);
+    const sin = -Math.sin(angle);
+    const cx = left + width / 2;
+    const cy = bottom + height / 2;
+    context.content.concat(
+      cos,
+      sin,
+      -sin,
+      cos,
+      cx - (width / 2) * cos + (height / 2) * sin,
+      cy - (width / 2) * sin - (height / 2) * cos,
+    );
+  }
+  const local: PdfFrame = { dx: mp(0), dy: mp(0), height: area.height };
+  const text = context.result.objectText.get(object.objectId);
+  if (text !== undefined) {
+    for (const block of text) paintBlock(block, local, context);
+  }
+  if (object.relationshipId !== undefined) {
+    const name = context.images.nameFor(object.relationshipId);
+    if (name !== undefined) {
+      const report = context.images.reportFor(object.relationshipId);
+      const box = imageBox(object, 0, 0, report);
+      context.content.drawImage(name, box.a, box.b, box.c, box.d, box.e, box.f);
+    } else {
+      context.losses.push({
+        code: 'missingImage',
+        message: `no image was supplied for ${object.relationshipId}`,
+        detail: object.relationshipId,
+      });
+    }
+  }
+  context.content.restore();
+};
+
+const paintFloats = (
+  page: PageFragment,
+  context: PagePaintContext,
+  behind: boolean,
+): void => {
+  const floats = floatsInPage(page)
+    .filter((entry) => (entry.atom.object?.anchor?.behind ?? false) === behind)
+    .sort(floatsByStacking);
+  if (floats.length === 0) return;
+  const origin = pageOriginOf(page);
+  const frame = pdfFrame(page);
+  for (const entry of floats) paintFloat(entry, frame, origin, context);
+};
+
 const PAGE_RULE_RGB = { r: 0.4, g: 0.4, b: 0.4 } as const;
 
 export const paintFootnotes = (
@@ -285,6 +358,7 @@ export const paintFootnotes = (
 
 export const paintPage = (page: PageFragment, context: PagePaintContext): void => {
   const frame = pdfFrame(page);
+  paintFloats(page, context, true);
   if (hasBorders(page.pageBorders)) {
     paintBorders(context.content, page.pageBorders, page.page, frame);
   }
@@ -296,6 +370,7 @@ export const paintPage = (page: PageFragment, context: PagePaintContext): void =
   if (page.header !== undefined) paintRegion(page.header, frame, context);
   if (page.footer !== undefined) paintRegion(page.footer, frame, context);
   if (page.footnotes !== undefined) paintFootnotes(page.footnotes, frame, context);
+  paintFloats(page, context, false);
 };
 
 export const blocksOfPage = (page: PageFragment): readonly BlockFragment[] => {

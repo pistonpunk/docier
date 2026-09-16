@@ -134,6 +134,24 @@ describe('the theme commands', () => {
     expect(relationship?.resolvedTarget).toBe('word/theme/theme1.xml');
   });
 
+  it('reports itself unavailable while the document is read-only', async () => {
+    const handle = await editorOfSpec(
+      {
+        body: bodyOf(paragraphText('alpha')),
+        styles: STYLES,
+        documentRelationships: [relationship('rIdTheme', 'theme', 'theme/theme1.xml')],
+        extraParts: [xmlPart('word/theme/theme1.xml', THEME)],
+      },
+      { permissions: { readOnly: true } },
+    );
+    expect(
+      handle.commands.isEnabled('docier.command.theme.setSpacing', { preset: 'open' }),
+    ).toBe(false);
+    expect(
+      String(handle.commands.disabledReason('docier.command.theme.setFonts', { major: 'Georgia' })),
+    ).toContain('read-only');
+  });
+
   it('asks for the argument it needs rather than sitting there greyed', async () => {
     const handle = await themed();
     expect(String(handle.commands.disabledReason('docier.command.theme.setColors'))).toContain(

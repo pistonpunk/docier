@@ -19,6 +19,7 @@ import { buildXmp } from './xmp.js';
 import { iccStream, outputIntent } from './pdfa.js';
 import { infoDict, resolveMetadata } from './metadata.js';
 import { asciiBytes, concatBytes } from './bytes.js';
+import type { BlockFragment } from '../layout/index.js';
 
 const DOCUMENT_ID_BYTES = 16;
 
@@ -29,9 +30,14 @@ const painterGaps = (): readonly PdfLoss[] =>
     detail: gap,
   }));
 
-const collectGlyphs = (result: LayoutResult, fonts: FontRegistry, images: ImageRegistry): void => {
-  for (const page of result.pages) {
-    for (const block of blocksOfPage(page)) {
+const collectBlockGlyphs = (
+  block: BlockFragment,
+  result: LayoutResult,
+  fonts: FontRegistry,
+  images: ImageRegistry,
+): void => {
+  {
+    {
       for (const line of block.lines) {
         for (const run of line.runs) {
           const paint = result.paint[run.paint];
@@ -52,6 +58,17 @@ const collectGlyphs = (result: LayoutResult, fonts: FontRegistry, images: ImageR
           }
         }
       }
+    }
+  }
+};
+
+const collectGlyphs = (result: LayoutResult, fonts: FontRegistry, images: ImageRegistry): void => {
+  for (const page of result.pages) {
+    for (const block of blocksOfPage(page)) collectBlockGlyphs(block, result, fonts, images);
+    // the text of a shape or text box is laid out beside the page, so its glyphs
+    // have to be collected from where it is kept rather than from the blocks
+    for (const blocks of result.objectText.values()) {
+      for (const block of blocks) collectBlockGlyphs(block, result, fonts, images);
     }
   }
 };

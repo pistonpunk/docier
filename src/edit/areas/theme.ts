@@ -293,13 +293,17 @@ const spacingSpec: AreaSpec<ThemeSpacingArgs> = {
   invalidation: DOCUMENT_INVALIDATION,
   permissions: ['format'],
   enabledIn: (host, args) =>
-    host.session.aligned && args?.preset !== undefined && host.session.model.styles !== undefined,
+    host.session.aligned &&
+    args?.preset !== undefined &&
+    host.session.model.styles !== undefined &&
+    host.editable,
   reason: (host, args) => {
     if (!host.session.aligned) return NOT_ALIGNED;
     if (args?.preset === undefined) return 'This control needs a spacing preset to apply';
-    return host.session.model.styles === undefined
-      ? 'This document carries no styles part, so its paragraph spacing cannot be changed'
-      : 'This command is available here';
+    if (host.session.model.styles === undefined) {
+      return 'This document carries no styles part, so its paragraph spacing cannot be changed';
+    }
+    return host.editable ? 'This command is available here' : 'The document is read-only';
   },
   run: (host, args) => {
     const preset = THEME_SPACING_PRESETS.find((entry) => entry.id === args?.preset);

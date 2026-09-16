@@ -1,9 +1,11 @@
 import type {
   AnchorAlign,
   AtomPlacement,
+  BlockFragment,
   LineFragment,
   LineRun,
   ObjectAnchor,
+  PageFragment,
   Rect,
 } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
@@ -147,3 +149,56 @@ export const MISSING_IMAGE_OUTLINE = '#b00020';
 
 export const missingImageLabel = (id: string | undefined): string =>
   id === undefined ? MISSING_IMAGE_LABEL : `${MISSING_IMAGE_LABEL}: ${id}`;
+
+export interface PlacedFloat {
+  readonly line: LineFragment;
+  readonly run: LineRun;
+  readonly atom: AtomPlacement;
+  readonly height: number;
+  readonly order: number;
+}
+
+export const regionBlocksOf = (page: PageFragment): readonly BlockFragment[] => {
+  const out: BlockFragment[] = [...page.blocks];
+  if (page.header !== undefined) out.push(...page.header.blocks);
+  if (page.footer !== undefined) out.push(...page.footer.blocks);
+  if (page.footnotes !== undefined) out.push(...page.footnotes.blocks);
+  return out;
+};
+
+export const floatsInPage = (page: PageFragment): readonly PlacedFloat[] => {
+  const found: PlacedFloat[] = [];
+  let order = 0;
+  for (const block of regionBlocksOf(page)) {
+    for (const line of block.lines) {
+      for (const atom of line.atoms) {
+        const object = atom.object;
+        if (object === undefined || object.anchor === undefined) continue;
+        const run = line.runs.find(
+          (candidate) =>
+            candidate.object === object ||
+            (atom.source.start >= candidate.source.start &&
+              atom.source.end <= candidate.source.end),
+        );
+        if (run === undefined) continue;
+        found.push({ line, run, atom, height: object.anchor.relativeHeight, order });
+        order += 1;
+      }
+    }
+  }
+  return found;
+};
+
+export const floatsByStacking = (first: PlacedFloat, second: PlacedFloat): number =>
+  first.height === second.height ? first.order - second.order : first.height - second.height;
+
+export const pageOriginOf = (page: PageFragment): PageOrigin => ({
+  originX: page.page.x,
+  originY: page.page.y,
+  originWidth: page.page.width,
+  originHeight: page.page.height,
+  contentX: page.contentBox.x,
+  contentY: page.contentBox.y,
+  contentWidth: page.contentBox.width,
+  contentHeight: page.contentBox.height,
+});

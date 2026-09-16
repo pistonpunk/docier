@@ -29,6 +29,12 @@ export class ContentStream {
     this.parts.push(text);
   }
 
+  concat(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.parts.push(
+      `${formatNumber(a)} ${formatNumber(b)} ${formatNumber(c)} ${formatNumber(d)} ${formatNumber(e)} ${formatNumber(f)} cm`,
+    );
+  }
+
   save(): void {
     this.parts.push('q');
     this.saved.push({ font: this.font, fontSize: this.fontSize });
