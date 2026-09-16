@@ -112,10 +112,14 @@ const unionOfBlocks = (
   for (const id of cell.blocks) {
     const block = blocks.get(id);
     if (block === undefined) continue;
-    left = Math.min(left, block.box.x as number);
-    top = Math.min(top, block.box.y as number);
-    right = Math.max(right, (block.box.x as number) + (block.box.width as number));
-    bottom = Math.max(bottom, (block.box.y as number) + (block.box.height as number));
+    // a block box spans the whole cell, so what the text occupies is the union
+    // of its lines rather than of its blocks
+    for (const line of block.lines) {
+      left = Math.min(left, line.box.x as number);
+      top = Math.min(top, line.box.y as number);
+      right = Math.max(right, (line.box.x as number) + (line.box.width as number));
+      bottom = Math.max(bottom, (line.box.y as number) + (line.box.height as number));
+    }
   }
   if (!Number.isFinite(left) || right <= left) return undefined;
   return { x: left, y: top, width: right - left, height: bottom - top };
@@ -164,7 +168,9 @@ const paintCell = (
       transform: cell.rotation === 'tbRl' ? 'rotate(90deg)' : 'rotate(-90deg)',
       'transform-origin': '50% 50%',
     });
-    const turned: Frame = { dx: mp(placed.x as number), dy: mp(placed.y as number) };
+    // the text is painted at its own origin, so the frame re-origins the text
+    // rather than the wrapper the text is put into
+    const turned: Frame = { dx: mp(union.x), dy: mp(union.y) };
     for (const id of cell.blocks) {
       const block = blocks.get(id);
       if (block !== undefined) paintBlock(contentNode, block, turned, context);

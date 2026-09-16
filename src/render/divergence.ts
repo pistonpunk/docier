@@ -79,6 +79,7 @@ export type DivergenceSkipReason =
   | 'runWithoutPaint'
   | 'zeroWidthRun'
   | 'tabRun'
+  | 'turnedCellRun'
   | 'hiddenRun'
   | 'objectRun'
   | 'unreadableBox'
@@ -102,6 +103,7 @@ const SKIP_SEVERITY: Record<DivergenceSkipReason, DivergenceSkipSeverity> = {
   runWithoutPaint: 'warning',
   zeroWidthRun: 'info',
   tabRun: 'info',
+  turnedCellRun: 'info',
   hiddenRun: 'info',
   objectRun: 'info',
   unreadableBox: 'warning',
@@ -417,6 +419,9 @@ export const detectDivergence = (
     );
   };
 
+  const turnedRun = (found: readonly HTMLElement[]): boolean =>
+    found.some((node) => node.closest('.docier-cell-turned') !== null);
+
   const tabRun = (line: LineFragment, run: LineRun): boolean =>
     line.atoms.some(
       (atom) =>
@@ -477,6 +482,12 @@ export const detectDivergence = (
         },
         scale.px(run.width),
       );
+      return;
+    }
+    // a run inside a rotated cell is painted turned and the engine's geometry for
+    // it is deliberately unturned, so the two boxes are not comparable
+    if (turnedRun(found)) {
+      skip('turnedCellRun');
       return;
     }
     const painted: MeasuredRect[] = [];

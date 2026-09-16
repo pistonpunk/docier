@@ -230,10 +230,12 @@ const unionOfCellBlocks = (
   for (const id of cell.blocks) {
     const block = blocks.get(id);
     if (block === undefined) continue;
-    left = Math.min(left, block.box.x as number);
-    top = Math.min(top, block.box.y as number);
-    right = Math.max(right, (block.box.x as number) + (block.box.width as number));
-    bottom = Math.max(bottom, (block.box.y as number) + (block.box.height as number));
+    for (const line of block.lines) {
+      left = Math.min(left, line.box.x as number);
+      top = Math.min(top, line.box.y as number);
+      right = Math.max(right, (line.box.x as number) + (line.box.width as number));
+      bottom = Math.max(bottom, (line.box.y as number) + (line.box.height as number));
+    }
   }
   if (!Number.isFinite(left) || right <= left) return undefined;
   return { x: mp(left), y: mp(top), width: mp(right - left), height: mp(bottom - top) };
@@ -264,7 +266,11 @@ const paintCell = (
   const centreY = (clip.y as number) + (clip.height as number) / 2;
   const originX = centreX - (union.width as number) / 2;
   const originY = centreY - (union.height as number) / 2;
-  const placed: PdfFrame = { dx: mp(frame.dx - originX), dy: mp(frame.dy - originY), height: frame.height };
+  const placed: PdfFrame = {
+    dx: mp(frame.dx - (union.x as number)),
+    dy: mp(frame.dy - (union.y as number)),
+    height: frame.height,
+  };
   const angle = cell.rotation === 'tbRl' ? Math.PI / 2 : -Math.PI / 2;
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
