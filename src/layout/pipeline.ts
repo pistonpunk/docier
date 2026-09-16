@@ -310,14 +310,14 @@ export const layoutDocument = (
     prepared.some(
       (entry) =>
         entry.paragraph.format.direction === 'rtl' &&
-        entry.measured.some((item) => /[0-9]/.test(item.atom.text)),
+        entry.measured.some((item) => /[0-9]/.test(item.atom.text) && /[^0-9.,\s]/.test(item.atom.text)),
     )
   ) {
     diagnostics.push({
       code: 'rtlLayoutPartial',
       severity: 'info',
       message:
-        'a number inside a right to left paragraph is placed by its direction group, without the Unicode rule for numbers',
+        'punctuation written inside a word is drawn in the order it is written, without the Unicode rule for neutrals',
       docPos: undefined,
     });
   }

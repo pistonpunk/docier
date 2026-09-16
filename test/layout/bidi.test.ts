@@ -110,3 +110,51 @@ describe('latin runs inside a right to left paragraph', () => {
     expect(one?.x).toBeLessThan(two?.x ?? 0);
   });
 });
+
+describe('numbers in right to left text', () => {
+  const rtlAtoms = async (text: string) => {
+    const model = await openModel({ body: `<w:p><w:pPr><w:bidi/></w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>` });
+    const result = await layoutDocument(model);
+    const line = result.pages[0]?.blocks[0]?.lines[0];
+    return (line?.atoms ?? []).map((atom) => ({
+      text: atom.text,
+      x: atom.x as number,
+      end: (atom.x as number) + (atom.width as number),
+    }));
+  };
+
+  it('keeps a number between two runs of hebrew between them', async () => {
+    const atoms = await rtlAtoms('שלום 2026 עולם');
+    const hebrew = atoms.filter((atom) => /[֐-׿]/.test(atom.text));
+    const digits = atoms.filter((atom) => /[0-9]/.test(atom.text));
+    expect(hebrew.length).toBeGreaterThan(1);
+    expect(digits.length).toBeGreaterThan(0);
+    // the number sits between the first and the last hebrew word, and reads left
+    // to right within itself
+    const first = hebrew[0];
+    const last = hebrew[hebrew.length - 1];
+    const number = digits[0];
+    expect(number?.x).toBeGreaterThan(last?.x ?? 0);
+    expect(number?.end).toBeLessThanOrEqual(first?.x ?? 0);
+  });
+
+  it('puts a neutral between a number and a hebrew word on the number\'s side', async () => {
+    const atoms = await rtlAtoms('שלום 2026 . עולם');
+    const digits = atoms.filter((atom) => /[0-9]/.test(atom.text));
+    const stop = atoms.find((atom) => atom.text === '.');
+    expect(digits.length).toBeGreaterThan(0);
+    expect(stop).toBeDefined();
+    // the neighbours disagree, so the full stop takes the paragraph's direction
+    // and lands at the left of the number
+    expect(stop?.end).toBeLessThanOrEqual(digits[0]?.x ?? 0);
+  });
+
+  it('reads the digits of a number left to right within their own atom', async () => {
+    const atoms = await rtlAtoms('שלום 1.5');
+    const number = atoms.find((atom) => /^[0-9]/.test(atom.text));
+    expect(number).toBeDefined();
+    // the digits and the point are one run, so their order is the one written
+    expect(number?.text).toContain('1');
+    expect(number?.text).toContain('5');
+  });
+});

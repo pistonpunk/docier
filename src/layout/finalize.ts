@@ -180,8 +180,10 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     // atom
     const groups: { readonly atoms: PlacedAtom[]; readonly rtl: boolean; readonly width: number }[] = [];
     let rtl = true;
-    for (const item of line.placed) {
-      const direction = directionOfAtom(item.measured.atom);
+    for (let index = 0; index < line.placed.length; index += 1) {
+      const item = line.placed[index];
+      if (item === undefined) continue;
+      const direction = resolvedDirection(line.placed, index, rtl);
       if (direction !== undefined) rtl = direction;
       const current = groups[groups.length - 1];
       if (current === undefined || current.rtl !== rtl) {
@@ -340,6 +342,28 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
 
 const STRONG_RTL = /[\u0590-\u05ff\u0600-\u06ff\u0700-\u074f\u0750-\u077f\u08a0-\u08ff\ufb1d-\ufdff\ufdf0-\ufeff]/;
 const STRONG_LTR = /[A-Za-z\u00c0-\u024f\u0370-\u058f]/;
+
+// a character with no direction of its own takes the one around it, and when
+// its neighbours disagree it takes the paragraph's, which is the rule that puts
+// a full stop after a number on the left of it in right to left text
+const resolvedDirection = (
+  placed: readonly PlacedAtom[],
+  index: number,
+  previous: boolean,
+): boolean | undefined => {
+  const item = placed[index];
+  if (item === undefined) return undefined;
+  const own = directionOfAtom(item.measured.atom);
+  if (own !== undefined) return own;
+  for (let ahead = index + 1; ahead < placed.length; ahead += 1) {
+    const next = placed[ahead];
+    if (next === undefined) break;
+    const following = directionOfAtom(next.measured.atom);
+    if (following === undefined) continue;
+    return following === previous ? previous : true;
+  }
+  return undefined;
+};
 
 const directionOfAtom = (atom: Atom): boolean | undefined => {
   const text = atom.text;
