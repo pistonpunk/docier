@@ -282,11 +282,17 @@ export const layoutDocument = (
       docPos: undefined,
     });
   }
-  if (prepared.some((entry) => entry.paragraph.format.tabStops.length > 0)) {
+  if (
+    prepared.some((entry) =>
+      entry.paragraph.format.tabStops.some(
+        (stop) => stop.alignment === 'bar' || stop.alignment === 'clear',
+      ),
+    )
+  ) {
     diagnostics.push({
       code: 'tabStopsPartial',
       severity: 'info',
-      message: 'tab leaders and tab stop alignment are not implemented',
+      message: 'a bar tab stop and a cleared tab stop are not applied by this slice',
       docPos: undefined,
     });
   }

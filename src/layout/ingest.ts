@@ -30,7 +30,7 @@ import {
 import type { RunAnnotation } from '../model/index.js';
 import type { ParagraphFormat, RunFormat } from './format.js';
 import type { ThemeResolution } from './format.js';
-import { hasThemeFont, paragraphFormatOf, runFormatOf } from './format.js';
+import { hasThemeFont, paragraphFormatOf, runFormatOf, tabStopOf } from './format.js';
 import { NumberingCounters, defaultLevelText, numberTextOf } from './numbering.js';
 import { objectPlacementOf, textBoxElementOf } from './objects.js';
 import { borderSetOf, shadingOf } from './table-borders.js';
@@ -372,7 +372,9 @@ export const ingestParagraph = (
   const format: ParagraphFormat = {
     ...paragraphFormatOf(
       resolvedParagraph,
-      paragraph.properties.tabStops.map((stop) => twipToMp(stop.position)),
+      paragraph.properties.tabStops.map((stop) =>
+        tabStopOf(twipToMp(stop.position), stop.alignment, stop.leader),
+      ),
     ),
     ...paragraphDecorationOf(paragraph),
   };

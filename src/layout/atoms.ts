@@ -14,8 +14,14 @@ export interface HyphenGlyph {
   readonly source: DocRange;
 }
 
+export interface LeaderGlyph {
+  readonly character: string;
+  readonly advance: number;
+}
+
 export interface Atom {
   readonly id: number;
+  readonly leaders?: Readonly<Record<string, LeaderGlyph>> | undefined;
   readonly kind: AtomKind;
   readonly text: string;
   readonly face: FontFace;

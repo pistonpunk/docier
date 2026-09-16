@@ -46,7 +46,7 @@ export interface ParagraphFormat {
   readonly pageBreakBefore: boolean;
   readonly widowControl: boolean;
   readonly contextualSpacing: boolean;
-  readonly tabStops: readonly Mp[];
+  readonly tabStops: readonly TabStopSpec[];
   readonly borders: BorderSet;
   readonly shading: Shading | undefined;
 }
@@ -172,9 +172,59 @@ export const runFormatOf = (
   };
 };
 
+export type TabAlignment = 'left' | 'center' | 'right' | 'decimal' | 'bar' | 'clear';
+
+export type TabLeader = 'dot' | 'hyphen' | 'underscore' | 'heavy' | 'middleDot';
+
+export interface TabStopSpec {
+  readonly position: Mp;
+  readonly alignment: TabAlignment;
+  readonly leader: TabLeader | undefined;
+}
+
+const TAB_ALIGNMENTS: ReadonlySet<string> = new Set([
+  'left',
+  'center',
+  'right',
+  'decimal',
+  'bar',
+  'clear',
+  'start',
+  'end',
+  'num',
+]);
+
+const TAB_ALIASES: Readonly<Record<string, TabAlignment>> = {
+  start: 'left',
+  end: 'right',
+  num: 'right',
+};
+
+const TAB_LEADERS: ReadonlySet<string> = new Set([
+  'dot',
+  'hyphen',
+  'underscore',
+  'heavy',
+  'middleDot',
+]);
+
+export const tabStopOf = (position: Mp, alignment: string, leader: string | undefined): TabStopSpec => {
+  const resolved: TabAlignment = TAB_ALIGNMENTS.has(alignment)
+    ? TAB_ALIASES[alignment] ?? (alignment as TabAlignment)
+    : 'left';
+  return {
+    position,
+    alignment: resolved,
+    leader:
+      leader === undefined || leader === 'none' || !TAB_LEADERS.has(leader)
+        ? undefined
+        : (leader as TabLeader),
+  };
+};
+
 export const paragraphFormatOf = (
   resolved: ResolvedProperties,
-  tabStops: readonly Mp[],
+  tabStops: readonly TabStopSpec[],
 ): ParagraphFormat => {
   const hanging = resolved.indentHanging;
   const firstLine = resolved.indentFirstLine;

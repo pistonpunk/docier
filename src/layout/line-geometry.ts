@@ -1,9 +1,9 @@
 import type { Mp } from '../units/index.js';
-import { mp } from '../units/index.js';
+import { maxMp, mp } from '../units/index.js';
 import type { LineBox } from '../measure/index.js';
 import type { Atom } from './atoms.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
-import { advanceAt } from './intrinsic.js';
+import { advanceAt, nextTabStop, trimmedTabGap } from './intrinsic.js';
 import type { CaretStop, DocPos, LineRun, ObjectPlacement } from './types.js';
 import type { RunAnnotation } from '../model/index.js';
 import { docPos } from './types.js';
@@ -21,6 +21,27 @@ export interface LineGeometry {
   readonly width: Mp;
 }
 
+const leaderFill = (item: MeasuredAtom, leader: string, width: Mp): MeasuredAtom => {
+  const glyph = item.atom.leaders?.[leader];
+  if (glyph === undefined || glyph.advance <= 0) return item;
+  const count = Math.max(0, Math.floor((width as number) / glyph.advance));
+  if (count === 0) return item;
+  const offsets: Mp[] = [];
+  for (let index = 0; index <= count; index += 1) offsets.push(mp(glyph.advance * index));
+  return {
+    atom: {
+      ...item.atom,
+      text: glyph.character.repeat(count),
+      units: Array.from({ length: count }, () => glyph.advance),
+      lengths: Array.from({ length: count }, () => glyph.character.length),
+      suppressible: false,
+    },
+    width: mp(glyph.advance * count),
+    offsets,
+    positionDependent: false,
+  };
+};
+
 export const placeAtoms = (
   measured: readonly MeasuredAtom[],
   start: number,
@@ -33,9 +54,22 @@ export const placeAtoms = (
   for (let index = start; index < end; index += 1) {
     const item = measured[index];
     if (item === undefined) break;
-    const width = advanceAt(item, x, context);
-    placed.push({ measured: item, x, width });
-    x = mp(x + width);
+    if (!item.positionDependent) {
+      const width = advanceAt(item, x, context);
+      placed.push({ measured: item, x, width });
+      x = mp(x + width);
+      continue;
+    }
+    const stop = nextTabStop(x, context);
+    const gap = trimmedTabGap(
+      measured,
+      index,
+      maxMp(mp(stop.position - x), mp(0)),
+      stop,
+    );
+    const fill = stop.leader === undefined ? item : leaderFill(item, stop.leader, gap);
+    placed.push({ measured: fill, x, width: gap });
+    x = mp(x + gap);
   }
   return placed;
 };

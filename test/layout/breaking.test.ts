@@ -104,6 +104,70 @@ describe('greedy line breaking', () => {
     expect(lineWidths(result)).toEqual([46000]);
   });
 
+  it('fills the gap to a dot leader with dots', async () => {
+    const result = await layoutOf(
+      bodyOf(
+        paragraphOf(
+          '<w:tabs><w:tab w:val="left" w:pos="300" w:leader="dot"/></w:tabs>',
+          contentRun('', `${text('aa')}${TAB}${text('bb')}`),
+        ),
+      ),
+    );
+    const placed = result.pages[0]?.blocks[0]?.lines[0]?.atoms ?? [];
+    const tab = placed.find((atom) => atom.kind === 'tab');
+    expect(tab?.width).toBe(5000);
+    const leaders = placed.filter((atom) => atom.text !== '' && /^\.+$/.test(atom.text));
+    expect(leaders.length).toBeGreaterThan(0);
+    const dots = leaders.map((atom) => atom.text).join('');
+    expect(dots.startsWith('.')).toBe(true);
+    // the dots fill the gap and no more
+    const filled = leaders.reduce((total, atom) => total + atom.width, 0);
+    expect(filled).toBeLessThanOrEqual(5000);
+    expect(filled).toBeGreaterThan(0);
+  });
+
+  it('ends the text at a right aligned stop where a left stop starts it', async () => {
+    const atomsFor = async (
+      alignment: string,
+      stop: number,
+    ): Promise<readonly { readonly x: number; readonly width: number; readonly text: string }[]> => {
+      const result = await layoutOf(
+        bodyOf(
+          paragraphOf(
+            `<w:tabs><w:tab w:val="${alignment}" w:pos="${String(stop)}"/></w:tabs>`,
+            contentRun('', `${text('aa')}${TAB}${text('b')}`),
+          ),
+        ),
+      );
+      return (result.pages[0]?.blocks[0]?.lines[0]?.atoms ?? []).map((atom) => ({
+        x: atom.x,
+        width: atom.width,
+        text: atom.text,
+      }));
+    };
+
+    const left = await atomsFor('left', 600);
+    const right = await atomsFor('right', 600);
+    const after = (
+      atoms: readonly { readonly x: number; readonly width: number; readonly text: string }[],
+    ): { readonly x: number; readonly end: number } | undefined => {
+      const tab = atoms.find((atom) => atom.text === '\t');
+      const index = tab === undefined ? -1 : atoms.indexOf(tab);
+      const tail = atoms[index + 1];
+      return tail === undefined ? undefined : { x: tail.x, end: tail.x + tail.width };
+    };
+
+    const leftTail = after(left);
+    const rightTail = after(right);
+    expect(leftTail).toBeDefined();
+    expect(rightTail).toBeDefined();
+    // a left stop starts the text at the stop; a right stop ends it there
+    expect(rightTail?.end).toBe(leftTail?.x);
+    // and it starts a whole word earlier, rather than at the stop
+    expect(rightTail?.x).toBeLessThan(leftTail?.x ?? 0);
+    expect((rightTail?.x ?? 0) > 0).toBe(true);
+  });
+
   it('honours explicit tab stops from the paragraph', async () => {
     const result = await layoutOf(
       bodyOf(

@@ -241,7 +241,9 @@ describe('layout divergence detection', () => {
     const report = detectDivergence(result, rendered, { measureText: measurerOf(result) });
     expect(report.ok).toBe(true);
     expect(report.checked.advances).toBe(0);
-    expect(report.skipped).toContainEqual({ reason: 'segmentedRunAdvance', count: 1, severity: 'info' });
+    // a run holding a tab advances to a tab stop, which no text measurement can
+    // reproduce, so it is counted as skipped rather than guessed at
+    expect(report.skipped).toContainEqual({ reason: 'tabRun', count: 1, severity: 'info' });
     const plain = await layoutOf(bodyOf(paragraphText('hello world')));
     const plainTarget = host();
     const plainRendered = renderDocument(plain, plainTarget);

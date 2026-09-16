@@ -78,6 +78,7 @@ export interface LayoutDivergence {
 export type DivergenceSkipReason =
   | 'runWithoutPaint'
   | 'zeroWidthRun'
+  | 'tabRun'
   | 'hiddenRun'
   | 'objectRun'
   | 'unreadableBox'
@@ -100,6 +101,7 @@ export type DivergenceSkipSeverity = 'info' | 'warning';
 const SKIP_SEVERITY: Record<DivergenceSkipReason, DivergenceSkipSeverity> = {
   runWithoutPaint: 'warning',
   zeroWidthRun: 'info',
+  tabRun: 'info',
   hiddenRun: 'info',
   objectRun: 'info',
   unreadableBox: 'warning',
@@ -415,6 +417,14 @@ export const detectDivergence = (
     );
   };
 
+  const tabRun = (line: LineFragment, run: LineRun): boolean =>
+    line.atoms.some(
+      (atom) =>
+        atom.kind === 'tab' &&
+        atom.source.start >= run.source.start &&
+        atom.source.end <= run.source.end,
+    );
+
   const checkRun = (
     page: PageFragment,
     sheet: HTMLElement,
@@ -440,6 +450,12 @@ export const detectDivergence = (
     }
     if (run.width === 0) {
       skip('zeroWidthRun');
+      return;
+    }
+    // a run holding a tab advances to a tab stop, which no text measurement can
+    // reproduce, so its painted width is not comparable
+    if (tabRun(line, run)) {
+      skip('tabRun');
       return;
     }
     const spec = runFontSpec(paint, scale);

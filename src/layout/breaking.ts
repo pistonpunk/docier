@@ -1,7 +1,7 @@
 import type { Mp } from '../units/index.js';
 import { mp } from '../units/index.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
-import { advanceAt } from './intrinsic.js';
+import { advanceAt, nextTabStop, trimmedTabGap } from './intrinsic.js';
 import type { ForcedBreak } from './types.js';
 
 export interface BreakLine {
@@ -39,6 +39,19 @@ interface Opportunity {
   readonly width: Mp;
 }
 
+const advanceOfItem = (
+  measured: readonly MeasuredAtom[],
+  index: number,
+  x: Mp,
+  context: MeasureContext,
+): Mp => {
+  const item = measured[index];
+  if (item === undefined) return mp(0);
+  if (!item.positionDependent) return advanceAt(item, x, context);
+  const stop = nextTabStop(x, context);
+  return trimmedTabGap(measured, index, mp(stop.position - x), stop);
+};
+
 const measureRange = (
   measured: readonly MeasuredAtom[],
   from: number,
@@ -48,9 +61,7 @@ const measureRange = (
 ): Mp => {
   let x = origin;
   for (let index = from; index < to; index += 1) {
-    const item = measured[index];
-    if (item === undefined) break;
-    x = mp(x + advanceAt(item, x, context));
+    x = mp(x + advanceOfItem(measured, index, x, context));
   }
   return mp(x - origin);
 };
@@ -98,7 +109,7 @@ export const greedyBreaker: Breaker = {
           break;
         }
 
-        const next = mp(x + advanceAt(item, x, context));
+        const next = mp(x + advanceOfItem(measured, cursor, x, context));
 
         if (next > limit && cursor > lineStart) {
           if (atom.breakBefore) {

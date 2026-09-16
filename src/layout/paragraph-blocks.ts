@@ -3,7 +3,7 @@ import { mp } from '../units/index.js';
 import { roundHalfEven } from '../units/index.js';
 import type { LineBox, TextMeasurer } from '../measure/index.js';
 import type { IngestedNumbering, IngestedParagraph } from './ingest.js';
-import type { Atom } from './atoms.js';
+import type { Atom, LeaderGlyph } from './atoms.js';
 import { atomize } from './atoms.js';
 import { NO_ANNOTATION } from '../model/index.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
@@ -11,7 +11,7 @@ import { measureAtoms, nextTabStop } from './intrinsic.js';
 import type { LaidLine, NumberingPlacement, SideBand } from './assembly.js';
 import { assembleParagraph } from './assembly.js';
 import type { PlacedAtom } from './line-geometry.js';
-import type { FontResolver } from './fonts.js';
+import type { FontFace, FontResolver } from './fonts.js';
 import type { PaintRegistry } from './paint.js';
 import type { Hasher } from './hash.js';
 import type { PaginateBlock } from './paginate.js';
@@ -125,6 +125,28 @@ const hashAtom = (hasher: Hasher, atom: Atom): void => {
   hasher.field(atom.object?.rotationMilliDegrees);
 };
 
+const LEADER_CHARACTERS: Readonly<Record<string, string>> = {
+  dot: '.',
+  hyphen: '-',
+  underscore: '_',
+  heavy: '_',
+  middleDot: '\u00b7',
+};
+
+const leaderGlyphs = (
+  measurer: TextMeasurer,
+  face: FontFace,
+): Readonly<Record<string, LeaderGlyph>> => {
+  const out: Record<string, LeaderGlyph> = {};
+  for (const [name, character] of Object.entries(LEADER_CHARACTERS)) {
+    const advance =
+      measurer.clusters(face.family, character, { bold: face.bold, italic: face.italic })[0]
+        ?.advance ?? 0;
+    if (advance > 0) out[name] = { character, advance };
+  }
+  return out;
+};
+
 const numberPlacement = (
   prepared: PreparedParagraph,
   contentX: Mp,
@@ -155,7 +177,7 @@ const numberPlacement = (
     placed.push({ measured: space, x: end, width: space.width });
     end = mp(end + space.width);
   } else if (numbering.suffix === 'tab') {
-    end = origin > end ? origin : nextTabStop(end, context);
+    end = origin > end ? origin : nextTabStop(end, context).position;
   }
   return { prefix: placed, textStart: end };
 };
@@ -171,6 +193,9 @@ export const prepareParagraph = (
     faceOf: (format) => fonts.face(format, spacing),
     paintOf: (format, face) => paint.indexOf(format, face),
   }).atoms;
+  const withLeaders = atoms.map((atom) =>
+    atom.kind === 'tab' ? { ...atom, leaders: leaderGlyphs(measurer, atom.face) } : atom,
+  );
   const markBox = fonts.face(paragraph.markFormat, spacing).lineBox;
   const format = paragraph.format;
   hash.field(paragraph.index);
@@ -193,7 +218,11 @@ export const prepareParagraph = (
   hash.field(format.pageBreakBefore);
   hash.field(format.widowControl);
   hash.field(format.contextualSpacing);
-  for (const stop of format.tabStops) hash.field(stop);
+  for (const stop of format.tabStops) {
+    hash.field(stop.position);
+    hash.field(stop.alignment);
+    hash.field(stop.leader);
+  }
   hash.field(format.borders.top?.style);
   hash.field(format.borders.top?.width);
   hash.field(format.borders.top?.color);
@@ -226,7 +255,7 @@ export const prepareParagraph = (
   return {
     paragraph,
     atoms,
-    measured: measureAtoms(atoms),
+    measured: measureAtoms(withLeaders),
     numberPrefix: measureAtoms(prefix),
     markBox,
   };
