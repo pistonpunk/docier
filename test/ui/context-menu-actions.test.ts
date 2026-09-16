@@ -10,12 +10,11 @@ import {
 import type { UiNode } from '../../src/ui/menu-model.js';
 import { dialogNameFor } from '../../src/ui/dialog.js';
 
-// Two rows still open a dialog this build has not written, and they are named
-// here rather than left to be rediscovered. Both want a choice of value with
-// nowhere to offer it: Date and Time wants a format, Word Count wants the counts
-// dialog described in the progress file. Anything else appearing in this list is
-// a row that should be running its command.
-const STILL_OPEN = ['docier.command.insert.dateTime', 'docier.command.proof.wordCount'];
+// One row still opens a dialog this build has not written, and it is named here
+// rather than left to be rediscovered: Word Count wants the counts dialog
+// described in the progress file, not a different row. Anything else appearing
+// in this list is a row that should be running its command.
+const STILL_OPEN = ['docier.command.proof.wordCount'];
 
 const everyNode = (nodes: readonly UiNode[]): readonly UiNode[] => {
   const found: UiNode[] = [];

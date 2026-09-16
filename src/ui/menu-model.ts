@@ -773,8 +773,6 @@ export const RIBBON_TABS: readonly UiTab[] = [
           button({
             labelKey: 'ui.control.insertDate',
             command: command('insert.dateTime'),
-            action: 'openDialog',
-            actionArgs: { dialog: command('insert.dateTime') },
           }),
         ],
       },
