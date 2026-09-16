@@ -210,7 +210,7 @@ describe('opening the picker', () => {
     const loose = pickerOf(handle, chrome);
     loose.open(ANCHOR);
     expect(loose.element.parentElement).toBe(document.body);
-    expect(loose.element.style.border).toBe('1px solid var(--docier-border, #c9c9c9)');
+    expect(loose.element.style.border).toBe('1px solid var(--docier-border, #d1d1d1)');
   });
 
   it('marks the colour the caret already carries', async () => {

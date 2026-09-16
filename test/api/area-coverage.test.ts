@@ -223,7 +223,8 @@ describe('deliberately unavailable commands', () => {
     expect(reasonOf(handle, 'docier.command.insert.closeHeaderFooter')).toContain('not in a header');
     expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');
     expect(reasonOf(handle, 'docier.command.theme.setColors')).toContain('theme part');
-    expect(reasonOf(handle, 'docier.command.doc.save')).toContain('host application');
+    expect(handle.commands.isEnabled('docier.command.doc.save')).toBe(true);
+    expect(reasonOf(handle, 'docier.command.export.pdf')).toContain('exportPdf handler');
     expect(reasonOf(handle, 'docier.command.find.find')).toContain('search engine');
     expect(reasonOf(handle, 'docier.command.doc.setLineNumbers')).toContain('LE-044');
   });

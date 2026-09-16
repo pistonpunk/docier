@@ -16,14 +16,7 @@ const NO_DRAWING =
   'This build authors a picture from bytes the host supplies and nothing else: it has no shape, chart or text-box geometry';
 const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
-const HOST_OWNED = (action: string): string =>
-  `The host application owns ${action} in this build; the editor exposes no ${action} backend`;
-
 const REFUSALS: readonly Refusal[] = [
-  { id: 'docier.command.doc.open', label: 'Open', category: 'doc', reason: HOST_OWNED('opening documents') },
-  { id: 'docier.command.doc.save', label: 'Save', category: 'doc', reason: HOST_OWNED('saving documents') },
-  { id: 'docier.command.doc.saveAs', label: 'Save as', category: 'doc', reason: HOST_OWNED('saving documents') },
-  { id: 'docier.command.doc.print', label: 'Print', category: 'doc', reason: HOST_OWNED('printing') },
   {
     id: 'docier.command.doc.setPageBackground',
     label: 'Page colour',
@@ -60,10 +53,6 @@ const REFUSALS: readonly Refusal[] = [
     category: 'doc',
     reason: 'This build preserves revision marks and never rejects them',
   },
-
-  { id: 'docier.command.export.docx', label: 'Export as Word', category: 'export', reason: HOST_OWNED('exports') },
-  { id: 'docier.command.export.pdf', label: 'Export as PDF', category: 'export', reason: HOST_OWNED('exports') },
-  { id: 'docier.command.export.html', label: 'Export as HTML', category: 'export', reason: HOST_OWNED('exports') },
 
   {
     id: 'docier.command.find.find',

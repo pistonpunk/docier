@@ -24,7 +24,8 @@ export const createResolver = (
   const open = (spec: ControlSpec, label: string): ResolvedControl => ({
     id: spec.labelKey ?? 'submenu',
     label,
-    hint: spec.keytip,
+    hint: undefined,
+    keytip: spec.keytip,
     enabled: true,
     active: false,
     reason: undefined,
@@ -56,7 +57,8 @@ export const createResolver = (
         return {
           id: spec.command,
           label: commandLabel,
-          hint: shortcutHint(descriptor.bindings) ?? keytip,
+          hint: shortcutHint(descriptor.bindings),
+          keytip,
           enabled,
           active: byArgs ? options.commands.isActive(spec.command, spec.args) : descriptor.active,
           reason: enabled ? undefined : (reason ?? options.i18n.text('ui.reason.unavailable')),
@@ -71,7 +73,8 @@ export const createResolver = (
         return {
           id: spec.command,
           label: commandLabel,
-          hint: keytip,
+          hint: undefined,
+          keytip,
           enabled: true,
           active: options.isActive?.(spec) ?? false,
           reason: undefined,
@@ -83,7 +86,8 @@ export const createResolver = (
       return {
         id: spec.command,
         label: commandLabel,
-        hint: keytip,
+        hint: undefined,
+        keytip,
         enabled: false,
         active: false,
         reason: options.i18n.text('ui.reason.unknown'),
@@ -96,7 +100,8 @@ export const createResolver = (
       return {
         id: spec.action,
         label,
-        hint: keytip,
+        hint: undefined,
+        keytip,
         enabled: true,
         active: options.isActive?.(spec) ?? false,
         reason: undefined,
@@ -107,7 +112,8 @@ export const createResolver = (
     return {
       id: spec.labelKey ?? 'control',
       label,
-      hint: keytip,
+      hint: undefined,
+      keytip,
       enabled: false,
       active: false,
       reason: options.i18n.text('ui.reason.unavailable'),
@@ -178,8 +184,20 @@ export const applyResolved = (
   const field = element.querySelector('input');
   if (field !== null) {
     field.readOnly = !resolved.enabled;
-    if (resolved.enabled) field.removeAttribute('aria-disabled');
-    else field.setAttribute('aria-disabled', 'true');
+    if (resolved.enabled) {
+      field.removeAttribute('aria-disabled');
+      field.removeAttribute('aria-description');
+      field.removeAttribute('title');
+    } else {
+      field.setAttribute('aria-disabled', 'true');
+      // A field inside a disabled control is disabled for the same reason, and the wrapper's
+      // explanation is the only place that reason exists.
+      const explanation = resolved.reason ?? title;
+      if (explanation !== undefined && explanation !== '') {
+        field.setAttribute('aria-description', explanation);
+        field.setAttribute('title', explanation);
+      }
+    }
   }
 };
 
@@ -360,6 +378,7 @@ export const createControl = (
   } else if (resolved.hint !== undefined) {
     element.setAttribute('data-docier-shortcut', resolved.hint);
   }
+  if (resolved.keytip !== undefined) element.setAttribute('data-docier-keytip', resolved.keytip);
 
   applyResolved(element, resolved, role);
   if (node.kind === 'toggle' && role === 'button') element.setAttribute('data-docier-toggle', 'true');

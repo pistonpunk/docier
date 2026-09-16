@@ -229,14 +229,14 @@ const SWATCH_SHADOW = 'inset 0 0 0 1px rgba(0, 0, 0, 0.18)';
 
 const TOKENS = {
   surface: 'var(--docier-surface-raised, #ffffff)',
-  border: 'var(--docier-border, #c9c9c9)',
+  border: 'var(--docier-border, #d1d1d1)',
   radius: 'var(--docier-radius, 4px)',
   shadow: 'var(--docier-shadow-3, 0 8px 24px rgba(0, 0, 0, 0.24))',
-  text: 'var(--docier-text, #1b1b1b)',
-  muted: 'var(--docier-text-muted, #575757)',
-  accent: 'var(--docier-accent, #1f6feb)',
+  text: 'var(--docier-text, #242424)',
+  muted: 'var(--docier-text-muted, #616161)',
+  accent: 'var(--docier-accent, #185abd)',
   font: 'var(--docier-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif)',
-  fontSize: 'var(--docier-ui-font-size, 13px)',
+  fontSize: 'var(--docier-ui-font-size, 12px)',
 } as const;
 
 const CURRENT_OUTLINE = `2px solid ${TOKENS.accent}`;

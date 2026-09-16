@@ -577,6 +577,11 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         quickAccess: options?.quickAccess,
         backstage: options?.backstage,
         mount: portal,
+        stats: () => ({
+          name: handle.config.document.docId,
+          pages: queries.pages(),
+          words: queries.words(),
+        }),
       });
       if (enabled('menuBar')) {
         root.appendChild(mountInto('menuBar', menuBar.element));

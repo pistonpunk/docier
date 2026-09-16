@@ -7,7 +7,12 @@ import type { PackageSource } from '../ooxml/package.js';
 import type { DocumentModel } from '../model/index.js';
 import { DocumentModel as DocumentModelClass, Paragraph, isWElement } from '../model/index.js';
 import { renderDocument } from '../render/index.js';
-import type { RenderOptions, RenderViewMode, RenderedDocument } from '../render/index.js';
+import type {
+  RenderImageProvider,
+  RenderOptions,
+  RenderViewMode,
+  RenderedDocument,
+} from '../render/index.js';
 import type { EditSession, EditSnapshot, ParagraphSlot } from '../edit/session.js';
 import { createEditSession } from '../edit/session.js';
 import { paragraphLength } from '../edit/mutation.js';
@@ -21,7 +26,10 @@ import type { HistoryOutcome } from '../edit/commands.js';
 import { attachInput } from '../edit/input.js';
 import type { InputHandle, InputHost } from '../edit/input.js';
 import { installAreaCommands } from '../edit/areas/index.js';
-import type { AreaHost } from '../edit/areas/index.js';
+import type { DocumentAreaHost } from '../edit/areas/index.js';
+import { generatorMeta, htmlOfNode } from '../edit/clipboard/index.js';
+import { DOCX_MIME } from '../edit/clipboard/types.js';
+import { beginPrint } from '../render/index.js';
 import { installClipboardCommands } from '../edit/clipboard/commands.js';
 import type { ClipboardCommandHost } from '../edit/clipboard/commands.js';
 import { createClipboardBuffer } from '../edit/clipboard/transfer.js';
@@ -40,6 +48,7 @@ import { createHistory } from './history.js';
 import type { History, HistoryEntryInit } from './history.js';
 import { applyPatch, defaultConfig } from './config.js';
 import { DocierError, commandIdOf } from './errors.js';
+import { createPackageImageProvider } from './package-images.js';
 import { DEFAULT_MAX_INSTANCES_PER_PAGE, DEFAULT_ZOOM } from './constants.js';
 import type {
   CaretGeometry,
@@ -72,6 +81,7 @@ export interface EditorMountOptions {
   readonly document?: DocumentSource;
   readonly zoom?: number;
   readonly render?: RenderOptions;
+  readonly io?: { readonly exportPdf?: (() => void) | undefined } | undefined;
 }
 
 export interface EditorHandle {
@@ -326,6 +336,7 @@ export const createEditor = (
   let zoom = options.zoom ?? DEFAULT_ZOOM;
   let viewMode: RenderViewMode = options.render?.viewMode ?? 'print';
   let flowWidth: Mp | undefined;
+  let defaultImageProvider: RenderImageProvider | undefined = undefined;
   let destroyed = false;
   let current: TransactionState | undefined = undefined;
   let pending: EditSelection | undefined = undefined;
@@ -395,8 +406,10 @@ export const createEditor = (
     const active = session;
     if (active === undefined) return;
     const previous = renderedDocument;
+    const provider = options.render?.imageProvider ?? defaultImageProvider;
     renderedDocument = renderDocument(active.layout, rendered, {
       ...options.render,
+      ...(provider === undefined ? {} : { imageProvider: provider }),
       zoom,
       viewMode,
       ariaLabel: options.render?.ariaLabel ?? settings.ui.ariaLabel ?? settings.document.docId,
@@ -405,7 +418,120 @@ export const createEditor = (
     input?.reveal();
   };
 
-  const host: ClipboardCommandHost & AreaHost = {
+  defaultImageProvider = createPackageImageProvider({
+    current: (): DocumentModel | undefined => model,
+    onHydrated: (): void => {
+      if (state !== 'ready') return;
+      paint();
+    },
+  });
+
+  const download = (bytes: Uint8Array, name: string, mimeType: string): void => {
+    const view = owner.defaultView;
+    if (view === null) return;
+    const buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+    const url = view.URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+    const anchor = owner.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    anchor.style.display = 'none';
+    owner.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    view.setTimeout(() => {
+      view.URL.revokeObjectURL(url);
+    }, 10_000);
+  };
+
+  const fileName = (extension: string): string => {
+    const id = settings.document.docId === '' ? 'document' : settings.document.docId;
+    return `${id}.${extension}`;
+  };
+
+  const chooseFile = (accept: string): Promise<Uint8Array | undefined> =>
+    new Promise((resolve) => {
+      const input = owner.createElement('input');
+      input.type = 'file';
+      input.accept = accept;
+      input.setAttribute('data-docier-part', 'open-input');
+      input.style.setProperty('position', 'fixed');
+      input.style.setProperty('left', '-10000px');
+      owner.body.appendChild(input);
+      const finish = (value: Uint8Array | undefined): void => {
+        input.remove();
+        resolve(value);
+      };
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file === undefined) {
+          finish(undefined);
+          return;
+        }
+        void file
+          .arrayBuffer()
+          .then((buffer) => {
+            finish(new Uint8Array(buffer));
+          })
+          .catch(() => {
+            finish(undefined);
+          });
+      });
+      input.addEventListener('cancel', () => {
+        finish(undefined);
+      });
+      input.click();
+    });
+
+  const htmlExportOf = (): string => {
+    const active = model;
+    if (active === undefined) return '';
+    const parts: string[] = [];
+    for (const block of active.body().blocks()) {
+      parts.push(htmlOfNode(block.element));
+    }
+    return `<!doctype html><html><head><meta charset="utf-8">${generatorMeta()}<title>${fileName(
+      'html',
+    )}</title></head><body>${parts.join('')}</body></html>`;
+  };
+
+  const documentIo = {
+    open: (): void => {
+      void chooseFile('.docx,.docm').then((bytes) => {
+        if (bytes === undefined || bytes.byteLength === 0) return;
+        void load(bytes);
+      });
+    },
+    save: (): void => {
+      const active = model;
+      if (active === undefined) return;
+      void active.save().then((bytes) => {
+        download(bytes, fileName('docx'), DOCX_MIME);
+      });
+    },
+    saveAs: (): void => {
+      documentIo.save();
+    },
+    print: (): void => {
+      const current = renderedDocument;
+      if (current === undefined) return;
+      beginPrint(current, {}).print();
+    },
+    exportDocx: (): void => {
+      documentIo.save();
+    },
+    exportHtml: (): void => {
+      const html = htmlExportOf();
+      if (html === '') return;
+      download(new TextEncoder().encode(html), fileName('html'), 'text/html');
+    },
+    ...(options.io?.exportPdf === undefined ? {} : { exportPdf: options.io.exportPdf }),
+  };
+
+  const host: ClipboardCommandHost & DocumentAreaHost = {
+    io: documentIo,
     buffer: clipboardBuffer,
     htmlPolicy: DEFAULT_HTML_POLICY,
     get documentId(): string {

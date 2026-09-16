@@ -47,9 +47,11 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
 
 export const DARK_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-surface': '#2a2a2a',
+  '--docier-surface-command': '#303030',
   '--docier-surface-raised': '#333333',
   '--docier-surface-sunken': '#232323',
   '--docier-border': '#4d4d4d',
+  '--docier-border-soft': '#3d3d3d',
   '--docier-pasteboard': '#1e1e1e',
   '--docier-text': '#f2f2f2',
   '--docier-text-muted': '#c2c2c2',
@@ -57,10 +59,19 @@ export const DARK_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-accent': '#6ea8fe',
   '--docier-accent-text': '#10182b',
   '--docier-accent-soft': 'rgba(110, 168, 254, 0.22)',
+  '--docier-state-hover': '#3a3a3a',
+  '--docier-state-pressed': '#454545',
+  '--docier-state-selected': '#404040',
+  '--docier-selection': 'rgba(110, 168, 254, 0.32)',
+  '--docier-guide': '#fb923c',
+  '--docier-error': '#f2b8b5',
+  '--docier-warning': '#e0b055',
+  '--docier-success': '#7ddc9a',
   '--docier-focus-ring': '#9ec5fe',
   '--docier-shadow-1': '0 1px 2px rgba(0, 0, 0, 0.5)',
   '--docier-shadow-2': '0 2px 8px rgba(0, 0, 0, 0.6)',
   '--docier-shadow-3': '0 8px 24px rgba(0, 0, 0, 0.7)',
+  '--docier-page-shadow': '0 2px 8px rgba(0, 0, 0, 0.55), 0 0 1px rgba(0, 0, 0, 0.5)',
 };
 
 export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, string>>>> = {

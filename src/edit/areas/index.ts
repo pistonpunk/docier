@@ -1,4 +1,6 @@
 import type { CommandDefinition, CommandRegistry, Disposable } from '../../api/types.js';
+import { documentCommands } from './document.js';
+import type { DocumentAreaHost } from './document.js';
 import { insertCommands } from './insert.js';
 import { numberingCommands } from './numbering.js';
 import { commentCommands } from './comment.js';
@@ -15,6 +17,8 @@ import type { AreaHost } from './support.js';
 import { unsupportedCommands } from './unsupported.js';
 
 export type { AreaHost } from './support.js';
+export type { DocumentAreaHost, DocumentIo } from './document.js';
+export { documentCommands } from './document.js';
 export { unsupportedIds } from './unsupported.js';
 export { pageCommands } from './page.js';
 export { paragraphCommands } from './paragraph.js';
@@ -30,6 +34,7 @@ export { tableCommands } from './table.js';
 export { unsupportedCommands } from './unsupported.js';
 
 export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
+  ...documentCommands(host as DocumentAreaHost),
   ...pageCommands(host),
   ...paragraphCommands(host),
   ...styleCommands(host),

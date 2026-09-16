@@ -21,6 +21,7 @@ import {
   startObjectResize,
 } from './object-resize.js';
 import type { ClipboardDataLike } from './clipboard/types.js';
+import { firstImageFile, imageArgsOf } from './image-file.js';
 
 export interface InputHost {
   readonly root: HTMLElement;
@@ -49,6 +50,9 @@ interface DataTransferEventLike {
 }
 
 const DRAG_THRESHOLD_PX = 4;
+const OVERLAY_Z_INDEX = 2;
+const COMPOSER_Z_INDEX = 3;
+const GUIDE_Z_INDEX = 4;
 const CARET_BLINK_MS = 530;
 const CARET_RETRY_MS = 16;
 const CARET_WATCHDOG_MS = 250;
@@ -293,6 +297,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     bottom: '0',
     'pointer-events': 'none',
     overflow: 'hidden',
+    'z-index': String(OVERLAY_Z_INDEX),
   });
   const selectionLayer = owner.createElement('div');
   const caret = owner.createElement('div');
@@ -360,7 +365,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     width: '1px',
     height: '1em',
     overflow: 'hidden',
-    'z-index': '3',
+    'z-index': String(COMPOSER_Z_INDEX),
     'caret-color': 'transparent',
     outline: 'none',
     'white-space': 'pre',
@@ -722,7 +727,7 @@ export const attachInput = (host: InputHost): InputHandle => {
       columnGuide.className = 'docier-column-guide';
       host.rendered.appendChild(columnGuide);
     }
-    const shared = 'position:absolute;z-index:4;pointer-events:none;background-color:var(--docier-accent,#1f6feb);';
+    const shared = `position:absolute;z-index:${String(GUIDE_Z_INDEX)};pointer-events:none;background-color:var(--docier-accent,#185abd);`;
     columnGuide.style.cssText =
       kind === 'column'
         ? `${shared}top:0;bottom:0;width:1px;`
@@ -1011,12 +1016,30 @@ export const attachInput = (host: InputHost): InputHandle => {
     event.preventDefault();
   };
 
+  const insertImageFile = (data: ClipboardDataLike, at: DocPos | undefined): boolean => {
+    const file = firstImageFile(data.files);
+    if (file === undefined) return false;
+    void (async (): Promise<void> => {
+      const args = await imageArgsOf(file).catch(() => undefined);
+      if (args === undefined) {
+        await host.commands.execute(`${PREFIX}object.insertImage`);
+        return;
+      }
+      if (at !== undefined) {
+        await host.commands.execute(`${PREFIX}selection.setCaret`, { pos: at });
+      }
+      await host.commands.execute(`${PREFIX}object.insertImage`, args);
+    })();
+    return true;
+  };
+
   const onDropEvent = (event: Event): void => {
     const data = dataTransferOf(event);
     if (data === undefined) return;
     event.preventDefault();
     const point = clientPointOf(event);
     const hit = point === undefined ? undefined : hitTest(point.x, point.y);
+    if (insertImageFile(data, hit?.pos)) return;
     run(`${PREFIX}clipboard.paste`, hit === undefined ? { data } : { data, at: hit.pos });
   };
 
@@ -1086,7 +1109,9 @@ export const attachInput = (host: InputHost): InputHandle => {
   const onPaste = (event: ClipboardEvent): void => {
     event.preventDefault();
     dropObjectSelection();
-    run(`${PREFIX}clipboard.paste`, { data: clipboardDataOf(event) });
+    const data = clipboardDataOf(event);
+    if (data !== undefined && insertImageFile(data, undefined)) return;
+    run(`${PREFIX}clipboard.paste`, { data });
   };
 
   host.rendered.addEventListener('pointermove', onHover);

@@ -15,6 +15,12 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.chrome.ruler': 'Ruler',
   'ui.chrome.statusBar': 'Status bar',
   'ui.chrome.backstage': 'File',
+  'ui.backstage.name': 'Name',
+  'ui.backstage.pages': 'Pages',
+  'ui.backstage.words': 'Words',
+  'ui.backstage.none': 'No document',
+  'ui.backstage.hint':
+    'Open a .docx to replace this document, save it back, or export it. Every action here also has a keyboard shortcut.',
   'ui.chrome.floatingControls': 'Text formatting',
   'ui.chrome.keyTips': 'Key tips',
   'ui.reason.unavailable': 'Unavailable here',

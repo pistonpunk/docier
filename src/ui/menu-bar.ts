@@ -8,12 +8,19 @@ import { openMenu } from './menu.js';
 import type { MenuHandle } from './menu.js';
 import type { ChromeContext, ControlSpec, ResolvedControl } from './types.js';
 
+export interface BackstageStats {
+  readonly name: string;
+  readonly pages: number;
+  readonly words: number;
+}
+
 export interface MenuBarOptions {
   readonly context: ChromeContext;
   readonly tabs?: readonly UiTab[] | undefined;
   readonly quickAccess?: readonly UiNode[] | undefined;
   readonly backstage?: readonly UiNode[] | undefined;
   readonly mount?: HTMLElement | undefined;
+  readonly stats?: (() => BackstageStats) | undefined;
 }
 
 export interface MenuBarHandle extends Disposable {
@@ -315,9 +322,42 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
     backstageItems.appendChild(element);
   }
   backstagePanel.appendChild(backstageItems);
+
+  const backstageBody = make('div', 'docier-backstage-body');
+  const infoTitle = make('h2', 'docier-backstage-title');
+  const infoGrid = make('dl', 'docier-backstage-facts');
+  const infoNote = make('p', 'docier-backstage-note');
+  backstageBody.appendChild(infoTitle);
+  backstageBody.appendChild(infoGrid);
+  backstageBody.appendChild(infoNote);
+  backstagePanel.appendChild(backstageBody);
+
+  const fact = (term: string): HTMLElement => {
+    const label = make('dt', 'docier-backstage-term');
+    label.textContent = term;
+    const value = make('dd', 'docier-backstage-value');
+    infoGrid.appendChild(label);
+    infoGrid.appendChild(value);
+    return value;
+  };
+
+  const titleValue = fact(context.i18n.text('ui.backstage.name'));
+  const pagesValue = fact(context.i18n.text('ui.backstage.pages'));
+  const wordsValue = fact(context.i18n.text('ui.backstage.words'));
+
+  const refreshBackstageInfo = (): void => {
+    const stats = options.stats?.();
+    titleValue.textContent = stats === undefined ? context.i18n.text('ui.backstage.none') : stats.name;
+    pagesValue.textContent = String(stats?.pages ?? 0);
+    wordsValue.textContent = String(stats?.words ?? 0);
+    infoNote.textContent = context.i18n.text('ui.backstage.hint');
+  };
+
   store.listen(backstageButton, 'click', (event) => {
     event.preventDefault();
-    context.run(context.state.backstage ? 'closeBackstage' : 'openBackstage', {});
+    const open = !context.state.backstage;
+    if (open) refreshBackstageInfo();
+    context.run(open ? 'openBackstage' : 'closeBackstage', {});
   });
   const applyBackstage = (): void => {
     const open = context.state.backstage;

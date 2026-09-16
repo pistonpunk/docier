@@ -119,6 +119,7 @@ export interface ResolvedControl {
   readonly id: string;
   readonly label: string;
   readonly hint: string | undefined;
+  readonly keytip?: string | undefined;
   readonly enabled: boolean;
   readonly active: boolean;
   readonly reason: string | undefined;

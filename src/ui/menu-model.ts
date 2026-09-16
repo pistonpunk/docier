@@ -1,3 +1,4 @@
+import { FONT_FAMILIES as FONT_FAMILY_NAMES, FONT_SIZES as FONT_SIZE_POINTS } from './font-family.js';
 import type {
   ChromeActionArgs,
   ChromeActionName,
@@ -111,26 +112,14 @@ const pending = (name: string, labelKey: string, keytip: string): UiNode =>
     actionArgs: { dialog: command(name) },
   });
 
-const FONT_FAMILIES: readonly ControlOption[] = [
-  { value: 'Calibri', label: 'Calibri' },
-  { value: 'Georgia', label: 'Georgia' },
-  { value: 'Arial', label: 'Arial' },
-  { value: 'Times New Roman', label: 'Times New Roman' },
-  { value: 'Courier New', label: 'Courier New' },
-];
+const FONT_FAMILIES: readonly ControlOption[] = FONT_FAMILY_NAMES.map((family) => ({
+  value: family,
+  label: family,
+}));
 
-const FONT_SIZES: readonly ControlOption[] = [
-  { value: '8' },
-  { value: '9' },
-  { value: '10' },
-  { value: '11' },
-  { value: '12' },
-  { value: '14' },
-  { value: '16' },
-  { value: '18' },
-  { value: '24' },
-  { value: '36' },
-];
+const FONT_SIZES: readonly ControlOption[] = FONT_SIZE_POINTS.map((size) => ({
+  value: String(size),
+}));
 
 export const STYLE_GALLERY: readonly UiNode[] = [
   { id: 'Normal', labelKey: 'Normal', value: 'Normal' },

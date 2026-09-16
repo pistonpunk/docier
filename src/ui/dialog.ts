@@ -77,19 +77,19 @@ export const DIALOG_TOKENS = {
   sunken: 'var(--docier-surface-sunken, #f0f0f0)',
   control: 'var(--docier-surface-command, #ffffff)',
   page: 'var(--docier-page, #ffffff)',
-  border: 'var(--docier-border, #c9c9c9)',
+  border: 'var(--docier-border, #d1d1d1)',
   borderSoft: 'var(--docier-border-soft, #e5e5e5)',
   radius: 'var(--docier-radius, 4px)',
   shadow: 'var(--docier-shadow-3, 0 8px 24px rgba(0, 0, 0, 0.24))',
-  text: 'var(--docier-text, #1b1b1b)',
-  muted: 'var(--docier-text-muted, #575757)',
+  text: 'var(--docier-text, #242424)',
+  muted: 'var(--docier-text-muted, #616161)',
   disabled: 'var(--docier-text-disabled, #bdbdbd)',
-  accent: 'var(--docier-accent, #1f6feb)',
+  accent: 'var(--docier-accent, #185abd)',
   accentText: 'var(--docier-accent-text, #ffffff)',
   error: 'var(--docier-error, #b3261e)',
   stateHover: 'var(--docier-state-hover, #f5f5f5)',
   font: 'var(--docier-ui-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif)',
-  fontSize: 'var(--docier-ui-font-size, 13px)',
+  fontSize: 'var(--docier-ui-font-size, 12px)',
 } as const;
 
 export const DIALOG_OVERLAY_Z = '1400';
@@ -364,6 +364,7 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
   const doc = context.host.ownerDocument;
   const store = createDisposableStore();
   let listeners: DisposableStore | undefined;
+  let placementWatcher: ResizeObserver | undefined;
   let openState = false;
   let disposed = false;
   let openerElement: HTMLElement | undefined;
@@ -381,6 +382,7 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
     justifyContent: 'center',
     padding: `${String(DIALOG_MARGIN_PX)}px`,
     boxSizing: 'border-box',
+    overflow: 'auto',
     background: 'rgba(0, 0, 0, 0.18)',
   });
 
@@ -395,7 +397,8 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
     flexDirection: 'column',
     width: `${String(options.width ?? DIALOG_DEFAULT_WIDTH)}px`,
     maxWidth: '100%',
-    maxHeight: '100%',
+    maxHeight: `calc(100dvh - ${String(DIALOG_MARGIN_PX * 2)}px)`,
+    margin: 'auto',
     boxSizing: 'border-box',
     background: DIALOG_TOKENS.surface,
     color: DIALOG_TOKENS.text,
@@ -596,6 +599,8 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
     openState = false;
     const opener = openerElement;
     openerElement = undefined;
+    placementWatcher?.disconnect();
+    placementWatcher = undefined;
     listeners?.dispose();
     listeners = undefined;
     if (overlay.parentNode !== null) overlay.parentNode.removeChild(overlay);
@@ -720,6 +725,13 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
     if (tabs.length > 0) setTab(activeTab === '' ? (tabs[0]?.id ?? '') : activeTab);
     options.onOpen?.();
     position(openOptions?.anchor);
+    const anchorForResize = openOptions?.anchor;
+    if (anchorForResize !== undefined && typeof ResizeObserver === 'function') {
+      placementWatcher = new ResizeObserver(() => {
+        if (openState) position(anchorForResize);
+      });
+      placementWatcher.observe(element);
+    }
     listeners = createDisposableStore();
     listeners.listen<FocusEvent>(
       doc,

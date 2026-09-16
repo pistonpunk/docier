@@ -4,30 +4,23 @@ import type { ChromeContext } from './types.js';
 
 export const PICTURE_DIALOG_NAME = 'picture';
 
-const DEFAULT_WIDTH_TWIPS = 2880;
-const DEFAULT_HEIGHT_TWIPS = 1920;
+export {
+  ALLOWED_IMAGE_TYPES,
+  extensionOfType,
+  fitTwips,
+  naturalSizeOf,
+  typeOfFile,
+} from '../edit/image-file.js';
 
-export const ALLOWED_IMAGE_TYPES: Readonly<Record<string, string>> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpeg',
-  'image/gif': 'gif',
-  'image/bmp': 'bmp',
-  'image/tiff': 'tiff',
-  'image/svg+xml': 'svg',
-  'image/webp': 'webp',
-};
-
-export const extensionOfType = (contentType: string): string | undefined =>
-  ALLOWED_IMAGE_TYPES[contentType];
-
-export const typeOfFile = (file: { readonly type: string; readonly name: string }): string => {
-  if (ALLOWED_IMAGE_TYPES[file.type] !== undefined) return file.type;
-  const extension = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase();
-  for (const [type, known] of Object.entries(ALLOWED_IMAGE_TYPES)) {
-    if (known === extension || (extension === 'jpg' && known === 'jpeg')) return type;
-  }
-  return '';
-};
+import {
+  ALLOWED_IMAGE_TYPES,
+  DEFAULT_IMAGE_HEIGHT_TWIPS as DEFAULT_HEIGHT_TWIPS,
+  DEFAULT_IMAGE_WIDTH_TWIPS as DEFAULT_WIDTH_TWIPS,
+  extensionOfType,
+  fitTwips,
+  naturalSizeOf,
+  typeOfFile,
+} from '../edit/image-file.js';
 
 export interface ImagePickerOptions {
   readonly context: ChromeContext;
@@ -47,41 +40,6 @@ export interface ImagePickerHandle {
   open(): void;
   dispose(): void;
 }
-
-const EMU_PER_PIXEL = 9525;
-const EMU_PER_TWIP = 635;
-
-export const fitTwips = (
-  naturalWidthPx: number,
-  naturalHeightPx: number,
-  limitTwips = DEFAULT_WIDTH_TWIPS,
-): { readonly widthTwips: number; readonly heightTwips: number } => {
-  const widthTwips = Math.round((naturalWidthPx * EMU_PER_PIXEL) / EMU_PER_TWIP);
-  const heightTwips = Math.round((naturalHeightPx * EMU_PER_PIXEL) / EMU_PER_TWIP);
-  if (widthTwips <= 0 || heightTwips <= 0) {
-    return { widthTwips: DEFAULT_WIDTH_TWIPS, heightTwips: DEFAULT_HEIGHT_TWIPS };
-  }
-  if (widthTwips <= limitTwips) return { widthTwips, heightTwips };
-  const scale = limitTwips / widthTwips;
-  return {
-    widthTwips: limitTwips,
-    heightTwips: Math.max(1, Math.round(heightTwips * scale)),
-  };
-};
-
-export const naturalSizeOf = async (bytes: Uint8Array): Promise<{ width: number; height: number } | undefined> => {
-  const view = globalThis as { createImageBitmap?: (source: Blob) => Promise<ImageBitmap> };
-  if (view.createImageBitmap === undefined) return undefined;
-  try {
-    const blob = new Blob([bytes as unknown as BlobPart]);
-    const bitmap = await view.createImageBitmap(blob);
-    const size = { width: bitmap.width, height: bitmap.height };
-    bitmap.close?.();
-    return size;
-  } catch {
-    return undefined;
-  }
-};
 
 export const createImagePicker = (options: ImagePickerOptions): ImagePickerHandle => {
   const { context } = options;

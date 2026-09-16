@@ -126,6 +126,10 @@ export const openMenu = (options: MenuOptions): MenuHandle => {
 
     control.setAttribute('aria-haspopup', 'menu');
     control.setAttribute('aria-expanded', 'false');
+    control.classList.add('docier-menu-item-submenu');
+    const chevron = make('span', 'docier-menu-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+    control.appendChild(chevron);
     control.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();

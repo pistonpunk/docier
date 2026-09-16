@@ -112,6 +112,11 @@ try {
     },
     {
       zoom: 1,
+      io: {
+        exportPdf: () => {
+          void exportPdfNow();
+        },
+      },
       render: {
         zoom: 1,
         pageGapPx: 24,
@@ -551,7 +556,13 @@ panel.add({
   code: 'demo.ready',
   severity: 'info',
   message: `${String(handle.commands.list().length)} commands registered; chrome ${chrome?.mounted === true ? `mounted (${chrome.mode})` : 'NOT mounted'}`,
-  detail: `ui.chrome is a reload key — it is set in the createEditor patch, not in updateConfig(). Slots still unclaimed: ${chrome?.remaining().join(', ') ?? 'n/a'}`,
+  detail: `ui.chrome is a reload key — it is set in the createEditor patch, not in updateConfig(). ${
+    chrome === undefined
+      ? 'The chrome was not mounted.'
+      : chrome.remaining().length === 0
+        ? 'Every slot is claimed.'
+        : `Slots still unclaimed: ${chrome.remaining().join(', ')}`
+  }`,
   source: 'example/src/main.ts',
 });
 

@@ -101,7 +101,7 @@ const paintDefault = (
   surface.appendChild(scaleLayer);
   root.appendChild(surface);
   clearRoot(target, options.className);
-  target.appendChild(root);
+  target.insertBefore(root, target.firstChild);
 
   let renderedPages: RenderedPage[] = [];
   let layerWidthPx = 0;

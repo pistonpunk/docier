@@ -92,8 +92,11 @@ describe('the font dialog', () => {
     ]) {
       expect(dialog.element.contains(field(dialog, id)), id).toBe(true);
     }
-    expect(field(dialog, 'docier-font-color').type).toBe('color');
-    expect(field(dialog, 'docier-font-automatic').type).toBe('checkbox');
+    expect(dialog.element.querySelector('[data-docier-dialog-colour="text"]')).not.toBeNull();
+    expect(dialog.element.querySelector('[data-docier-dialog-colour="highlight"]')).not.toBeNull();
+    expect(dialog.element.querySelectorAll('input[type="color"]').length).toBe(0);
+    expect(field(dialog, 'docier-font-text-none').type).toBe('checkbox');
+    expect(field(dialog, 'docier-font-highlight-none').type).toBe('checkbox');
 
     const tabs = [...dialog.element.querySelectorAll<HTMLElement>('[role="tab"]')];
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Font', 'Advanced']);
@@ -149,8 +152,8 @@ describe('the font dialog', () => {
     const seen = recordCommands(handle);
     const dialog = openFont(chrome);
 
-    field(dialog, 'docier-font-automatic').checked = false;
-    field(dialog, 'docier-font-color').value = '#ff0000';
+    click(dialog.element.querySelector<HTMLElement>('[data-docier-dialog-colour="text"]')!);
+    click(dialog.element.querySelector<HTMLElement>('[data-docier-dialog-swatch="FF0000"]')!);
     dialog.setTab('advanced');
     field(dialog, 'docier-font-position').value = 'superscript';
     click(dialog.applyButton);
@@ -169,7 +172,9 @@ describe('the font dialog', () => {
     const second = openFont(chrome, (key) => (key === 'color' ? markOf(handle).color : undefined));
     second.setTab('advanced');
     field(second, 'docier-font-position').value = 'baseline';
-    field(second, 'docier-font-automatic').checked = true;
+    const automatic = field(second, 'docier-font-text-none');
+    automatic.checked = true;
+    automatic.dispatchEvent(new Event('change', { bubbles: true }));
     click(second.applyButton);
     await handle.whenReady();
 

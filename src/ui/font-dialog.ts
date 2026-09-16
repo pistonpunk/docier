@@ -14,6 +14,8 @@ import {
   setDialogStyles,
 } from './dialog.js';
 import type { DialogValueReader, EditorDialogHandle } from './dialog.js';
+import { colourSections } from './colour-picker.js';
+import type { ColourKind } from './colour-picker.js';
 import type { ChromeContext } from './types.js';
 
 export const FONT_DIALOG_NAME = 'font';
@@ -21,15 +23,35 @@ export const FONT_DIALOG_NAME = 'font';
 export const SET_FONT_FAMILY = 'docier.command.format.setFontFamily';
 export const SET_FONT_SIZE = 'docier.command.format.setFontSize';
 export const SET_FONT_COLOR = 'docier.command.format.setColor';
+export const SET_HIGHLIGHT = 'docier.command.format.setHighlight';
 export const SET_SUPERSCRIPT = 'docier.command.format.superscript';
 export const SET_SUBSCRIPT = 'docier.command.format.subscript';
 
 const DIALOG_COALESCE_KEY = 'docier.dialog.font';
 
+const DEFAULT_TEXT_COLOUR = '000000';
+const DEFAULT_HIGHLIGHT = 'yellow';
+const HIGHLIGHT_NONE = 'none';
+
+const defaultColourFor = (kind: ColourKind): string =>
+  kind === 'highlight' ? DEFAULT_HIGHLIGHT : DEFAULT_TEXT_COLOUR;
+
+export interface ColourField {
+  readonly id: string;
+  readonly label: string;
+  readonly element: HTMLElement;
+  readonly focusable: HTMLElement;
+  readonly noneLabel: string;
+  value(): string | undefined;
+  setValue(value: string | undefined): void;
+  setFromDocument(raw: string | undefined): void;
+}
+
 export const FONT_VALUE_COMMANDS: Readonly<Record<string, string>> = {
   family: SET_FONT_FAMILY,
   sizePoints: SET_FONT_SIZE,
   color: SET_FONT_COLOR,
+  highlight: SET_HIGHLIGHT,
 };
 
 export type FontToggleKey =
@@ -79,24 +101,9 @@ export const FONT_EFFECT_TOGGLES: readonly ToggleSpec[] = [
   },
 ];
 
-export const FONT_FAMILIES: readonly string[] = [
-  'Calibri',
-  'Arial',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Cambria',
-  'Garamond',
-  'Tahoma',
-  'Verdana',
-  'DejaVu Sans',
-  'DejaVu Serif',
-  'Liberation Serif',
-];
+import { FONT_FAMILIES, FONT_SIZES } from './font-family.js';
 
-export const FONT_SIZES: readonly number[] = [
-  8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 36, 48, 72,
-];
+export { FONT_FAMILIES, FONT_SIZES };
 
 export const FONT_POSITIONS: readonly { readonly value: string; readonly label: string }[] = [
   { value: 'baseline', label: 'Normal' },
@@ -113,6 +120,7 @@ export interface FontState {
   readonly family: string | undefined;
   readonly sizePoints: number | undefined;
   readonly color: string | undefined;
+  readonly highlight: string | undefined;
   readonly bold: boolean;
   readonly italic: boolean;
   readonly underline: boolean;
@@ -167,10 +175,185 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
   const active = (command: string): boolean => context.describe({ command, args: {} }).active;
   const text = (key: string, fallback: string): string => dialogText(context, key, fallback);
 
+  const createColourField = (
+    kind: ColourKind,
+    label: string,
+    noneValue: string,
+    noneLabel: string,
+  ): ColourField => {
+    const lookup = (key: string, fallback: string): string => text(key, fallback);
+    const sections = colourSections(kind, lookup);
+
+    const swatch = document.createElement('span');
+    const caption = document.createElement('span');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'docier-control docier-dialog-colour-button';
+    button.setAttribute('data-docier-dialog-colour', kind);
+    button.setAttribute('aria-haspopup', 'true');
+    button.setAttribute('aria-expanded', 'false');
+    setDialogStyles(button, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      justifyContent: 'flex-start',
+      width: '100%',
+      minHeight: '26px',
+      padding: '2px 6px',
+      border: `1px solid ${DIALOG_TOKENS.border}`,
+      borderRadius: DIALOG_TOKENS.radius,
+      background: DIALOG_TOKENS.surface,
+      color: DIALOG_TOKENS.text,
+      font: 'inherit',
+      cursor: 'pointer',
+    });
+    setDialogStyles(swatch, {
+      width: '18px',
+      height: '18px',
+      flex: '0 0 auto',
+      borderRadius: '3px',
+      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.22)',
+      background: '#ffffff',
+    });
+    setDialogStyles(caption, { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+    button.appendChild(swatch);
+    button.appendChild(caption);
+
+    const grid = document.createElement('div');
+    grid.setAttribute('data-docier-dialog-colour-grid', kind);
+    grid.hidden = true;
+    setDialogStyles(grid, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      marginTop: '2px',
+    });
+
+    const none = dialogCheckbox(`docier-font-${kind}-none`, noneLabel, false);
+    const cell = document.createElement('div');
+    setDialogStyles(cell, { display: 'flex', flexDirection: 'column', gap: '6px' });
+
+    let value: string | undefined = undefined;
+
+    const paintSwatch = (): void => {
+      const found = sections
+        .flatMap((section) => section.swatches)
+        .find((entry) => entry.value.toLowerCase() === (value ?? '').toLowerCase());
+      swatch.style.setProperty('background', value === undefined ? 'transparent' : found?.css ?? `#${value}`);
+      if (value === undefined) {
+        swatch.style.setProperty(
+          'background-image',
+          'linear-gradient(45deg, transparent 45%, #b3261e 45%, #b3261e 55%, transparent 55%)',
+        );
+      } else {
+        swatch.style.removeProperty('background-image');
+      }
+      caption.textContent = value === undefined ? noneLabel : found?.label ?? value;
+    };
+
+    const setValue = (next: string | undefined): void => {
+      value = next;
+      none.input.checked = next === undefined;
+      paintSwatch();
+    };
+
+    const closeGrid = (): void => {
+      grid.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+    };
+
+    const buildGrid = (): void => {
+      if (grid.childElementCount > 0) return;
+      for (const section of sections) {
+        const block = document.createElement('div');
+        setDialogStyles(block, { display: 'flex', flexDirection: 'column', gap: '4px' });
+        const heading = document.createElement('div');
+        heading.textContent = section.label;
+        setDialogStyles(heading, {
+          color: DIALOG_TOKENS.muted,
+          fontSize: `calc(${DIALOG_TOKENS.fontSize} - 1px)`,
+        });
+        const cells = document.createElement('div');
+        setDialogStyles(cells, {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${String(section.columns)}, 18px)`,
+          gap: '3px',
+        });
+        for (const entry of section.swatches) {
+          const cellButton = document.createElement('button');
+          cellButton.type = 'button';
+          cellButton.setAttribute('data-docier-dialog-swatch', entry.value);
+          cellButton.setAttribute('data-docier-dialog-swatch-kind', kind);
+          cellButton.setAttribute('aria-label', entry.label);
+          cellButton.title = entry.label;
+          setDialogStyles(cellButton, {
+            width: '18px',
+            height: '18px',
+            padding: '0',
+            border: '0',
+            borderRadius: '3px',
+            cursor: 'pointer',
+            background: entry.css,
+            boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.22)',
+          });
+          cellButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            setValue(entry.value);
+            closeGrid();
+            button.focus();
+          });
+          cells.appendChild(cellButton);
+        }
+        block.appendChild(heading);
+        block.appendChild(cells);
+        grid.appendChild(block);
+      }
+    };
+
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      buildGrid();
+      const open = grid.hidden;
+      grid.hidden = !open;
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    none.input.addEventListener('change', () => {
+      if (none.input.checked) setValue(undefined);
+      else setValue(defaultColourFor(kind));
+    });
+
+    cell.appendChild(button);
+    cell.appendChild(none.element);
+    cell.appendChild(grid);
+    paintSwatch();
+
+    return {
+      id: `docier-font-${kind}`,
+      label,
+      element: cell,
+      focusable: button,
+      noneLabel: noneValue,
+      value: () => value,
+      setValue,
+      setFromDocument: (raw: string | undefined): void => {
+        const normalised = raw === undefined || raw === '' ? noneValue : raw;
+        if (normalised.toLowerCase() === noneValue.toLowerCase()) {
+          value = undefined;
+        } else {
+          value = kind === 'highlight' ? normalised : normalised.replace('#', '').toUpperCase();
+        }
+        none.input.checked = value === undefined;
+        paintSwatch();
+      },
+    };
+  };
+
   const readState = (): FontState => ({
     family: reader('family'),
     sizePoints: numberFrom(reader('sizePoints')),
     color: reader('color'),
+    highlight: reader('highlight'),
     bold: active('docier.command.format.bold'),
     italic: active('docier.command.format.italic'),
     underline: active('docier.command.format.underline'),
@@ -205,9 +388,12 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
     dialogCheckbox(`docier-font-${spec.key}`, text(spec.labelKey, spec.label)),
   );
 
-  const colourInput = dialogInput('docier-font-color', '#000000', 'color');
-  colourInput.setAttribute('aria-label', text('ui.control.textColor', 'Font Colour'));
-  const automatic = dialogCheckbox('docier-font-automatic', text('ui.colour.automatic', 'Automatic'));
+  const colour = createColourField(
+    'text',
+    text('ui.control.textColor', 'Font Colour'),
+    'auto',
+    text('ui.colour.automatic', 'Automatic'),
+  );
 
   const positionSelect = dialogSelect('docier-font-position', FONT_POSITIONS, 'baseline');
   positionSelect.setAttribute('aria-label', text('ui.dialog.position', 'Position'));
@@ -226,10 +412,12 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
   sampleLine.appendChild(sampleText);
   sampleLine.appendChild(sampleMeta);
 
-  const colourCell = document.createElement('div');
-  setDialogStyles(colourCell, { display: 'flex', alignItems: 'center', gap: '10px' });
-  colourCell.appendChild(colourInput);
-  colourCell.appendChild(automatic.element);
+  const highlight = createColourField(
+    'highlight',
+    text('ui.control.highlight', 'Highlight'),
+    'none',
+    text('ui.colour.noColour', 'No Colour'),
+  );
 
   const fontPanel = document.createElement('div');
   setDialogStyles(fontPanel, { display: 'flex', flexDirection: 'column', gap: '10px' });
@@ -242,11 +430,31 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
       'style',
     ),
   );
+  const colourRow = (field: ColourField): HTMLElement => {
+    const row = document.createElement('div');
+    row.setAttribute('data-docier-dialog-row', field.id);
+    setDialogStyles(row, {
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1fr)',
+      alignItems: 'center',
+      gap: '4px',
+    });
+    row.appendChild(field.element);
+    return row;
+  };
+
   fontPanel.appendChild(
     dialogGroup(
       text('ui.control.textColor', 'Font Colour'),
-      [dialogRow(text('ui.control.textColor', 'Font Colour'), colourCell, colourInput.id)],
+      [colourRow(colour)],
       'colour',
+    ),
+  );
+  fontPanel.appendChild(
+    dialogGroup(
+      text('ui.control.highlight', 'Text Highlight Colour'),
+      [colourRow(highlight)],
+      'highlight',
     ),
   );
 
@@ -282,9 +490,8 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
     return {
       family: family === '' ? undefined : family,
       sizePoints: numberFrom(sizeInput.value),
-      color: automatic.input.checked
-        ? 'auto'
-        : colourInput.value.replace('#', '').toUpperCase(),
+      color: colour.value(),
+      highlight: highlight.value(),
       bold: effects.bold === true,
       italic: effects.italic === true,
       underline: effects.underline === true,
@@ -324,9 +531,8 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
       const box = effectBoxes[index];
       if (box !== undefined) box.input.checked = initial[spec.key];
     }
-    const hex = colourOf(initial.color);
-    automatic.input.checked = hex === undefined;
-    colourInput.value = `#${hex ?? '000000'}`;
+    colour.setFromDocument(colourOf(initial.color));
+    highlight.setFromDocument(initial.highlight);
     positionSelect.value = initial.position;
     updateSample();
     baseline = stateFromControls();
@@ -372,6 +578,9 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
     if (colourOf(before.color) !== colourOf(next.color)) {
       jobs.push({ command: SET_FONT_COLOR, args: { color: next.color ?? 'auto' } });
     }
+    if ((before.highlight ?? HIGHLIGHT_NONE) !== (next.highlight ?? HIGHLIGHT_NONE)) {
+      jobs.push({ command: SET_HIGHLIGHT, args: { highlight: next.highlight ?? HIGHLIGHT_NONE } });
+    }
     for (const job of jobs) {
       void context.commands.execute(job.command, job.args, {
         source: 'ui',
@@ -411,9 +620,9 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
     datalist,
     familyInput,
     sizeInput,
-    colourInput,
+    colour.focusable,
+    highlight.focusable,
     positionSelect,
-    automatic.input,
     ...styleBoxes.map((box) => box.input),
     ...effectBoxes.map((box) => box.input),
   ]) {
