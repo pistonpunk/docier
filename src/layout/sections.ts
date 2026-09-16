@@ -35,8 +35,17 @@ export interface Section {
   readonly columnCount: number;
   readonly columnSpace: Mp;
   readonly lineNumbering: LineNumbering | undefined;
+  readonly verticalAlignment: SectionVerticalAlignment;
   readonly propertiesElement: XmlElement | undefined;
 }
+
+export type SectionVerticalAlignment = 'top' | 'center' | 'bottom' | 'both';
+
+const verticalAlignmentOf = (properties: SectionProperties | undefined): SectionVerticalAlignment => {
+  const raw = properties?.verticalAlignment;
+  if (raw === 'center' || raw === 'bottom' || raw === 'both') return raw;
+  return 'top';
+};
 
 export type LineNumberRestart = 'newPage' | 'newSection' | 'continuous';
 
@@ -168,11 +177,11 @@ export const buildSections = (
           docPos: undefined,
         });
       }
-      if (properties.verticalAlignment !== undefined) {
+      if (properties.verticalAlignment === 'both') {
         diagnostics.push({
           code: 'verticalAlignmentNotLaidOut',
           severity: 'info',
-          message: `section ${index} vertical alignment is ignored by this slice`,
+          message: `section ${index} justifies its content vertically; this slice centres the leftover space instead of distributing it`,
           docPos: undefined,
         });
       }
@@ -201,6 +210,7 @@ export const buildSections = (
       headerDistance: twipToMp(margins?.header ?? DEFAULT_HEADER_DISTANCE),
       footerDistance: twipToMp(margins?.footer ?? DEFAULT_FOOTER_DISTANCE),
       lineNumbering: lineNumberingOf(properties),
+      verticalAlignment: verticalAlignmentOf(properties),
       columnCount: properties?.columnCount ?? 1,
       columnSpace: twipToMp(properties?.columnSpacing ?? twip(DEFAULT_COLUMN_SPACE)),
       propertiesElement: element,

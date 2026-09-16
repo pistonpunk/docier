@@ -96,6 +96,7 @@ const fallbackSection = (): Section => {
     columnCount: 1,
     columnSpace: mp(0),
     lineNumbering: undefined,
+    verticalAlignment: 'top',
     propertiesElement: undefined,
   };
 };

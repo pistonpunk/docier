@@ -1,10 +1,10 @@
-import { mp } from '../units/index.js';
+import { mp, roundHalfEven } from '../units/index.js';
 import type { Mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
 import type { PageState, PaginateBlock, PlacedPiece } from './paginate.js';
 import type { PlacedRow, PlacedTable } from './table-flow.js';
 import { buildIndices } from './indices.js';
-import type { LineNumbering } from './sections.js';
+import type { LineNumbering, SectionVerticalAlignment } from './sections.js';
 import type { LineRef } from './indices.js';
 import { frozenMapOf } from './frozen-map.js';
 import { tableFragmentsOf } from './table-fragments.js';
@@ -67,6 +67,7 @@ export interface FinalizeInput {
   readonly pageBorders: ReadonlyMap<number, BorderSet>;
   readonly columnBoxes: ReadonlyMap<number, readonly Rect[]>;
   readonly lineNumbering: ReadonlyMap<number, LineNumbering | undefined>;
+  readonly verticalAlignment: ReadonlyMap<number, SectionVerticalAlignment>;
 }
 
 const atomsOf = (
@@ -295,6 +296,56 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
   };
 };
 
+const shiftRect = (rect: Rect, delta: Mp): Rect =>
+  delta === 0 ? rect : { ...rect, y: mp(rect.y + delta) };
+
+const shiftRow = (row: PlacedRow, delta: Mp): PlacedRow =>
+  delta === 0
+    ? row
+    : {
+        ...row,
+        box: shiftRect(row.box, delta),
+        cells: row.cells.map((cell) => ({
+          ...cell,
+          box: shiftRect(cell.box, delta),
+          contentBox: shiftRect(cell.contentBox, delta),
+          clip: cell.clip === undefined ? undefined : shiftRect(cell.clip, delta),
+        })),
+      };
+
+const blockHeightOf = (block: PaginateBlock | undefined, piece: PlacedPiece): Mp => {
+  if (block === undefined) return mp(0);
+  let total = piece.spaceBefore as number;
+  for (let index = piece.lineStart; index < piece.lineEnd; index += 1) {
+    total += block.lines[index]?.geometry.height ?? 0;
+  }
+  if (piece.split === 'end' || piece.split === 'whole') {
+    total += block.format.spaceAfter as number;
+  }
+  return mp(total);
+};
+
+const verticalDrop = (
+  alignment: SectionVerticalAlignment,
+  page: PageState,
+  pieces: readonly PlacedPiece[],
+  blocks: readonly (PaginateBlock | undefined)[],
+): Mp => {
+  if (alignment === 'top') return mp(0);
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const piece of pieces) {
+    const height = blockHeightOf(blocks[piece.block], piece);
+    top = Math.min(top, piece.boxTop as number);
+    bottom = Math.max(bottom, (piece.boxTop as number) + (height as number));
+  }
+  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) return mp(0);
+  const room = mp((page.contentBox.height as number) - (bottom - top));
+  if (room <= 0) return mp(0);
+  if (alignment === 'center') return mp(roundHalfEven(room / 2));
+  return room;
+};
+
 const lineNumbersFor = (
   page: PageState,
   blocks: readonly BlockFragment[],
@@ -359,8 +410,16 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
   let lineId = input.lineIdBase;
 
   for (const page of input.pages) {
-    const pagePieces = input.pieces.filter((piece) => piece.page === page.index);
-    const pageRows = input.rows.filter((row) => row.page === page.index);
+    const alignment = input.verticalAlignment.get(page.section) ?? 'top';
+    const unshiftedPieces = input.pieces.filter((piece) => piece.page === page.index);
+    const unshiftedRows = input.rows.filter((row) => row.page === page.index);
+    const drop = verticalDrop(alignment, page, unshiftedPieces, input.blocks);
+    const pagePieces =
+      drop === 0
+        ? unshiftedPieces
+        : unshiftedPieces.map((piece) => ({ ...piece, boxTop: mp(piece.boxTop + drop) }));
+    const pageRows =
+      drop === 0 ? unshiftedRows : unshiftedRows.map((row) => shiftRow(row, drop));
     const cellFragments = new Map<string, CellFragment>();
     for (const row of pageRows) {
       for (const cell of row.cells) {
