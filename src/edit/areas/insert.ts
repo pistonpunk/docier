@@ -349,11 +349,21 @@ const textBoxSpec: AreaSpec<TextBoxArgs> = {
   },
 };
 
+export const FIELD_INSERTS: readonly { readonly id: string; readonly label: string; readonly instruction: string }[] = [
+  { id: 'docier.command.insert.pageNumber', label: 'Page number', instruction: 'PAGE' },
+  { id: 'docier.command.insert.pageCount', label: 'Page count', instruction: 'NUMPAGES' },
+  { id: 'docier.command.insert.sectionNumber', label: 'Section number', instruction: 'SECTION' },
+  { id: 'docier.command.insert.sectionPageCount', label: 'Section page count', instruction: 'SECTIONPAGES' },
+  { id: 'docier.command.insert.dateTime', label: 'Date and time', instruction: 'DATE' },
+  { id: 'docier.command.insert.time', label: 'Time', instruction: 'TIME' },
+];
+
 export const insertCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<SymbolArgs>(host, symbolSpec),
   areaCommand<LinkArgs>(host, linkSpec),
-  areaCommand<FieldArgs>(host, fieldSpec('docier.command.insert.pageNumber', 'Page number', 'PAGE')),
-  areaCommand<FieldArgs>(host, fieldSpec('docier.command.insert.dateTime', 'Date and time', 'DATE')),
+  ...FIELD_INSERTS.map((field) =>
+    areaCommand<FieldArgs>(host, fieldSpec(field.id, field.label, field.instruction)),
+  ),
   areaCommand<TocArgs>(host, tocSpec),
   areaCommand<TextBoxArgs>(host, textBoxSpec),
 ];

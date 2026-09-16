@@ -259,7 +259,16 @@ export const createControl = (
   if (node.kind === 'menu') {
     const element = make('button', item ? 'docier-menu-item' : 'docier-control docier-control-wide');
     markPart(element, 'menu-open');
-    setText(element, resolved.label === '' ? context.i18n.text('ui.menu.noItems') : resolved.label);
+    const label = make('span', 'docier-control-label');
+    setText(label, resolved.label === '' ? context.i18n.text('ui.menu.noItems') : resolved.label);
+    if (item) {
+      // The same gutter a leaf row reserves for its tick, so submenu openers and
+      // leaf rows line their labels up instead of stepping in and out.
+      const gutter = make('span', 'docier-menu-check');
+      gutter.setAttribute('aria-hidden', 'true');
+      element.appendChild(gutter);
+    }
+    element.appendChild(label);
     element.setAttribute('aria-haspopup', 'menu');
     element.setAttribute('aria-expanded', 'false');
     element.setAttribute('type', 'button');

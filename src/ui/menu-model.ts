@@ -94,6 +94,15 @@ const picturePicker = (labelKey: string, keytip: string): UiNode =>
     actionArgs: { dialog: 'object.insertImage' },
   });
 
+export const FIELD_INSERT_NODES: readonly UiNode[] = [
+  'pageNumber',
+  'pageCount',
+  'sectionNumber',
+  'sectionPageCount',
+  'dateTime',
+  'time',
+].map((name) => button({ id: command(`insert.${name}`), labelKey: '', command: command(`insert.${name}`) }));
+
 const opensDialog = (id: string, name: string, labelKey: string, keytip: string): UiNode =>
   button({
     id,
@@ -478,13 +487,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         labelKey: 'ui.group.text',
         large: true,
         nodes: [
-          button({
-            labelKey: 'ui.control.insertField',
-            command: command('token.insert'),
-            keytip: 'F',
-            action: 'openDialog',
-            actionArgs: { dialog: command('token.insert') },
-          }),
+          menu('ui.control.insertField', FIELD_INSERT_NODES, { keytip: 'F' }),
           pending('insert.textBox', 'ui.control.insertTextBox', 'TB'),
         ],
       },

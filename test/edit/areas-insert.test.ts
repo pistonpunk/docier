@@ -206,6 +206,23 @@ describe('insert fields', () => {
     await run(handle, 'insert.dateTime', { format: 'yyyy-MM-dd' });
     expect(xmlOf(handle)).toContain('DATE \\@ &quot;yyyy-MM-dd&quot;');
   });
+
+  it('offers the whole field set, not just the two the ribbon used to reach', async () => {
+    const expected: readonly (readonly [string, string])[] = [
+      ['insert.pageNumber', 'PAGE'],
+      ['insert.pageCount', 'NUMPAGES'],
+      ['insert.sectionNumber', 'SECTION'],
+      ['insert.sectionPageCount', 'SECTIONPAGES'],
+      ['insert.dateTime', 'DATE'],
+      ['insert.time', 'TIME'],
+    ];
+    for (const [name, instruction] of expected) {
+      const handle = await editorOf(FIXTURE);
+      await run(handle, 'selection.setCaret', { pos: pos(0) });
+      await run(handle, name);
+      expect(xmlOf(handle), name).toContain(`w:instr="${instruction}"`);
+    }
+  });
 });
 
 describe('insert availability', () => {

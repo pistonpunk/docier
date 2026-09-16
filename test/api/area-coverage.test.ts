@@ -118,10 +118,9 @@ describe('chrome command coverage', () => {
 
     // the number rises whenever a menu entry is wired from a dialog stub to the
     // command it names, or when a menu row that named nothing gains a command;
-    // the last rise was the table menu's nine cell alignments, three AutoFit
-    // modes, Repeat Header Rows and Distribute Columns Evenly, plus the
-    // registered refusals that replaced four rows that named nothing at all
-    expect(registered).toBe(140);
+    // the last rise was the whole field set behind Insert > Field, which used to
+    // reach only Page number and Date & time
+    expect(registered).toBe(143);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -142,11 +141,14 @@ describe('chrome command coverage', () => {
       'view',
     ]);
     expect(areas.get('doc')).toBe(15);
-    expect(areas.get('insert')).toBe(18);
+    expect(areas.get('insert')).toBe(22);
     expect(areas.get('format')).toBe(24);
     expect(areas.get('table')).toBe(35);
     expect(areas.get('object')).toBe(12);
-    expect(areas.get('token')).toBe(6);
+    // one fewer than it was: Insert > Field used to dispatch token.insert, which
+    // is the template-token subsystem rather than a field, and now dispatches the
+    // insert.field set instead
+    expect(areas.get('token')).toBe(5);
     expect(areas.get('theme')).toBe(3);
     expect(areas.get('view')).toBe(2);
   });

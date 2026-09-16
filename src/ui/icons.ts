@@ -123,6 +123,14 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M5 11h6"/><path d="M3 8h10" stroke-dasharray="2 1.6"/>',
   'insert.pageNumber':
     '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M7.1 5.6 6.5 10.4"/><path d="M9.5 5.6 8.9 10.4"/><path d="M5.4 7.4h5.2"/><path d="M5.4 9h5.2"/>',
+  'insert.pageCount':
+    '<rect x="2.5" y="2.5" width="8" height="11" rx="1"/><path d="M12.6 4.6a1 1 0 0 1 .9 1v8a1 1 0 0 1-1 1h-7"/><path d="M5.2 6.2h2.6"/><path d="M5.2 9h2.6"/>',
+  'insert.sectionNumber':
+    '<rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M6.6 5.4c-1.1 0-1.1 1.6 0 1.6s1.1 1.6 0 1.6"/><path d="M9.6 5.4c-1.1 0-1.1 1.6 0 1.6s1.1 1.6 0 1.6"/><path d="M7.4 4.6 8.8 9.4"/><path d="M5.4 11.6h5.2"/>',
+  'insert.sectionPageCount':
+    '<rect x="2.5" y="2.5" width="8" height="11" rx="1"/><path d="M12.6 4.6a1 1 0 0 1 .9 1v8a1 1 0 0 1-1 1h-7"/><path d="M4.4 6.4c-.9 0-.9 1.3 0 1.3s.9 1.3 0 1.3"/><path d="M7.2 6.4c-.9 0-.9 1.3 0 1.3s.9 1.3 0 1.3"/><path d="M5.4 5.8 6.4 9.6"/>',
+  'insert.time':
+    '<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.2l2.2 1.4"/>',
   'insert.textBox':
     '<rect x="2.5" y="3.5" width="11" height="9" rx="1" stroke-dasharray="3 1.8"/><path d="M5.8 6.2h4.4"/><path d="M8 6.2v4.2"/>',
   'insert.symbol':
