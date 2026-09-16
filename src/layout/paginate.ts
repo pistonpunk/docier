@@ -11,6 +11,7 @@ import {
   sectionOfBlock,
 } from './sections.js';
 import type { PreparedTable } from './table-prepare.js';
+import type { TableAlign, TablePosition } from './table-ingest.js';
 import type { PlacedRow, PlacedTable, TableFlowHost } from './table-flow.js';
 import { flowTable } from './table-flow.js';
 import type { CellRef, DocRange, LayoutDiagnostic, PageKind, Rect } from './types.js';
@@ -124,6 +125,28 @@ const sumHeights = (lines: readonly LaidLine[], from: number, to: number): Mp =>
   for (let index = from; index < to; index += 1) total += lines[index]?.geometry.height ?? 0;
   return mp(total);
 };
+
+// an alignment puts the table against an edge of the frame it is anchored to,
+// and an offset puts it a distance inside that edge
+const alignedPosition = (
+  frame: Rect,
+  align: TableAlign | undefined,
+  extent: Mp,
+  offset: Mp,
+): Mp => {
+  const start = frame.x as number;
+  const size = frame.width as number;
+  if (align === 'right' || align === 'bottom') {
+    return mp(start + size - (extent as number) - (offset as number));
+  }
+  if (align === 'center' || align === 'middle') {
+    return mp(start + (size - (extent as number)) / 2 - (offset as number));
+  }
+  return mp(start + (offset as number));
+};
+
+const shiftRectX = (rect: Rect, dx: Mp): Rect =>
+  dx === 0 ? rect : { ...rect, x: mp(rect.x + dx) };
 
 const fitCount = (top: Mp, lines: readonly LaidLine[], from: number, bottom: Mp): number => {
   let y = top;
@@ -287,6 +310,69 @@ export const paginateFlow = (
     },
   };
 
+  // a floating table is placed against the page or the margin rather than in the
+  // flow, so the text after it starts where it would have without it
+  const flowFloatingTable = (
+    tableHost: TableFlowHost,
+    table: PreparedTable,
+    position: TablePosition,
+    page: Rect,
+    column: Rect,
+  ): void => {
+    const frameX = position.horizontal === 'page' ? page : column;
+    const frameY = position.vertical === 'page' ? page : column;
+    const anchorX = alignedPosition(frameX, position.alignX, table.total, position.x);
+    const anchorY = alignedPosition(frameY, position.alignY, table.height, position.y);
+    const flowCursor = cursor;
+    const flowBottom = bottom;
+    const flowHasContent = pageHasContent;
+    const outer: TableFlowHost = {
+      ...tableHost,
+      get cursor(): Mp {
+        return nestedCursor;
+      },
+      get contentBottom(): Mp {
+        return mp((page.y as number) + (page.height as number));
+      },
+      get remaining(): Mp {
+        return mp((page.y as number) + (page.height as number) - (nestedCursor as number));
+      },
+      get pageHeight(): Mp {
+        return page.height;
+      },
+      get atPageTop(): boolean {
+        return true;
+      },
+      openPage(): void {
+        return;
+      },
+      advance(height: Mp): void {
+        nestedCursor = mp(nestedCursor + height);
+      },
+    };
+    let nestedCursor = anchorY;
+    const dx = mp((anchorX as number) - (table.originX as number));
+    const shifted: TableFlowHost = {
+      ...outer,
+      emitRow(row: PlacedRow): void {
+        outer.emitRow({
+          ...row,
+          box: shiftRectX(row.box, dx),
+          cells: row.cells.map((cell) => ({
+            ...cell,
+            box: shiftRectX(cell.box, dx),
+            contentBox: shiftRectX(cell.contentBox, dx),
+            clip: cell.clip === undefined ? undefined : shiftRectX(cell.clip, dx),
+          })),
+        });
+      },
+    };
+    flowTable(shifted, table);
+    cursor = flowCursor;
+    bottom = flowBottom;
+    pageHasContent = flowHasContent;
+  };
+
   const paragraphAt = (from: number): PaginateBlock | undefined => {
     for (let index = from; index < flow.length; index += 1) {
       const item = flow[index];
@@ -352,6 +438,17 @@ export const paginateFlow = (
     if (pendingPageBreak) openPage(currentSection, 'any');
 
     if (item.kind === 'table') {
+      const floating = item.table.floating;
+      if (floating !== undefined) {
+        flowFloatingTable(
+          host,
+          item.table,
+          floating,
+          currentSection.page,
+          columnBoxes[columnIndex] ?? pageBox,
+        );
+        continue;
+      }
       flowTable(host, item.table);
       continue;
     }

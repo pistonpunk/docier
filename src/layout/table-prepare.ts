@@ -7,6 +7,7 @@ import type {
   IngestedRow,
   IngestedTable,
   RowHeightRuleKind,
+  TablePosition,
 } from './table-ingest.js';
 import type { ColumnRequirement, ColumnWidths, SpanRequirement } from './table-columns.js';
 import {
@@ -106,6 +107,7 @@ export interface PreparedTable {
   readonly total: Mp;
   readonly height: Mp;
   readonly originX: Mp;
+  readonly floating: TablePosition | undefined;
   readonly borders: TableBorderDeclarations;
   readonly shading: Shading | undefined;
   readonly depth: number;
@@ -671,6 +673,7 @@ export const prepareTable = (
     total: width.total,
     height: mp(height),
     originX,
+    floating: table.floating,
     borders: table.borders,
     shading: table.shading,
     depth: table.depth,

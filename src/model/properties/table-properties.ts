@@ -133,6 +133,32 @@ export class TableProperties {
     return this.prop('tblpPr').element;
   }
 
+  get floatingOffsetX(): Twip | undefined {
+    const raw = integerFrom(this.prop('tblpPr').attribute('tblpX'));
+    return raw === undefined ? undefined : (raw as Twip);
+  }
+
+  get floatingOffsetY(): Twip | undefined {
+    const raw = integerFrom(this.prop('tblpPr').attribute('tblpY'));
+    return raw === undefined ? undefined : (raw as Twip);
+  }
+
+  get floatingAlignX(): string | undefined {
+    return this.prop('tblpPr').attribute('tblpXSpec');
+  }
+
+  get floatingAlignY(): string | undefined {
+    return this.prop('tblpPr').attribute('tblpYSpec');
+  }
+
+  get floatingAnchorX(): string | undefined {
+    return this.prop('tblpPr').attribute('horzAnchor');
+  }
+
+  get floatingAnchorY(): string | undefined {
+    return this.prop('tblpPr').attribute('vertAnchor');
+  }
+
   get look(): XmlElement | undefined {
     return this.prop('tblLook').element;
   }

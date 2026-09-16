@@ -6,6 +6,7 @@ import type {
   DocumentModel,
   Paragraph,
   ResolvedTableProperties,
+  TableProperties,
   Table,
   TableCell,
   TableRow,
@@ -72,6 +73,17 @@ export interface IngestedRow {
   readonly docEnd: DocPos;
 }
 
+export type TableAlign = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+
+export interface TablePosition {
+  readonly x: Mp;
+  readonly y: Mp;
+  readonly horizontal: 'page' | 'margin';
+  readonly vertical: 'page' | 'margin';
+  readonly alignX: TableAlign | undefined;
+  readonly alignY: TableAlign | undefined;
+}
+
 export interface IngestedTable {
   readonly paragraphIndex: number;
   readonly rows: readonly IngestedRow[];
@@ -86,7 +98,7 @@ export interface IngestedTable {
   readonly borders: TableBorderDeclarations;
   readonly shading: Shading | undefined;
   readonly cellSpacing: Mp;
-  readonly floating: boolean;
+  readonly floating: TablePosition | undefined;
   readonly depth: number;
   readonly docStart: DocPos;
   readonly docEnd: DocPos;
@@ -112,6 +124,36 @@ export interface IngestState {
   readonly textBoxes: Map<string, XmlElement>;
   cursor: number;
 }
+
+const horizontalAnchorOf = (raw: string | undefined): 'page' | 'margin' =>
+  raw === 'page' ? 'page' : 'margin';
+
+const verticalAnchorOf = (raw: string | undefined): 'page' | 'margin' =>
+  raw === 'page' ? 'page' : 'margin';
+
+// a floating table is positioned against the page or the margin, either by an
+// offset or by an alignment, which this slice keeps as a negative offset from
+// the right or the bottom edge for the painter to resolve
+const floatingPositionOf = (properties: TableProperties): TablePosition | undefined => {
+  if (properties.floating === undefined) return undefined;
+  const offsetX = properties.floatingOffsetX;
+  const offsetY = properties.floatingOffsetY;
+  const specX = properties.floatingAlignX;
+  const specY = properties.floatingAlignY;
+  return {
+    x: offsetX === undefined ? mp(0) : twipToMp(offsetX),
+    y: offsetY === undefined ? mp(0) : twipToMp(offsetY),
+    horizontal: horizontalAnchorOf(properties.floatingAnchorX),
+    vertical: verticalAnchorOf(properties.floatingAnchorY),
+    alignX: specX === 'center' || specX === 'right' || specX === 'left' ? specX : undefined,
+    alignY:
+      specY === 'top' || specY === 'bottom' || specY === 'center'
+        ? specY === 'center'
+          ? 'middle'
+          : specY
+        : undefined,
+  };
+};
 
 const NO_WIDTH: TableWidth = { rule: 'auto', twips: undefined, percentFiftieths: undefined };
 
@@ -310,11 +352,12 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
   const grid: (Mp | undefined)[] = [];
   for (let index = 0; index < columnCount; index += 1) grid.push(declared[index]);
 
-  if (properties.floating !== undefined) {
+  const floating = floatingPositionOf(properties);
+  if (floating !== undefined) {
     state.diagnostics.push({
       code: 'floatingTableNotLaidOut',
-      severity: 'warning',
-      message: 'a floating table is placed in the flow instead of against its anchor',
+      severity: 'info',
+      message: 'a floating table is placed against its anchor; text does not wrap around it yet',
       docPos: start,
     });
   }
@@ -353,7 +396,7 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
     borders: tableBordersOf(resolved),
     shading: shadingOfElement(resolved.element(['shd'])),
     cellSpacing,
-    floating: properties.floating !== undefined,
+    floating,
     depth,
     docStart: start,
     docEnd: docPos(state.cursor),
