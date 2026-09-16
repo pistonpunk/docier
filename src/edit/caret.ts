@@ -149,14 +149,17 @@ export const caretEntry = (
   index: PositionIndex,
   pos: DocPos,
   affinity: TextAffinity,
-): CaretStopEntry | undefined => index.stopAt(index.clamp(pos), affinity);
+  page?: number | undefined,
+): CaretStopEntry | undefined =>
+  index.stopAt(index.clamp(pos), affinity, page);
 
 export const caretGeometryOf = (
   index: PositionIndex,
   pos: DocPos,
   affinity: TextAffinity,
+  page?: number | undefined,
 ): CaretGeometry | undefined => {
-  const stop = caretEntry(index, pos, affinity);
+  const stop = caretEntry(index, pos, affinity, page);
   if (stop === undefined) return undefined;
   return {
     pos: stop.pos,

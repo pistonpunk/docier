@@ -69,9 +69,17 @@ export interface PositionIndex {
   paragraphAt(pos: DocPos): ParagraphSpan | undefined;
   paragraphIndexOf(pos: DocPos): number;
   clamp(pos: DocPos): DocPos;
-  lineAt(pos: DocPos, affinity?: TextAffinity): LineEntry | undefined;
-  stopAt(pos: DocPos, affinity: TextAffinity): CaretStopEntry | undefined;
-  nearestStop(pos: DocPos, affinity: TextAffinity): CaretStopEntry | undefined;
+  lineAt(pos: DocPos, affinity?: TextAffinity, page?: number | undefined): LineEntry | undefined;
+  stopAt(
+    pos: DocPos,
+    affinity: TextAffinity,
+    page?: number | undefined,
+  ): CaretStopEntry | undefined;
+  nearestStop(
+    pos: DocPos,
+    affinity: TextAffinity,
+    page?: number | undefined,
+  ): CaretStopEntry | undefined;
   storyAt(pos: DocPos): StorySpan | undefined;
   storySpan(id: StoryId): StorySpan | undefined;
 }
@@ -258,7 +266,35 @@ export const buildPositionIndex = (result: LayoutResult): PositionIndex => {
     return found;
   };
 
-  const stopAt = (pos: DocPos, affinity: TextAffinity): CaretStopEntry | undefined => {
+  // A story that repeats on every page — a header, a footer, a repeated table
+  // header row — is laid out once per page but mapped into one position range,
+  // so a single position has a stop on each of those pages. Preferring a page
+  // is how a caret placed on page 3 stays on page 3; without it the first
+  // instance wins and the caret is drawn on page 1.
+  const onPage = (
+    from: number,
+    to: number,
+    page: number | undefined,
+    last: boolean,
+  ): CaretStopEntry | undefined => {
+    if (page === undefined) return undefined;
+    if (last) {
+      for (let at = to; at >= from; at -= 1) {
+        if (byPos[at]?.page === page) return byPos[at];
+      }
+      return undefined;
+    }
+    for (let at = from; at <= to; at += 1) {
+      if (byPos[at]?.page === page) return byPos[at];
+    }
+    return undefined;
+  };
+
+  const stopAt = (
+    pos: DocPos,
+    affinity: TextAffinity,
+    page?: number | undefined,
+  ): CaretStopEntry | undefined => {
     const index = searchStops(pos);
     if (index < 0) {
       return affinity === 'downstream' ? byPos[0] : byPos[byPos.length - 1];
@@ -267,18 +303,22 @@ export const buildPositionIndex = (result: LayoutResult): PositionIndex => {
       if (byPos[index]?.pos === pos) {
         let first = index;
         while (first > 0 && byPos[first - 1]?.pos === pos) first -= 1;
-        return byPos[first];
+        return onPage(first, index, page, false) ?? byPos[first];
       }
       return byPos[index + 1] ?? byPos[byPos.length - 1];
     }
     let last = index;
     while (last + 1 < byPos.length && byPos[last + 1]?.pos === pos) last += 1;
-    return byPos[last];
+    return onPage(index, last, page, true) ?? byPos[last];
   };
 
   const nearestStop = stopAt;
 
-  const lineAt = (pos: DocPos, affinity: TextAffinity = 'downstream'): LineEntry | undefined => {
+  const lineAt = (
+    pos: DocPos,
+    affinity: TextAffinity = 'downstream',
+    page?: number | undefined,
+  ): LineEntry | undefined => {
     let low = 0;
     let high = lines.length - 1;
     let found: LineEntry | undefined;
@@ -294,17 +334,28 @@ export const buildPositionIndex = (result: LayoutResult): PositionIndex => {
       }
     }
     if (found === undefined) return lines[0];
+    const sameBlock = (entry: LineEntry | undefined): boolean =>
+      entry !== undefined && entry.blockId === found?.blockId && entry.start === found?.start;
+    const onWantedPage = (): LineEntry | undefined => {
+      if (page === undefined) return undefined;
+      for (const entry of lines) {
+        if (sameBlock(entry) && entry.page === page) return entry;
+      }
+      return undefined;
+    };
     if (affinity === 'upstream' && found.start === pos && found.end !== pos) {
       let index = lines.indexOf(found);
       while (index > 0) {
         index -= 1;
         const previous = lines[index];
         if (previous === undefined) break;
-        if (previous.end === pos && previous.blockId === found.blockId) return previous;
+        if (previous.end === pos && previous.blockId === found.blockId) {
+          return onWantedPage() ?? previous;
+        }
         if (previous.end < pos) break;
       }
     }
-    return found;
+    return onWantedPage() ?? found;
   };
 
   const storyAt = (pos: DocPos): StorySpan | undefined => {

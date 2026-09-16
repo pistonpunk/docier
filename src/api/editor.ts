@@ -389,7 +389,10 @@ export const createEditor = (
     const moved =
       (anchor as number) !== (candidate.anchor as number) ||
       (focus as number) !== (candidate.focus as number);
-    return { selection: { anchor, focus, affinity: candidate.affinity, ranges }, moved };
+    return {
+      selection: { anchor, focus, affinity: candidate.affinity, ranges, page: candidate.page },
+      moved,
+    };
   };
 
   const relayout = (): LayoutResult => {
@@ -1192,7 +1195,7 @@ export const createEditor = (
     caretGeometry: () => {
       const active = session;
       if (active === undefined) return undefined;
-      return caretGeometryOf(active.index, selection.focus, selection.affinity);
+      return caretGeometryOf(active.index, selection.focus, selection.affinity, selection.page);
     },
     paragraphIndents: () => {
       const active = session;

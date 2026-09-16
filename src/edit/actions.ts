@@ -386,8 +386,12 @@ export const moveCaretTo = (
   return selectionAction(next, extend ? 'extend' : 'set');
 };
 
-export const setCaretAt = (host: EditActionHost, pos: DocPos): ActionResult => {
-  const next = caretSelection(host.session.index.clamp(pos), 'downstream');
+export const setCaretAt = (
+  host: EditActionHost,
+  pos: DocPos,
+  page?: number | undefined,
+): ActionResult => {
+  const next = caretSelection(host.session.index.clamp(pos), 'downstream', page);
   if (selectionEquals(next, host.selection)) return NO_CHANGE;
   return selectionAction(next, 'set');
 };

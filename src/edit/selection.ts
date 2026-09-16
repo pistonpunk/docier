@@ -18,6 +18,7 @@ export interface EditSelection {
   readonly focus: DocPos;
   readonly affinity: TextAffinity;
   readonly ranges: readonly SelectionRange[];
+  readonly page?: number | undefined;
 }
 
 const isBefore = (first: DocPos, second: DocPos): boolean => (first as number) < (second as number);
@@ -35,22 +36,29 @@ const dedupe = (ranges: readonly SelectionRange[]): readonly SelectionRange[] =>
   return out;
 };
 
-export const caretSelection = (pos: DocPos, affinity: TextAffinity = 'downstream'): EditSelection => ({
+export const caretSelection = (
+  pos: DocPos,
+  affinity: TextAffinity = 'downstream',
+  page?: number | undefined,
+): EditSelection => ({
   anchor: pos,
   focus: pos,
   affinity,
   ranges: [{ anchor: pos, focus: pos }],
+  page,
 });
 
 export const selectionOf = (
   anchor: DocPos,
   focus: DocPos,
   affinity: TextAffinity = 'downstream',
+  page?: number | undefined,
 ): EditSelection => ({
   anchor,
   focus,
   affinity,
   ranges: [{ anchor, focus }],
+  page,
 });
 
 export const isCollapsed = (selection: EditSelection): boolean =>
@@ -81,7 +89,7 @@ export const collapseSelection = (
         : to === 'anchor'
           ? selection.anchor
           : selection.focus;
-  return caretSelection(target, selection.affinity);
+  return caretSelection(target, selection.affinity, selection.page);
 };
 
 export const collapseForDirection = (
@@ -96,7 +104,8 @@ export const setCaret = (
   index: PositionIndex,
   pos: DocPos,
   affinity: TextAffinity = 'downstream',
-): EditSelection => caretSelection(clamp(index, pos), affinity);
+  page?: number | undefined,
+): EditSelection => caretSelection(clamp(index, pos), affinity, page);
 
 export const setSelection = (
   index: PositionIndex,
@@ -110,8 +119,9 @@ export const extendTo = (
   selection: EditSelection,
   pos: DocPos,
   affinity: TextAffinity,
+  page?: number | undefined,
 ): EditSelection =>
-  selectionOf(selection.anchor, clamp(index, pos), affinity);
+  selectionOf(selection.anchor, clamp(index, pos), affinity, page ?? selection.page);
 
 export const selectRange = (index: PositionIndex, range: DocRange): EditSelection =>
   selectionOf(clamp(index, range.start), clamp(index, range.end), 'downstream');
@@ -134,6 +144,7 @@ export const withRanges = (
   focus: primary.focus,
   affinity: primary.affinity,
   ranges: dedupe([{ anchor: primary.anchor, focus: primary.focus }, ...ranges]),
+  page: primary.page,
 });
 
 export const primaryRange = (selection: EditSelection): SelectionRange => ({
@@ -162,6 +173,7 @@ export const snapshotOf = (selection: EditSelection): SelectionSnapshot => ({
   reversed: isReversed(selection),
   affinity: selection.affinity,
   ranges: selection.ranges.map((range) => ({ anchor: range.anchor, focus: range.focus })),
+  page: selection.page,
 });
 
 export const selectionFromSnapshot = (
@@ -178,12 +190,14 @@ export const selectionFromSnapshot = (
           anchor: clamp(index, range.anchor),
           focus: clamp(index, range.focus),
         })),
+  page: snapshot.page,
 });
 
 export const selectionEquals = (first: EditSelection, second: EditSelection): boolean =>
   (first.anchor as number) === (second.anchor as number) &&
   (first.focus as number) === (second.focus as number) &&
   first.affinity === second.affinity &&
+  first.page === second.page &&
   first.ranges.length === second.ranges.length &&
   first.ranges.every((range, at) => {
     const other = second.ranges[at];

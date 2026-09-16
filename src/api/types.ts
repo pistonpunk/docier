@@ -345,6 +345,7 @@ export interface SelectionSnapshot {
   readonly reversed: boolean;
   readonly affinity: TextAffinity;
   readonly ranges: readonly { readonly anchor: DocPos; readonly focus: DocPos }[];
+  readonly page?: number | undefined;
 }
 
 export interface SelectionChange extends EventEnvelope {

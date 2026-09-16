@@ -427,7 +427,12 @@ export const attachInput = (host: InputHost): InputHandle => {
   const caretOf = (): CaretGeometry | undefined => {
     const positions = index();
     if (positions === undefined) return undefined;
-    return caretGeometryOf(positions, host.selection.focus, host.selection.affinity);
+    return caretGeometryOf(
+      positions,
+      host.selection.focus,
+      host.selection.affinity,
+      host.selection.page,
+    );
   };
 
   const scrollerOf = (): HTMLElement | undefined => {
@@ -542,7 +547,7 @@ export const attachInput = (host: InputHost): InputHandle => {
   const hitTest = (
     clientX: number,
     clientY: number,
-  ): { readonly pos: DocPos; readonly affinity: TextAffinity } | undefined => {
+  ): { readonly pos: DocPos; readonly affinity: TextAffinity; readonly page: number } | undefined => {
     const positions = index();
     if (positions === undefined) return undefined;
     for (const sheet of sheets()) {
@@ -560,7 +565,7 @@ export const attachInput = (host: InputHost): InputHandle => {
         host.zoom,
       );
       const hit = hitTestPage(positions, pageIndex, point);
-      return hit === undefined ? undefined : { pos: hit.pos, affinity: hit.affinity };
+      return hit === undefined ? undefined : { pos: hit.pos, affinity: hit.affinity, page: hit.page };
     }
     return undefined;
   };
@@ -969,7 +974,7 @@ export const attachInput = (host: InputHost): InputHandle => {
     } else if (event.shiftKey) {
       run(`${PREFIX}selection.extendTo`, { pos: hit.pos });
     } else {
-      run(`${PREFIX}selection.setCaret`, { pos: hit.pos });
+      run(`${PREFIX}selection.setCaret`, { pos: hit.pos, page: hit.page });
     }
     dragging = true;
     owner.addEventListener('pointermove', onPointerMove);

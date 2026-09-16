@@ -12,10 +12,11 @@ import {
   reopenModel,
 } from '../model/support.js';
 import { EXACT_TEN_THOUSAND, PAGE, paragraphText } from '../layout/support.js';
+import { mp, toCssPx } from '../../src/units/index.js';
 import type { EditSnapshot } from '../../src/edit/session.js';
 import type { EditorHandle } from '../../src/api/editor.js';
 import { createEditor } from '../../src/api/editor.js';
-import { hitTestPage } from '../../src/edit/caret.js';
+import { caretGeometryOf, hitTestPage } from '../../src/edit/caret.js';
 import type { DocPos, StoryId } from '../../src/layout/index.js';
 import { disposeEditors, mountPoint, track } from './support.js';
 
@@ -163,7 +164,7 @@ describe('a caret placed in a header', () => {
     expect(bodySlotTexts(handle)).toEqual(['filler 0', 'filler 1']);
   });
 
-  it('takes the caret for a pointer inside the region on any page', async () => {
+  it('takes the caret for a pointer inside the region on the page it was clicked', async () => {
     const handle = await editorOf({ header: paragraphText('Head'), fillers: 10 });
     const header = sessionOf(handle).layout.pages[0]?.header;
     if (header === undefined) throw new Error('no header fragment');
@@ -176,6 +177,108 @@ describe('a caret placed in a header', () => {
     if (hit === undefined) return;
     expect(sessionOf(handle).index.storyAt(hit.pos)?.id).toBe(HEADER_ID);
     expect(hit.pos).toBe(spanOf(handle, HEADER_ID).start);
+    expect(hit.page).toBe(0);
+  });
+});
+
+/**
+ * A header or footer story is laid out once per page but mapped into a single
+ * position range, so one position has a stop on every page it appears on. The
+ * caret therefore has to carry the page it was placed on, or the first instance
+ * wins and a caret placed in the footer of page 3 is drawn in the footer of
+ * page 1 — and the view scrolls back to page 1 with it.
+ */
+describe('the page a region caret was placed on', () => {
+  const FOOTER = paragraphText('Foot');
+
+  const footerBoxOn = (handle: EditorHandle, page: number) => {
+    const region = sessionOf(handle).layout.pages[page]?.footer;
+    if (region === undefined) throw new Error(`no footer fragment on page ${String(page)}`);
+    return region.box;
+  };
+
+  const clickFooterOn = async (handle: EditorHandle, page: number): Promise<DocPos> => {
+    const box = footerBoxOn(handle, page);
+    const hit = hitTestPage(sessionOf(handle).index, page, {
+      x: ((box.x as number) + 100) as never,
+      y: ((box.y as number) + 100) as never,
+    });
+    if (hit === undefined) throw new Error('no hit in the footer');
+    expect(hit.page).toBe(page);
+    await run(handle, 'selection.setCaret', { pos: hit.pos, page: hit.page });
+    return hit.pos;
+  };
+
+  it('reports the page the caret was placed on, on a document with several pages', async () => {
+    const handle = await editorOf({ footer: FOOTER, fillers: 25 });
+    expect(sessionOf(handle).layout.pages.length).toBeGreaterThan(2);
+
+    const pos = await clickFooterOn(handle, 2);
+    expect(handle.selection.page).toBe(2);
+
+    const index = sessionOf(handle).index;
+    const geometry = caretGeometryOf(index, pos, handle.selection.affinity, handle.selection.page);
+    expect(geometry?.page).toBe(2);
+  });
+
+  const PAGE_HEIGHT_PX = 2000;
+
+  const stubPageRects = (handle: EditorHandle): void => {
+    for (const sheet of handle.root.querySelectorAll<HTMLElement>('[data-docier-page]')) {
+      const index = Number(sheet.getAttribute('data-docier-page') ?? '0');
+      const top = index * PAGE_HEIGHT_PX;
+      sheet.getBoundingClientRect = () =>
+        ({
+          left: 0,
+          top,
+          width: 800,
+          height: PAGE_HEIGHT_PX,
+          right: 800,
+          bottom: top + PAGE_HEIGHT_PX,
+          x: 0,
+          y: top,
+        }) as DOMRect;
+    }
+  };
+
+  it('takes the page from a real pointer press in the footer', async () => {
+    const handle = await editorOf({ footer: FOOTER, fillers: 25 });
+    stubPageRects(handle);
+
+    const box = footerBoxOn(handle, 2);
+    const surface = handle.root.querySelector<HTMLElement>('.docier-editor-surface');
+    if (surface === null) throw new Error('no surface');
+    const clientX = toCssPx(mp((box.x as number) + 100), 1);
+    const clientY = 2 * PAGE_HEIGHT_PX + toCssPx(mp((box.y as number) + 100), 1);
+
+    const press = new Event('pointerdown', { bubbles: true, cancelable: true });
+    Object.assign(press, { clientX, clientY, button: 0, shiftKey: false });
+    surface.dispatchEvent(press);
+    await Promise.resolve();
+
+    expect(handle.selection.page).toBe(2);
+
+    const caret = handle.root.querySelector<HTMLElement>('.docier-caret');
+    if (caret === null) throw new Error('no caret element');
+    const top = Number.parseFloat(caret.style.top.replace('px', ''));
+    // page 2 occupies [4000, 6000) once the sheets are stubbed
+    expect(top, `caret top ${String(top)} should be on page 2`).toBeGreaterThanOrEqual(
+      2 * PAGE_HEIGHT_PX,
+    );
+    expect(top).toBeLessThan(3 * PAGE_HEIGHT_PX);
+  });
+
+  it('would otherwise resolve the same position to the first page', async () => {
+    const handle = await editorOf({ footer: FOOTER, fillers: 25 });
+    const pos = await clickFooterOn(handle, 2);
+
+    const index = sessionOf(handle).index;
+    // the position alone is ambiguous: the same one exists on every page
+    const ambiguous = index.stops.filter((stop) => stop.pos === pos).map((stop) => stop.page);
+    expect(new Set(ambiguous).size).toBeGreaterThan(1);
+
+    const withoutPage = caretGeometryOf(index, pos, handle.selection.affinity);
+    expect(withoutPage?.page).toBe(0);
   });
 });
 

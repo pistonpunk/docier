@@ -265,6 +265,7 @@ interface TextArgs {
 
 interface CaretArgs {
   readonly pos?: DocPos;
+  readonly page?: number;
 }
 
 interface RangeArgs {
@@ -557,7 +558,7 @@ export const installEditCommands = (
       area: 'selection',
       layer: 'chrome',
       undoable: false,
-      run: (h, args) => given(args.pos, (pos) => setCaretAt(h, pos)),
+      run: (h, args) => given(args.pos, (pos) => setCaretAt(h, pos, args.page)),
       enabledIn: loadedOnly,
       reason: () => NO_DOCUMENT,
     }),
