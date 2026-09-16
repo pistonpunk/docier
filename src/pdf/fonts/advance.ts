@@ -148,6 +148,7 @@ export const inkUnitsOf = (text: string, font: Sfnt): readonly number[] => {
 export interface AdvancePlan {
   readonly glyphs: readonly number[];
   readonly adjustments: readonly number[];
+  readonly boundaries: readonly number[];
   readonly unitsSource: 'measurer' | 'font';
   readonly engineTotal: Mp;
   readonly inkTotal: Mp;
@@ -207,6 +208,7 @@ export const planAdvance = (
   return {
     glyphs,
     adjustments,
+    boundaries,
     unitsSource: source,
     engineTotal,
     inkTotal: mp(Math.round(inkPerMille * perMille)),

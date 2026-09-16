@@ -6,7 +6,9 @@ import type { ContentStream } from './content.js';
 import type { PdfFrame } from './geometry.js';
 import { pdfBaseline, pdfLength, pdfTop, pdfX } from './geometry.js';
 import { highlightRgb, textRgb } from './color.js';
-import { planAdvance } from './fonts/advance.js';
+import { clustersOf, planAdvance } from './fonts/advance.js';
+import type { AdvancePlan } from './fonts/advance.js';
+import { readingOrder } from './bidi.js';
 import type { FontSlot } from './fonts/registry.js';
 import type { PdfLoss } from './types.js';
 
@@ -82,6 +84,41 @@ const band = (
   height: heightPt,
 });
 
+// the order an atom's glyphs are drawn in: a right to left atom reads from the
+// right, but a left to right word inside it keeps its own order, and a number
+// takes the direction of the letters written before it. The plan's glyphs are
+// in written order, so they are regrouped by cluster and laid out again.
+const drawnOrder = (
+  plan: AdvancePlan,
+  text: string,
+  baseRightToLeft: boolean,
+): { readonly glyphs: readonly number[]; readonly adjustments: readonly number[] } => {
+  const clusters = clustersOf(text);
+  const asWritten = { glyphs: plan.glyphs, adjustments: plan.adjustments };
+  if (clusters.length !== plan.boundaries.length) return asWritten;
+  const slices: { readonly start: number; readonly end: number }[] = [];
+  let expected = 0;
+  for (let index = 0; index < clusters.length; index += 1) {
+    const start = index === 0 ? 0 : (plan.boundaries[index - 1] ?? -1) + 1;
+    const end = (plan.boundaries[index] ?? -1) + 1;
+    if (start < 0 || end < start) return asWritten;
+    slices.push({ start, end });
+    expected += end - start;
+  }
+  if (expected !== plan.glyphs.length) return asWritten;
+  const glyphs: number[] = [];
+  const adjustments: number[] = [];
+  for (const index of readingOrder(clusters, baseRightToLeft)) {
+    const slice = slices[index];
+    if (slice === undefined) return asWritten;
+    for (let at = slice.start; at < slice.end; at += 1) {
+      glyphs.push(plan.glyphs[at] ?? 0);
+      adjustments.push(plan.adjustments[at] ?? 0);
+    }
+  }
+  return { glyphs, adjustments };
+};
+
 export const paintRun = (run: LineRun, paint: RunPaint, context: RunPaintContext): void => {
   const { line, frame, content, losses, measurer, slot } = context;
   const segments = segmentsOf(line, run);
@@ -140,16 +177,8 @@ export const paintRun = (run: LineRun, paint: RunPaint, context: RunPaintContext
           detail: `${paint.family} (advances from the ${plan.unitsSource})`,
         });
       }
-      // a right to left atom is placed by the layout but its glyphs are drawn in
-      // the order they are written, and a reader of that script reads the last
-      // one first: the sequence is turned around, advances and all, so the two
-      // arrays stay paired. Latin inside right to left text keeps its own order,
-      // which is why this is the atom's direction and not the run's
-      if (atom.rightToLeft === true) {
-        content.showGlyphs([...plan.glyphs].reverse(), [...plan.adjustments].reverse());
-      } else {
-        content.showGlyphs(plan.glyphs, plan.adjustments);
-      }
+      const ordered = drawnOrder(plan, atom.text, atom.rightToLeft === true);
+      content.showGlyphs(ordered.glyphs, ordered.adjustments);
     }
   }
   content.endText();

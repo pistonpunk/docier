@@ -30,23 +30,28 @@ const glyphRuns = async (body: string): Promise<readonly string[]> => {
 const groupsOf = (hex: string): readonly string[] =>
   hex.length === 0 ? [] : (hex.match(/.{4}/g) ?? []);
 
-// the test font has no glyphs for hebrew, so every hebrew character draws as
-// glyph 0000 and a sequence of them cannot show its order. A digit beside them
-// has a real glyph, and a digit after a hebrew letter is the same reversal
-const MIXED = 'א1';
+// the test font has no glyphs for hebrew, so a hebrew letter draws as glyph
+// 0000. The latin letters beside it have real glyphs, which is what makes the
+// order they come out in observable at all
+const MIXED = 'abא';
 
 describe('right to left text in the PDF', () => {
-  it('draws a right to left atom in the reverse of its written order', async () => {
-    const written = await glyphRuns(ltrParagraph(MIXED));
-    const mirrored = await glyphRuns(rtlParagraph(MIXED));
-    expect(written.length).toBe(1);
-    expect(mirrored.length).toBe(1);
-    const logical = groupsOf(written[0] ?? '');
-    const drawn = groupsOf(mirrored[0] ?? '');
-    expect(logical.length).toBe(2);
-    // the digit must be a glyph the font actually has, or this proves nothing
-    expect(logical.filter((glyph) => glyph !== '0000').length).toBe(1);
-    expect(drawn).toEqual([...logical].reverse());
+  it('orders a mixed word by its base direction, not by reversing it', async () => {
+    const leftToRight = await glyphRuns(ltrParagraph(MIXED));
+    const rightToLeft = await glyphRuns(rtlParagraph(MIXED));
+    expect(leftToRight.length).toBe(1);
+    expect(rightToLeft.length).toBe(1);
+    const written = groupsOf(leftToRight[0] ?? '');
+    const mirrored = groupsOf(rightToLeft[0] ?? '');
+    expect(written.length).toBe(3);
+    // the font draws the hebrew as 0000 and the latin as real glyphs, so the two
+    // orders are only distinguishable if some of them differ
+    expect(new Set(written).size).toBeGreaterThan(1);
+    // left to right base: the latin stays put and the hebrew follows it
+    expect(written[written.length - 1]).toBe('0000');
+    // right to left base: the hebrew leads and the latin keeps its own order
+    expect(mirrored[0]).toBe('0000');
+    expect(mirrored.slice(1)).toEqual(written.slice(0, 2));
   });
 
   it('leaves a latin word inside right to left text in its written order', async () => {
