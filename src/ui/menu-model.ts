@@ -122,6 +122,45 @@ const pending = (name: string, labelKey: string, keytip: string): UiNode =>
     actionArgs: { dialog: command(name) },
   });
 
+export const IMAGE_ALIGN_MENU: UiNode = menu('ui.menu.alignObjects', [
+  ...(
+    [
+      ['left', 'ui.align.left'],
+      ['center', 'ui.align.center'],
+      ['right', 'ui.align.right'],
+      ['top', 'ui.align.top'],
+      ['middle', 'ui.align.middle'],
+      ['bottom', 'ui.align.bottom'],
+    ] as const
+  ).map(([edge, labelKey]) =>
+    button({
+      labelKey,
+      id: `align:${edge}`,
+      command: command('object.align'),
+      args: { edge },
+    }),
+  ),
+]);
+
+export const IMAGE_WRAP_MENU: UiNode = menu('ui.menu.wrapText', [
+  ...(
+    [
+      ['square', 'ui.wrap.square'],
+      ['tight', 'ui.wrap.tight'],
+      ['through', 'ui.wrap.through'],
+      ['topAndBottom', 'ui.wrap.topAndBottom'],
+      ['none', 'ui.wrap.none'],
+    ] as const
+  ).map(([wrap, labelKey]) =>
+    button({
+      labelKey,
+      id: `wrap:${wrap}`,
+      command: command('object.setWrap'),
+      args: { wrap },
+    }),
+  ),
+]);
+
 const FONT_FAMILIES: readonly ControlOption[] = FONT_FAMILY_NAMES.map((family) => ({
   value: family,
   label: family,
@@ -895,43 +934,8 @@ export const PICTURE_TAB: UiTab = {
       id: 'pictureTools',
       labelKey: 'ui.group.pictureTools',
       nodes: [
-        menu('ui.menu.alignObjects', [
-      ...(
-        [
-          ['left', 'ui.align.left'],
-          ['center', 'ui.align.center'],
-          ['right', 'ui.align.right'],
-          ['top', 'ui.align.top'],
-          ['middle', 'ui.align.middle'],
-          ['bottom', 'ui.align.bottom'],
-        ] as const
-      ).map(([edge, labelKey]) =>
-        button({
-          labelKey,
-          id: `align:${edge}`,
-          command: command('object.align'),
-          args: { edge },
-        }),
-      ),
-    ]),
-    menu('ui.menu.wrapText', [
-      ...(
-        [
-          ['square', 'ui.wrap.square'],
-          ['tight', 'ui.wrap.tight'],
-          ['through', 'ui.wrap.through'],
-          ['topAndBottom', 'ui.wrap.topAndBottom'],
-          ['none', 'ui.wrap.none'],
-        ] as const
-      ).map(([wrap, labelKey]) =>
-        button({
-          labelKey,
-          id: `wrap:${wrap}`,
-          command: command('object.setWrap'),
-          args: { wrap },
-        }),
-      ),
-    ]),
+        IMAGE_ALIGN_MENU,
+        IMAGE_WRAP_MENU,
         pending('object.changeImage', 'ui.menu.changePicture', 'CP'),
         pending('object.compress', 'ui.menu.compressPictures', 'CM'),
       ],
@@ -1096,7 +1100,8 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
   }),
   ],
   image: [
-    pending('object.setWrap', 'ui.menu.wrapText', 'WT'),
+    IMAGE_ALIGN_MENU,
+    IMAGE_WRAP_MENU,
     separator('ctx:image:sep1'),
     pending('object.changeImage', 'ui.menu.changePicture', 'CP'),
     pending('object.compress', 'ui.menu.compressPictures', 'CM'),
