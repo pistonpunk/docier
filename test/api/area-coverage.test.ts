@@ -216,7 +216,7 @@ describe('the chrome does not show placeholders', () => {
 describe('deliberately unavailable commands', () => {
   it('registers each of them with a specific reason instead of a generic one', async () => {
     const handle = await editorOf(FIXTURE);
-    expect(unsupportedIds.length).toBeGreaterThan(38);
+    expect(unsupportedIds.length).toBeGreaterThan(36);
 
     const missing: string[] = [];
     const generic: string[] = [];

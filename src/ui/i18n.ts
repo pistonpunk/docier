@@ -150,6 +150,8 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.control.trackChanges': 'Track Changes',
   'ui.control.acceptChange': 'Accept Change',
   'ui.control.rejectChange': 'Reject Change',
+  'ui.control.acceptAllChanges': 'Accept All Changes',
+  'ui.control.rejectAllChanges': 'Reject All Changes',
   'ui.control.viewPrint': 'Print Layout',
   'ui.control.viewWeb': 'Web Layout',
   'ui.control.viewDraft': 'Draft',

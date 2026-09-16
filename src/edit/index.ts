@@ -29,6 +29,8 @@ export type { InputHandle, InputHost } from './input.js';
 export { attachInput } from './input.js';
 export type { MarkState, ParagraphMarks, RunMarks } from './inspect.js';
 export { marksAt, marksFrom, pageBackgroundAt, paragraphMarksAt } from './inspect.js';
+export type { RevisionDecision, RevisionSite } from './revisions.js';
+export { resolveAllRevisions, resolveRevision, revisionAt, revisionKindOf } from './revisions.js';
 export type { AreaHost, AreaSpec } from './areas/support.js';
 export { areaCommands, installAreaCommands, unsupportedIds } from './areas/index.js';
 export {

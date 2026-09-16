@@ -1,5 +1,8 @@
 import type { CommandArea, CommandDefinition, LocalizedString } from '../../api/types.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
+import { Paragraph } from '../../model/index.js';
+import type { RevisionDecision } from '../index.js';
+import { resolveAllRevisions, resolveRevision, revisionAt } from '../revisions.js';
 import { createWElement, setWAttr } from '../../model/index.js';
 import type { AreaHost, AreaSpec } from './support.js';
 import { areaCommand, documentSection, DOCUMENT_INVALIDATION } from './support.js';
@@ -162,6 +165,55 @@ const lineNumbersSpec: AreaSpec<LineNumberArgs> = {
   },
 };
 
+export interface ResolveChangeArgs {
+  readonly all?: boolean;
+}
+
+const revisionReason = (host: AreaHost, args: ResolveChangeArgs | undefined): LocalizedString | undefined => {
+  if (args?.all === true) return undefined;
+  const target = revisionTarget(host);
+  if (target === undefined) return 'The caret is not inside a tracked change';
+  return undefined;
+};
+
+const revisionTarget = (host: AreaHost) => {
+  const session = host.session;
+  const resolved = session.resolve(session.index.clamp(host.selection.focus));
+  const paragraph = Paragraph.of(session.model.context, resolved?.slot.element ?? session.model.body().element);
+  return revisionAt(session.model, paragraph.element, resolved?.offset ?? 0);
+};
+
+const resolveSpec = (
+  id: string,
+  label: string,
+  decision: RevisionDecision,
+): AreaSpec<ResolveChangeArgs> => ({
+  id,
+  label,
+  category: 'doc',
+  permissions: ['format'],
+  enabledIn: (host, args) => host.session.aligned && host.editable && revisionReason(host, args) === undefined,
+  reason: (host, args) => {
+    if (!host.session.aligned) return NO_PAGE_BACKGROUND;
+    if (!host.editable) return 'The document is read-only';
+    return revisionReason(host, args) ?? 'This command is available here';
+  },
+  run: (host, args) => {
+    if (!host.editable) return false;
+    const changed =
+      args?.all === true
+        ? resolveAllRevisions(host.session.model, decision)
+        : (() => {
+            const target = revisionTarget(host);
+            if (target === undefined) return false;
+            return resolveRevision(host.session.model, target, decision);
+          })();
+    if (!changed) return false;
+    host.session.relayout();
+    return true;
+  },
+});
+
 const anyIo = (): boolean => true;
 const pdfIo = (io: DocumentIo): boolean => io.exportPdf !== undefined;
 
@@ -170,6 +222,8 @@ export const documentCommands = (
 ): readonly CommandDefinition<never, void>[] => [
   areaCommand<PageBackgroundArgs>(host, pageBackgroundSpec),
   areaCommand<LineNumberArgs>(host, lineNumbersSpec),
+  areaCommand<ResolveChangeArgs>(host, resolveSpec('docier.command.doc.acceptChange', 'Accept change', 'accept')),
+  areaCommand<ResolveChangeArgs>(host, resolveSpec('docier.command.doc.rejectChange', 'Reject change', 'reject')),
   docSpec(host, 'docier.command.doc.open', 'Open', (io) => {
     io.open();
   }, anyIo, NO_HANDLER),

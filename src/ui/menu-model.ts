@@ -1021,8 +1021,28 @@ export const RIBBON_TABS: readonly UiTab[] = [
             action: 'openDialog',
             actionArgs: { dialog: command('doc.toggleTrackChanges') },
           }),
-          pending('doc.acceptChange', 'ui.control.acceptChange', 'AC'),
-          pending('doc.rejectChange', 'ui.control.rejectChange', 'RC'),
+          button({
+            labelKey: 'ui.control.acceptChange',
+            command: command('doc.acceptChange'),
+            keytip: 'AC',
+          }),
+          button({
+            labelKey: 'ui.control.rejectChange',
+            command: command('doc.rejectChange'),
+            keytip: 'RC',
+          }),
+          menu('ui.control.acceptAllChanges', [
+            button({
+              labelKey: 'ui.control.acceptAllChanges',
+              command: command('doc.acceptChange'),
+              args: { all: true },
+            }),
+            button({
+              labelKey: 'ui.control.rejectAllChanges',
+              command: command('doc.rejectChange'),
+              args: { all: true },
+            }),
+          ]),
         ],
       },
     ],
