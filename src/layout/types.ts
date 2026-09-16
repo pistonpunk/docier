@@ -136,6 +136,7 @@ export interface RunPaint {
   readonly characterSpacing: Mp;
   readonly characterScale: number;
   readonly rightToLeft: boolean;
+  readonly revision: 'insert' | 'delete' | undefined;
 }
 
 export interface AtomPlacement {

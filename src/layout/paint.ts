@@ -21,6 +21,7 @@ const keyOf = (format: RunFormat, face: FontFace): string =>
     format.characterSpacing,
     format.characterScale,
     format.rightToLeft ? 'rtl' : 'ltr',
+    format.revision ?? '',
   ].join('|');
 
 export class PaintRegistry {
@@ -52,6 +53,7 @@ export class PaintRegistry {
       characterSpacing: format.characterSpacing,
       characterScale: format.characterScale,
       rightToLeft: format.rightToLeft,
+      revision: format.revision,
     });
     return index;
   }

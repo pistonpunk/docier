@@ -21,6 +21,7 @@ import {
   NoteReferenceContent,
   SymbolContent,
   TabContent,
+  DeletedTextContent,
   TextContent,
   annotateRuns,
   branchCarriesModelledContent,
@@ -152,12 +153,35 @@ const itemOf = (
   drawing,
 });
 
+const REVISIONS: Readonly<Record<string, 'insert' | 'delete'>> = {
+  ins: 'insert',
+  del: 'delete',
+  moveTo: 'insert',
+  moveFrom: 'delete',
+};
+
+const REVISION_STOP: ReadonlySet<string> = new Set(['p', 'tc', 'hdr', 'ftr', 'body', 'txbxContent']);
+
+export const revisionOf = (element: XmlElement): 'insert' | 'delete' | undefined => {
+  let current = element.parent;
+  while (current !== undefined && !REVISION_STOP.has(current.localName)) {
+    const found = REVISIONS[current.localName];
+    if (found !== undefined) return found;
+    current = current.parent;
+  }
+  return undefined;
+};
+
 const itemFromContent = (
   content: unknown,
   format: RunFormat,
   start: DocPos,
 ): IngestedItem | undefined => {
   if (content instanceof TextContent) {
+    if (content.value.length === 0) return undefined;
+    return itemOf('text', content.value, format.requestedFamily, format.size, start, 'none', 0);
+  }
+  if (content instanceof DeletedTextContent) {
     if (content.value.length === 0) return undefined;
     return itemOf('text', content.value, format.requestedFamily, format.size, start, 'none', 0);
   }
@@ -412,7 +436,12 @@ export const ingestParagraph = (
 
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);
-    const runFormat = runFormatOf(resolvedRun, options.defaultFontFamily, options.theme);
+    const runFormat = runFormatOf(
+      resolvedRun,
+      options.defaultFontFamily,
+      options.theme,
+      revisionOf(run.element),
+    );
     if (hasThemeFont(resolvedRun)) hasThemeFontSeen = true;
     const runStart = docPos(cursor);
     const items: IngestedItem[] = [];

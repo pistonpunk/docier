@@ -19,19 +19,20 @@ const REFUSALS: readonly Refusal[] = [
     id: 'docier.command.doc.toggleTrackChanges',
     label: 'Track changes',
     category: 'doc',
-    reason: 'This build does not record tracked changes; revision marks are preserved exactly as they were loaded',
+    reason:
+      'This build lays out the revision marks a document carries and does not record new ones',
   },
   {
     id: 'docier.command.doc.acceptChange',
     label: 'Accept change',
     category: 'doc',
-    reason: 'This build preserves revision marks and never accepts them',
+    reason: 'This build lays out revision marks and never accepts them',
   },
   {
     id: 'docier.command.doc.rejectChange',
     label: 'Reject change',
     category: 'doc',
-    reason: 'This build preserves revision marks and never rejects them',
+    reason: 'This build lays out revision marks and never rejects them',
   },
 
 

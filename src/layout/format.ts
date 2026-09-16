@@ -28,7 +28,10 @@ export interface RunFormat {
   readonly characterSpacing: Mp;
   readonly characterScale: number;
   readonly rightToLeft: boolean;
+  readonly revision: RunRevision | undefined;
 }
+
+export type RunRevision = 'insert' | 'delete';
 
 export interface ParagraphFormat {
   readonly justification: Justification;
@@ -160,12 +163,16 @@ export const fallbackRunFormat = (family: string): RunFormat => ({
   characterSpacing: mp(0),
   characterScale: 100,
   rightToLeft: false,
+  revision: undefined,
 });
+
+export const REVISION_COLOUR = 'C00000';
 
 export const runFormatOf = (
   resolved: ResolvedProperties,
   fallbackFamily: string,
   theme?: ThemeResolution | undefined,
+  revision?: RunRevision | undefined,
 ): RunFormat => {
   const size = resolved.size;
   return {
@@ -173,12 +180,13 @@ export const runFormatOf = (
     size: size === undefined ? DEFAULT_FONT_SIZE : halfPointToMp(size),
     bold: resolved.bold ?? false,
     italic: resolved.italic ?? false,
-    underline: resolved.underline !== undefined,
-    strike: resolved.strike ?? false,
+    underline: revision === 'insert' ? true : resolved.underline !== undefined,
+    strike: revision === 'delete' ? true : resolved.strike ?? false,
+    revision,
     allCaps: resolved.allCaps ?? false,
     smallCaps: resolved.smallCaps ?? false,
     hidden: resolved.hidden ?? false,
-    color: resolveThemeColour(resolved, theme),
+    color: revision === undefined ? resolveThemeColour(resolved, theme) : REVISION_COLOUR,
     highlight: resolved.highlight,
     verticalAlign: verticalAlignOf(resolved.verticalAlign),
     position: halfPointToMp(resolved.position ?? halfPoint(0)),

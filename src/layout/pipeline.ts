@@ -18,8 +18,7 @@ import {
 } from './sections.js';
 import { FontResolver } from './fonts.js';
 import { PaintRegistry } from './paint.js';
-import type { RunFormat } from './format.js';
-import { DEFAULT_FONT_SIZE } from './format.js';
+import { fallbackRunFormat } from './format.js';
 import type { IntrinsicWidths, PreparedParagraph } from './paragraph-blocks.js';
 import { buildParagraphBlock, intrinsicWidths, prepareParagraphs } from './paragraph-blocks.js';
 import type { SideBand } from './assembly.js';
@@ -112,24 +111,7 @@ const tabStopTwips = (model: DocumentModel): Twip => {
   return raw === undefined || raw <= 0 ? twip(DEFAULT_TAB_STOP_TWIPS) : twip(raw);
 };
 
-const fallbackRunFormat = (family: string): RunFormat => ({
-  requestedFamily: family,
-  size: DEFAULT_FONT_SIZE,
-  bold: false,
-  italic: false,
-  underline: false,
-  strike: false,
-  allCaps: false,
-  smallCaps: false,
-  hidden: false,
-  color: undefined,
-  highlight: undefined,
-  verticalAlign: 'baseline',
-  position: mp(0),
-  characterSpacing: mp(0),
-  characterScale: 100,
-  rightToLeft: false,
-});
+
 
 const flowSections = (
   sections: readonly Section[],
