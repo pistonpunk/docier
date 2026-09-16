@@ -97,9 +97,6 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="2" y="2.5" width="12" height="4.5" rx="1"/>' +
     '<rect x="2" y="9" width="12" height="4.5" rx="1"/>' +
     '<path d="M8 7v2"/>',
-  'doc.setPageBackground':
-    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/>' +
-    '<path d="M2.5 9.5h11"/><path d="M6 13.5V9.5"/><path d="M11 9.5v4"/>',
   'pagecolours:FFF2CC':
     '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
   'pagecolours:FFFFFF':

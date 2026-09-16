@@ -1,7 +1,5 @@
 import type { CommandArea, CommandDefinition, LocalizedString } from '../../api/types.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
-import { xml } from '../../ooxml/index.js';
-import { W_NAMESPACE } from '../../ooxml/namespaces.js';
 import { createWElement, setWAttr } from '../../model/index.js';
 import type { AreaHost, AreaSpec } from './support.js';
 import { areaCommand } from './support.js';
