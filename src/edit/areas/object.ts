@@ -14,6 +14,8 @@ import {
   AlternateContentContent,
   DrawingContent,
   Paragraph,
+  childElements,
+  isWElement,
   resolvedRunContents,
 } from '../../model/index.js';
 import { buildInlineDrawing } from '../../ooxml/drawing.js';
@@ -335,8 +337,57 @@ const selectSpec: AreaSpec<ObjectSelectArgs> = {
   },
 };
 
+const runElementOf = (drawing: XmlElement): XmlElement | undefined => {
+  const parent = drawing.parent;
+  if (parent === undefined || !isWElement(parent, 'r')) return undefined;
+  return parent;
+};
+
+const deleteSpec: AreaSpec<ObjectSelectArgs> = {
+  id: 'docier.command.object.delete',
+  label: 'Delete object',
+  category: 'object',
+  permissions: ['edit'],
+  enabledIn: (host, args) =>
+    drawingWithId(host, selectedId(host, args) ?? '') !== undefined,
+  reason: (host, args) => {
+    const id = selectedId(host, args);
+    return id === undefined ? NO_SELECTION : NO_PICTURE;
+  },
+  run: (host, args) => {
+    const id = selectedId(host, args);
+    if (id === undefined) return false;
+    const drawing = drawingWithId(host, id);
+    if (drawing === undefined) return false;
+    const container = drawing.parent;
+    if (container === undefined) return false;
+    const run = runElementOf(drawing);
+    const runHost = run?.parent;
+    // a run that carries nothing but the picture goes with it, so the removal
+    // happens one level up from the drawing; a run that also holds text stays
+    const drop =
+      run !== undefined &&
+      runHost !== undefined &&
+      childElements(run).every((child) => child === drawing);
+    const root = drop ? (runHost ?? container) : container;
+    const changed = changedBy([root], () => {
+      if (drop && run !== undefined) {
+        root.children = root.children.filter((child) => child !== run);
+      } else {
+        container.children = container.children.filter((child) => child !== drawing);
+      }
+      host.session.model.context.forgetSubtree(root);
+    });
+    if (!changed) return false;
+    clearObjectSelection(host.session);
+    host.session.relayout();
+    return true;
+  },
+};
+
 export const objectCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<ObjectSizeArgs>(host, setSizeSpec),
+  areaCommand<ObjectSelectArgs>(host, deleteSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),
 ];

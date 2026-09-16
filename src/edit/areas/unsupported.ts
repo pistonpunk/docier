@@ -10,8 +10,8 @@ interface Refusal {
   readonly live?: (host: AreaHost) => string;
 }
 
-const NO_OBJECT_SELECTION =
-  'There is no object selection in this build, so drawing commands cannot act';
+const NO_FLOATING =
+  'This build places pictures and text boxes in the line they sit in: it has no floating objects, so there is no stacking order and no wrap to set';
 const NO_DRAWING =
   'This build authors a picture from bytes the host supplies and nothing else: it has no shape, chart or text-box geometry';
 const NO_PART = (part: string): string =>
@@ -139,19 +139,24 @@ const REFUSALS: readonly Refusal[] = [
 
   { id: 'docier.command.object.insertShape', label: 'Shape', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
-  { id: 'docier.command.object.changeImage', label: 'Change picture', category: 'object', reason: NO_DRAWING },
+  {
+    id: 'docier.command.object.changeImage',
+    label: 'Change picture',
+    category: 'object',
+    reason:
+      'Replacing a picture means rewriting the media part, and this build inserts media without ever rewriting bytes a document already carries',
+  },
   {
     id: 'docier.command.object.compress',
     label: 'Compress pictures',
     category: 'object',
     reason: 'Compression re-encodes media bytes, and this build inserts and scales them but never rewrites them',
   },
-  { id: 'docier.command.object.align', label: 'Align objects', category: 'object', reason: NO_OBJECT_SELECTION },
-  { id: 'docier.command.object.bringForward', label: 'Bring forward', category: 'object', reason: NO_OBJECT_SELECTION },
-  { id: 'docier.command.object.sendBackward', label: 'Send backward', category: 'object', reason: NO_OBJECT_SELECTION },
-  { id: 'docier.command.object.group', label: 'Group', category: 'object', reason: NO_OBJECT_SELECTION },
-  { id: 'docier.command.object.setWrap', label: 'Wrap text', category: 'object', reason: NO_OBJECT_SELECTION },
-  { id: 'docier.command.object.delete', label: 'Delete object', category: 'object', reason: NO_OBJECT_SELECTION },
+  { id: 'docier.command.object.align', label: 'Align objects', category: 'object', reason: NO_FLOATING },
+  { id: 'docier.command.object.bringForward', label: 'Bring forward', category: 'object', reason: NO_FLOATING },
+  { id: 'docier.command.object.sendBackward', label: 'Send backward', category: 'object', reason: NO_FLOATING },
+  { id: 'docier.command.object.group', label: 'Group', category: 'object', reason: NO_FLOATING },
+  { id: 'docier.command.object.setWrap', label: 'Wrap text', category: 'object', reason: NO_FLOATING },
 
   {
     id: 'docier.command.theme.setColors',

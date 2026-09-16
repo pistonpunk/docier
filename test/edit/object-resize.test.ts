@@ -26,7 +26,15 @@ import { findMember } from '../harness/zip-read.js';
 import { binaryPart } from '../harness/zip-build.js';
 import type { DocxSpec } from '../model/support.js';
 import { openModel, parseElement, wrap } from '../model/support.js';
-import { bodyOf, disposeEditors, editorOf, mountPoint, paragraphText, track } from './support.js';
+import {
+  bodyOf,
+  disposeEditors,
+  documentText,
+  editorOf,
+  mountPoint,
+  paragraphText,
+  track,
+} from './support.js';
 
 const WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
 const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -522,6 +530,67 @@ describe('resizing a picture through the surface', () => {
       widthTwips: 1200,
     });
     expect(String(reason)).toContain('No picture is selected');
+  });
+});
+
+describe('deleting the selected picture', () => {
+  const BODY_WITH_TEXT = bodyOf(
+    wrap(`<w:r>${picture({ blip: BLIP })}</w:r>`),
+    paragraphText('after'),
+  );
+
+  const run = async (handle: EditorHandle, id: string, args?: unknown): Promise<string> => {
+    const result = await handle.commands.execute(`docier.command.${id}`, args);
+    return result.status;
+  };
+
+  it('refuses until something is selected, and says so', async () => {
+    const handle = await editorOf(BODY_WITH_TEXT);
+    expect(handle.commands.isEnabled('docier.command.object.delete')).toBe(false);
+    expect(String(handle.commands.disabledReason('docier.command.object.delete'))).toContain(
+      'No picture is selected',
+    );
+  });
+
+  it('takes the picture out of the paragraph and clears the selection', async () => {
+    const handle = await editorOf(BODY_WITH_TEXT);
+    await selectByClick(handle);
+    const session = handle.session;
+    if (session === undefined) throw new Error('no session');
+    expect(objectSelectionOf(session)).toBe(PICTURE_ID);
+    expect(handle.commands.isEnabled('docier.command.object.delete')).toBe(true);
+
+    expect(await run(handle, 'object.delete')).toBe('ok');
+    expect(objectSelectionOf(session)).toBeUndefined();
+    expect(documentText(handle)).toBe('\nafter');
+    expect(handle.root.querySelector(`[${ATTR.objectId}="${PICTURE_ID}"]`)).toBeNull();
+  });
+
+  it('leaves the run behind when it also carries text', async () => {
+    const handle = await editorOf(
+      bodyOf(wrap(`<w:r>${picture({ blip: BLIP })}<w:t xml:space="preserve">caption</w:t></w:r>`)),
+    );
+    await selectByClick(handle);
+
+    expect(await run(handle, 'object.delete')).toBe('ok');
+    // read the serialized body: the model's block views are built once and do not
+    // reflect a mutation made behind their back
+    const xml = serializeXmlNode(handle.document!.body().element);
+    expect(xml).not.toContain('<w:drawing');
+    expect(xml).toContain('caption');
+    expect(xml).toContain('<w:r>');
+  });
+
+  it('is one undo entry', async () => {
+    const handle = await editorOf(BODY_WITH_TEXT);
+    await selectByClick(handle);
+    const before = serializeXmlNode(handle.document!.body().element);
+
+    expect(await run(handle, 'object.delete')).toBe('ok');
+    expect(serializeXmlNode(handle.document!.body().element)).not.toBe(before);
+
+    await handle.commands.execute('docier.command.history.undo');
+    expect(serializeXmlNode(handle.document!.body().element)).toBe(before);
   });
 });
 
