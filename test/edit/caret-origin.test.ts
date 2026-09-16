@@ -20,6 +20,8 @@ const NUMBERING = numberingXml(
 
 const NUMBERED = '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
 const INDENTED = '<w:ind w:left="1440" w:firstLine="720"/>';
+const CENTRED = '<w:jc w:val="center"/>';
+const RIGHT = '<w:jc w:val="right"/>';
 
 const handleOf = async (spec: DocxSpec): Promise<EditorHandle> => {
   const model: DocumentModel = await openModel(spec);
@@ -132,5 +134,48 @@ describe('the caret on an empty line sits at the line text origin', () => {
 
     await setCaret(handle, paragraphStart(handle, 1) as number);
     await expectCaretMatchesTextOrigin(handle, 1, 'click onto an empty list line');
+  });
+
+  /**
+   * Justified lines need a different statement from the left-aligned one above.
+   * On an empty left-aligned line the caret and the first glyph share an x, so
+   * the two can be required to be equal. On a centred line they do not: the
+   * empty line's caret belongs at the centre of the line, while once a character
+   * exists the caret sits at the left edge of that character, which is half a
+   * character to the left of centre. Both are correct, and they differ by half a
+   * glyph, so the expectation is stated against the line's own geometry:
+   * centred is the midpoint of left-aligned and right-aligned empty lines.
+   */
+  const emptyCaretLeft = async (justification: string): Promise<number> => {
+    const handle = await handleOf({
+      body: bodyOf(paragraphText('', justification), paragraphText('gamma')),
+    });
+    await setCaret(handle, paragraphStart(handle, 0) as number);
+    return caretLeft(handle);
+  };
+
+  it('puts an empty centred line caret halfway across, and a right-aligned one at the right edge', async () => {
+    const left = await emptyCaretLeft('');
+    const centred = await emptyCaretLeft(CENTRED);
+    const right = await emptyCaretLeft(RIGHT);
+
+    expect(right, 'a right-aligned empty line should not sit at the left margin').toBeGreaterThan(
+      left,
+    );
+    expect(centred, 'an empty centred line should not sit at the left margin').toBeGreaterThan(left);
+    expect(centred, 'and should not run to the right margin').toBeLessThan(right);
+    expect(centred).toBeCloseTo((left + right) / 2, 1);
+  });
+
+  it('keeps an empty centred line caret mid-line after a paragraph split', async () => {
+    const handle = await handleOf({
+      body: bodyOf(paragraphText('alpha', CENTRED), paragraphText('gamma')),
+    });
+    await setCaret(handle, paragraphStart(handle, 0) as number + 5);
+    await handle.commands.execute('docier.command.edit.splitParagraph');
+
+    const plain = await emptyCaretLeft('');
+    const right = await emptyCaretLeft(RIGHT);
+    expect(caretLeft(handle)).toBeCloseTo((plain + right) / 2, 1);
   });
 });

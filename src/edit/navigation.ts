@@ -2,7 +2,6 @@ import type { DocPos } from '../layout/index.js';
 import type { TextAffinity } from '../api/types.js';
 import { docPos } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
-import { mp } from '../units/index.js';
 import { downFrom, linesFrom, upFrom } from './caret.js';
 import type { PositionIndex, StorySpan } from './positions.js';
 import { spanText } from './positions.js';
@@ -24,7 +23,7 @@ export interface MoveOptions {
 
 export interface VerticalMoveResult {
   readonly selection: EditSelection;
-  readonly goalX: Mp;
+  readonly goalX: Mp | undefined;
 }
 
 const asPos = (value: number): DocPos => docPos(value);
@@ -174,12 +173,12 @@ export const moveUp = (
 ): VerticalMoveResult => {
   const extend = options.extend ?? false;
   const collapsed = prepare(selection, 'up', extend);
-  if (collapsed !== undefined) return { selection: collapsed, goalX: goalX ?? mp(0) };
+  if (collapsed !== undefined) return { selection: collapsed, goalX };
   const moved = upFrom(index, selection.focus, selection.affinity, goalX);
   if (moved === undefined) {
     const line = index.lineAt(selection.focus, selection.affinity);
     const target = line?.start ?? storyStart(index, selection.focus);
-    return { selection: apply(index, selection, target, 'downstream', extend), goalX: goalX ?? mp(0) };
+    return { selection: apply(index, selection, target, 'downstream', extend), goalX };
   }
   return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
 };
@@ -192,12 +191,12 @@ export const moveDown = (
 ): VerticalMoveResult => {
   const extend = options.extend ?? false;
   const collapsed = prepare(selection, 'down', extend);
-  if (collapsed !== undefined) return { selection: collapsed, goalX: goalX ?? mp(0) };
+  if (collapsed !== undefined) return { selection: collapsed, goalX };
   const moved = downFrom(index, selection.focus, selection.affinity, goalX);
   if (moved === undefined) {
     const line = index.lineAt(selection.focus, selection.affinity);
     const target = line?.end ?? storyEnd(index, selection.focus);
-    return { selection: apply(index, selection, target, 'upstream', extend), goalX: goalX ?? mp(0) };
+    return { selection: apply(index, selection, target, 'upstream', extend), goalX };
   }
   return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
 };
@@ -211,11 +210,11 @@ export const moveLinesDown = (
 ): VerticalMoveResult => {
   const extend = options.extend ?? false;
   const collapsed = prepare(selection, 'down', extend);
-  if (collapsed !== undefined) return { selection: collapsed, goalX: goalX ?? mp(0) };
+  if (collapsed !== undefined) return { selection: collapsed, goalX };
   const moved = linesFrom(index, selection.focus, selection.affinity, goalX, Math.max(1, lines));
   if (moved === undefined) {
     const target = storyEnd(index, selection.focus);
-    return { selection: apply(index, selection, target, 'upstream', extend), goalX: mp(0) };
+    return { selection: apply(index, selection, target, 'upstream', extend), goalX: undefined };
   }
   return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
 };
@@ -229,11 +228,11 @@ export const moveLinesUp = (
 ): VerticalMoveResult => {
   const extend = options.extend ?? false;
   const collapsed = prepare(selection, 'up', extend);
-  if (collapsed !== undefined) return { selection: collapsed, goalX: goalX ?? mp(0) };
+  if (collapsed !== undefined) return { selection: collapsed, goalX };
   const moved = linesFrom(index, selection.focus, selection.affinity, goalX, -Math.max(1, lines));
   if (moved === undefined) {
     const target = storyStart(index, selection.focus);
-    return { selection: apply(index, selection, target, 'downstream', extend), goalX: mp(0) };
+    return { selection: apply(index, selection, target, 'downstream', extend), goalX: undefined };
   }
   return { selection: apply(index, selection, moved.pos, moved.affinity, extend), goalX: moved.goalX };
 };

@@ -9,6 +9,7 @@ import type {
   TableFragment,
 } from '../layout/index.js';
 import type { Frame, ResolvedRenderOptions } from './types.js';
+import { mp } from '../units/index.js';
 import type { PaintScale } from './scale.js';
 import { formatPx } from './scale.js';
 import { applyStyle, positionStyle } from './style.js';
@@ -74,9 +75,9 @@ const paintObjectText = (
       if (atom === undefined) continue;
       const container = box('docier-textbox');
       stamp(container, { [ATTR.textBox]: run.object.objectId });
-      applyStyle(container, positionStyle(geometryAt(objectBoxOf(line, run, atom), frame, context.scale)));
       const area = objectBoxOf(line, run, atom);
-      const inner = frameOf({ x: area.x, y: area.y, width: area.width, height: area.height });
+      applyStyle(container, positionStyle(geometryAt(area, frame, context.scale)));
+      const inner: Frame = { dx: mp(0), dy: mp(0) };
       for (const entry of blocks) paintBlock(container, entry, inner, context);
       parent.appendChild(container);
     }

@@ -7,6 +7,10 @@ import { paintScale } from '../../src/render/scale.js';
 import { pdfBaseline, pdfFrame, pdfTop, pdfX } from '../../src/pdf/geometry.js';
 import { renderPdf } from '../../src/pdf/index.js';
 import { segmentsOf } from '../../src/pdf/runs.js';
+import type { Rect } from '../../src/layout/index.js';
+import { objectBoxOf } from '../../src/render/inline-object.js';
+import { buildTextBoxDrawing } from '../../src/ooxml/drawing.js';
+import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
 import {
   buildTestFont,
   contentStreamOf,
@@ -136,5 +140,58 @@ describe('a screen coordinate and a print coordinate', () => {
       }
     }
     expect(checked).toBeGreaterThan(0);
+  });
+});
+
+describe('an inline text box in the PDF', () => {
+  it('draws the box text at the box, not by subtracting the box position away', async () => {
+    const drawing = serializeXmlNode(
+      buildTextBoxDrawing({ cx: 914400, cy: 457200, docPrId: 7, name: 'Box', text: 'inside' }),
+    );
+    const body = [
+      '<w:p><w:r><w:t xml:space="preserve">lead in </w:t></w:r>',
+      `<w:r>${drawing}</w:r></w:p>`,
+      '<w:p><w:r><w:t>after</w:t></w:r></w:p>',
+    ].join('');
+    const result = await layoutOf(body, font.measurer);
+    const page = result.pages[0];
+    expect(page).toBeDefined();
+    if (page === undefined) return;
+
+    let box: Rect | undefined;
+    for (const block of page.blocks) {
+      for (const line of block.lines) {
+        for (const atom of line.atoms) {
+          if (atom.object === undefined) continue;
+          const run = line.runs.find(
+            (candidate) =>
+              candidate.object === atom.object ||
+              (atom.source.start >= candidate.source.start && atom.source.end <= candidate.source.end),
+          );
+          if (run === undefined) continue;
+          box = objectBoxOf(line, run, atom);
+          break;
+        }
+        if (box !== undefined) break;
+      }
+      if (box !== undefined) break;
+    }
+    expect(box, 'the text box should be laid out as an object').toBeDefined();
+    if (box === undefined) return;
+
+    const bytes = await renderPdf(result, fontOptions(font));
+    const written = textMatrices(await contentStreamOf(bytes)).map(
+      (matrix) => matrix.x * CSS_PX_PER_POINT,
+    );
+    expect(written.length).toBeGreaterThan(0);
+
+    const left = toCssPx(mp((box.x as number) - (page.page.x as number)), 1);
+    const right = left + toCssPx(box.width, 1);
+
+    // the box text must land inside the box
+    const inside = written.filter((value) => value >= left - 1 && value <= right + 1);
+    expect(inside.length, `nothing drawn between ${String(left)} and ${String(right)}`).toBeGreaterThan(0);
+    // and nothing may be drawn left of the page
+    expect(written.filter((value) => value < 0)).toEqual([]);
   });
 });

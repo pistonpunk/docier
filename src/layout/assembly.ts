@@ -108,10 +108,11 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
       (!last || format.justification === 'distribute');
     if (stretches) placed = justifyPlaced(placed, extra);
 
+    let alignmentShift = mp(0);
     if (!stretches && (format.justification === 'right' || format.justification === 'center')) {
       const slack = maxMp(mp(lineWidth - natural), mp(0));
-      const shift = format.justification === 'right' ? slack : mp(roundHalfEven(slack / 2));
-      if (shift !== 0) placed = shiftPlaced(placed, shift);
+      alignmentShift = format.justification === 'right' ? slack : mp(roundHalfEven(slack / 2));
+      if (alignmentShift !== 0) placed = shiftPlaced(placed, alignmentShift);
     }
 
     const prefix = index === 0 && numbering !== undefined ? numbering.prefix : [];
@@ -126,7 +127,7 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
       geometry: geometryOfPlaced(withPrefix, request.fallbackBox, geometryOrigin),
       justified: stretches,
       breakAfter: line.forced,
-      textOrigin: lineOrigin,
+      textOrigin: mp(lineOrigin + alignmentShift),
     });
   }
 

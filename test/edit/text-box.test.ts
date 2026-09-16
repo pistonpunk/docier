@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { EditorHandle } from '../../src/api/editor.js';
 import { memberText } from '../model/support.js';
-import { bodyOf, disposeEditors, editorOf } from './support.js';
+import { bodyOf, disposeEditors, editorOf, paragraphText } from './support.js';
 import { buildTextBoxDrawing, WORD_DRAWING_SHAPE } from '../../src/ooxml/drawing.js';
 import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
 
@@ -86,5 +86,48 @@ describe('inserting a text box', () => {
     await handle.commands.execute('docier.command.history.undo');
     await handle.whenReady();
     expect(await bodyText(handle)).toBe(before);
+  });
+});
+
+describe('where the text inside a box is painted', () => {
+  const px = (value: string | undefined): number => {
+    const parsed = Number.parseFloat(value ?? '');
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  };
+
+  it('places the box content inside the box, not back at the page origin', async () => {
+    const handle = await editorOf(bodyOf(paragraphText('alpha beta gamma')));
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: 5 });
+    const status = await handle.commands.execute('docier.command.insert.textBox', {
+      text: 'in the box',
+    });
+    expect(status.status).toBe('ok');
+    await handle.whenReady();
+
+    const container = handle.root.querySelector<HTMLElement>('[data-docier-textbox]');
+    expect(container).not.toBeNull();
+    if (container === null) return;
+
+    const containerLeft = px(container.style.left);
+    const containerWidth = px(container.style.width);
+    expect(Number.isFinite(containerLeft)).toBe(true);
+    expect(containerWidth).toBeGreaterThan(0);
+
+    const inner = [...container.querySelectorAll<HTMLElement>('*')].filter(
+      (node) => node.style.left !== '',
+    );
+    expect(inner.length).toBeGreaterThan(0);
+
+    const wrong: string[] = [];
+    for (const node of inner) {
+      const left = px(node.style.left);
+      const width = px(node.style.width);
+      if (!Number.isFinite(left)) continue;
+      if (left < 0) wrong.push(`${node.className} left=${String(left)} is off the left of the box`);
+      else if (Number.isFinite(width) && left + width > containerWidth + 1) {
+        wrong.push(`${node.className} left=${String(left)} width=${String(width)} overflows the box`);
+      }
+    }
+    expect(wrong).toEqual([]);
   });
 });
