@@ -376,7 +376,7 @@ const contextKey = (
     tableStyle?.styleId ?? '',
     tableStyle?.conditions.join(',') ?? '',
     numbering === undefined ? '' : `${numbering.numId}/${numbering.ilvl}`,
-  ].join(' ');
+  ].join('\x00');
 
 interface ResolutionBucket<T> {
   readonly content: string;
@@ -464,7 +464,7 @@ export class StyleResolver {
       input.numbering,
     );
     if (key === undefined) return this.computeRun(input);
-    const content = `${contentKey(key)} ${contentKey(input.paragraphProperties)}`;
+    const content = `${contentKey(key)}\x00${contentKey(input.paragraphProperties)}`;
     return this.cached(this.runCache, key, content, signature, () => this.computeRun(input));
   }
 
