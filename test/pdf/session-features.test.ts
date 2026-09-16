@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { exportPdf } from '../../src/pdf/index.js';
-import { buildTestFont, contentStreamOf, layoutOf, pdfTextOf, sampleBody } from './support.js';
+import {
+  buildTestFont,
+  contentStreamOf,
+  imageSource,
+  layoutOf,
+  pdfTextOf,
+  pngOf,
+  sampleBody,
+} from './support.js';
 
 const font = buildTestFont();
 
@@ -97,5 +105,41 @@ describe('a tab leader in the PDF', () => {
     const text = await pdfTextOf(exported.bytes);
     expect(text).toMatch(/\.{3,}/);
     void W;
+  });
+});
+
+describe('a grouped shape in the PDF', () => {
+  it('draws each of its pictures rather than one missing-image box', async () => {
+    const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const WPG = 'http://schemas.microsoft.com/office/word/2010/wordprocessingGroup';
+    const WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+    const EMU = 914400;
+    const drawing =
+      '<w:drawing>' +
+      `<wp:inline xmlns:wp="${WP}"><wp:extent cx="${String(EMU * 2)}" cy="${String(EMU)}"/>` +
+      '<wp:docPr id="9" name="Group 1"/>' +
+      `<a:graphic xmlns:a="${A}"><a:graphicData uri="${WPG}"><wpg:wgp xmlns:wpg="${WPG}">` +
+      '<wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/>' +
+      `<a:ext cx="${String(EMU * 2)}" cy="${String(EMU)}"/>` +
+      `<a:chOff x="0" y="0"/><a:chExt cx="${String(EMU * 2)}" cy="${String(EMU)}"/></a:xfrm></wpg:grpSpPr>` +
+      '<wpg:pic><a:xfrm><a:off x="0" y="0"/>' +
+      `<a:ext cx="${String(EMU)}" cy="${String(EMU)}"/></a:xfrm>` +
+      '<a:blipFill><a:blip r:embed="rId4"/></a:blipFill></wpg:pic>' +
+      '<wpg:pic><a:xfrm>' +
+      `<a:off x="${String(EMU)}" y="0"/><a:ext cx="${String(EMU)}" cy="${String(EMU)}"/>` +
+      '</a:xfrm><a:blipFill><a:blip r:embed="rId5"/></a:blipFill></wpg:pic>' +
+      '</wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing>';
+    const png = await pngOf(4, 4, 'grey');
+    const result = await layoutOf(sampleBody(`<w:p><w:r>${drawing}</w:r></w:p>`), font.measurer);
+    const exported = await exportPdf(result, {
+      fonts: [font.face],
+      measurer: font.measurer,
+      images: [imageSource('rId4', 'image/png', png), imageSource('rId5', 'image/png', png)],
+    });
+    // two pictures drawn, and no report of one that could not be
+    const stream = await contentStreamOf(exported.bytes);
+    const drawn = (stream.match(/\/Im[\w-]* Do/g) ?? []).length;
+    expect(drawn).toBe(2);
+    expect(exported.losses.some((loss) => loss.code === 'missingImage')).toBe(false);
   });
 });

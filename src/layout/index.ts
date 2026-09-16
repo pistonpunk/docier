@@ -32,6 +32,7 @@ export type {
   LineMark,
   LineMarkKind,
   ObjectAnchor,
+  ObjectChild,
   ObjectWrap,
   LineRun,
   ObjectPlacement,

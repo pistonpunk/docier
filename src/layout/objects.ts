@@ -10,6 +10,7 @@ import {
 } from '../ooxml/namespaces.js';
 import type {
   AnchorAlign,
+  ObjectChild,
   AnchorRelativeTo,
   ObjectAnchor,
   ObjectPlacement,
@@ -242,15 +243,97 @@ export const objectPlacementOf = (
     element,
     (candidate) => isA(candidate) && candidate.localName === 'srcRect',
   );
+  // a group holds the pictures rather than being one, so it claims no
+  // relationship of its own and the first blip it contains is a child's
+  const children = groupChildrenOf(element);
   return {
     objectId: objectIdOfDrawing(element, fallbackId),
-    relationshipId: relationshipIdOf(blip),
+    children,
+    relationshipId: children.length > 0 ? undefined : relationshipIdOf(blip),
     width,
     height,
     crop: srcRect === undefined ? undefined : cropOf(srcRect, width, height),
     rotationMilliDegrees: rotationOf(element),
     anchor:
       inline.localName === 'anchor' ? anchorOf(inline) : undefined,
+  };
+};
+
+const WPG_NAMESPACE = 'http://schemas.microsoft.com/office/word/2010/wordprocessingGroup';
+
+const isWpg = (element: XmlElement): boolean =>
+  element.uri === WPG_NAMESPACE || element.uri === WPG_NAMESPACE.replace('/2010/', '/2009/');
+
+// a grouped shape is one object holding several: each child sits in the group's
+// own child coordinate space, which the group's transform maps into its box
+const groupChildrenOf = (element: XmlElement): readonly ObjectChild[] => {
+  const group = descendantIn(element, (candidate) => isWpg(candidate) && candidate.localName === 'wgp');
+  if (group === undefined) return [];
+  const groupTransform = descendantIn(
+    group,
+    (candidate) => isA(candidate) && candidate.localName === 'xfrm',
+  );
+  const groupOff = groupTransform === undefined ? undefined : aChild(groupTransform, 'off');
+  const groupExt = groupTransform === undefined ? undefined : aChild(groupTransform, 'ext');
+  const childOff = groupTransform === undefined ? undefined : aChild(groupTransform, 'chOff');
+  const childExt = groupTransform === undefined ? undefined : aChild(groupTransform, 'chExt');
+  const groupBox = rectOf(groupOff, groupExt);
+  const childBox = rectOf(childOff, childExt);
+  if (groupBox === undefined || childBox === undefined) return [];
+
+  const children: ObjectChild[] = [];
+  const visit = (holder: XmlElement): void => {
+    for (const child of childrenOf(holder)) {
+      if (!isWpg(child)) continue;
+      if (child.localName === 'grpSp') {
+        visit(child);
+        continue;
+      }
+      if (child.localName !== 'sp' && child.localName !== 'pic') continue;
+      const transform = descendantIn(
+        child,
+        (candidate) => isA(candidate) && candidate.localName === 'xfrm',
+      );
+      const box = rectOf(
+        transform === undefined ? undefined : aChild(transform, 'off'),
+        transform === undefined ? undefined : aChild(transform, 'ext'),
+      );
+      if (box === undefined) continue;
+      const scaleX = groupBox.width / childBox.width;
+      const scaleY = groupBox.height / childBox.height;
+      const blip = descendantIn(child, (candidate) => isA(candidate) && candidate.localName === 'blip');
+      children.push({
+        x: mp((box.x - childBox.x) * scaleX),
+        y: mp((box.y - childBox.y) * scaleY),
+        width: mp(box.width * scaleX),
+        height: mp(box.height * scaleY),
+        rotationMilliDegrees: rotationOf(child),
+        relationshipId: relationshipIdOf(blip),
+      });
+    }
+  };
+  visit(group);
+  return children;
+};
+
+const aChild = (element: XmlElement, localName: string): XmlElement | undefined =>
+  childrenOf(element).find((child) => isA(child) && child.localName === localName);
+
+const rectOf = (
+  offset: XmlElement | undefined,
+  extent: XmlElement | undefined,
+): Rect | undefined => {
+  const x = offset === undefined ? undefined : integerAttribute(offset, 'x');
+  const y = offset === undefined ? undefined : integerAttribute(offset, 'y');
+  const cx = extent === undefined ? undefined : integerAttribute(extent, 'cx');
+  const cy = extent === undefined ? undefined : integerAttribute(extent, 'cy');
+  if (x === undefined || y === undefined || cx === undefined || cy === undefined) return undefined;
+  if (cx <= 0 || cy <= 0) return undefined;
+  return {
+    x: emuToMp(emu(x)),
+    y: emuToMp(emu(y)),
+    width: emuToMp(emu(cx)),
+    height: emuToMp(emu(cy)),
   };
 };
 

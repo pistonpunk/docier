@@ -1,5 +1,6 @@
 import type {
   BlockFragment,
+  ObjectChild,
   LineFragment,
   LineRun,
   ObjectPlacement,
@@ -79,6 +80,36 @@ const paintMissing = (
   container.appendChild(label);
 };
 
+const paintChild = (
+  container: HTMLElement,
+  child: ObjectChild,
+  images: ImageRegistry,
+  scale: PaintScale,
+): void => {
+  const node = element('img', 'docier-image');
+  stamp(node, { [ATTR.image]: child.relationshipId ?? '' });
+  const url = child.relationshipId === undefined ? undefined : images.urlFor(child.relationshipId);
+  if (url === undefined) return;
+  applyStyle(
+    node,
+    positionStyle(
+      {
+        left: scale.px(child.x),
+        top: scale.px(child.y),
+        width: scale.px(child.width),
+        height: scale.px(child.height),
+      },
+      {
+        transform: cssRotationOf(child.rotationMilliDegrees),
+        'transform-origin': '50% 50%',
+      },
+    ),
+  );
+  node.setAttribute('src', url);
+  node.setAttribute('alt', '');
+  container.appendChild(node);
+};
+
 const paintImage = (container: HTMLElement, object: ObjectPlacement, url: string, scale: PaintScale): void => {
   const node = element('img', 'docier-image');
   stamp(node, { [ATTR.image]: object.relationshipId ?? '' });
@@ -124,12 +155,14 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
       ),
     );
     if (object.relationshipId === undefined) {
+      for (const child of object.children) paintChild(container, child, images, scale);
       parent.appendChild(container);
       continue;
     }
     const url = images.urlFor(object.relationshipId);
     if (url !== undefined) paintImage(container, object, url, scale);
     else paintMissing(container, object.relationshipId, scale, object);
+    for (const child of object.children) paintChild(container, child, images, scale);
     parent.appendChild(container);
   }
 };
@@ -176,6 +209,7 @@ export const paintFloats = (
       if (url !== undefined) paintImage(container, object, url, input.scale);
       else paintMissing(container, object.relationshipId, input.scale, object);
     }
+    for (const child of object.children) paintChild(container, child, input.images, input.scale);
     parent.appendChild(container);
   }
   return floats.length;

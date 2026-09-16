@@ -167,7 +167,32 @@ const paintObject = (
     };
     for (const block of text) paintBlock(block, inner, context);
   }
+  // a grouped shape draws its children inside its own box
+  const area = objectBoxOf(line, run, atom);
+  for (const child of object.children) {
+    const name = context.images.nameFor(child.relationshipId);
+    if (name === undefined) continue;
+    const report = context.images.reportFor(child.relationshipId);
+    const childBox = imageBox(
+      {
+        objectId: object.objectId,
+        children: [],
+        relationshipId: child.relationshipId,
+        width: child.width,
+        height: child.height,
+        crop: undefined,
+        rotationMilliDegrees: child.rotationMilliDegrees,
+        anchor: undefined,
+      },
+      pdfX(frame, mp(area.x + child.x)),
+      pdfTop(frame, mp(area.y + child.y), child.height),
+      report,
+    );
+    context.content.drawImage(name, childBox.a, childBox.b, childBox.c, childBox.d, childBox.e, childBox.f);
+  }
   const id = object.relationshipId;
+  // a group is drawn by its children, so it is not a picture that failed to load
+  if (object.children.length > 0 && id === undefined) return;
   const name = context.images.nameFor(id);
   if (name === undefined) {
     context.losses.push(
@@ -483,7 +508,13 @@ export const drawableTokens = (result: LayoutResult): readonly string[] => {
     for (const block of blocksOfPage(page)) {
       for (const line of block.lines) {
         for (const atom of line.atoms) {
-          if (atom.object?.relationshipId !== undefined) ids.push(atom.object.relationshipId);
+          const object = atom.object;
+          if (object === undefined) continue;
+          if (object.relationshipId !== undefined) ids.push(object.relationshipId);
+          // a grouped shape's pictures are its children's, not its own
+          for (const child of object.children) {
+            if (child.relationshipId !== undefined) ids.push(child.relationshipId);
+          }
         }
       }
     }

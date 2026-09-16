@@ -296,3 +296,39 @@ describe('the divergence detector over painted objects', () => {
     expect(report.divergences.map((entry) => entry.kind)).toContain('missingImage');
   });
 });
+
+describe('a grouped shape', () => {
+  it('paints each of its pictures inside its box', async () => {
+    const WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+    const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const WPG = 'http://schemas.microsoft.com/office/word/2010/wordprocessingGroup';
+    const EMU = 914400;
+    const drawing =
+      '<w:drawing>' +
+      `<wp:inline xmlns:wp="${WP}"><wp:extent cx="${String(EMU * 2)}" cy="${String(EMU)}"/>` +
+      '<wp:docPr id="9" name="Group 1"/>' +
+      `<a:graphic xmlns:a="${A}"><a:graphicData uri="${WPG}"><wpg:wgp xmlns:wpg="${WPG}">` +
+      '<wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/>' +
+      `<a:ext cx="${String(EMU * 2)}" cy="${String(EMU)}"/>` +
+      `<a:chOff x="0" y="0"/><a:chExt cx="${String(EMU * 2)}" cy="${String(EMU)}"/></a:xfrm></wpg:grpSpPr>` +
+      '<wpg:pic><a:xfrm><a:off x="0" y="0"/>' +
+      `<a:ext cx="${String(EMU)}" cy="${String(EMU)}"/></a:xfrm>` +
+      '<a:blipFill><a:blip r:embed="rId4"/></a:blipFill></wpg:pic>' +
+      '<wpg:pic><a:xfrm>' +
+      `<a:off x="${String(EMU)}" y="0"/><a:ext cx="${String(EMU)}" cy="${String(EMU)}"/>` +
+      '</a:xfrm><a:blipFill><a:blip r:embed="rId5"/></a:blipFill></wpg:pic>' +
+      '</wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing>';
+    const result = await layoutOf(bodyOf(`<w:p><w:r>${drawing}</w:r></w:p>`));
+    const target = host();
+    renderDocument(result, target, {
+      images: [
+        { id: 'rId4', mimeType: 'image/png', bytes: PNG_BYTES },
+        { id: 'rId5', mimeType: 'image/png', bytes: PNG_BYTES },
+      ],
+    });
+    const images = Array.from(target.querySelectorAll<HTMLElement>(`.docier-object img`));
+    expect(images).toHaveLength(2);
+    expect(images[0]?.style.left).toBe('0px');
+    expect(images[1]?.style.left).not.toBe('0px');
+  });
+});

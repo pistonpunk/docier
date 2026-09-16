@@ -106,8 +106,18 @@ export interface ObjectAnchor {
   readonly relativeHeight: number;
 }
 
+export interface ObjectChild {
+  readonly x: Mp;
+  readonly y: Mp;
+  readonly width: Mp;
+  readonly height: Mp;
+  readonly rotationMilliDegrees: number;
+  readonly relationshipId: string | undefined;
+}
+
 export interface ObjectPlacement {
   readonly objectId: string;
+  readonly children: readonly ObjectChild[];
   readonly relationshipId: string | undefined;
   readonly width: Mp;
   readonly height: Mp;
