@@ -336,6 +336,23 @@ describe('dialogs', () => {
     expect(live?.textContent).toContain('styles');
   });
 
+  it('names the dialog a reader asked for, not the identifier behind it', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    // the status bar asks for wordCount, goToPage, setLanguage and save, none of
+    // which are built, and the message used to show those identifiers verbatim
+    for (const [requested, label] of [
+      ['wordCount', 'Word Count'],
+      ['goToPage', 'Go To Page'],
+      ['setLanguage', 'Set Language'],
+      ['save', 'Save'],
+    ] as const) {
+      chrome.context.run('openDialog', { dialog: requested });
+      const live = document.getElementById('docier-ui-live');
+      expect(live?.textContent).toContain(label);
+      expect(live?.textContent).not.toContain(requested);
+    }
+  });
+
   it('opens the Font dialog on control D from the page, but not from a field', async () => {
     await mountWith(longBody(), { mode: 'full' });
     document

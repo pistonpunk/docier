@@ -433,6 +433,10 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.ruler.mixed': 'Mixed values',
   'ui.keytip.press': 'Press {key} to use the {name}',
   'ui.dialog.notImplemented': '{name} is not available yet',
+  'ui.dialog.goToPage': 'Go To Page',
+  'ui.dialog.wordCount': 'Word Count',
+  'ui.dialog.setLanguage': 'Set Language',
+  'ui.dialog.save': 'Save',
 };
 
 const registry = new Map<string, MessageCatalogue>();

@@ -13,6 +13,7 @@ import { createContextMenus } from './context-menu.js';
 import type { ContextMenuController } from './context-menu.js';
 import { createResolver } from './controls.js';
 import { PICTURE_DIALOG, dialogNameFor, openEditorDialog } from './dialog.js';
+import { dialogLabelKeyFor } from './dialog-names.js';
 import type { EditorDialogHandle } from './dialog.js';
 import { createImagePicker } from './image-picker.js';
 import type { ImagePickerHandle } from './image-picker.js';
@@ -445,7 +446,14 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         const requested = String(args?.dialog ?? '');
         const name = dialogNameFor(requested);
         if (name === undefined) {
-          setMessage(i18n.text('ui.dialog.notImplemented', { name: requested }));
+          // the raw identifier is what was asked for, and it is not what a reader
+          // should be shown: wordCount is the Word Count dialog
+          const labelKey = dialogLabelKeyFor(requested);
+          setMessage(
+            i18n.text('ui.dialog.notImplemented', {
+              name: labelKey === undefined ? requested : i18n.text(labelKey),
+            }),
+          );
           return;
         }
         const anchor = args?.anchor;
