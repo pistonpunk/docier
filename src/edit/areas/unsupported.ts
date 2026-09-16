@@ -54,18 +54,6 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'This build preserves revision marks and never rejects them',
   },
 
-  {
-    id: 'docier.command.find.find',
-    label: 'Find',
-    category: 'find',
-    reason: 'This build has no search engine, so find and replace are not implemented',
-  },
-  {
-    id: 'docier.command.find.replace',
-    label: 'Replace',
-    category: 'find',
-    reason: 'This build has no search engine, so find and replace are not implemented',
-  },
 
   { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },
   {

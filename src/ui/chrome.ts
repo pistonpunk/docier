@@ -823,10 +823,17 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   ownerWindow?.addEventListener('resize', viewportChanged);
   ownerDocument.addEventListener('scroll', viewportChanged, true);
 
-  const fontDialogKey = (event: KeyboardEvent): void => {
+  const DIALOG_SHORTCUTS: Readonly<Record<string, string>> = {
+    d: 'font',
+    f: 'docier.command.find.find',
+    h: 'docier.command.find.find',
+  };
+
+  const dialogShortcutKey = (event: KeyboardEvent): void => {
     if (!event.ctrlKey && !event.metaKey) return;
     if (event.altKey || event.shiftKey) return;
-    if (event.key.toLowerCase() !== 'd') return;
+    const dialog = DIALOG_SHORTCUTS[event.key.toLowerCase()];
+    if (dialog === undefined) return;
     const active = ownerDocument.activeElement;
     if (
       active instanceof HTMLInputElement ||
@@ -837,9 +844,9 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     }
     if (editorDialog?.isOpen === true) return;
     event.preventDefault();
-    run('openDialog', { dialog: 'font' });
+    run('openDialog', { dialog });
   };
-  if (mode !== 'none') ownerDocument.addEventListener('keydown', fontDialogKey);
+  if (mode !== 'none') ownerDocument.addEventListener('keydown', dialogShortcutKey);
 
   applyThemeMode();
   trackVerticalRuler();
@@ -868,7 +875,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     dispose: () => {
       ownerWindow?.removeEventListener('resize', viewportChanged);
       ownerDocument.removeEventListener('scroll', viewportChanged, true);
-      ownerDocument.removeEventListener('keydown', fontDialogKey);
+      ownerDocument.removeEventListener('keydown', dialogShortcutKey);
       editorDialog?.dispose();
       editorDialog = undefined;
       imagePicker?.dispose();

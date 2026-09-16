@@ -1,5 +1,6 @@
 import type { Disposable } from '../api/types.js';
 import { MP_PER_TWIP } from '../units/index.js';
+import { FIND_DIALOG_NAME, createFindDialog } from './find-dialog.js';
 import { FONT_DIALOG_NAME, createFontDialog } from './font-dialog.js';
 import {
   LINK_DIALOG_NAME,
@@ -829,6 +830,9 @@ export const DIALOG_ALIASES: Readonly<Record<string, string>> = {
   'insert.link': LINK_DIALOG_NAME,
   'docier.command.insert.symbol': SYMBOL_DIALOG_NAME,
   'insert.symbol': SYMBOL_DIALOG_NAME,
+  [FIND_DIALOG_NAME]: FIND_DIALOG_NAME,
+  'docier.command.find.find': FIND_DIALOG_NAME,
+  'find.find': FIND_DIALOG_NAME,
 };
 
 export const dialogNameFor = (dialog: string): string | undefined => DIALOG_ALIASES[dialog];
@@ -864,6 +868,15 @@ export const createEditorDialog = (
     placement: request.placement,
     width: request.width,
   };
+  if (request.dialog === FIND_DIALOG_NAME) {
+    return createFindDialog({
+      context,
+      mount: request.mount,
+      onClose: request.onClose,
+      placement: request.placement,
+      width: request.width,
+    });
+  }
   if (request.dialog === FONT_DIALOG_NAME) return createFontDialog(options);
   if (request.dialog === PARAGRAPH_DIALOG_NAME) return createParagraphDialog(options);
   if (request.dialog === LINK_DIALOG_NAME || request.dialog === SYMBOL_DIALOG_NAME) {

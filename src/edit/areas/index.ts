@@ -1,6 +1,7 @@
 import type { CommandDefinition, CommandRegistry, Disposable } from '../../api/types.js';
 import { documentCommands } from './document.js';
 import type { DocumentAreaHost } from './document.js';
+import { findCommands } from './find.js';
 import { insertCommands } from './insert.js';
 import { numberingCommands } from './numbering.js';
 import { commentCommands } from './comment.js';
@@ -35,6 +36,7 @@ export { unsupportedCommands } from './unsupported.js';
 
 export const areaCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   ...documentCommands(host as DocumentAreaHost),
+  ...findCommands(host),
   ...pageCommands(host),
   ...paragraphCommands(host),
   ...styleCommands(host),

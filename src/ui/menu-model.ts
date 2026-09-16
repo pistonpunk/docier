@@ -408,20 +408,22 @@ export const RIBBON_TABS: readonly UiTab[] = [
         id: 'editing',
         labelKey: 'ui.group.editing',
         nodes: [
+          // No command on these two: a spec that names one is executed rather than
+          // opened, and the dialog is the only sensible entry point for a search box.
           button({
+            id: command('find.find'),
             labelKey: 'ui.control.find',
-            command: command('find.find'),
-            keytip: 'FD',
-            large: true,
             action: 'openDialog',
             actionArgs: { dialog: command('find.find') },
+            keytip: 'FD',
+            large: true,
           }),
           button({
+            id: command('find.replace'),
             labelKey: 'ui.control.replace',
-            command: command('find.replace'),
-            keytip: 'HR',
             action: 'openDialog',
-            actionArgs: { dialog: command('find.replace') },
+            actionArgs: { dialog: command('find.find') },
+            keytip: 'HR',
           }),
           button({
             labelKey: 'ui.control.selectAll',
@@ -928,7 +930,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     button({ labelKey: 'ui.control.translate', id: 'ctx:text:translate', command: command('proof.translate') }),
     pending('comment.create', 'ui.control.newComment', 'NC'),
     separator('ctx:text:sep4'),
-    button({ labelKey: 'ui.control.find', id: 'ctx:text:find', command: command('find.find'), action: 'openDialog', actionArgs: { dialog: command('find.find') } }),
+    button({ labelKey: 'ui.control.find', id: 'ctx:text:find', action: 'openDialog', actionArgs: { dialog: command('find.find') } }),
     button({ labelKey: 'ui.control.selectAll', id: 'ctx:text:all', command: command('edit.selectAll') }),
   ],
   table: [

@@ -117,17 +117,17 @@ describe('chrome command coverage', () => {
     }
 
     // the number rises whenever a menu entry is wired from a dialog stub to the
-    // command it names, or when a menu row that named nothing gains a command;
-    // the last rise was the whole field set behind Insert > Field, which used to
-    // reach only Page number and Date & time
-    expect(registered).toBe(143);
+    // command it names, or when a menu row that named nothing gains a command.
+    // The last rise was the whole field set behind Insert > Field; the last fall
+    // was Find and Replace, which open the find dialog instead of being executed
+    // from the ribbon, so the dialog dispatches them rather than the chrome
+    expect(registered).toBe(141);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
       'doc',
       'edit',
       'export',
-      'find',
       'format',
       'history',
       'insert',
@@ -227,7 +227,13 @@ describe('deliberately unavailable commands', () => {
     expect(reasonOf(handle, 'docier.command.theme.setColors')).toContain('theme part');
     expect(handle.commands.isEnabled('docier.command.doc.save')).toBe(true);
     expect(reasonOf(handle, 'docier.command.export.pdf')).toContain('exportPdf handler');
-    expect(reasonOf(handle, 'docier.command.find.find')).toContain('search engine');
+    expect(reasonOf(handle, 'docier.command.find.find')).toBe('Type something to find');
+    // with no arguments both want a query first, and replace asks for the
+    // replacement once it has one
+    expect(reasonOf(handle, 'docier.command.find.replace')).toBe('Type something to find');
+    expect(handle.commands.disabledReason('docier.command.find.replace', { query: 'cat' })).toBe(
+      'Type the replacement text',
+    );
     expect(reasonOf(handle, 'docier.command.doc.setLineNumbers')).toContain('LE-044');
   });
 });

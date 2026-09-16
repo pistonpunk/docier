@@ -22,6 +22,9 @@ export interface ParagraphSpan {
   readonly inCell: boolean;
   readonly cell: CellRef | undefined;
   readonly fragments: readonly BlockFragment[];
+  // The paragraph's text indexed the way its positions are, filled in by whoever
+  // pairs the span with its element. Absent on an index built without a model.
+  readonly text?: string | undefined;
 }
 
 export interface StorySpan {
@@ -336,17 +339,35 @@ export const rangeOf = (anchor: DocPos, focus: DocPos): DocRange => ({
   end: docPos(Math.max(anchor, focus)),
 });
 
+// The text of a span, preferring the exact per-position text when the index was
+// built with a model behind it. Rebuilding from the atoms is the fallback, and it
+// is lossy: the line breaker drops the spaces it breaks at, so the result is
+// shorter than the paragraph and any index into it is off by that much.
+export const spanText = (span: ParagraphSpan): string => span.text ?? blockText(span);
+
 export const blockText = (span: ParagraphSpan): string => {
-  const seen = new Map<number, string>();
+  const seen = new Map<number, { readonly text: string; readonly end: number }>();
   for (const block of span.fragments) {
     for (const line of block.lines) {
       for (const atom of line.atoms) {
-        if (!seen.has(atom.source.start)) seen.set(atom.source.start, atom.text);
+        if (!seen.has(atom.source.start)) {
+          seen.set(atom.source.start, { text: atom.text, end: atom.source.end as number });
+        }
       }
     }
   }
-  return [...seen.keys()]
-    .sort((first, second) => first - second)
-    .map((start) => seen.get(start) ?? '')
-    .join('');
+  const ordered = [...seen.entries()].sort((first, second) => first[0] - second[0]);
+  let out = '';
+  let reached = Number.NEGATIVE_INFINITY;
+  for (const [start, atom] of ordered) {
+    // A gap between one atom's end and the next one's start is whitespace the line
+    // breaker consumed at a wrap. Dropping it shortens the string, and everything
+    // that indexes this text by position then reads the wrong characters.
+    if (start > reached && reached !== Number.NEGATIVE_INFINITY) {
+      out += ' '.repeat(Math.max(0, start - reached));
+    }
+    out += atom.text;
+    reached = Math.max(reached, atom.end);
+  }
+  return out;
 };

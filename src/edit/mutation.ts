@@ -117,6 +117,69 @@ export const paragraphLength = (model: DocumentModel, paragraph: XmlElement): nu
   return spans[spans.length - 1]?.end ?? 0;
 };
 
+const OBJECT_PLACEHOLDER = '￼';
+
+// The character a run's content contributes at the offset it occupies. This has to
+// agree with ingestedLength exactly, or a text position stops meaning the same thing
+// as a character index.
+const runContentText = (element: XmlElement): string => {
+  switch (runContentKindOf(element)) {
+    case 'text':
+    case 'deletedText':
+      return textOfElement(element);
+    case 'tab':
+      return '\t';
+    case 'break':
+    case 'carriageReturn':
+      return '\n';
+    case 'noBreakHyphen':
+      return '‑';
+    case 'softHyphen':
+      return '­';
+    case 'drawing':
+    case 'picture':
+    case 'object':
+    case 'noteReference':
+      return OBJECT_PLACEHOLDER;
+    case 'symbol': {
+      const code = wAttr(element, 'char');
+      if (code === undefined) return '';
+      const point = Number.parseInt(code, 16);
+      return Number.isFinite(point) ? String.fromCodePoint(point) : OBJECT_PLACEHOLDER;
+    }
+    case 'alternateContent': {
+      const chosen = selectAlternateContent(element).element;
+      if (chosen === undefined) return '';
+      let out = '';
+      for (const child of childElements(chosen)) out += runContentText(child);
+      return out;
+    }
+    default:
+      return '';
+  }
+};
+
+const runText = (element: XmlElement): string => {
+  if (runContentKindOf(element) !== 'opaque') return runContentText(element);
+  let out = '';
+  for (const child of childElements(element)) out += runText(child);
+  return out;
+};
+
+// The paragraph's text indexed the way a text position indexes it: character n of
+// this string is what DocPos `slot.start + n` addresses. Rebuilding it from the
+// laid-out atoms instead loses every space the line breaker dropped at a wrap, which
+// silently shifts the text of anything read back out, copying included.
+export const paragraphTextOf = (model: DocumentModel, paragraph: XmlElement): string => {
+  const view = Paragraph.of(model.context, paragraph);
+  let out = '';
+  for (const run of view.runs()) {
+    if (model.resolveRunProperties(view, run.properties.element).hidden === true) continue;
+    out += runText(run.element);
+  }
+  return out;
+};
+
 const runPropertiesOf = (run: XmlElement): XmlElement | undefined =>
   findOrderedChild(run, RUN_PROPERTY_LOCAL_NAME);
 

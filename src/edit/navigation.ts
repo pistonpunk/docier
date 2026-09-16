@@ -5,7 +5,7 @@ import type { Mp } from '../units/index.js';
 import { mp } from '../units/index.js';
 import { downFrom, linesFrom, upFrom } from './caret.js';
 import type { PositionIndex, StorySpan } from './positions.js';
-import { blockText } from './positions.js';
+import { spanText } from './positions.js';
 import { nextWordStart, previousWordStart } from './words.js';
 import type { EditSelection } from './selection.js';
 import {
@@ -41,7 +41,7 @@ const stepPosition = (index: PositionIndex, pos: DocPos, delta: 1 | -1): DocPos 
   const story = storyBoundsOf(index, pos);
   const span = index.paragraphAt(pos);
   if (span === undefined) return limited(story, (pos as number) + delta);
-  const text = blockText(span);
+  const text = spanText(span);
   const local = (pos as number) - (span.start as number);
   if (delta > 0) {
     if (local >= text.length) {
@@ -73,7 +73,7 @@ const wordTarget = (index: PositionIndex, pos: DocPos, delta: 1 | -1): DocPos =>
     if (delta < 0 && (cursor as number) > (span.end as number)) {
       return limited(story, span.end as number);
     }
-    const text = blockText(span);
+    const text = spanText(span);
     const local = Math.max(0, Math.min(text.length, (cursor as number) - (span.start as number)));
     if (delta > 0) {
       const next = nextWordStart(text, local);

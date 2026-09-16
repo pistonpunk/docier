@@ -27,6 +27,7 @@ import {
   insertTextAt,
   joinParagraphInto,
   paragraphLength,
+  paragraphTextOf,
   setParagraphProperties,
   setRunPropertiesAtCaret,
   setRunPropertiesOnRange,
@@ -433,6 +434,20 @@ export const createEditSession = (
       ...collectRegionContainers(model, regionStoryIds()),
     ];
     const paired = pairContainers(containers, index.paragraphs);
+    // Now that each span knows its element, give it the text its positions index.
+    // Word stepping reads it, and rebuilding that text from the laid-out atoms
+    // instead loses every space the line breaker dropped at a wrap.
+    const texts = new Map<number, string>();
+    for (const entry of paired.entries) {
+      texts.set(entry.span.index, paragraphTextOf(model, entry.element));
+    }
+    index = {
+      ...index,
+      paragraphs: index.paragraphs.map((span) => {
+        const text = texts.get(span.index);
+        return text === undefined ? span : { ...span, text };
+      }),
+    };
     const slots: ParagraphSlot[] = [];
     for (const entry of paired.entries) {
       const span = entry.span;
@@ -531,6 +546,9 @@ export const createEditSession = (
       return result;
     },
     get index(): PositionIndex {
+      // The spans only carry their text once the slots have been paired, and word
+      // stepping reads it, so this cannot hand back the bare index.
+      slots();
       return index;
     },
     get aligned(): boolean {
