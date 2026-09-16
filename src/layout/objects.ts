@@ -9,6 +9,7 @@ import {
   WP_STRICT_NAMESPACE,
 } from '../ooxml/namespaces.js';
 import type {
+  AnchorAlign,
   AnchorRelativeTo,
   ObjectAnchor,
   ObjectPlacement,
@@ -141,65 +142,72 @@ const wrapOf = (anchor: XmlElement): ObjectWrap => {
   return 'none';
 };
 
+interface OffsetAxis {
+  readonly value: Mp;
+  readonly relative: AnchorRelativeTo;
+  readonly align: AnchorAlign | undefined;
+}
+
+const textOf = (element: XmlElement): string =>
+  element.children
+    .filter((child) => child.kind === 'text')
+    .map((child) => child.value)
+    .join('')
+    .trim();
+
+const alignValueOf = (element: XmlElement): string | undefined => {
+  const text = textOf(element);
+  if (text !== '') return text;
+  return attributeValue(element, 'val');
+};
+
 const offsetOf = (
   anchor: XmlElement,
   axis: 'positionH' | 'positionV',
-  align: (value: string) => Mp | undefined,
-): { readonly value: Mp; readonly relative: AnchorRelativeTo } => {
+  align: (value: string) => AnchorAlign | undefined,
+): OffsetAxis => {
   const holder = childrenOf(anchor).find(
     (child) => isWp(child) && child.localName === axis,
   );
-  if (holder === undefined) return { value: mp(0), relative: 'column' };
+  if (holder === undefined) return { value: mp(0), relative: 'column', align: undefined };
   const relative = RELATIVE_TO[attributeValue(holder, 'relativeFrom') ?? ''] ?? 'column';
   const offset = childrenOf(holder).find(
     (child) => isWp(child) && child.localName === 'posOffset',
   );
-  const raw =
-    offset === undefined
-      ? undefined
-      : offset.children
-          .filter((child) => child.kind === 'text')
-          .map((child) => child.value)
-          .join('')
-          .trim();
+  const raw = offset === undefined ? undefined : textOf(offset);
   const parsed = raw === undefined || raw === '' ? Number.NaN : Number.parseInt(raw, 10);
   const emuOffset = Number.isFinite(parsed) ? parsed : undefined;
-  if (emuOffset !== undefined) return { value: emuToMp(emu(emuOffset)), relative };
+  if (emuOffset !== undefined) return { value: emuToMp(emu(emuOffset)), relative, align: undefined };
   const alignElement = childrenOf(holder).find(
     (child) => isWp(child) && child.localName === 'align',
   );
-  const named = alignElement === undefined ? undefined : attributeValue(alignElement, 'val');
-  return { value: named === undefined ? mp(0) : (align(named) ?? mp(0)), relative };
+  const named = alignElement === undefined ? undefined : alignValueOf(alignElement);
+  const resolved = named === undefined ? undefined : align(named);
+  return { value: mp(0), relative, align: resolved };
 };
 
-const horizontalAlign = (value: string, extent: Mp): Mp | undefined => {
-  if (value === 'left' || value === 'inside') return mp(0);
-  if (value === 'right' || value === 'outside') return mp(-extent);
-  if (value === 'center') return mp(-extent / 2);
+const horizontalAlign = (value: string): AnchorAlign | undefined => {
+  if (value === 'left' || value === 'inside') return 'start';
+  if (value === 'right' || value === 'outside') return 'end';
+  if (value === 'center') return 'center';
   return undefined;
 };
 
-const verticalAlign = (value: string, extent: Mp): Mp | undefined => {
-  if (value === 'top' || value === 'inside') return mp(0);
-  if (value === 'bottom' || value === 'outside') return mp(-extent);
-  if (value === 'center') return mp(-extent / 2);
+const verticalAlign = (value: string): AnchorAlign | undefined => {
+  if (value === 'top' || value === 'inside') return 'start';
+  if (value === 'bottom' || value === 'outside') return 'end';
+  if (value === 'center') return 'center';
   return undefined;
 };
 
-const anchorOf = (
-  anchor: XmlElement,
-  width: Mp,
-  height: Mp,
-): ObjectAnchor => {
-  const horizontal = offsetOf(anchor, 'positionH', (value) =>
-    horizontalAlign(value, width),
-  );
-  const vertical = offsetOf(anchor, 'positionV', (value) =>
-    verticalAlign(value, height),
-  );
+const anchorOf = (anchor: XmlElement): ObjectAnchor => {
+  const horizontal = offsetOf(anchor, 'positionH', horizontalAlign);
+  const vertical = offsetOf(anchor, 'positionV', verticalAlign);
   return {
     x: horizontal.value,
     y: vertical.value,
+    alignX: horizontal.align,
+    alignY: vertical.align,
     horizontal: horizontal.relative,
     vertical: vertical.relative,
     behind:
@@ -242,7 +250,7 @@ export const objectPlacementOf = (
     crop: srcRect === undefined ? undefined : cropOf(srcRect, width, height),
     rotationMilliDegrees: rotationOf(element),
     anchor:
-      inline.localName === 'anchor' ? anchorOf(inline, width, height) : undefined,
+      inline.localName === 'anchor' ? anchorOf(inline) : undefined,
   };
 };
 

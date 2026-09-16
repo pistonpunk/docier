@@ -1,6 +1,7 @@
 import type { Mp } from '../units/index.js';
 import { mp } from '../units/index.js';
 import type { DocumentModel, Story } from '../model/index.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
 import { SectionProperties } from '../model/index.js';
 import type { TextMeasurer } from '../measure/index.js';
 import type { FontResolver } from './fonts.js';
@@ -115,6 +116,7 @@ export interface RegionLayout {
   readonly height: Mp;
   readonly blocks: readonly BlockFragment[];
   readonly nextLineId: number;
+  readonly textBoxes: ReadonlyMap<string, XmlElement>;
 }
 
 export const layoutRegion = (request: RegionRequest): RegionLayout => {
@@ -175,7 +177,7 @@ export const layoutRegion = (request: RegionRequest): RegionLayout => {
     first = false;
   }
 
-  return { height: cursor, blocks, nextLineId: lineId };
+  return { height: cursor, blocks, nextLineId: lineId, textBoxes: ingested.textBoxes };
 };
 
 export const storyLayoutOf = (story: Story, blockCount: number): StoryLayout => ({

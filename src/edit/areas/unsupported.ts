@@ -11,16 +11,10 @@ interface Refusal {
 }
 
 const NO_DRAWING =
-  'This build authors a picture from bytes the host supplies and nothing else: it has no shape, chart or text-box geometry';
+  'This build authors pictures and text boxes; it has no geometry for a preset shape or a chart part';
 const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const REFUSALS: readonly Refusal[] = [
-  {
-    id: 'docier.command.doc.setWatermark',
-    label: 'Watermark',
-    category: 'doc',
-    reason: 'A watermark is a shape drawn inside a header part, and this build cannot author drawing content',
-  },
   {
     id: 'docier.command.doc.setLineNumbers',
     label: 'Line numbers',

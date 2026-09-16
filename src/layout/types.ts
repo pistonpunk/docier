@@ -95,9 +95,13 @@ export type ObjectWrap = 'none' | 'square' | 'tight' | 'through' | 'topAndBottom
 
 export type AnchorRelativeTo = 'page' | 'margin' | 'column' | 'paragraph';
 
+export type AnchorAlign = 'start' | 'center' | 'end';
+
 export interface ObjectAnchor {
   readonly x: Mp;
   readonly y: Mp;
+  readonly alignX: AnchorAlign | undefined;
+  readonly alignY: AnchorAlign | undefined;
   readonly horizontal: AnchorRelativeTo;
   readonly vertical: AnchorRelativeTo;
   readonly behind: boolean;

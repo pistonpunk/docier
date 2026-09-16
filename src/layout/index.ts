@@ -27,6 +27,7 @@ export type {
   LayoutIndices,
   LayoutResult,
   LineFragment,
+  AnchorAlign,
   AnchorRelativeTo,
   LineMark,
   LineMarkKind,

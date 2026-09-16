@@ -251,7 +251,8 @@ describe('page and section commands', () => {
     expect(await resultOf(handle, 'doc.setPageBorders')).toEqual({
       status: 'blocked',
       code: 'INAPPLICABLE',
-      reason: 'This control needs a border style, or an explicit request to remove borders',
+      reason:
+        'This control needs a border style, a colour, or an explicit request to remove borders',
     });
   });
 });

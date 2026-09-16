@@ -29,6 +29,10 @@ export interface ColourPickerOptions {
   readonly context: ChromeContext;
   readonly command: string;
   readonly argKey?: string | undefined;
+  readonly kind?: ColourKind | undefined;
+  readonly palette?: ColourKind | undefined;
+  readonly noneValue?: string | undefined;
+  readonly custom?: boolean | undefined;
   readonly value?: (() => string | undefined) | undefined;
   readonly mount?: HTMLElement | undefined;
   readonly onPick?: ((value: string) => void) | undefined;
@@ -45,6 +49,7 @@ export interface ColourPickerHandle extends Disposable {
 
 export const SET_COLOR_COMMAND = 'docier.command.format.setColor';
 export const SET_HIGHLIGHT_COMMAND = 'docier.command.format.setHighlight';
+export const SET_PAGE_BACKGROUND_COMMAND = 'docier.command.doc.setPageBackground';
 
 export const NO_COLOUR: Readonly<Record<ColourKind, string>> = {
   text: 'auto',
@@ -60,6 +65,25 @@ export const VIEWPORT_MARGIN_PX = 8;
 export const ANCHOR_GAP_PX = 4;
 export const DEFAULT_PICKER_WIDTH = 238;
 export const DEFAULT_PICKER_HEIGHT = 252;
+
+export const RECENT_COLOURS_KEY = 'docier.colour.recent';
+export const RECENT_COLOUR_COUNT = 8;
+
+export const normaliseHex = (input: string): string | undefined => {
+  const trimmed = input.trim().replace(/^#/, '').replace(/^0x/i, '');
+  if (/^[0-9a-fA-F]{3}$/.test(trimmed)) {
+    const [r, g, b] = trimmed.toUpperCase().split('');
+    return `${r ?? '0'}${r ?? '0'}${g ?? '0'}${g ?? '0'}${b ?? '0'}${b ?? '0'}`;
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed.toUpperCase();
+  if (/^[0-9a-fA-F]{8}$/.test(trimmed)) return trimmed.slice(2).toUpperCase();
+  return undefined;
+};
+
+export const hexToCss = (value: string): string | undefined => {
+  const hex = normaliseHex(value);
+  return hex === undefined ? undefined : `#${hex.toLowerCase()}`;
+};
 
 export const argKeyFor = (command: string): string =>
   command === SET_HIGHLIGHT_COMMAND ? 'highlight' : 'color';
@@ -226,6 +250,216 @@ export const colourSections = (
 };
 
 const SWATCH_SHADOW = 'inset 0 0 0 1px rgba(0, 0, 0, 0.18)';
+export interface CustomColourSection {
+  readonly element: HTMLElement;
+  readonly refresh: (current: string | undefined) => void;
+}
+
+export interface CustomColourOptions {
+  readonly doc: Document;
+  readonly text: (key: string, fallback: string) => string;
+  readonly onPick: (value: string) => void;
+}
+
+export const createCustomColourSection = (options: CustomColourOptions): CustomColourSection => {
+  const { doc } = options;
+  const win = doc.defaultView;
+  const listeners: (() => void)[] = [];
+  const on = <K extends keyof HTMLElementEventMap>(
+    target: HTMLElement,
+    type: K,
+    handler: (event: HTMLElementEventMap[K]) => void,
+  ): void => {
+    const listener = handler as EventListener;
+    target.addEventListener(type, listener);
+    listeners.push(() => {
+      target.removeEventListener(type, listener);
+    });
+  };
+
+  const readRecent = (): readonly string[] => {
+    try {
+      const raw = win?.localStorage.getItem(RECENT_COLOURS_KEY);
+      if (raw === null || raw === undefined) return [];
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => normaliseHex(entry))
+        .filter((entry): entry is string => entry !== undefined)
+        .slice(0, RECENT_COLOUR_COUNT);
+    } catch {
+      return [];
+    }
+  };
+
+  const writeRecent = (list: readonly string[]): void => {
+    try {
+      win?.localStorage.setItem(RECENT_COLOURS_KEY, JSON.stringify(list));
+    } catch {
+      return;
+    }
+  };
+
+  let recent: readonly string[] = readRecent();
+
+  const wrapper = make('div', 'docier-colour-custom');
+  wrapper.setAttribute('data-docier-colour-section', 'custom');
+  Object.assign(wrapper.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    fontFamily: TOKENS.font,
+    fontSize: TOKENS.fontSize,
+    color: TOKENS.text,
+  });
+
+  const heading = make('div', 'docier-colour-heading');
+  heading.setAttribute('aria-hidden', 'true');
+  setText(heading, options.text('ui.colour.custom', 'Custom Colour'));
+  Object.assign(heading.style, { color: TOKENS.muted, fontSize: '11px' });
+  wrapper.appendChild(heading);
+
+  const row = make('div', 'docier-colour-custom-row');
+  Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '6px' });
+
+  const native = doc.createElement('input');
+  native.setAttribute('type', 'color');
+  native.setAttribute('data-docier-colour-native', '');
+  native.setAttribute('aria-label', options.text('ui.colour.custom', 'Custom Colour'));
+  Object.assign(native.style, {
+    appearance: 'none',
+    width: '40px',
+    height: `${String(SWATCH_PX)}px`,
+    padding: '0',
+    border: `1px solid ${TOKENS.border}`,
+    borderRadius: '2px',
+    background: 'transparent',
+    cursor: 'pointer',
+    flex: '0 0 auto',
+  });
+
+  const hex = doc.createElement('input');
+  hex.setAttribute('type', 'text');
+  hex.setAttribute('data-docier-colour-hex', '');
+  hex.setAttribute('autocomplete', 'off');
+  hex.setAttribute('spellcheck', 'false');
+  hex.setAttribute('aria-label', options.text('ui.colour.hex', 'Hex colour'));
+  hex.placeholder = '#RRGGBB';
+  hex.value = '#';
+  Object.assign(hex.style, {
+    flex: '1 1 auto',
+    minWidth: '0',
+    height: `${String(SWATCH_PX)}px`,
+    padding: '0 6px',
+    boxSizing: 'border-box',
+    border: `1px solid ${TOKENS.border}`,
+    borderRadius: '2px',
+    background: TOKENS.surface,
+    color: TOKENS.text,
+    font: 'inherit',
+    outline: 'none',
+  });
+
+  const apply = make('button', 'docier-colour-apply');
+  apply.setAttribute('type', 'button');
+  apply.setAttribute('data-docier-colour-apply', '');
+  setText(apply, options.text('ui.colour.apply', 'Apply'));
+  Object.assign(apply.style, {
+    appearance: 'none',
+    height: `${String(SWATCH_PX)}px`,
+    padding: '0 8px',
+    border: `1px solid ${TOKENS.border}`,
+    borderRadius: '2px',
+    background: 'transparent',
+    color: TOKENS.text,
+    font: 'inherit',
+    cursor: 'pointer',
+    flex: '0 0 auto',
+  });
+
+  const grid = make('div', 'docier-colour-recent');
+  grid.setAttribute('data-docier-colour-grid', 'recent');
+  Object.assign(grid.style, {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${String(PALETTE_COLUMNS.text)}, ${String(SWATCH_PX)}px)`,
+    gap: `${String(SWATCH_GAP_PX)}px`,
+  });
+
+  const paintRecent = (): void => {
+    grid.textContent = '';
+    grid.hidden = recent.length === 0;
+    for (const value of recent) {
+      const cell = make('button', 'docier-colour-swatch');
+      cell.setAttribute('type', 'button');
+      cell.setAttribute('data-docier-swatch', value);
+      cell.setAttribute('data-docier-colour-group', 'recent');
+      cell.setAttribute('aria-label', `#${value}`);
+      cell.setAttribute('title', `#${value}`);
+      cell.tabIndex = -1;
+      Object.assign(cell.style, {
+        appearance: 'none',
+        width: `${String(SWATCH_PX)}px`,
+        height: `${String(SWATCH_PX)}px`,
+        padding: '0',
+        border: '0',
+        borderRadius: '2px',
+        cursor: 'pointer',
+        background: `#${value.toLowerCase()}`,
+        boxShadow: SWATCH_SHADOW,
+        outline: 'none',
+      });
+      grid.appendChild(cell);
+    }
+  };
+
+  const commit = (input: string): void => {
+    const value = normaliseHex(input);
+    if (value === undefined) return;
+    recent = [value, ...recent.filter((entry) => entry !== value)].slice(0, RECENT_COLOUR_COUNT);
+    writeRecent(recent);
+    paintRecent();
+    options.onPick(value);
+  };
+
+  on(native, 'change', () => {
+    const value = native.value;
+    const normalised = normaliseHex(value);
+    if (normalised !== undefined) hex.value = `#${normalised.toLowerCase()}`;
+    commit(value);
+  });
+  on(hex, 'input', () => {
+    const value = normaliseHex(hex.value);
+    if (value !== undefined) native.value = `#${value.toLowerCase()}`;
+  });
+  on(hex, 'keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    commit(hex.value);
+  });
+  on(apply, 'click', () => {
+    commit(hex.value);
+  });
+
+  row.appendChild(native);
+  row.appendChild(hex);
+  row.appendChild(apply);
+  wrapper.appendChild(row);
+  wrapper.appendChild(grid);
+  paintRecent();
+
+  return {
+    element: wrapper,
+    refresh: (current) => {
+      const value = current === undefined ? undefined : normaliseHex(current);
+      if (value !== undefined && hex.value.toLowerCase() !== `#${value.toLowerCase()}`) {
+        hex.value = `#${value.toLowerCase()}`;
+        native.value = `#${value.toLowerCase()}`;
+      }
+    },
+  };
+};
+
 
 const TOKENS = {
   surface: 'var(--docier-surface-raised, #ffffff)',
@@ -262,9 +496,10 @@ export const createColourPicker = (options: ColourPickerOptions): ColourPickerHa
   const store = createDisposableStore();
   const doc = context.host.ownerDocument;
   const mount = options.mount ?? mountFor(doc);
-  const kind = kindFor(options.command);
+  const kind = options.palette ?? options.kind ?? kindFor(options.command);
   const argKey = options.argKey ?? argKeyFor(options.command);
-  const noneValue = NO_COLOUR[kind];
+  const noneValue = options.noneValue ?? NO_COLOUR[kind];
+  const custom = options.custom ?? kind === 'text';
 
   const text = (key: string, fallback: string): string => {
     const value = context.i18n.text(key);
@@ -398,6 +633,18 @@ export const createColourPicker = (options: ColourPickerOptions): ColourPickerHa
   none.appendChild(chipLabel);
   element.appendChild(none);
 
+  const customSection =
+    custom === false
+      ? undefined
+      : createCustomColourSection({
+          doc,
+          text,
+          onPick: (value) => {
+            applyValue(value);
+          },
+        });
+  if (customSection !== undefined) element.appendChild(customSection.element);
+
   const marksCurrent = (button: HTMLElement, ring: HTMLElement, current: boolean): void => {
     button.setAttribute('aria-pressed', current ? 'true' : 'false');
     ring.style.outline = current ? CURRENT_OUTLINE : 'none';
@@ -416,6 +663,7 @@ export const createColourPicker = (options: ColourPickerOptions): ColourPickerHa
       marksCurrent(entry.cell, entry.cell, current !== undefined && matches(swatch, current));
     }
     marksCurrent(none, chip, current === undefined || matches(noneValue, current));
+    customSection?.refresh(current);
   };
 
   const focusCell = (cell: HTMLElement): void => {
@@ -432,15 +680,19 @@ export const createColourPicker = (options: ColourPickerOptions): ColourPickerHa
     return current?.cell ?? entries[0]?.cell ?? none;
   };
 
-  const activate = (cell: HTMLElement): void => {
-    const value = cell.getAttribute('data-docier-swatch');
-    if (value === null) return;
+  const applyValue = (value: string): void => {
     if (context.commands.get(options.command) === undefined) return;
     const args: Record<string, string> = {};
     args[argKey] = value;
     options.onPick?.(value);
     void context.commands.execute(options.command, args, { source: 'ui' });
     close(true);
+  };
+
+  const activate = (cell: HTMLElement): void => {
+    const value = cell.getAttribute('data-docier-swatch');
+    if (value === null) return;
+    applyValue(value);
   };
 
   const focusedCell = (event: KeyboardEvent): HTMLElement | undefined => {
@@ -485,6 +737,10 @@ export const createColourPicker = (options: ColourPickerOptions): ColourPickerHa
       event.preventDefault();
       event.stopPropagation();
       close(true);
+      return;
+    }
+    const origin = event.target;
+    if (origin instanceof HTMLElement && (origin.tagName === 'INPUT' || origin.tagName === 'TEXTAREA')) {
       return;
     }
     const cell = focusedCell(event);

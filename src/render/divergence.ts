@@ -25,7 +25,7 @@ import { ATTR, frameOf, geometryAt } from './dom.js';
 import { fontShorthand, runFontSpec } from './style.js';
 import { BORDER_SIDES, edgeBandOf, shadingColorOf } from './decoration.js';
 import { needsSegmentation, segmentsOf } from './runs.js';
-import { objectBoxOf } from './inline-object.js';
+import { objectBoxOf, rotatedBounds } from './inline-object.js';
 
 export const DEFAULT_TOLERANCE_PX = 0.5;
 export const DEFAULT_MAX_DIVERGENCES = 100;
@@ -613,6 +613,16 @@ export const detectDivergence = (
   ): void => {
     if (run.object === undefined) return;
     const frame = frameOf(page.page);
+    const origin = {
+      originX: page.page.x,
+      originY: page.page.y,
+      originWidth: page.page.width,
+      originHeight: page.page.height,
+      contentX: page.contentBox.x,
+      contentY: page.contentBox.y,
+      contentWidth: page.contentBox.width,
+      contentHeight: page.contentBox.height,
+    };
     for (const atom of line.atoms) {
       const object = atom.object;
       if (object === undefined) continue;
@@ -644,7 +654,14 @@ export const detectDivergence = (
         continue;
       }
       const local = localRect(rect, sheetRect);
-      const expected = geometryAt(objectBoxOf(line, run, atom), frame, scale);
+      const box = objectBoxOf(line, run, atom, origin);
+      const transformed =
+        (node.ownerDocument.defaultView?.getComputedStyle(node).transform ?? 'none') !== 'none';
+      const expected = geometryAt(
+        transformed ? rotatedBounds(box, object.rotationMilliDegrees) : box,
+        frame,
+        scale,
+      );
       const delta = rectDelta(expected, local);
       if (delta > tolerancePx) {
         push({ ...draft, kind: 'objectBox', message: rectMessage('the painted object box', expected, local) }, delta);

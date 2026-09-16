@@ -167,8 +167,10 @@ const pageBordersSpec = (): AreaSpec<PageBorderArgs> => ({
   category: 'doc',
   invalidation: DOCUMENT_INVALIDATION,
   permissions: ['format'],
-  enabledIn: (_host, args) => args?.none === true || args?.style !== undefined,
-  reason: () => 'This control needs a border style, or an explicit request to remove borders',
+  enabledIn: (_host, args) =>
+    args?.none === true || args?.style !== undefined || args?.color !== undefined,
+  reason: () =>
+    'This control needs a border style, a colour, or an explicit request to remove borders',
   run: (active, args) => {
     const section = documentSection(active);
     const borders = section.borders;
@@ -177,6 +179,18 @@ const pageBordersSpec = (): AreaSpec<PageBorderArgs> => ({
       if (borders.element === undefined) return false;
       borders.remove();
       return true;
+    }
+    if (args.style === undefined && args.color !== undefined) {
+      if (borders.element === undefined) return false;
+      const colour = args.color;
+      let recoloured = false;
+      for (const side of sides) {
+        const edge = borders.side(side);
+        if (edge.style === undefined || edge.color === colour) continue;
+        edge.color = colour;
+        recoloured = true;
+      }
+      return recoloured;
     }
     const style = args.style;
     if (style === undefined) return false;

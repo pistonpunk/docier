@@ -2,6 +2,7 @@ import type { Mp, Twip } from '../units/index.js';
 import { mp, twip, twipToMp } from '../units/index.js';
 import { Story } from '../model/index.js';
 import type { DocumentModel } from '../model/index.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
 import type { TextMeasurer } from '../measure/index.js';
 import { SINGLE_LINE_MULTIPLE, autoSpacing, createDeterministicMeasurer } from '../measure/index.js';
 import { ingest } from './ingest.js';
@@ -21,7 +22,7 @@ import type { FlowBlock, PageState, PaginateBlock, PaginationResult } from './pa
 import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
 import type { PageHeaderFooter } from './finalize.js';
 import { finalize } from './finalize.js';
-import type { BorderSet, FootnoteAreaFragment } from './types.js';
+import type { AtomPlacement, BorderSet, FootnoteAreaFragment } from './types.js';
 import type {
   BlockFragment,
   HeaderFooterFragment,
@@ -305,6 +306,8 @@ export const layoutDocument = (
   };
 
   const regionCache = new Map<string, HeaderFooterFragment>();
+  const regionTextBoxes = new Map<string, XmlElement>();
+  const regionAtoms: AtomPlacement[] = [];
   let regionLineId = -1;
 
   const regionOf = (
@@ -336,6 +339,12 @@ export const layoutDocument = (
       diagnostics,
       marks: showMarks,
     });
+    for (const [objectId, element] of layout.textBoxes) {
+      if (!regionTextBoxes.has(objectId)) regionTextBoxes.set(objectId, element);
+    }
+    for (const block of layout.blocks) {
+      for (const line of block.lines) regionAtoms.push(...line.atoms);
+    }
     const distance = slot.kind === 'header' ? section.headerDistance : section.footerDistance;
     const y = slot.kind === 'header'
       ? distance
@@ -714,11 +723,14 @@ export const layoutDocument = (
   }
 
   const objectText = new Map<string, readonly BlockFragment[]>();
+  const objectAtoms = [...prepared.flatMap((entry) => entry.atoms), ...regionAtoms];
+  const everyTextBox = new Map<string, XmlElement>(ingested.textBoxes);
+  for (const [objectId, element] of regionTextBoxes) {
+    if (!everyTextBox.has(objectId)) everyTextBox.set(objectId, element);
+  }
   let objectLineId = -1;
-  for (const [objectId, element] of ingested.textBoxes) {
-    const object = prepared
-      .flatMap((entry) => entry.atoms)
-      .find((atom) => atom.object?.objectId === objectId)?.object;
+  for (const [objectId, element] of everyTextBox) {
+    const object = objectAtoms.find((atom) => atom.object?.objectId === objectId)?.object;
     if (object === undefined) continue;
     {
       const story = new Story({

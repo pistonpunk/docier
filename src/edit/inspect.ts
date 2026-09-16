@@ -1,6 +1,6 @@
 import type { DocPos, DocRange } from '../layout/index.js';
 import type { DocumentModel, ResolvedProperties } from '../model/index.js';
-import { Paragraph, RunProperties } from '../model/index.js';
+import { Paragraph, RunProperties, wAttr } from '../model/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
 import { runSpans } from './mutation.js';
 import type { EditSession } from './session.js';
@@ -69,6 +69,21 @@ const runElementAt = (
     if (offset > span.start && offset <= span.end) return span.element;
   }
   return spans[0]?.element;
+};
+
+export const pageBackgroundAt = (model: DocumentModel): string | undefined => {
+  const root = model.body().element.parent;
+  if (root === undefined) return undefined;
+  const background = root.children.find(
+    (child): child is XmlElement => child.kind === 'element' && child.localName === 'background',
+  );
+  if (background === undefined) return undefined;
+  const fill = background.children.find(
+    (child): child is XmlElement => child.kind === 'element' && child.localName === 'color',
+  );
+  if (fill === undefined) return undefined;
+  const value = wAttr(fill, 'val');
+  return value === undefined || value === '' ? undefined : value;
 };
 
 export const marksAt = (

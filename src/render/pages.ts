@@ -17,7 +17,7 @@ import { ATTR, box, frameOf, geometryAt, stamp } from './dom.js';
 import { paintBorders, paintShading } from './decoration.js';
 import { paintFloats } from './objects.js';
 import { paintLine } from './runs.js';
-import { objectBoxOf } from './inline-object.js';
+import { objectBoxOf, rotationStyle } from './inline-object.js';
 import { appendSlotContent } from './registry.js';
 import type { ImageRegistry } from './images.js';
 
@@ -60,6 +60,17 @@ export const paintBlock = (
   return node;
 };
 
+const paintShapeText = (
+  container: HTMLElement,
+  objectId: string,
+  context: PagePaintContext,
+): void => {
+  const blocks = context.result.objectText.get(objectId);
+  if (blocks === undefined) return;
+  const inner: Frame = { dx: mp(0), dy: mp(0) };
+  for (const entry of blocks) paintBlock(container, entry, inner, context);
+};
+
 const paintObjectText = (
   parent: HTMLElement,
   block: BlockFragment,
@@ -70,6 +81,7 @@ const paintObjectText = (
   for (const line of block.lines) {
     for (const run of line.runs) {
       if (run.object === undefined) continue;
+      if (run.object.anchor !== undefined) continue;
       const blocks = context.result.objectText.get(run.object.objectId);
       if (blocks === undefined || blocks.length === 0) continue;
       const atom = line.atoms.find((entry) => entry.object?.objectId === run.object?.objectId);
@@ -77,9 +89,13 @@ const paintObjectText = (
       const container = box('docier-textbox');
       stamp(container, { [ATTR.textBox]: run.object.objectId });
       const area = objectBoxOf(line, run, atom);
-      applyStyle(container, positionStyle(geometryAt(area, frame, context.scale)));
-      const inner: Frame = { dx: mp(0), dy: mp(0) };
-      for (const entry of blocks) paintBlock(container, entry, inner, context);
+      applyStyle(
+        container,
+        positionStyle(geometryAt(area, frame, context.scale), {
+          ...rotationStyle(run.object.rotationMilliDegrees),
+        }),
+      );
+      paintShapeText(container, run.object.objectId, context);
       parent.appendChild(container);
     }
   }
@@ -218,7 +234,20 @@ export const paintPage = (
   const blocks = blocksById(page);
   const behind = box('docier-floats-behind');
   applyStyle(behind, positionStyle({ left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) }));
-  const behindCount = paintFloats(behind, { page, blocks: page.blocks, frame, scale: context.scale, images: context.images }, true);
+  const floatText = (container: HTMLElement, objectId: string): void =>
+    paintShapeText(container, objectId, context);
+  const behindCount = paintFloats(
+    behind,
+    {
+      page,
+      blocks: page.blocks,
+      frame,
+      scale: context.scale,
+      images: context.images,
+      paintText: floatText,
+    },
+    true,
+  );
   if (behindCount > 0) sheet.appendChild(behind);
 
   for (const block of page.blocks) {
@@ -240,7 +269,18 @@ export const paintPage = (
 
   const front = box('docier-floats-front');
   applyStyle(front, positionStyle({ left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) }));
-  const frontCount = paintFloats(front, { page, blocks: page.blocks, frame, scale: context.scale, images: context.images }, false);
+  const frontCount = paintFloats(
+    front,
+    {
+      page,
+      blocks: page.blocks,
+      frame,
+      scale: context.scale,
+      images: context.images,
+      paintText: floatText,
+    },
+    false,
+  );
   if (frontCount > 0) sheet.appendChild(front);
 };
 

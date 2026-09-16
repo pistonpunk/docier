@@ -282,6 +282,87 @@ describe('the page a region caret was placed on', () => {
   });
 });
 
+describe('a watermark', () => {
+  const watermarkDrawing = (handle: EditorHandle): string | undefined => {
+    const model = handle.session?.model;
+    const story = model?.stories().find((candidate) => candidate.isHeaderFooter);
+    return story === undefined ? undefined : serializeXmlNode(story.element);
+  };
+
+  it('creates the header it needs and puts a rotated text drawing in it', async () => {
+    const handle = await editorOf({ fillers: 2 });
+    await run(handle, 'doc.setWatermark', { text: 'DRAFT' });
+
+    const xml = watermarkDrawing(handle) ?? '';
+    expect(xml).toContain('DRAFT');
+    expect(xml).toContain('w:drawing');
+    expect(xml).toContain('wps:wsp');
+    expect(xml).toContain('rot="-2700000"');
+    expect(xml).toContain('val="C0C0C0"');
+  });
+
+  it('replaces the watermark rather than stacking a second one', async () => {
+    const handle = await editorOf({ fillers: 2 });
+    await run(handle, 'doc.setWatermark', { text: 'DRAFT' });
+    await run(handle, 'doc.setWatermark', { text: 'FINAL' });
+
+    const xml = watermarkDrawing(handle) ?? '';
+    expect(xml).toContain('FINAL');
+    expect(xml).not.toContain('DRAFT');
+  });
+
+  it('removes it again and is one undo entry', async () => {
+    const handle = await editorOf({ fillers: 2 });
+    await run(handle, 'doc.setWatermark', { text: 'DRAFT' });
+    const withWatermark = watermarkDrawing(handle) ?? '';
+
+    await run(handle, 'doc.setWatermark', { none: true });
+    expect(watermarkDrawing(handle) ?? '').not.toContain('DRAFT');
+
+    await run(handle, 'history.undo');
+    expect(watermarkDrawing(handle)).toBe(withWatermark);
+  });
+
+  it('reaches the page as a float behind the text', async () => {
+    const handle = await editorOf({ fillers: 2 });
+    await run(handle, 'doc.setWatermark', { text: 'DRAFT' });
+    const session = sessionOf(handle);
+    const header = session.layout.pages[0]?.header;
+    const atoms = (header?.blocks ?? []).flatMap((block) =>
+      block.lines.flatMap((line) => line.atoms),
+    );
+    const anchored = atoms.filter((atom) => atom.object?.anchor !== undefined);
+    expect(anchored).toHaveLength(1);
+    expect(anchored[0]?.object?.anchor?.behind).toBe(true);
+    expect(anchored[0]?.object?.anchor?.alignX).toBe('center');
+    expect(anchored[0]?.object?.anchor?.alignY).toBe('center');
+    // the text inside the box is laid out, so it paints something readably sized
+    const inner = [...session.layout.objectText.values()].flatMap((blocks) =>
+      blocks.flatMap((block) => block.lines.flatMap((line) => line.runs)),
+    );
+    expect(inner.length).toBeGreaterThan(0);
+    const paints = inner.map((entry) => session.layout.paint[entry.paint]);
+    expect(paints.some((paint) => (paint?.size ?? 0) > 40000)).toBe(true);
+  });
+
+  it('writes its run properties in the w namespace', async () => {
+    const handle = await editorOf({ fillers: 2 });
+    await run(handle, 'doc.setWatermark', { text: 'DRAFT' });
+    const xml = watermarkDrawing(handle) ?? '';
+    expect(xml).toContain('<w:sz w:val="88"/>');
+    expect(xml).toContain('<w:color w:val="C0C0C0"/>');
+  });
+
+  it('reports what it needs', async () => {
+    const handle = await editorOf({ fillers: 2 });
+    expect(handle.commands.isEnabled('docier.command.doc.setWatermark')).toBe(false);
+    expect(String(handle.commands.disabledReason('docier.command.doc.setWatermark'))).toContain(
+      'needs the text of the watermark',
+    );
+    expect(handle.commands.isEnabled('docier.command.doc.setWatermark', { text: 'X' })).toBe(true);
+  });
+});
+
 describe('editing inside a header', () => {
   it('changes the document and is a single undo entry', async () => {
     const handle = await editorOf({ header: paragraphText('Head') });

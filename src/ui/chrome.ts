@@ -1,6 +1,6 @@
 import type { EditorHandle } from '../api/editor.js';
 import type { ChromeMode, CommandDescriptor, Disposable, Unsubscribe } from '../api/types.js';
-import { marksAt } from '../edit/index.js';
+import { marksAt, pageBackgroundAt } from '../edit/index.js';
 import { toCssPx, mp } from '../units/index.js';
 import { createCommentsPanel } from './comments-panel.js';
 import type { CommentsPanelHandle } from './comments-panel.js';
@@ -24,7 +24,11 @@ import type { EditorQueries } from './queries.js';
 import { createRuler, RULER_UNITS } from './ruler.js';
 import { createVerticalRuler } from './ruler-vertical.js';
 import type { VerticalRulerHandle } from './ruler-vertical.js';
-import { SET_HIGHLIGHT_COMMAND, createColourPicker } from './colour-picker.js';
+import {
+  SET_HIGHLIGHT_COMMAND,
+  SET_PAGE_BACKGROUND_COMMAND,
+  createColourPicker,
+} from './colour-picker.js';
 import type { ColourPickerHandle } from './colour-picker.js';
 import type { RulerHandle, RulerIndents } from './ruler.js';
 import { createChromeStore, initialChromeState } from './store.js';
@@ -298,17 +302,24 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         const model = handle.document;
         const readColour = (): string | undefined => {
           if (session === undefined || model === undefined) return undefined;
+          if (command === SET_PAGE_BACKGROUND_COMMAND) return pageBackgroundAt(model);
           const marks = marksAt(model, session, handle.selection.focus);
           if (marks === undefined) return undefined;
           return command === SET_HIGHLIGHT_COMMAND ? marks.highlight : marks.color;
         };
         let picker = colourPickers.get(command);
         if (picker === undefined) {
+          const kind = args?.kind;
+          const noneValue = args?.noneValue;
+          const argKey = args?.argKey;
           picker = createColourPicker({
             context,
             command,
             value: readColour,
             mount: portal ?? root,
+            ...(kind === 'text' || kind === 'highlight' ? { kind } : {}),
+            ...(typeof noneValue === 'string' ? { noneValue } : {}),
+            ...(typeof argKey === 'string' ? { argKey } : {}),
           });
           colourPickers.set(command, picker);
           styleStore.add(picker);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { objectPlacementOf } from '../../src/layout/index.js';
+import { objectBoxOf } from '../../src/render/inline-object.js';
 import { mp } from '../../src/units/index.js';
 import { layoutOf, paragraphText, bodyOf } from './support.js';
 import { parseElement } from '../model/support.js';
@@ -69,14 +70,59 @@ describe('an anchored drawing is read', () => {
     const xml =
       '<w:drawing>' +
       `<wp:anchor xmlns:wp="${WP}" behindDoc="0">` +
-      '<wp:positionH relativeFrom="margin"><wp:align val="center"/></wp:positionH>' +
-      '<wp:positionV relativeFrom="margin"><wp:align val="bottom"/></wp:positionV>' +
+      '<wp:positionH relativeFrom="margin"><wp:align>center</wp:align></wp:positionH>' +
+      '<wp:positionV relativeFrom="margin"><wp:align>bottom</wp:align></wp:positionV>' +
       '<wp:extent cx="914400" cy="457200"/><wp:wrapNone/><wp:docPr id="9" name="x"/>' +
       '</wp:anchor></w:drawing>';
     const anchor = objectPlacementOf(parse(xml))?.anchor;
     expect(anchor?.horizontal).toBe('margin');
-    expect(anchor?.x).toBe(mp(-36000));
-    expect(anchor?.y).toBe(mp(-36000));
+    expect(anchor?.alignX).toBe('center');
+    expect(anchor?.alignY).toBe('end');
+  });
+
+  it('still reads an alignment written as an attribute', () => {
+    const xml =
+      '<w:drawing>' +
+      `<wp:anchor xmlns:wp="${WP}" behindDoc="0">` +
+      '<wp:positionH relativeFrom="page"><wp:align val="right"/></wp:positionH>' +
+      '<wp:extent cx="914400" cy="457200"/><wp:wrapNone/><wp:docPr id="9" name="x"/>' +
+      '</wp:anchor></w:drawing>';
+    expect(objectPlacementOf(parse(xml))?.anchor?.alignX).toBe('end');
+  });
+
+  it('resolves an alignment against the frame it is relative to', async () => {
+    const xml =
+      '<w:drawing>' +
+      `<wp:anchor xmlns:wp="${WP}" behindDoc="0">` +
+      '<wp:positionH relativeFrom="margin"><wp:align>center</wp:align></wp:positionH>' +
+      '<wp:positionV relativeFrom="margin"><wp:align>center</wp:align></wp:positionV>' +
+      '<wp:extent cx="914400" cy="457200"/><wp:wrapNone/><wp:docPr id="9" name="x"/>' +
+      '</wp:anchor></w:drawing>';
+    const body = bodyOf(
+      `<w:p><w:r>${xml}<w:t xml:space="preserve">tail</w:t></w:r></w:p>`,
+      paragraphText('after'),
+    );
+    const result = await layoutOf(body);
+    const line = result.pages[0]?.blocks[0]?.lines[0];
+    const run = line?.runs[0];
+    const atom = line?.atoms.find((entry) => entry.object !== undefined);
+    expect(line).toBeDefined();
+    expect(run).toBeDefined();
+    expect(atom).toBeDefined();
+    if (line === undefined || run === undefined || atom === undefined) return;
+    const box = objectBoxOf(line, run, atom, {
+      originX: mp(0),
+      originY: mp(0),
+      originWidth: mp(1000000),
+      originHeight: mp(1400000),
+      contentX: mp(100000),
+      contentY: mp(100000),
+      contentWidth: mp(800000),
+      contentHeight: mp(1200000),
+    });
+    // centred in the content box: 100000 + (800000 - 72000) / 2
+    expect(box.x).toBe(mp(464000));
+    expect(box.y).toBe(mp(100000 + (1200000 - 36000) / 2));
   });
 
   it('leaves an inline drawing without an anchor', () => {

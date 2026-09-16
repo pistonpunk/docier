@@ -153,12 +153,23 @@ export const WORD_DRAWING_SHAPE =
 
 const WPS_NAMESPACE = WORD_DRAWING_SHAPE;
 
+export interface DrawingAnchorRequest {
+  readonly behind: boolean;
+  readonly align: 'left' | 'center' | 'right';
+  readonly relativeHeight: number;
+}
+
 export interface TextBoxRequest {
   readonly cx: number;
   readonly cy: number;
   readonly docPrId: number;
   readonly name: string;
   readonly text: string;
+  readonly rotationMilliDegrees?: number;
+  readonly color?: string;
+  readonly sizeHalfPoints?: number;
+  readonly anchor?: DrawingAnchorRequest | undefined;
+  readonly noOutline?: boolean | undefined;
 }
 
 export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
@@ -169,7 +180,8 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
   }
   declareNamespace(drawing, 'wps', WPS_NAMESPACE);
 
-  const inline = namespaced('inline', 'wp', DRAWING_NAMESPACES.wp);
+  const anchor = request.anchor;
+  const inline = namespaced(anchor === undefined ? 'inline' : 'anchor', 'wp', DRAWING_NAMESPACES.wp);
   inline.selfClosing = false;
   withAttributes(inline, [
     ['distT', '0', '', ''],
@@ -177,6 +189,16 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
     ['distL', '0', '', ''],
     ['distR', '0', '', ''],
   ]);
+  if (anchor !== undefined) {
+    withAttributes(inline, [
+      ['simplePos', '0', '', ''],
+      ['relativeHeight', String(anchor.relativeHeight), '', ''],
+      ['behindDoc', anchor.behind ? '1' : '0', '', ''],
+      ['locked', '0', '', ''],
+      ['layoutInCell', '1', '', ''],
+      ['allowOverlap', '1', '', ''],
+    ]);
+  }
   const extent = namespaced('extent', 'wp', DRAWING_NAMESPACES.wp);
   withAttributes(extent, [
     ['cx', String(request.cx), '', ''],
@@ -210,6 +232,9 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
   spPr.selfClosing = false;
   const xfrm = namespaced('xfrm', 'a', DRAWING_NAMESPACES.a);
   xfrm.selfClosing = false;
+  if (request.rotationMilliDegrees !== undefined) {
+    withAttributes(xfrm, [['rot', String(request.rotationMilliDegrees), '', '']]);
+  }
   const off = namespaced('off', 'a', DRAWING_NAMESPACES.a);
   withAttributes(off, [
     ['x', '0', '', ''],
@@ -231,11 +256,17 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
   avLst.parent = prstGeom;
   const outline = namespaced('ln', 'a', DRAWING_NAMESPACES.a);
   outline.selfClosing = false;
-  const outlineFill = namespaced('solidFill', 'a', DRAWING_NAMESPACES.a);
-  const outlineColour = namespaced('srgbClr', 'a', DRAWING_NAMESPACES.a);
-  withAttributes(outlineColour, [['val', '000000', '', '']]);
-  outlineFill.children.push(outlineColour);
-  outlineColour.parent = outlineFill;
+  const outlineFill = namespaced(
+    request.noOutline === true ? 'noFill' : 'solidFill',
+    'a',
+    DRAWING_NAMESPACES.a,
+  );
+  if (request.noOutline !== true) {
+    const outlineColour = namespaced('srgbClr', 'a', DRAWING_NAMESPACES.a);
+    withAttributes(outlineColour, [['val', '000000', '', '']]);
+    outlineFill.children.push(outlineColour);
+    outlineColour.parent = outlineFill;
+  }
   outline.children.push(outlineFill);
   outlineFill.parent = outline;
   spPr.children.push(xfrm, prstGeom, outline);
@@ -255,6 +286,24 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
   text.children.push({ kind: 'text', value: request.text, parent: text });
   run.children.push(text);
   text.parent = run;
+  if (request.color !== undefined || request.sizeHalfPoints !== undefined) {
+    const runProperties = namespaced('rPr', 'w', WORD_NAMESPACE);
+    runProperties.selfClosing = false;
+    if (request.color !== undefined) {
+      const color = namespaced('color', 'w', WORD_NAMESPACE);
+      withAttributes(color, [['val', request.color, 'w', WORD_NAMESPACE]]);
+      runProperties.children.push(color);
+      color.parent = runProperties;
+    }
+    if (request.sizeHalfPoints !== undefined) {
+      const size = namespaced('sz', 'w', WORD_NAMESPACE);
+      withAttributes(size, [['val', String(request.sizeHalfPoints), 'w', WORD_NAMESPACE]]);
+      runProperties.children.push(size);
+      size.parent = runProperties;
+    }
+    run.children.unshift(runProperties);
+    runProperties.parent = run;
+  }
   paragraph.children.push(run);
   run.parent = paragraph;
   content.children.push(paragraph);
@@ -281,7 +330,36 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
   wsp.parent = graphicData;
   graphic.children.push(graphicData);
   graphicData.parent = graphic;
-  inline.children.push(extent, effectExtent, docPr, graphic);
+  if (anchor !== undefined) {
+    const simplePos = namespaced('simplePos', 'wp', DRAWING_NAMESPACES.wp);
+    withAttributes(simplePos, [
+      ['x', '0', '', ''],
+      ['y', '0', '', ''],
+    ]);
+    const position = (axis: 'positionH' | 'positionV'): XmlElement => {
+      const holder = namespaced(axis, 'wp', DRAWING_NAMESPACES.wp);
+      holder.selfClosing = false;
+      withAttributes(holder, [['relativeFrom', 'margin', '', '']]);
+      const align = namespaced('align', 'wp', DRAWING_NAMESPACES.wp);
+      let value = 'center';
+      if (anchor.align === 'left') value = axis === 'positionH' ? 'left' : 'top';
+      if (anchor.align === 'right') value = axis === 'positionH' ? 'right' : 'bottom';
+      align.children.push({ kind: 'text', value, parent: align });
+      holder.children.push(align);
+      align.parent = holder;
+      return holder;
+    };
+    const wrap = namespaced('wrapNone', 'wp', DRAWING_NAMESPACES.wp);
+    const positionH = position('positionH');
+    const positionV = position('positionV');
+    inline.children.push(simplePos, positionH, positionV, extent, effectExtent, wrap, docPr, graphic);
+    simplePos.parent = inline;
+    positionH.parent = inline;
+    positionV.parent = inline;
+    wrap.parent = inline;
+  } else {
+    inline.children.push(extent, effectExtent, docPr, graphic);
+  }
   extent.parent = inline;
   effectExtent.parent = inline;
   docPr.parent = inline;

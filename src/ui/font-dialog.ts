@@ -14,7 +14,7 @@ import {
   setDialogStyles,
 } from './dialog.js';
 import type { DialogValueReader, EditorDialogHandle } from './dialog.js';
-import { colourSections } from './colour-picker.js';
+import { colourSections, createCustomColourSection } from './colour-picker.js';
 import type { ColourKind } from './colour-picker.js';
 import type { ChromeContext } from './types.js';
 
@@ -308,6 +308,19 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
         block.appendChild(heading);
         block.appendChild(cells);
         grid.appendChild(block);
+      }
+      if (kind === 'text') {
+        grid.appendChild(
+          createCustomColourSection({
+            doc: document,
+            text,
+            onPick: (picked) => {
+              setValue(picked);
+              closeGrid();
+              button.focus();
+            },
+          }).element,
+        );
       }
     };
 

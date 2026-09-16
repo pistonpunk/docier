@@ -15,10 +15,11 @@ import { applyStyle, positionStyle } from './style.js';
 import { ATTR, box, element, geometryAt, stamp } from './dom.js';
 import {
   MISSING_IMAGE_BACKGROUND,
+  cssRotationOf,
+  rotationStyle,
   MISSING_IMAGE_FONT_SIZE_PX,
   MISSING_IMAGE_OUTLINE,
   MISSING_IMAGE_OUTLINE_WIDTH_PX,
-  cssRotationOf,
   missingImageLabel,
   objectBoxOf,
 } from './inline-object.js';
@@ -115,7 +116,10 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
     });
     applyStyle(
       container,
-      positionStyle(geometryAt(objectBoxOf(line, run, atom), frame, scale)),
+      positionStyle(
+        geometryAt(objectBoxOf(line, run, atom), frame, scale),
+        object.anchor === undefined ? {} : { ...rotationStyle(object.rotationMilliDegrees) },
+      ),
     );
     if (object.relationshipId === undefined) {
       parent.appendChild(container);
@@ -130,6 +134,7 @@ export const paintObjects = (parent: HTMLElement, input: ObjectPaintInput): void
 
 export interface FloatPaintInput {
   readonly page: PageFragment;
+  readonly paintText?: ((container: HTMLElement, objectId: string) => void) | undefined;
   readonly blocks: readonly BlockFragment[];
   readonly frame: Frame;
   readonly scale: PaintScale;
@@ -144,10 +149,18 @@ interface PlacedFloat {
   readonly order: number;
 }
 
+const regionBlocks = (page: PageFragment): readonly BlockFragment[] => {
+  const out: BlockFragment[] = [...page.blocks];
+  if (page.header !== undefined) out.push(...page.header.blocks);
+  if (page.footer !== undefined) out.push(...page.footer.blocks);
+  if (page.footnotes !== undefined) out.push(...page.footnotes.blocks);
+  return out;
+};
+
 export const floatsInPage = (page: PageFragment): readonly PlacedFloat[] => {
   const found: PlacedFloat[] = [];
   let order = 0;
-  for (const block of page.blocks) {
+  for (const block of regionBlocks(page)) {
     for (const line of block.lines) {
       for (const atom of line.atoms) {
         const object = atom.object;
@@ -185,15 +198,19 @@ export const paintFloats = (
   const origin = {
     originX: page.page.x,
     originY: page.page.y,
+    originWidth: page.page.width,
+    originHeight: page.page.height,
     contentX: page.contentBox.x,
     contentY: page.contentBox.y,
+    contentWidth: page.contentBox.width,
+    contentHeight: page.contentBox.height,
   };
   const floats = floatsInPage(page)
     .filter((entry) => (entry.atom.object?.anchor?.behind ?? false) === behind)
     .sort(byStacking);
   for (const entry of floats) {
     const object = entry.atom.object;
-    if (object === undefined || object.relationshipId === undefined) continue;
+    if (object === undefined) continue;
     const container = box('docier-object');
     stamp(container, {
       [ATTR.object]: String(entry.atom.atomId),
@@ -204,11 +221,16 @@ export const paintFloats = (
       container,
       positionStyle(
         geometryAt(objectBoxOf(entry.line, entry.run, entry.atom, origin), input.frame, input.scale),
+        { ...rotationStyle(object.rotationMilliDegrees) },
       ),
     );
-    const url = input.images.urlFor(object.relationshipId);
-    if (url !== undefined) paintImage(container, object, url, input.scale);
-    else paintMissing(container, object.relationshipId, input.scale, object);
+    if (object.relationshipId === undefined) {
+      input.paintText?.(container, object.objectId);
+    } else {
+      const url = input.images.urlFor(object.relationshipId);
+      if (url !== undefined) paintImage(container, object, url, input.scale);
+      else paintMissing(container, object.relationshipId, input.scale, object);
+    }
     parent.appendChild(container);
   }
   return floats.length;

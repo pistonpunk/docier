@@ -88,7 +88,7 @@ describe('ribbon controls', () => {
     const shape = chrome.context.describe({ command: 'docier.command.object.insertShape' });
     expect(shape.enabled).toBe(false);
     expect(shape.registered).toBe(true);
-    expect(shape.reason).toContain('no shape, chart or text-box geometry');
+    expect(shape.reason).toContain('no geometry for a preset shape');
 
     const unregistered = chrome.context.describe({ command: 'docier.command.nope.missing' });
     expect(unregistered.enabled).toBe(false);

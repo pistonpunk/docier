@@ -9,6 +9,7 @@ import {
 } from './dialog.js';
 import type { EditorDialogHandle } from './dialog.js';
 import { BORDERS_DIALOG_NAME } from './dialog-names.js';
+import { createCustomColourSection, hexToCss, normaliseHex } from './colour-picker.js';
 import type { ChromeContext } from './types.js';
 
 export const BORDERS_COMMAND = 'docier.command.table.setBorders';
@@ -93,6 +94,62 @@ export const createBordersDialog = (options: BordersDialogOptions): BordersDialo
   fill.setAttribute('aria-label', text('ui.borders.fill', 'Shading fill'));
   fill.setAttribute('placeholder', text('ui.borders.fillPlaceholder', 'none'));
 
+  const withPicker = (field: HTMLElement, fallback: string): HTMLElement => {
+    const wrapper = document.createElement('div');
+    setDialogStyles(wrapper, { display: 'flex', alignItems: 'center', gap: '6px' });
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = 'docier-control';
+    swatch.setAttribute('data-docier-dialog-picker', fallback);
+    swatch.setAttribute('aria-label', text('ui.colour.custom', 'Custom Colour'));
+    swatch.title = text('ui.colour.custom', 'Custom Colour');
+    setDialogStyles(swatch, {
+      width: '24px',
+      height: '24px',
+      flex: '0 0 auto',
+      padding: '0',
+      border: '1px solid var(--docier-border, #d1d1d1)',
+      borderRadius: '3px',
+      cursor: 'pointer',
+      background: '#ffffff',
+    });
+    const section = createCustomColourSection({
+      doc: document,
+      text,
+      onPick: (picked) => {
+        if (field instanceof HTMLInputElement) field.value = picked;
+        swatch.style.setProperty('background', hexToCss(picked) ?? '#ffffff');
+        section.element.hidden = true;
+        swatch.setAttribute('aria-expanded', 'false');
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+    });
+    section.element.hidden = true;
+    swatch.setAttribute('aria-expanded', 'false');
+    swatch.addEventListener('click', (event) => {
+      event.preventDefault();
+      const opening = section.element.hidden;
+      section.element.hidden = !opening;
+      swatch.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    });
+    if (field instanceof HTMLInputElement) {
+      field.addEventListener('input', () => {
+        const ink = normaliseHex(field.value);
+        swatch.style.setProperty('background', ink === undefined ? '#ffffff' : `#${ink.toLowerCase()}`);
+      });
+    }
+    const stack = document.createElement('div');
+    setDialogStyles(stack, { display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 auto' });
+    wrapper.appendChild(field);
+    wrapper.appendChild(swatch);
+    stack.appendChild(wrapper);
+    stack.appendChild(section.element);
+    return stack;
+  };
+
+  const colourField = withPicker(colour, 'auto');
+  const fillField = withPicker(fill, 'none');
+
   const panel = document.createElement('div');
   setDialogStyles(panel, { display: 'flex', flexDirection: 'column', gap: '14px' });
   panel.appendChild(
@@ -100,13 +157,13 @@ export const createBordersDialog = (options: BordersDialogOptions): BordersDialo
       dialogRow(text('ui.borders.preset', 'Setting'), preset, preset.id),
       dialogRow(text('ui.borders.style', 'Style'), style, style.id),
       dialogRow(text('ui.borders.width', 'Width'), width, width.id),
-      dialogRow(text('ui.borders.colour', 'Colour'), colour, colour.id),
+      dialogRow(text('ui.borders.colour', 'Colour'), colourField, colour.id),
     ]),
   );
   panel.appendChild(
     dialogGroup(text('ui.borders.applyTo', 'Apply to'), [
       dialogRow(text('ui.borders.scope', 'Apply to'), scope, scope.id),
-      dialogRow(text('ui.borders.fill', 'Shading fill'), fill, fill.id),
+      dialogRow(text('ui.borders.fill', 'Shading fill'), fillField, fill.id),
     ]),
   );
 

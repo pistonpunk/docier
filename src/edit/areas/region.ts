@@ -1,14 +1,20 @@
 import type { CommandDefinition, LocalizedString } from '../../api/types.js';
 import { noInvalidation } from '../../api/types.js';
 import type { HeaderFooterFragment, HeaderFooterRegionKind } from '../../layout/index.js';
-import { createWElement } from '../../model/index.js';
+import { childElements, createWElement } from '../../model/index.js';
 import type { SectionProperties } from '../../model/index.js';
 import { RELATIONSHIP_TYPES } from '../../ooxml/namespaces.js';
+import { buildTextBoxDrawing } from '../../ooxml/drawing.js';
+import { twipToEmu, twip } from '../../units/index.js';
+import { nextDocPrId } from './object.js';
 import { createDeclaration, createDocument } from '../../ooxml/xml/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { caretSelection } from '../selection.js';
 import { BODY_INVALIDATION, areaCommand, caretInRegion, documentSection } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
+
+const NEEDS_TEXT: LocalizedString =
+  'This control needs the text of the watermark, or an explicit request to remove it';
 
 const NOT_A_REGION: LocalizedString =
   'The caret is not in a header or footer, so there is none to close';
@@ -147,8 +153,129 @@ const closeSpec: AreaSpec<Record<string, never>> = {
   },
 };
 
+export interface WatermarkArgs {
+  readonly text?: string;
+  readonly color?: string;
+  readonly none?: boolean;
+}
+
+const WATERMARK_NAME = 'Watermark';
+const WATERMARK_TWIPS = 4320;
+const DIAGONAL_MILLI_DEGREES = -2700000;
+const WATERMARK_RELATIVE_HEIGHT = 251658240;
+
+const watermarkDrawingIn = (root: XmlElement): XmlElement | undefined => {
+  for (const child of childElements(root)) {
+    if (child.localName === 'drawing') {
+      const named = descendantNamed(child, 'docPr');
+      const name = named?.attributes.find((attribute) => attribute.localName === 'name')?.value;
+      if (name === WATERMARK_NAME) return child;
+    }
+    const nested = watermarkDrawingIn(child);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+};
+
+const descendantNamed = (element: XmlElement, localName: string): XmlElement | undefined => {
+  for (const child of childElements(element)) {
+    if (child.localName === localName) return child;
+    const nested = descendantNamed(child, localName);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+};
+
+const watermarkReason = (host: AreaHost, args: WatermarkArgs | undefined): LocalizedString | undefined => {
+  if (args?.none === true) return host.editable ? undefined : 'The document is read-only';
+  if (args?.text === undefined || args.text.trim() === '') {
+    return 'This control needs the text of the watermark, or an explicit request to remove it';
+  }
+  return host.editable ? undefined : 'The document is read-only';
+};
+
+const watermarkSpec: AreaSpec<WatermarkArgs> = {
+  id: 'docier.command.doc.setWatermark',
+  label: 'Watermark',
+  category: 'doc',
+  permissions: ['insert'],
+  enabledIn: (host, args) => host.session.aligned && watermarkReason(host, args) === undefined,
+  reason: (host, args) =>
+    host.session.aligned ? (watermarkReason(host, args) ?? NEEDS_TEXT) : NOT_ALIGNED,
+  run: (host, args) => {
+    if (watermarkReason(host, args) !== undefined) return false;
+    const model = host.session.model;
+    let headerPartName = headerPartNameOf(host);
+    if (headerPartName === undefined) {
+      let made: { readonly partName: string } | undefined;
+      host.session.changeRegions(() => {
+        made = createRegionPart(host, 'header');
+        return made !== undefined;
+      });
+      if (made === undefined) return false;
+      headerPartName = made.partName;
+      host.session.relayout();
+    }
+    const story = model.stories().find((candidate) => candidate.partName === headerPartName);
+    if (story === undefined) return false;
+    const root = story.element;
+    const changed = host.session.changeRegions(() => {
+      const existing = watermarkDrawingIn(root);
+      if (existing !== undefined) {
+        const host_ = existing.parent;
+        if (host_ !== undefined) {
+          host_.children = host_.children.filter((child) => child !== existing);
+        }
+      }
+      if (args?.none === true) return true;
+      const paragraph = childElements(root).find((child) => child.localName === 'p');
+      const owner =
+        paragraph ??
+        (() => {
+          const created = createWElement(root, 'p');
+          created.parent = root;
+          root.children.push(created);
+          return created;
+        })();
+      const run = createWElement(owner, 'r');
+      run.parent = owner;
+      const drawing = buildTextBoxDrawing({
+        cx: twipToEmu(twip(WATERMARK_TWIPS)),
+        cy: twipToEmu(twip(WATERMARK_TWIPS)),
+        docPrId: nextDocPrId(model),
+        name: WATERMARK_NAME,
+        text: args?.text ?? '',
+        rotationMilliDegrees: DIAGONAL_MILLI_DEGREES,
+        color: args?.color ?? 'C0C0C0',
+        sizeHalfPoints: 88,
+        noOutline: true,
+        anchor: {
+          behind: true,
+          align: 'center',
+          relativeHeight: WATERMARK_RELATIVE_HEIGHT,
+        },
+      });
+      run.children.push(drawing);
+      drawing.parent = run;
+      owner.children.push(run);
+      return true;
+    });
+    if (!changed) return false;
+    model.context.forgetSubtree(root);
+    host.session.relayout();
+    return true;
+  },
+};
+
+const headerPartNameOf = (host: AreaHost): string | undefined => {
+  const region = regionKindOf(host, 'header');
+  if (region === undefined) return undefined;
+  return host.session.model.story(region.storyId)?.partName;
+};
+
 export const regionCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<Record<string, never>>(host, enterSpec('header')),
   areaCommand<Record<string, never>>(host, enterSpec('footer')),
   areaCommand<Record<string, never>>(host, closeSpec),
+  areaCommand<WatermarkArgs>(host, watermarkSpec),
 ];

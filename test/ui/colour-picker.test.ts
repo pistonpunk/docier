@@ -11,6 +11,7 @@ import {
 } from '../../src/ui/colour-picker.js';
 import { contentRun, paragraphOf, text } from '../layout/support.js';
 import { pos } from '../edit/support.js';
+import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
 import type { ChromeHandle } from '../../src/ui/chrome.js';
 import { bodyOf, chromeOf, click, disposeChromes, paragraphText } from './support.js';
 
@@ -161,7 +162,7 @@ describe('opening the picker', () => {
     const headings = [...picker.element.querySelectorAll('.docier-colour-heading')].map(
       (node) => node.textContent,
     );
-    expect(headings).toEqual(['Theme Colours', 'Standard Colours']);
+    expect(headings).toEqual(['Theme Colours', 'Standard Colours', 'Custom Colour']);
     expect(gridCells(picker, 'theme').length).toBe(50);
     expect(gridCells(picker, 'standard').length).toBe(50);
     expect(picker.element.querySelectorAll('[data-docier-swatch]').length).toBe(101);
@@ -431,5 +432,112 @@ describe('disposal', () => {
     expect(picker.element.parentElement).toBeNull();
     document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(picker.element.parentElement).toBeNull();
+  });
+});
+
+describe('the custom colour section', () => {
+  const hexField = (picker: ColourPickerHandle): HTMLInputElement => {
+    const node = picker.element.querySelector<HTMLInputElement>('[data-docier-colour-hex]');
+    expect(node).not.toBeNull();
+    return node!;
+  };
+
+  const typeHex = (picker: ColourPickerHandle, value: string): void => {
+    const field = hexField(picker);
+    field.value = value;
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  };
+
+  const recentOf = (picker: ColourPickerHandle): readonly string[] =>
+    [...picker.element.querySelectorAll('[data-docier-colour-grid="recent"] [data-docier-swatch]')].map(
+      (cell) => cell.getAttribute('data-docier-swatch') ?? '',
+    );
+
+  it('applies a typed hex to the selection', async () => {
+    const { handle, chrome } = await chromeOf(bodyOf(paragraphText('hello')));
+    handleTo(handle, 0);
+    const executed = recordCommands(handle);
+    const picker = pickerOf(handle, chrome);
+    picker.open(ANCHOR);
+
+    typeHex(picker, '#12ab34');
+    await Promise.resolve();
+    const applied = executed.filter((entry) => entry.commandId === COLOUR);
+    expect(applied).toHaveLength(1);
+    expect(applied[0]?.args.color).toBe('12AB34');
+    expect(markAt(handle)).toBe('12AB34');
+  });
+
+  it('accepts a hex without the hash and a three digit shorthand', async () => {
+    const { handle, chrome } = await chromeOf(bodyOf(paragraphText('hello')));
+    handleTo(handle, 0);
+    const picker = pickerOf(handle, chrome);
+    picker.open(ANCHOR);
+
+    typeHex(picker, 'ff8800');
+    await Promise.resolve();
+    expect(markAt(handle)).toBe('FF8800');
+
+    typeHex(picker, '#0f0');
+    await Promise.resolve();
+    expect(markAt(handle)).toBe('00FF00');
+  });
+
+  it('ignores a hex it cannot read', async () => {
+    const { handle, chrome } = await chromeOf(bodyOf(paragraphText('hello')));
+    handleTo(handle, 0);
+    const executed = recordCommands(handle);
+    const picker = pickerOf(handle, chrome);
+    picker.open(ANCHOR);
+
+    typeHex(picker, 'not a colour');
+    await Promise.resolve();
+    expect(executed.filter((entry) => entry.commandId === COLOUR)).toHaveLength(0);
+  });
+
+  it('remembers the colours it has used', async () => {
+    const { handle, chrome } = await chromeOf(bodyOf(paragraphText('hello')));
+    handleTo(handle, 0);
+    const picker = pickerOf(handle, chrome);
+    picker.open(ANCHOR);
+
+    typeHex(picker, '123456');
+    await Promise.resolve();
+    expect(recentOf(picker)).toContain('123456');
+
+    const second = pickerOf(handle, chrome);
+    second.open(ANCHOR);
+    expect(recentOf(second)).toContain('123456');
+  });
+
+  it('reaches the page background through the chrome action', async () => {
+    const { handle, chrome } = await chromeOf(bodyOf(paragraphText('hello')));
+    chrome.context.run('openColourPicker', {
+      command: 'docier.command.doc.setPageBackground',
+      argKey: 'color',
+      kind: 'text',
+      noneValue: 'none',
+      anchor: ANCHOR,
+    });
+    const picker = [...document.querySelectorAll<HTMLElement>('.docier-colour-picker')]
+      .map((element) => element)
+      .find((element) => !element.hidden);
+    expect(picker).toBeDefined();
+    const field = picker?.querySelector<HTMLInputElement>('[data-docier-colour-hex]');
+    expect(field).not.toBeNull();
+    field!.value = 'abcdef';
+    field!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await Promise.resolve();
+
+    const model = handle.document;
+    const root = model?.body().element.parent;
+    const xml = root === undefined ? '' : serializeXmlNode(root);
+    expect(xml).toContain('abcdef'.toUpperCase());
+  });
+
+  it('leaves the highlight picker without a custom section', async () => {
+    const { handle, chrome } = await chromeOf(bodyOf(paragraphText('hello')));
+    const picker = pickerOf(handle, chrome, HIGHLIGHT, () => highlightAt(handle));
+    expect(picker.element.querySelector('[data-docier-colour-hex]')).toBeNull();
   });
 });

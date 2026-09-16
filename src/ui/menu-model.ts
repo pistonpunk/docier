@@ -152,6 +152,62 @@ export const PAGE_BORDERS_MENU: UiNode = menu('ui.menu.pageBorders', [
     command: command('doc.setPageBorders'),
     args: { none: true },
   }),
+  separator('pageBorderColour'),
+  menu('ui.pageBorder.colour', [
+    button({
+      labelKey: 'ui.colour.more',
+      id: 'pagebordercolour:custom',
+      command: command('doc.setPageBorders'),
+      args: { color: 'auto' },
+      action: 'openColourPicker',
+      actionArgs: {
+        command: command('doc.setPageBorders'),
+        argKey: 'color',
+        kind: 'text',
+        noneValue: 'auto',
+      },
+    }),
+  ]),
+]);
+
+export const WATERMARK_MENU: UiNode = menu('ui.menu.watermark', [
+  ...(
+    [
+      ['DRAFT', 'ui.watermark.draft'],
+      ['CONFIDENTIAL', 'ui.watermark.confidential'],
+      ['SAMPLE', 'ui.watermark.sample'],
+      ['DO NOT COPY', 'ui.watermark.doNotCopy'],
+      ['ASAP', 'ui.watermark.asap'],
+    ] as const
+  ).map(([text, labelKey]) =>
+    button({
+      labelKey,
+      id: `watermark:${text}`,
+      command: command('doc.setWatermark'),
+      args: { text },
+    }),
+  ),
+  separator('watermarkCustom'),
+  button({
+    labelKey: 'ui.watermark.custom',
+    id: 'watermark:custom',
+    command: command('doc.setWatermark'),
+    args: { text: 'DRAFT' },
+    action: 'openColourPicker',
+    actionArgs: {
+      command: command('doc.setWatermark'),
+      argKey: 'color',
+      kind: 'text',
+      noneValue: 'C0C0C0',
+    },
+  }),
+  separator('watermarkRemove'),
+  button({
+    labelKey: 'ui.watermark.remove',
+    id: 'watermark:remove',
+    command: command('doc.setWatermark'),
+    args: { none: true },
+  }),
 ]);
 
 export const PAGE_COLOUR_MENU: UiNode = menu('ui.menu.pageColour', [
@@ -173,6 +229,20 @@ export const PAGE_COLOUR_MENU: UiNode = menu('ui.menu.pageColour', [
       args: { color },
     }),
   ),
+  separator('pageColourCustom'),
+  button({
+    labelKey: 'ui.colour.more',
+    id: 'pagecolours:custom',
+    command: command('doc.setPageBackground'),
+    args: { color: 'FFFFFF' },
+    action: 'openColourPicker',
+    actionArgs: {
+      command: command('doc.setPageBackground'),
+      argKey: 'color',
+      kind: 'text',
+      noneValue: 'none',
+    },
+  }),
 ]);
 
 export const IMAGE_ALIGN_MENU: UiNode = menu('ui.menu.alignObjects', [
@@ -658,7 +728,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         large: true,
         nodes: [
           PAGE_COLOUR_MENU,
-          pending('doc.setWatermark', 'ui.menu.watermark', 'WM'),
+          WATERMARK_MENU,
           PAGE_BORDERS_MENU,
         ],
       },
