@@ -328,7 +328,7 @@ export const attachInput = (host: InputHost): InputHandle => {
   applyStyle(objectFrame, {
     position: 'absolute',
     display: 'none',
-    outline: '1px dashed var(--docier-accent, #1f6feb)',
+    outline: '1px solid var(--docier-accent, #1f6feb)',
   });
   const handleNodes = new Map<ObjectHandle, HTMLElement>();
   for (const handle of OBJECT_HANDLES) {
@@ -341,6 +341,8 @@ export const attachInput = (host: InputHost): InputHandle => {
       height: `${String(HANDLE_SIZE_PX)}px`,
       'background-color': 'var(--docier-surface, #ffffff)',
       border: '1px solid var(--docier-accent, #1f6feb)',
+      'border-radius': '1px',
+      'box-shadow': '0 0 0 1px rgba(255, 255, 255, 0.9)',
       'box-sizing': 'border-box',
     });
     handleNodes.set(handle, node);
@@ -688,6 +690,8 @@ export const attachInput = (host: InputHost): InputHandle => {
     undefined;
   let dragSource: DocRange | undefined = undefined;
   let dropPos: DocPos | undefined = undefined;
+  let armedObject: { readonly range: DocRange; readonly x: number; readonly y: number } | undefined =
+    undefined;
 
   const run = (command: string, args?: unknown): void => {
     void host.commands.execute(command, args);
@@ -873,7 +877,7 @@ export const attachInput = (host: InputHost): InputHandle => {
       return;
     }
     if (objectAtPoint(event.clientX, event.clientY) !== undefined) {
-      host.rendered.style.cursor = 'default';
+      host.rendered.style.cursor = 'move';
       return;
     }
     const edge = tableEdgeAt(event.clientX, event.clientY);
@@ -890,6 +894,7 @@ export const attachInput = (host: InputHost): InputHandle => {
   const releasePointer = (): void => {
     dragging = false;
     armed = undefined;
+    armedObject = undefined;
     dragSource = undefined;
     dropPos = undefined;
     owner.removeEventListener('pointermove', onPointerMove);
@@ -935,9 +940,15 @@ export const attachInput = (host: InputHost): InputHandle => {
       if (object !== undefined) {
         event.preventDefault();
         composer.focus({ preventScroll: true });
-        run(`${PREFIX}object.select`, { objectId: object.objectId });
+        if (selectedObject() !== object.objectId) {
+          run(`${PREFIX}object.select`, { objectId: object.objectId });
+        }
         paintObjectHandles();
         paintCaret();
+        armedObject = { range: object.range, x: event.clientX, y: event.clientY };
+        dragging = true;
+        owner.addEventListener('pointermove', onPointerMove);
+        owner.addEventListener('pointerup', onPointerUp);
         return;
       }
     }
@@ -967,6 +978,14 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const onPointerMove = (event: PointerEvent): void => {
     if (!dragging) return;
+    if (armedObject !== undefined && dragSource === undefined) {
+      const travelled =
+        Math.abs(event.clientX - armedObject.x) + Math.abs(event.clientY - armedObject.y);
+      if (travelled < DRAG_THRESHOLD_PX) return;
+      dragSource = armedObject.range;
+      armedObject = undefined;
+      dropObjectSelection();
+    }
     if (armed !== undefined && dragSource === undefined) {
       const travelled =
         Math.abs(event.clientX - armed.x) + Math.abs(event.clientY - armed.y);

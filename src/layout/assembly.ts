@@ -20,6 +20,7 @@ export interface LaidLine {
   readonly geometry: LineGeometry;
   readonly justified: boolean;
   readonly breakAfter: ForcedBreak;
+  readonly textOrigin: Mp;
 }
 
 export interface NumberingPlacement {
@@ -125,6 +126,7 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
       geometry: geometryOfPlaced(withPrefix, request.fallbackBox, geometryOrigin),
       justified: stretches,
       breakAfter: line.forced,
+      textOrigin: lineOrigin,
     });
   }
 

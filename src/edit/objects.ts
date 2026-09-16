@@ -1,4 +1,4 @@
-import type { LayoutResult, PageFragment, Rect } from '../layout/index.js';
+import type { DocRange, LayoutResult, PageFragment, Rect } from '../layout/index.js';
 import type { Mp } from '../units/index.js';
 import { objectBoxOf } from '../render/inline-object.js';
 import type { EditSession } from './session.js';
@@ -7,6 +7,7 @@ export interface ObjectBox {
   readonly objectId: string;
   readonly page: number;
   readonly box: Rect;
+  readonly range: DocRange;
 }
 
 export interface ObjectPoint {
@@ -46,6 +47,7 @@ export const resizableObjectsInPage = (page: PageFragment): readonly ObjectBox[]
           objectId: object.objectId,
           page: page.index,
           box: objectBoxOf(line, run, atom),
+          range: atom.source,
         });
       }
     }

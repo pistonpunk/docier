@@ -120,7 +120,9 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     const markPos = docPos((block.docRange.end as number) - 1);
     const end = lineEndOf(line, markPos);
     const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
-    const stops = request.collect ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak) : [];
+    const stops = request.collect
+      ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak, line.textOrigin)
+      : [];
     const runs: LineRun[] = [];
     for (const run of runsOfPlaced(line.prefix)) runs.push(run);
     for (const run of runsOfPlaced(line.placed)) runs.push(run);

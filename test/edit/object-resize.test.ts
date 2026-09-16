@@ -7,8 +7,9 @@ import type { XmlElement } from '../../src/ooxml/xml/index.js';
 import { ATTR } from '../../src/render/dom.js';
 import { mountChrome } from '../../src/ui/chrome.js';
 import type { ChromeHandle } from '../../src/ui/chrome.js';
-import type { Rect } from '../../src/layout/index.js';
+import type { DocPos, Rect } from '../../src/layout/index.js';
 import { MP_PER_TWIP, mp, toCssPx } from '../../src/units/index.js';
+import { caretGeometryOf } from '../../src/edit/caret.js';
 import { findObjectBox, objectSelectionOf } from '../../src/edit/objects.js';
 import type { ObjectResizeCommit } from '../../src/edit/object-resize.js';
 import {
@@ -149,11 +150,13 @@ const clientBoxOf = (handle: EditorHandle, objectId: string): Rect => {
 const selectByClick = async (handle: EditorHandle): Promise<void> => {
   stubPageRects(handle);
   const box = clientBoxOf(handle, PICTURE_ID);
-  handle.root
-    .querySelector<HTMLElement>(`[${ATTR.surface}]`)
-    ?.dispatchEvent(
-      pointer('pointerdown', (box.x as number) + (box.width as number) / 2, (box.y as number) + (box.height as number) / 2),
-    );
+  const x = (box.x as number) + (box.width as number) / 2;
+  const y = (box.y as number) + (box.height as number) / 2;
+  const surface = handle.root.querySelector<HTMLElement>(`[${ATTR.surface}]`);
+  surface?.dispatchEvent(pointer('pointerdown', x, y));
+  // a click is a press and a release; the object branch arms a possible move on
+  // the press, so the release has to follow or the gesture stays armed
+  document.dispatchEvent(pointer('pointerup', x, y));
   await Promise.resolve();
 };
 
@@ -519,6 +522,120 @@ describe('resizing a picture through the surface', () => {
       widthTwips: 1200,
     });
     expect(String(reason)).toContain('No picture is selected');
+  });
+});
+
+describe('moving a picture through the surface', () => {
+  const MOVE_BODY = (): string =>
+    bodyOf(wrap(`<w:r>${picture({ blip: BLIP })}</w:r>`), paragraphText('after'));
+
+  const paragraphDrawingIn = (handle: EditorHandle): number => {
+    const story = handle.document?.body();
+    if (story === undefined) throw new Error('no document');
+    const paragraphs = [...story.paragraphs()];
+    for (let index = 0; index < paragraphs.length; index += 1) {
+      const paragraph = paragraphs[index];
+      if (paragraph === undefined) continue;
+      for (const run of paragraph.runs()) {
+        for (const content of run.contents()) {
+          if (content instanceof DrawingContent) return index;
+        }
+      }
+    }
+    return -1;
+  };
+
+  const clientPointOf = (handle: EditorHandle, pos: DocPos): { x: number; y: number } => {
+    const session = handle.session;
+    if (session === undefined) throw new Error('no session');
+    const geometry = caretGeometryOf(session.index, pos, 'downstream');
+    if (geometry === undefined) throw new Error('no caret geometry');
+    const page = session.layout.pages.find((candidate) => candidate.index === geometry.page);
+    if (page === undefined) throw new Error('no page');
+    return {
+      x: toCssPx(mp((geometry.x as number) - (page.page.x as number)), 1),
+      y:
+        toCssPx(
+          mp(
+            (geometry.y as number) -
+              (page.page.y as number) +
+              (geometry.height as number) / 2,
+          ),
+          1,
+        ) +
+        geometry.page * PAGE_HEIGHT_PX,
+    };
+  };
+
+  const dragPictureTo = async (handle: EditorHandle, pos: DocPos): Promise<void> => {
+    stubPageRects(handle);
+    const box = clientBoxOf(handle, PICTURE_ID);
+    const from = {
+      x: (box.x as number) + (box.width as number) / 2,
+      y: (box.y as number) + (box.height as number) / 2,
+    };
+    const to = clientPointOf(handle, pos);
+    const surface = handle.root.querySelector<HTMLElement>(`[${ATTR.surface}]`);
+    if (surface === null) throw new Error('no surface');
+    surface.dispatchEvent(pointer('pointerdown', from.x, from.y));
+    await Promise.resolve();
+    await Promise.resolve();
+    document.dispatchEvent(pointer('pointermove', to.x, to.y));
+    await Promise.resolve();
+    document.dispatchEvent(pointer('pointerup', to.x, to.y));
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  const tailPos = (handle: EditorHandle): DocPos => {
+    const session = handle.session;
+    if (session === undefined) throw new Error('no session');
+    const slot = session.slots()[1];
+    if (slot === undefined) throw new Error('no second paragraph');
+    return slot.start;
+  };
+
+  it('moves the picture into the paragraph it is dragged onto', async () => {
+    const handle = await editorOf(MOVE_BODY());
+    expect(paragraphDrawingIn(handle)).toBe(0);
+
+    await dragPictureTo(handle, tailPos(handle));
+    expect(paragraphDrawingIn(handle)).toBe(1);
+  });
+
+  it('lands the move on one undo entry and undoes back', async () => {
+    const handle = await editorOf(MOVE_BODY());
+    const fired = commitsOf(handle);
+    await dragPictureTo(handle, tailPos(handle));
+    expect(fired.filter((id) => id === 'docier.command.clipboard.moveRange').length).toBe(1);
+
+    const undone = await handle.commands.execute('docier.command.history.undo');
+    expect(undone.status).toBe('ok');
+    expect(paragraphDrawingIn(handle)).toBe(0);
+  });
+
+  it('leaves the picture where it is when the press does not travel', async () => {
+    const handle = await editorOf(MOVE_BODY());
+    stubPageRects(handle);
+    const box = clientBoxOf(handle, PICTURE_ID);
+    const surface = handle.root.querySelector<HTMLElement>(`[${ATTR.surface}]`);
+    if (surface === null) throw new Error('no surface');
+    // a click, not a drag: below the travel threshold
+    surface.dispatchEvent(
+      pointer('pointerdown', (box.x as number) + 10, (box.y as number) + 10),
+    );
+    document.dispatchEvent(
+      pointer('pointermove', (box.x as number) + 11, (box.y as number) + 11),
+    );
+    document.dispatchEvent(
+      pointer('pointerup', (box.x as number) + 11, (box.y as number) + 11),
+    );
+    await Promise.resolve();
+
+    expect(paragraphDrawingIn(handle)).toBe(0);
+    const session = handle.session;
+    if (session === undefined) throw new Error('no session');
+    expect(objectSelectionOf(session)).toBe(PICTURE_ID);
   });
 });
 

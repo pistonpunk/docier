@@ -40,18 +40,42 @@ const verticalDistance = (line: LineEntry, y: number): number => {
   return 0;
 };
 
-export const lineOfPoint = (index: PositionIndex, page: number, y: Mp): LineEntry | undefined => {
-  const candidates = linesOnPage(index, page);
-  let best: LineEntry | undefined;
+const horizontalDistance = (line: LineEntry, x: number): number => {
+  const left = line.box.x as number;
+  const right = left + (line.box.width as number);
+  if (x < left) return left - x;
+  if (x > right) return x - right;
+  return 0;
+};
+
+export const lineOfPoint = (
+  index: PositionIndex,
+  page: number,
+  x: Mp,
+  y: Mp,
+): LineEntry | undefined => {
+  const candidates: LineEntry[] = [];
+  const vertical: number[] = [];
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const line of candidates) {
+  for (const line of linesOnPage(index, page)) {
     if (line.box.height === 0) continue;
     const distance = verticalDistance(line, y);
-    if (distance < bestDistance) {
+    candidates.push(line);
+    vertical.push(distance);
+    if (distance < bestDistance) bestDistance = distance;
+  }
+
+  let best: LineEntry | undefined;
+  let bestHorizontal = Number.POSITIVE_INFINITY;
+  for (let at = 0; at < candidates.length; at += 1) {
+    if ((vertical[at] ?? 0) > bestDistance) continue;
+    const line = candidates[at];
+    if (line === undefined) continue;
+    const distance = horizontalDistance(line, x);
+    if (distance < bestHorizontal) {
+      bestHorizontal = distance;
       best = line;
-      bestDistance = distance;
     }
-    if (distance === 0) break;
   }
   return best;
 };
@@ -91,7 +115,7 @@ export const hitTestPage = (
   page: number,
   point: PagePoint,
 ): CaretHit | undefined => {
-  const line = lineOfPoint(index, page, point.y);
+  const line = lineOfPoint(index, page, point.x, point.y);
   if (line === undefined) return undefined;
   const affinity = affinityOfPoint(line, point.y);
   const stop = stopOfPoint(index, line, point.x, affinity);

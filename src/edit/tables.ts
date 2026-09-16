@@ -11,6 +11,7 @@ import {
 } from '../model/index.js';
 import type { XmlElement } from '../ooxml/xml/index.js';
 import { MAX_TABLE_DEPTH } from '../layout/table-ingest.js';
+import { DEFAULT_BORDER_EIGHTHS } from '../layout/table-borders.js';
 
 export { MAX_TABLE_DEPTH };
 
@@ -103,6 +104,14 @@ export const createTableElement = (owner: XmlElement, shape: TableShape): XmlEle
   for (const side of ['top', 'start', 'left', 'bottom', 'end', 'right']) {
     const margin = createChild(margins, side);
     setWAttr(margin, 'w', String(side === 'top' || side === 'bottom' ? 0 : DEFAULT_CELL_MARGIN_TWIPS));
+  }
+  const borders = createChild(properties, 'tblBorders');
+  for (const side of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+    const border = createChild(borders, side);
+    setWAttr(border, 'val', 'single');
+    setWAttr(border, 'sz', String(DEFAULT_BORDER_EIGHTHS));
+    setWAttr(border, 'space', '0');
+    setWAttr(border, 'color', 'auto');
   }
   const grid = createChild(table, 'tblGrid');
   for (const width of widths) {
