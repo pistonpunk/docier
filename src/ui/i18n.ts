@@ -173,6 +173,8 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.colour.hex': 'Hex colour',
   'ui.colour.apply': 'Apply',
   'ui.colour.more': 'More Colours…',
+  'ui.direction.ltr': 'Left-to-right',
+  'ui.direction.rtl': 'Right-to-left',
   'ui.columns.one': 'One',
   'ui.columns.two': 'Two',
   'ui.columns.three': 'Three',

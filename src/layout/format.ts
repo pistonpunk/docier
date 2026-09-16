@@ -230,7 +230,10 @@ export const paragraphFormatOf = (
   const firstLine = resolved.indentFirstLine;
   const direction: TextDirection = resolved.bidi === true ? 'rtl' : 'ltr';
   return {
-    justification: justificationOf(resolved.justification),
+    justification:
+      direction === 'rtl' && resolved.justification === undefined
+        ? 'right'
+        : justificationOf(resolved.justification),
     direction,
     indentStart: twipsToMp(resolved.indentStart, mp(0)),
     indentEnd: twipsToMp(resolved.indentEnd, mp(0)),

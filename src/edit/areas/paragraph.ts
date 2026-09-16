@@ -97,6 +97,34 @@ const indentSpec: AreaSpec<IndentArgs> = {
   run: (active, args) => forEachSlot(active, (slot) => applyIndent(slot.element, args)),
 };
 
+export interface DirectionArgs {
+  readonly direction?: 'ltr' | 'rtl';
+}
+
+const directionSpec: AreaSpec<DirectionArgs> = {
+  id: 'docier.command.format.setDirection',
+  label: 'Text direction',
+  category: 'format',
+  permissions: ['format'],
+  enabledIn: (_host, args) => args?.direction !== undefined,
+  reason: () => 'This control needs a text direction to apply',
+  run: (active, args) => {
+    const wanted = args?.direction;
+    if (wanted === undefined) return false;
+    return forEachSlot(active, (slot) => {
+      const properties = ParagraphProperties.inOwner(slot.element);
+      const current = properties.bidi === true;
+      if (current === (wanted === 'rtl')) return false;
+      properties.bidi = wanted === 'rtl';
+      for (const run of slot.element.children) {
+        if (run.kind !== 'element' || run.localName !== 'r') continue;
+        RunProperties.inOwner(run).rightToLeft = wanted === 'rtl';
+      }
+      return true;
+    });
+  },
+};
+
 const nudgeIndent = (
   id: string,
   label: string,
@@ -292,6 +320,7 @@ const changeCaseSpec: AreaSpec<CaseArgs> = {
 
 export const paragraphCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<CaseArgs>(host, changeCaseSpec),
+  areaCommand<DirectionArgs>(host, directionSpec),
   areaCommand<IndentArgs>(host, indentSpec),
   areaCommand<IndentArgs>(
     host,

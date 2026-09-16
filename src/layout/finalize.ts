@@ -6,6 +6,7 @@ import type { PlacedRow, PlacedTable } from './table-flow.js';
 import { buildIndices } from './indices.js';
 import type { LineRef } from './indices.js';
 import { frozenMapOf } from './frozen-map.js';
+import type { PlacedAtom } from './line-geometry.js';
 import { caretStopsOfPlaced, runsOfPlaced } from './line-geometry.js';
 import { pageOrigins } from './page-geometry.js';
 import type {
@@ -66,8 +67,11 @@ export interface FinalizeInput {
   readonly columnBoxes: ReadonlyMap<number, readonly Rect[]>;
 }
 
-const atomsOf = (line: LaidLine, shift: Mp): readonly AtomPlacement[] =>
-  line.placed.map((item) => {
+const atomsOf = (
+  placed: readonly PlacedAtom[],
+  shift: Mp,
+): readonly AtomPlacement[] =>
+  placed.map((item) => {
     const atom = item.measured.atom;
     return {
       atomId: atom.id,
@@ -150,6 +154,30 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
   let lineId = request.lineIdStart;
   let y = request.boxTop;
   const shift = mp(request.x - block.originX);
+  const mirrored = block.format.direction === 'rtl';
+
+  // a right to left line runs its characters from the right, so the placed atoms
+  // are turned around once and everything downstream reads the turned list
+  const placedOf = (line: LaidLine): readonly PlacedAtom[] => {
+    if (!mirrored) return line.placed;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const item of line.placed) {
+      min = Math.min(min, item.x as number);
+      max = Math.max(max, (item.x as number) + (item.width as number));
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return line.placed;
+    const left = mp(min);
+    const right = mp(max);
+    return line.placed.map((item) => ({
+      measured: {
+        ...item.measured,
+        offsets: item.measured.offsets.map((offset) => mp((item.width as number) - (offset as number))),
+      },
+      x: mp((left as number) + (right as number) - (item.x as number) - (item.width as number)),
+      width: item.width,
+    }));
+  };
 
   const topAndBottomBands = (): readonly Rect[] => {
     const bands: Rect[] = [];
@@ -192,8 +220,9 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     const markPos = docPos((block.docRange.end as number) - 1);
     const end = lineEndOf(line, markPos);
     const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
+    const placedAtoms = placedOf(line);
     const stops = request.collect
-      ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak, mp(line.textOrigin + shift))
+      ? caretStopsOfPlaced(placedAtoms, baselineY, end, endsWithBreak, mp(line.textOrigin + shift))
       : [];
     const marks = request.marks
       ? marksOfPlaced(line, baselineY, index === block.lines.length - 1).map((mark) =>
@@ -201,8 +230,9 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
         )
       : [];
     const runs: LineRun[] = [];
-    for (const run of runsOfPlaced(line.prefix)) runs.push(run);
-    for (const run of runsOfPlaced(line.placed)) runs.push(run);
+    const shifted = (run: LineRun): LineRun => (shift === 0 ? run : { ...run, x: mp(run.x + shift) });
+    for (const run of runsOfPlaced(line.prefix)) runs.push(shifted(run));
+    for (const run of runsOfPlaced(placedAtoms)) runs.push(shifted(run));
     const fragment: LineFragment = {
       id: lineId,
       box: { x: request.x, y, width: geometry.width, height: geometry.height },
@@ -210,7 +240,7 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
       ascent: geometry.aboveBaseline,
       descent: geometry.belowBaseline,
       lineHeight: geometry.height,
-      atoms: atomsOf(line, shift),
+      atoms: atomsOf(placedAtoms, shift),
       runs,
       caretStops: stops,
       justified: line.justified,

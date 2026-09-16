@@ -150,6 +150,10 @@ export class RunProperties {
     return this.prop('rtl').onOff;
   }
 
+  set rightToLeft(to: boolean | undefined) {
+    this.prop('rtl').onOff = to;
+  }
+
   get complexScript(): boolean | undefined {
     return this.prop('cs').onOff;
   }

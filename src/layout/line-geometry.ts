@@ -139,10 +139,17 @@ export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] 
     const previous = runs[runs.length - 1];
     const object: ObjectPlacement | undefined = atom.object;
     if (previous !== undefined && sameRun(previous, atom)) {
+      // the atoms of a run are not always in ascending x: a right to left line
+      // places them in descending order, so the run box is their union
+      const left = Math.min(previous.x as number, item.x as number);
+      const right = Math.max(
+        (previous.x as number) + (previous.width as number),
+        (item.x as number) + (item.width as number),
+      );
       runs[runs.length - 1] = {
         paint: previous.paint,
-        x: previous.x,
-        width: mp(item.x + item.width - previous.x),
+        x: mp(left),
+        width: mp(right - left),
         shift: mp(Math.max(previous.shift, atom.shift)),
         ascent: mp(Math.max(previous.ascent, ascentOfAtom(atom))),
         descent: mp(Math.max(previous.descent, descentOfAtom(atom))),

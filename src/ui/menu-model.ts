@@ -175,6 +175,21 @@ export const PAGE_BORDERS_MENU: UiNode = menu('ui.menu.pageBorders', [
   ]),
 ]);
 
+export const TEXT_DIRECTION_MENU: UiNode = menu('ui.menu.textDirection', [
+  button({
+    labelKey: 'ui.direction.ltr',
+    id: 'direction:ltr',
+    command: command('format.setDirection'),
+    args: { direction: 'ltr' },
+  }),
+  button({
+    labelKey: 'ui.direction.rtl',
+    id: 'direction:rtl',
+    command: command('format.setDirection'),
+    args: { direction: 'rtl' },
+  }),
+]);
+
 export const COLUMNS_MENU: UiNode = menu('ui.control.columns', [
   ...(
     [
@@ -600,6 +615,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
             command: command('format.alignJustify'),
             keytip: 'AJ',
           }),
+          TEXT_DIRECTION_MENU,
           menu('ui.control.lineSpacing', [
             button({
               labelKey: 'ui.control.lineSpacingSingle',

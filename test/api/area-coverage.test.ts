@@ -127,7 +127,7 @@ describe('chrome command coverage', () => {
     // Before that it was the whole field set behind Insert > Field, and before
     // that Find and Replace, which open the find dialog instead of being executed
     // from the ribbon, so the dialog dispatches them rather than the chrome
-    expect(registered).toBe(139);
+    expect(registered).toBe(140);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -148,7 +148,9 @@ describe('chrome command coverage', () => {
     ]);
     expect(areas.get('doc')).toBe(15);
     expect(areas.get('insert')).toBe(22);
-    expect(areas.get('format')).toBe(25);
+    // one more than it was: the text direction command, which the layout can now
+    // lay out instead of warning that it cannot
+    expect(areas.get('format')).toBe(26);
     // one fewer than it was: Table Properties was two commands, one of which was
     // the dialog refusal, and is now a single command that opens the dialog
     expect(areas.get('table')).toBe(32);

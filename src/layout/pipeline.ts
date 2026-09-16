@@ -281,11 +281,18 @@ export const layoutDocument = (
       docPos: undefined,
     });
   }
-  if (prepared.some((entry) => entry.paragraph.format.direction === 'rtl')) {
+  if (
+    prepared.some(
+      (entry) =>
+        entry.paragraph.format.direction === 'rtl' &&
+        entry.measured.some((item) => /[A-Za-z]{2,}/.test(item.atom.text)),
+    )
+  ) {
     diagnostics.push({
       code: 'bidiNotLaidOut',
-      severity: 'warning',
-      message: 'bidirectional reordering is not implemented; every run is laid out left to right',
+      severity: 'info',
+      message:
+        'a left to right run inside a right to left paragraph is placed by its run order, without the Unicode reordering rule',
       docPos: undefined,
     });
   }
