@@ -118,6 +118,13 @@ const pending = (name: string, labelKey: string, keytip: string): UiNode =>
     labelKey,
     command: command(name),
     keytip,
+  });
+
+const pendingDialog = (name: string, labelKey: string, keytip: string): UiNode =>
+  button({
+    labelKey,
+    command: command(name),
+    keytip,
     action: 'openDialog',
     actionArgs: { dialog: command(name) },
   });
@@ -715,8 +722,8 @@ export const RIBBON_TABS: readonly UiTab[] = [
             action: 'setIndent',
             actionArgs: { deltaTwips: -720, target: 'right' },
           }),
-          pending('format.setSpaceBefore', 'ui.control.spaceBefore', 'SB'),
-          pending('format.setSpaceAfter', 'ui.control.spaceAfter', 'SA'),
+          pendingDialog('format.setSpaceBefore', 'ui.control.spaceBefore', 'SB'),
+          pendingDialog('format.setSpaceAfter', 'ui.control.spaceAfter', 'SA'),
         ],
       },
       {
