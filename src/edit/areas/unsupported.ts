@@ -57,12 +57,6 @@ const REFUSALS: readonly Refusal[] = [
 
   { id: 'docier.command.insert.endnote', label: 'Endnote', category: 'insert', reason: NO_PART('endnotes') },
   {
-    id: 'docier.command.insert.coverPage',
-    label: 'Cover page',
-    category: 'insert',
-    reason: 'Cover pages need a built-in gallery, which this build does not ship',
-  },
-  {
     id: 'docier.command.insert.updateTable',
     label: 'Update table',
     category: 'insert',

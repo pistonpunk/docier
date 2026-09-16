@@ -1,12 +1,15 @@
 import type { CommandDefinition, LocalizedString } from '../../api/types.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { R_NAMESPACE, xml } from '../../ooxml/index.js';
+import type { BorderSide } from '../../model/index.js';
 import { Paragraph, Table, createWElement, setWAttr } from '../../model/index.js';
 import type { BlockNode, DocumentModel } from '../../model/index.js';
 import { buildTextBoxDrawing } from '../../ooxml/drawing.js';
 import { twip, twipToEmu } from '../../units/index.js';
 import { appendRun, insertContainerAt, insertRunChildAt } from './content.js';
 import { nextDocPrId } from './object.js';
+import { docPos } from '../../layout/index.js';
+import { caretSelection } from '../selection.js';
 import { areaCommand, writingAt } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
@@ -306,6 +309,143 @@ const tocSpec: AreaSpec<TocArgs> = {
   },
 };
 
+export type CoverDesign = 'plain' | 'banded' | 'lines';
+
+export interface CoverPageArgs {
+  readonly design?: CoverDesign;
+  readonly title?: string;
+  readonly subtitle?: string;
+  readonly author?: string;
+}
+
+const COVER_DESIGNS: readonly CoverDesign[] = ['plain', 'banded', 'lines'];
+
+const COVER_DEFAULT_TITLE = '[Document title]';
+const COVER_DEFAULT_SUBTITLE = '[Subtitle]';
+const COVER_DEFAULT_AUTHOR = '[Author]';
+
+const pageBreak = (parent: XmlElement): XmlElement =>
+  paragraphWith(parent, (paragraph) => {
+    const run = appendRun(paragraph, '');
+    const br = createWElement(run, 'br');
+    setWAttr(br, 'type', 'page');
+    run.children.push(br);
+  });
+
+const centre = (paragraph: XmlElement): void => {
+  const properties = paragraph.children.find(
+    (child): child is XmlElement => child.kind === 'element' && child.localName === 'pPr',
+  );
+  const owner = properties ?? createWElement(paragraph, 'pPr');
+  const justification = createWElement(owner, 'jc');
+  setWAttr(justification, 'val', 'center');
+  owner.children.push(justification);
+  if (properties === undefined) paragraph.children.unshift(owner);
+};
+
+const sizedRun = (
+  paragraph: XmlElement,
+  text: string,
+  halfPoints: number,
+  bold: boolean,
+): void => {
+  const run = appendRun(paragraph, text);
+  const properties = createWElement(run, 'rPr');
+  if (bold) {
+    const heavy = createWElement(properties, 'b');
+    properties.children.push(heavy);
+  }
+  const size = createWElement(properties, 'sz');
+  setWAttr(size, 'val', String(halfPoints));
+  properties.children.push(size);
+  run.children.unshift(properties);
+};
+
+const ruleParagraph = (parent: XmlElement, sides: readonly BorderSide[]): XmlElement => {
+  const paragraph = createWElement(parent, 'p');
+  paragraph.selfClosing = false;
+  const properties = createWElement(paragraph, 'pPr');
+  const borders = createWElement(properties, 'pBdr');
+  for (const side of sides) {
+    const border = createWElement(borders, side);
+    setWAttr(border, 'val', 'single');
+    setWAttr(border, 'sz', '8');
+    setWAttr(border, 'space', '1');
+    setWAttr(border, 'color', 'auto');
+    borders.children.push(border);
+  }
+  properties.children.push(borders);
+  paragraph.children.push(properties);
+  return paragraph;
+};
+
+const coverSpec: AreaSpec<CoverPageArgs> = {
+  id: 'docier.command.insert.coverPage',
+  label: 'Cover page',
+  category: 'insert',
+  permissions: ['insert'],
+  enabledIn: (host) =>
+    host.session.aligned &&
+    host.selection.focus === host.session.index.documentStart &&
+    host.session.index.storyAt(host.selection.focus)?.kind === 'body',
+  reason: (host) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    if (host.session.index.storyAt(host.selection.focus)?.kind !== 'body') {
+      return 'Place the caret in the body to insert a cover page';
+    }
+    return 'A cover page goes at the start of the document; move the caret to the first paragraph';
+  },
+  run: (host, args) => {
+    const design = args?.design ?? 'plain';
+    if (!COVER_DESIGNS.includes(design)) return false;
+    const model = host.session.model;
+    const body = model.body().element;
+    const styles = model.styles;
+    const changed = writingAt(host, () => {
+      for (const id of ['Title', 'Subtitle']) styles?.ensure(id);
+      const blocks: XmlElement[] = [];
+      if (design === 'banded') blocks.push(ruleParagraph(body, ['bottom']));
+      blocks.push(
+        paragraphWith(
+          body,
+          (paragraph) => {
+            centre(paragraph);
+            sizedRun(paragraph, args?.title ?? COVER_DEFAULT_TITLE, 56, true);
+          },
+          'Title',
+        ),
+      );
+      blocks.push(
+        paragraphWith(
+          body,
+          (paragraph) => {
+            centre(paragraph);
+            sizedRun(paragraph, args?.subtitle ?? COVER_DEFAULT_SUBTITLE, 26, false);
+          },
+          'Subtitle',
+        ),
+      );
+      if (design === 'lines') blocks.push(ruleParagraph(body, ['top', 'bottom']));
+      blocks.push(paragraphWith(body, (paragraph) => appendRun(paragraph, args?.author ?? COVER_DEFAULT_AUTHOR)));
+      blocks.push(pageBreak(body));
+
+      const first = body.children.findIndex(
+        (child) => child.kind === 'element' && (child.localName === 'p' || child.localName === 'tbl'),
+      );
+      const at = first < 0 ? body.children.length : first;
+      for (const block of blocks) block.parent = body;
+      body.children.splice(at, 0, ...blocks);
+      body.selfClosing = false;
+      model.context.forgetSubtree(body);
+      return true;
+    });
+    if (!changed) return false;
+    host.session.relayout();
+    host.setSelection(caretSelection(docPos(0), 'downstream'), 'input');
+    return true;
+  },
+};
+
 export interface TextBoxArgs {
   readonly text?: string | undefined;
   readonly widthTwips?: number | undefined;
@@ -365,5 +505,6 @@ export const insertCommands = (host: AreaHost): readonly CommandDefinition<never
     areaCommand<FieldArgs>(host, fieldSpec(field.id, field.label, field.instruction)),
   ),
   areaCommand<TocArgs>(host, tocSpec),
+  areaCommand<CoverPageArgs>(host, coverSpec),
   areaCommand<TextBoxArgs>(host, textBoxSpec),
 ];

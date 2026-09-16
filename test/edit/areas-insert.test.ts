@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { EditorHandle } from '../../src/api/editor.js';
 import { createEditor } from '../../src/api/editor.js';
 import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
+import { openModel, stylesXml } from '../model/support.js';
 import {
   bodyOf,
   disposeEditors,
@@ -222,6 +223,120 @@ describe('insert fields', () => {
       await run(handle, name);
       expect(xmlOf(handle), name).toContain(`w:instr="${instruction}"`);
     }
+  });
+});
+
+describe('insert.coverPage', () => {
+  const paragraphTexts = (handle: EditorHandle): readonly string[] => {
+    const session = handle.session;
+    if (session === undefined) return [];
+    return session
+      .slots()
+      .map((slot) => session.textOf({ start: slot.start, end: slot.textEnd }));
+  };
+
+  it('puts the cover at the very start of the document and leaves the body after it', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    await run(handle, 'insert.coverPage', {
+      title: 'Contract of employment',
+      subtitle: 'Human Resources',
+      author: 'Ada Lovelace',
+    });
+
+    const texts = paragraphTexts(handle);
+    expect(texts.slice(0, 4)).toEqual([
+      'Contract of employment',
+      'Human Resources',
+      'Ada Lovelace',
+      '',
+    ]);
+    expect(texts.slice(4)).toEqual(['alpha', 'beta']);
+  });
+
+  it('carries the Title and Subtitle styles, and defines them when the document has a styles part', async () => {
+    const withStyles = async (): Promise<EditorHandle> => {
+      const model = await openModel({
+        body: FIXTURE,
+        styles: stylesXml('<w:style w:type="paragraph" w:styleId="Normal" w:default="1"><w:name w:val="Normal"/></w:style>'),
+      });
+      return track(createEditor(mountPoint(), {}, { document: model }));
+    };
+
+    const handle = await withStyles();
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    await run(handle, 'insert.coverPage', {});
+
+    const model = handle.session?.model;
+    expect(model?.styles?.style('Title')).toBeDefined();
+    expect(model?.styles?.style('Subtitle')).toBeDefined();
+
+    const styles = (model?.body().paragraphs() ?? [])
+      .map((paragraph) => paragraph.properties.styleId)
+      .filter((id): id is string => id !== undefined);
+    expect(styles).toContain('Title');
+    expect(styles).toContain('Subtitle');
+  });
+
+  it('looks like a cover even when the document has no styles part at all', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    await run(handle, 'insert.coverPage', { title: 'Big', subtitle: 'Small' });
+
+    const xml = serializeXmlNode(handle.document!.body().element);
+    // the style names would resolve to nothing here, so the cover carries its own
+    expect(xml).toContain('<w:jc w:val="center"/>');
+    expect(xml).toContain('<w:sz w:val="56"/>');
+    expect(xml).toContain('<w:b/>');
+    expect(xml).toContain('<w:sz w:val="26"/>');
+  });
+
+  it('ends the cover with a page break so the body starts on page two', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    await run(handle, 'insert.coverPage', {});
+
+    const xml = serializeXmlNode(handle.document!.body().element);
+    expect(xml).toContain('<w:br w:type="page"/>');
+    expect(handle.session?.layout.pages.length ?? 0).toBeGreaterThan(1);
+  });
+
+  it('draws a rule for the banded and lines designs but not for plain', async () => {
+    for (const design of ['banded', 'lines'] as const) {
+      const handle = await editorOf(FIXTURE);
+      await run(handle, 'selection.setCaret', { pos: pos(0) });
+      await run(handle, 'insert.coverPage', { design });
+      expect(serializeXmlNode(handle.document!.body().element), design).toContain('<w:pBdr>');
+    }
+    const plain = await editorOf(FIXTURE);
+    await run(plain, 'selection.setCaret', { pos: pos(0) });
+    await run(plain, 'insert.coverPage', { design: 'plain' });
+    expect(serializeXmlNode(plain.document!.body().element)).not.toContain('<w:pBdr>');
+  });
+
+  it('is one undo entry', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    const before = serializeXmlNode(handle.document!.body().element);
+    await run(handle, 'insert.coverPage', {});
+    expect(serializeXmlNode(handle.document!.body().element)).not.toBe(before);
+    await run(handle, 'history.undo');
+    expect(serializeXmlNode(handle.document!.body().element)).toBe(before);
+  });
+
+  it('only offers itself at the start of the document', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(3) });
+    expect(handle.commands.isEnabled('docier.command.insert.coverPage')).toBe(false);
+    expect(String(handle.commands.disabledReason('docier.command.insert.coverPage'))).toContain(
+      'start of the document',
+    );
+
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    expect(handle.commands.isEnabled('docier.command.insert.coverPage')).toBe(true);
+    // a design the build does not ship changes nothing rather than half-inserting
+    expect((await resultOf(handle, 'insert.coverPage', { design: 'fancy' })).status).toBe('noop');
+    expect(serializeXmlNode(handle.document!.body().element)).not.toContain('Title');
   });
 });
 

@@ -469,7 +469,23 @@ export const RIBBON_TABS: readonly UiTab[] = [
             command: command('edit.insertPageBreak'),
             keytip: 'PB',
           }),
-          pending('insert.coverPage', 'ui.control.coverPage', 'CV'),
+          menu('ui.control.coverPage', [
+            ...(
+              [
+                ['plain', 'ui.cover.plain', 'CV'],
+                ['banded', 'ui.cover.banded', 'CB'],
+                ['lines', 'ui.cover.lines', 'CL'],
+              ] as const
+            ).map(([design, labelKey, keytip]) =>
+              button({
+                labelKey,
+                id: `cover:${design}`,
+                command: command('insert.coverPage'),
+                args: { design },
+                keytip,
+              }),
+            ),
+          ]),
         ],
       },
       {

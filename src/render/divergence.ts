@@ -77,6 +77,7 @@ export interface LayoutDivergence {
 
 export type DivergenceSkipReason =
   | 'runWithoutPaint'
+  | 'zeroWidthRun'
   | 'hiddenRun'
   | 'objectRun'
   | 'unreadableBox'
@@ -98,6 +99,7 @@ export type DivergenceSkipSeverity = 'info' | 'warning';
 
 const SKIP_SEVERITY: Record<DivergenceSkipReason, DivergenceSkipSeverity> = {
   runWithoutPaint: 'warning',
+  zeroWidthRun: 'info',
   hiddenRun: 'info',
   objectRun: 'info',
   unreadableBox: 'warning',
@@ -434,6 +436,10 @@ export const detectDivergence = (
     }
     if (run.object !== undefined) {
       skip('objectRun');
+      return;
+    }
+    if (run.width === 0) {
+      skip('zeroWidthRun');
       return;
     }
     const spec = runFontSpec(paint, scale);
