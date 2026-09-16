@@ -458,6 +458,8 @@ describe('deleting and setting up a table', () => {
     expect(xml).toContain('<w:jc w:val="center"/>');
     await undo(handle);
     expect(bodyXml(handle)).not.toContain('w:tblLayout');
+    // the width must come back too, or an undone dialog leaves the table resized
+    expect(bodyXml(handle)).not.toContain('w:w="900"');
   });
 });
 
