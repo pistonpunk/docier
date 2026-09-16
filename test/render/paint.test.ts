@@ -177,8 +177,12 @@ describe('painting table fragments', () => {
     const cellNode = target.querySelector<HTMLElement>(`[${ATTR.cell}="0"]`);
     const blockNode = cellNode?.querySelector<HTMLElement>(`[${ATTR.block}="${String(block?.id)}"]`);
     expect(blockNode).not.toBeNull();
-    expect(styleLeft(blockNode)).toBe(px((block?.box.x ?? 0) - (cellFragment?.box.x ?? 0)));
-    expect(styleTop(blockNode)).toBe(px((block?.box.y ?? 0) - (cellFragment?.box.y ?? 0)));
+    // the cell's paragraphs sit in its content box, which is the cell box inside
+    // its margins and borders
+    const content = cellFragment?.contentBox;
+    expect(styleLeft(blockNode)).toBe(px((block?.box.x ?? 0) - (content?.x ?? 0)));
+    expect(styleTop(blockNode)).toBe(px((block?.box.y ?? 0) - (content?.y ?? 0)));
+    expect(cellNode?.querySelector('.docier-cell-content')).not.toBeNull();
   });
 });
 

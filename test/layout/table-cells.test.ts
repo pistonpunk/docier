@@ -219,12 +219,38 @@ describe('nested tables', () => {
     expect(tableDiags(result)).toEqual([]);
   });
 
-  it('reports a rotated cell as laid out horizontally', async () => {
+  it('lays a rotated cell out unwrapped, and reports nothing', async () => {
     const result = await layoutOf(
       bodyOf(
         table(FIXED(1000), grid([500, 500]), [
           row('', [
-            cell('<w:textDirection w:val="btLr"/>', para('aa')),
+            cell('<w:textDirection w:val="btLr"/>', para('aa bb cc dd ee ff gg')),
+            cell('', para('aa')),
+          ]),
+        ]),
+      ),
+    );
+    const rotated = result.pages[0]?.tables[0]?.rows[0]?.cells[0];
+    expect(rotated?.rotation).toBe('btLr');
+    // the text runs down the cell, so it is not wrapped to the column width
+    const block = (result.pages[0]?.blocks ?? []).find((candidate) => candidate.cell !== undefined);
+    expect(block?.lines.length).toBe(1);
+    // and the row is tall enough to hold the text it turned: the line's advance
+    // becomes the height the row needs, not the width
+    const advance = block?.lines[0]?.box.width ?? 0;
+    expect(rotated?.box.height).toBeGreaterThanOrEqual(advance);
+    expect(tableDiags(result)).not.toContain('tableTextDirectionNotLaidOut');
+  });
+
+  it('still reports a table nested inside a rotated cell', async () => {
+    const result = await layoutOf(
+      bodyOf(
+        table(FIXED(1000), grid([500, 500]), [
+          row('', [
+            cell(
+              '<w:textDirection w:val="tbRl"/>',
+              table(FIXED(400), grid([400]), [row('', [cell('', para('inner'))])]),
+            ),
             cell('', para('aa')),
           ]),
         ]),

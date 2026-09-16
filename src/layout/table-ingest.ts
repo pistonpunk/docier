@@ -330,11 +330,11 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
   const rotated = rows.some((row) =>
     row.cells.some((cell) => cell.textDirection !== undefined && cell.textDirection !== 'lrTb'),
   );
-  if (rotated) {
+  if (rotated && rows.some((row) => row.cells.some((cell) => cell.blocks.some((block) => block.kind === 'table')))) {
     state.diagnostics.push({
       code: 'tableTextDirectionNotLaidOut',
-      severity: 'warning',
-      message: 'a rotated cell (w:textDirection) is laid out horizontally',
+      severity: 'info',
+      message: 'a table inside a rotated cell is laid out unrotated',
       docPos: start,
     });
   }

@@ -269,7 +269,10 @@ export type CellVerticalAlignment = 'top' | 'center' | 'bottom';
 
 export type CellMergeRole = 'none' | 'restart' | 'continue';
 
+export type CellRotation = 'none' | 'tbRl' | 'btLr';
+
 export interface CellFragment {
+  readonly rotation: CellRotation;
   readonly column: number;
   readonly columnSpan: number;
   readonly box: Rect;

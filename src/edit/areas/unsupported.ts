@@ -205,7 +205,8 @@ const REFUSALS: readonly Refusal[] = [
     id: 'docier.command.table.setTextDirection',
     label: 'Text direction',
     category: 'table',
-    reason: 'This build reads w:textDirection and never writes it',
+    reason:
+      'This build lays out a rotated cell and never writes the property that rotates one',
   },
 ];
 

@@ -227,6 +227,7 @@ const emitCell = (
   }
 
   return {
+    rotation: cell.rotation,
     column: cell.gridStart,
     columnSpan: cell.gridSpan,
     box,

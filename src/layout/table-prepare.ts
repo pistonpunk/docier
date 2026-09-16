@@ -56,7 +56,10 @@ export interface MergeRegion {
   readonly height: Mp;
 }
 
+export type CellRotation = 'none' | 'tbRl' | 'btLr';
+
 export interface PreparedCell {
+  readonly rotation: CellRotation;
   readonly gridStart: number;
   readonly gridSpan: number;
   readonly merge: CellMergeRole;
@@ -111,6 +114,8 @@ export interface PreparedTable {
   readonly docStart: number;
   readonly docEnd: number;
 }
+
+const ROTATED_LINE_WIDTH_MP = 2000000;
 
 export interface TablePrepareState {
   readonly prepared: readonly PreparedParagraph[];
@@ -365,6 +370,14 @@ const buildCell = (
     });
   }
 
+  const rotation: CellRotation =
+    cell.textDirection === 'tbRl' ? 'tbRl' : cell.textDirection === 'btLr' ? 'btLr' : 'none';
+  // a rotated cell runs its text down the cell rather than across it, so the
+  // line is as long as the cell is tall; a cell whose height is not declared has
+  // no line length to wrap against, and Word lays such text out unwrapped
+  const lineWidth = rotation === 'none' ? contentWidth : mp(ROTATED_LINE_WIDTH_MP);
+
+  let advance = 0;
   const items: CellItem[] = [];
   const nested: PreparedTable[] = [];
   const blocks: number[] = [];
@@ -377,9 +390,10 @@ const buildCell = (
       const laid = buildParagraphBlock(
         prepared,
         contentX,
-        contentWidth,
+        lineWidth,
         { defaultTabStop: state.defaultTabStop },
       );
+      for (const line of laid.lines) advance = Math.max(advance, line.geometry.width as number);
       const blockIndex = laid.index;
       context.blocks.push(laid);
       blocks.push(blockIndex);
@@ -429,12 +443,17 @@ const buildCell = (
     body += item.height + itemGap(items, index);
   }
   const innerHeight =
-    items.length === 0 ? state.defaultLineBox.height : mp(body + leadIn + trailing);
+    rotation !== 'none'
+      ? mp(items.length === 0 ? state.defaultLineBox.height : advance + leadIn + trailing)
+      : items.length === 0
+        ? state.defaultLineBox.height
+        : mp(body + leadIn + trailing);
   const outerHeight = mp(
     innerHeight + cell.margins.top + cell.margins.bottom + halfTop + halfBottom,
   );
 
   return {
+    rotation,
     gridStart: cell.gridStart,
     gridSpan: cell.gridSpan,
     merge: cell.merge,

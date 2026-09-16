@@ -101,6 +101,26 @@ const paintObjectText = (
   }
 };
 
+const unionOfBlocks = (
+  cell: CellFragment,
+  blocks: ReadonlyMap<number, BlockFragment>,
+): { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined => {
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const id of cell.blocks) {
+    const block = blocks.get(id);
+    if (block === undefined) continue;
+    left = Math.min(left, block.box.x as number);
+    top = Math.min(top, block.box.y as number);
+    right = Math.max(right, (block.box.x as number) + (block.box.width as number));
+    bottom = Math.max(bottom, (block.box.y as number) + (block.box.height as number));
+  }
+  if (!Number.isFinite(left) || right <= left) return undefined;
+  return { x: left, y: top, width: right - left, height: bottom - top };
+};
+
 const paintCell = (
   parent: HTMLElement,
   cell: CellFragment,
@@ -114,25 +134,44 @@ const paintCell = (
   const inner = frameOf(cell.box);
   paintShading(node, cell.shading, cell.box, inner, context.scale);
   paintBorders(node, cell.borders, cell.box, inner, context.scale);
-  const clip = cell.clip;
-  if (clip === undefined) {
+
+  const clip = cell.clip ?? cell.contentBox;
+  const content = box('docier-cell-content');
+  const union = cell.rotation === 'none' ? undefined : unionOfBlocks(cell, blocks);
+  if (union === undefined) {
+    applyStyle(content, positionStyle(geometryAt(clip, inner, context.scale), { overflow: 'hidden' }));
     for (const id of cell.blocks) {
       const block = blocks.get(id);
-      if (block !== undefined) paintBlock(node, block, inner, context);
+      if (block !== undefined) paintBlock(content, block, frameOf(clip), context);
     }
   } else {
-    const clipped = box('docier-cell-content');
-    applyStyle(
-      clipped,
-      positionStyle(geometryAt(clip, inner, context.scale), { overflow: 'hidden' }),
-    );
-    const clipFrame = frameOf(clip);
+    // a rotated cell runs its text down the cell: the content is centred on the
+    // cell first, then turned about its own centre
+    const centreX = (clip.x as number) + (clip.width as number) / 2;
+    const centreY = (clip.y as number) + (clip.height as number) / 2;
+    const placed = {
+      x: mp(centreX - union.width / 2),
+      y: mp(centreY - union.height / 2),
+      width: mp(union.width),
+      height: mp(union.height),
+    };
+    applyStyle(content, {
+      ...positionStyle(geometryAt(clip, inner, context.scale), { overflow: 'hidden' }),
+    });
+    const contentNode = box('docier-cell-turned');
+    applyStyle(contentNode, {
+      ...positionStyle(geometryAt(placed, inner, context.scale)),
+      transform: cell.rotation === 'tbRl' ? 'rotate(90deg)' : 'rotate(-90deg)',
+      'transform-origin': '50% 50%',
+    });
+    const turned: Frame = { dx: mp(placed.x as number), dy: mp(placed.y as number) };
     for (const id of cell.blocks) {
       const block = blocks.get(id);
-      if (block !== undefined) paintBlock(clipped, block, clipFrame, context);
+      if (block !== undefined) paintBlock(contentNode, block, turned, context);
     }
-    node.appendChild(clipped);
+    content.appendChild(contentNode);
   }
+  node.appendChild(content);
   parent.appendChild(node);
   return node;
 };

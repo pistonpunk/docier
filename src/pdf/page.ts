@@ -9,6 +9,7 @@ import type {
   LineRun,
   ObjectPlacement,
   PageFragment,
+  Rect,
   RowFragment,
   RunPaint,
   TableFragment,
@@ -218,6 +219,26 @@ const paintBlock = (block: BlockFragment, frame: PdfFrame, context: PagePaintCon
   for (const line of block.lines) paintLine(line, frame, context);
 };
 
+const unionOfCellBlocks = (
+  cell: CellFragment,
+  blocks: ReadonlyMap<number, BlockFragment>,
+): Rect | undefined => {
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const id of cell.blocks) {
+    const block = blocks.get(id);
+    if (block === undefined) continue;
+    left = Math.min(left, block.box.x as number);
+    top = Math.min(top, block.box.y as number);
+    right = Math.max(right, (block.box.x as number) + (block.box.width as number));
+    bottom = Math.max(bottom, (block.box.y as number) + (block.box.height as number));
+  }
+  if (!Number.isFinite(left) || right <= left) return undefined;
+  return { x: mp(left), y: mp(top), width: mp(right - left), height: mp(bottom - top) };
+};
+
 const paintCell = (
   cell: CellFragment,
   blocks: ReadonlyMap<number, BlockFragment>,
@@ -226,19 +247,42 @@ const paintCell = (
 ): void => {
   paintShading(context.content, cell.shading, cell.box, frame);
   paintBorders(context.content, cell.borders, cell.box, frame);
-  const clip = cell.clip;
-  if (clip === undefined) {
+  const clip = cell.clip ?? cell.contentBox;
+  context.content.save();
+  context.content.clip(pdfRect(frame, clip));
+  const union = cell.rotation === 'none' ? undefined : unionOfCellBlocks(cell, blocks);
+  if (union === undefined) {
     for (const id of cell.blocks) {
       const block = blocks.get(id);
       if (block !== undefined) paintBlock(block, frame, context);
     }
+    context.content.restore();
     return;
   }
-  context.content.save();
-  context.content.clip(pdfRect(frame, clip));
+  // a rotated cell is centred on the cell and then turned about its own centre
+  const centreX = (clip.x as number) + (clip.width as number) / 2;
+  const centreY = (clip.y as number) + (clip.height as number) / 2;
+  const originX = centreX - (union.width as number) / 2;
+  const originY = centreY - (union.height as number) / 2;
+  const placed: PdfFrame = { dx: mp(frame.dx - originX), dy: mp(frame.dy - originY), height: frame.height };
+  const angle = cell.rotation === 'tbRl' ? Math.PI / 2 : -Math.PI / 2;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const centrePdfX = pdfX(frame, mp(centreX));
+  const centrePdfY = pdfBaseline(frame, mp(centreY));
+  const originPdfX = pdfX(frame, mp(originX));
+  const originPdfY = pdfBaseline(frame, mp(originY));
+  context.content.concat(
+    cos,
+    sin,
+    -sin,
+    cos,
+    centrePdfX - (originPdfX - centrePdfX) * cos + (originPdfY - centrePdfY) * sin,
+    centrePdfY - (originPdfX - centrePdfX) * sin - (originPdfY - centrePdfY) * cos,
+  );
   for (const id of cell.blocks) {
     const block = blocks.get(id);
-    if (block !== undefined) paintBlock(block, frame, context);
+    if (block !== undefined) paintBlock(block, placed, context);
   }
   context.content.restore();
 };
