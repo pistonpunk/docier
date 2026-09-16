@@ -106,6 +106,8 @@ const dedupe = (diagnostics: readonly LayoutDiagnostic[]): readonly LayoutDiagno
   return out;
 };
 
+const DEFAULT_FLOAT_GAP = mp(9000);
+
 const tabStopTwips = (model: DocumentModel): Twip => {
   const raw = model.settings?.defaultTabStop;
   return raw === undefined || raw <= 0 ? twip(DEFAULT_TAB_STOP_TWIPS) : twip(raw);
@@ -616,9 +618,12 @@ export const layoutDocument = (
     }
     // a floating table is a float like any anchored object: the text beside it
     // wraps rather than being written over
-    const floatingTables = new Set(
-      tablePrepare.tables.filter((table) => table.floating !== undefined).map((table) => table.id),
+    const floatingById = new Map(
+      tablePrepare.tables
+        .filter((table) => table.floating !== undefined)
+        .map((table) => [table.id, table.floating] as const),
     );
+    const floatingTables = new Set(floatingById.keys());
     if (floatingTables.size > 0) {
       const byTable = new Map<number, { top: Mp; bottom: Mp; left: Mp; right: Mp; page: number }>();
       for (const row of paginated.rows) {
@@ -640,20 +645,29 @@ export const layoutDocument = (
         existing.left = mp(Math.min(existing.left, box.x));
         existing.right = mp(Math.max(existing.right, box.x + box.width));
       }
-      for (const entry of byTable.values()) {
+      for (const [id, entry] of byTable) {
         const state = pageState(entry.page);
         const boxCentre = mp(
           (state?.contentBox.x ?? mp(0)) + (state?.contentBox.width ?? mp(0)) / 2,
         );
         const centre = mp(entry.left + (entry.right - entry.left) / 2);
+        const side: 'left' | 'right' = centre <= boxCentre ? 'left' : 'right';
+        const position = floatingById.get(id);
+        // the distance the document asks for is the one on the side the text is
+        // on, and Word's default is 180 twips
+        const gap =
+          position === undefined
+            ? DEFAULT_FLOAT_GAP
+            : (side === 'left' ? position.rightFromText : position.leftFromText) ??
+              DEFAULT_FLOAT_GAP;
         placedFloats.push({
           page: entry.page,
           top: entry.top,
           bottom: entry.bottom,
           left: entry.left,
           right: entry.right,
-          side: centre <= boxCentre ? 'left' : 'right',
-          extent: mp(entry.right - entry.left + 1000),
+          side,
+          extent: mp(entry.right - entry.left + (gap as number)),
         });
       }
     }

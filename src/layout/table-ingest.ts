@@ -82,6 +82,8 @@ export interface TablePosition {
   readonly vertical: 'page' | 'margin';
   readonly alignX: TableAlign | undefined;
   readonly alignY: TableAlign | undefined;
+  readonly leftFromText: Mp | undefined;
+  readonly rightFromText: Mp | undefined;
 }
 
 export interface IngestedTable {
@@ -145,6 +147,14 @@ const floatingPositionOf = (properties: TableProperties): TablePosition | undefi
     y: offsetY === undefined ? mp(0) : twipToMp(offsetY),
     horizontal: horizontalAnchorOf(properties.floatingAnchorX),
     vertical: verticalAnchorOf(properties.floatingAnchorY),
+    leftFromText:
+      properties.floatingLeftFromText === undefined
+        ? undefined
+        : twipToMp(properties.floatingLeftFromText),
+    rightFromText:
+      properties.floatingRightFromText === undefined
+        ? undefined
+        : twipToMp(properties.floatingRightFromText),
     alignX: specX === 'center' || specX === 'right' || specX === 'left' ? specX : undefined,
     alignY:
       specY === 'top' || specY === 'bottom' || specY === 'center'
@@ -353,15 +363,6 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
   for (let index = 0; index < columnCount; index += 1) grid.push(declared[index]);
 
   const floating = floatingPositionOf(properties);
-  if (floating !== undefined && properties.floatingLeftFromText !== undefined) {
-    state.diagnostics.push({
-      code: 'floatingTableNotLaidOut',
-      severity: 'info',
-      message:
-        'the gap between a floating table and the text beside it is a fixed width, not the w:tblpPr distance',
-      docPos: start,
-    });
-  }
   const cellSpacing = cellSpacingOf(resolved);
   if (cellSpacing !== undefined && cellSpacing !== 0) {
     state.diagnostics.push({

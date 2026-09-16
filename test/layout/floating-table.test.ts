@@ -57,23 +57,42 @@ describe('a floating table', () => {
     expect(floated).toEqual(bareTops);
   });
 
-  it('reports the one thing about it that is still fixed', async () => {
+  it('is laid out, so it reports nothing', async () => {
     const result = await layoutOf(
       body(
         '<w:tblpPr w:tblpX="2000" w:tblpY="3000" w:leftFromText="180" w:horzAnchor="page" w:vertAnchor="page"/>',
       ),
     );
-    const diagnostic = result.diagnostics.find(
-      (entry) => entry.code === 'floatingTableNotLaidOut',
-    );
-    expect(diagnostic?.message).toContain('fixed width');
-    // and says nothing when the document asks for no particular distance
-    const quiet = await layoutOf(
-      body('<w:tblpPr w:tblpX="2000" w:tblpY="3000" w:horzAnchor="page" w:vertAnchor="page"/>'),
-    );
-    expect(quiet.diagnostics.map((entry) => entry.code)).not.toContain(
+    expect(result.diagnostics.map((entry) => entry.code)).not.toContain(
       'floatingTableNotLaidOut',
     );
+  });
+
+  it('keeps the text a distance from it that the document chooses', async () => {
+    const near = await tableBox(
+      '<w:tblpPr w:tblpXSpec="left" w:tblpYSpec="top" w:rightFromText="20" w:horzAnchor="margin" w:vertAnchor="margin"/>',
+    );
+    const far = await tableBox(
+      '<w:tblpPr w:tblpXSpec="left" w:tblpYSpec="top" w:rightFromText="800" w:horzAnchor="margin" w:vertAnchor="margin"/>',
+    );
+    // the boxes are the same; only the room the text leaves differs, which the
+    // band carries, so assert through the text beside it
+    expect(near?.x).toBe(far?.x);
+    const textLeft = async (properties: string): Promise<number> => {
+      const result = await layoutOf(
+        bodyOf(
+          `<w:p><w:r><w:t>${'word '.repeat(12)}</w:t></w:r></w:p>${floatWith(properties)}${PAGE}`,
+        ),
+      );
+      return result.pages[0]?.blocks[0]?.lines[0]?.atoms[0]?.x ?? 0;
+    };
+    const tight = await textLeft(
+      '<w:tblpPr w:tblpXSpec="left" w:tblpYSpec="top" w:rightFromText="20" w:horzAnchor="margin" w:vertAnchor="margin"/>',
+    );
+    const loose = await textLeft(
+      '<w:tblpPr w:tblpXSpec="left" w:tblpYSpec="top" w:rightFromText="800" w:horzAnchor="margin" w:vertAnchor="margin"/>',
+    );
+    expect(loose).toBeGreaterThan(tight);
   });
 });
 

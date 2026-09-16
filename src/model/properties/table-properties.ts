@@ -164,6 +164,11 @@ export class TableProperties {
     return raw === undefined ? undefined : (raw as Twip);
   }
 
+  get floatingRightFromText(): Twip | undefined {
+    const raw = integerFrom(this.prop('tblpPr').attribute('rightFromText'));
+    return raw === undefined ? undefined : (raw as Twip);
+  }
+
   get look(): XmlElement | undefined {
     return this.prop('tblLook').element;
   }

@@ -78,7 +78,6 @@ export type LayoutDiagnosticCode =
   | 'tableTextDirectionNotLaidOut'
   | 'tableCellSpacingNotLaidOut'
   | 'verticalMergeOrphan'
-  | 'floatingTableNotLaidOut';
 
 export type LayoutDiagnosticSeverity = 'info' | 'warning' | 'error';
 
