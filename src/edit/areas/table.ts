@@ -3,8 +3,9 @@ import type { DocPos } from '../../layout/index.js';
 import type { Mp } from '../../units/index.js';
 import { mpToTwip, twip } from '../../units/index.js';
 import type { BorderSide, Paragraph, Table, TableCell, TableRow } from '../../model/index.js';
-import { isWElement, propertyOf, setWAttr } from '../../model/index.js';
+import { childElements, createWElement, isWElement, propertyOf, setWAttr } from '../../model/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
+import { cloneNode } from '../../ooxml/xml/index.js';
 import { caretSelection, rangeAsDocRange } from '../selection.js';
 import type { ParagraphSlot } from '../session.js';
 import type { TableShape } from '../tables.js';
@@ -566,6 +567,69 @@ const setBordersSpec: AreaSpec<BordersArgs> = {
     if (!changed) return false;
     host.session.model.context.forgetSubtree(target.table.element);
     placeCaret(host, firstParagraphOf(target.cell.element));
+    return true;
+  },
+};
+
+const SPLIT_KEEP: LocalizedString =
+  'Splitting here would leave the first table empty; move the caret to a later row';
+
+const splitReason = (host: AreaHost): LocalizedString | undefined => {
+  if (!host.session.aligned) return NOT_ALIGNED;
+  const target = targetAt(host);
+  if (target === undefined) return PLACE_CARET;
+  const rows = target.table.rows();
+  if (target.row <= 0 || target.row >= rows.length) return SPLIT_KEEP;
+  return undefined;
+};
+
+const splitTableSpec: AreaSpec<Record<string, never>> = {
+  id: 'docier.command.table.splitTable',
+  label: 'Split table',
+  category: 'table',
+  permissions: ['insert'],
+  enabledIn: (host) => splitReason(host) === undefined,
+  reason: (host) => splitReason(host) ?? SPLIT_KEEP,
+  run: (host) => {
+    if (splitReason(host) !== undefined) return false;
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const table = target.table;
+    const parent = table.element.parent;
+    if (parent === undefined) return false;
+    const rows = [...table.rows()];
+    const moved = rows.slice(target.row).map((row) => row.element);
+    const carried = childElements(table.element).filter(
+      (child) => child.localName === 'tblPr' || child.localName === 'tblGrid',
+    );
+
+    const changed = changedBy([parent], () => {
+      const second = createWElement(parent, 'tbl');
+      second.selfClosing = false;
+      for (const child of carried) {
+        const clone = cloneNode(child) as XmlElement;
+        clone.parent = second;
+        second.children.push(clone);
+      }
+      for (const row of moved) {
+        row.parent = second;
+        second.children.push(row);
+      }
+      table.element.children = table.element.children.filter(
+        (child) => !moved.includes(child as XmlElement),
+      );
+      // Word keeps the two tables apart with an empty paragraph; without one a
+      // reader merges them straight back together
+      const gap = createWElement(parent, 'p');
+      gap.selfClosing = false;
+      gap.parent = parent;
+      second.parent = parent;
+      const at = parent.children.indexOf(table.element) + 1;
+      parent.children.splice(at, 0, gap, second);
+      host.session.model.context.forgetSubtree(parent);
+    });
+    if (!changed) return false;
+    host.session.relayout();
     return true;
   },
 };
@@ -1200,6 +1264,7 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<TablePropertiesArgs>(host, setPropertiesSpec),
   areaCommand<BordersArgs>(host, setBordersSpec),
   areaCommand<SortArgs>(host, sortSpec),
+  areaCommand<Record<string, never>>(host, splitTableSpec),
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
   areaCommand<TableWidthArgs>(host, setTableWidthSpec),
   areaCommand<RowHeightArgs>(host, setRowHeightSpec),

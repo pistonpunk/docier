@@ -840,6 +840,12 @@ export const TABLE_TAB: UiTab = {
       nodes: [
         pending('table.mergeCells', 'ui.menu.mergeCells', 'MC'),
         pending('table.splitCells', 'ui.menu.splitCells', 'SC'),
+        button({
+          labelKey: 'ui.menu.splitTable',
+          id: 'table:split',
+          command: command('table.splitTable'),
+          keytip: 'ST',
+        }),
         pending('table.delete', 'ui.menu.deleteTable', 'DT'),
       ],
     },

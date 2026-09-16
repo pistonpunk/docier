@@ -238,13 +238,6 @@ const REFUSALS: readonly Refusal[] = [
       'Even row heights need a height for the selection as a whole, and this build has no row selection to measure one against',
   },
   {
-    id: 'docier.command.table.splitTable',
-    label: 'Split table',
-    category: 'table',
-    reason:
-      'Splitting a table moves rows into a second table, and this build has no command that moves blocks between tables',
-  },
-  {
     id: 'docier.command.table.selectRow',
     label: 'Select row',
     category: 'table',

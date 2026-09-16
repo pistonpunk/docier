@@ -536,6 +536,93 @@ describe('borders and shading', () => {
   });
 });
 
+describe('splitting a table', () => {
+  const splittable = (): string =>
+    bodyOf(
+      paragraphText('alpha'),
+      '<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="2000"/></w:tblPr>' +
+        '<w:tblGrid><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/></w:tblGrid>' +
+        `<w:tr>${cell('one')}${cell('1')}</w:tr>` +
+        `<w:tr>${cell('two')}${cell('2')}</w:tr>` +
+        `<w:tr>${cell('three')}${cell('3')}</w:tr>` +
+        '</w:tbl>',
+      paragraphText('beta'),
+    );
+
+  // read the rows out of the serialized body: the model's block view is built
+  // once and does not necessarily reflect a mutation made behind its back
+  const rowsPerTable = (handle: EditorHandle): readonly (readonly string[])[] =>
+    bodyXml(handle)
+      .split('</w:tbl>')
+      .slice(0, -1)
+      .map((part) => {
+        const from = part.lastIndexOf('<w:tbl>');
+        return [...part.slice(from).matchAll(/<w:t xml:space="preserve">([^<]*)<\/w:t>/g)].map(
+          (match) => match[1] ?? '',
+        );
+      });
+
+  it('moves the caret row and everything below into a second table', async () => {
+    const handle = await editorOf(splittable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 0).start });
+
+    await run(handle, 'table.splitTable');
+    const rows = rowsPerTable(handle);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual(['one', '1']);
+    expect(rows[1]).toEqual(['two', '2', 'three', '3']);
+  });
+
+  it('leaves the model with two tables that know their own rows', async () => {
+    const handle = await editorOf(splittable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 0).start });
+    await run(handle, 'table.splitTable');
+
+    const tables = handle.session?.model.body().tables() ?? [];
+    expect(tables).toHaveLength(2);
+    expect(tables[0]?.rows()).toHaveLength(1);
+    expect(tables[1]?.rows()).toHaveLength(2);
+  });
+
+  it('gives the second table the same width and grid as the first', async () => {
+    const handle = await editorOf(splittable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 0).start });
+    await run(handle, 'table.splitTable');
+
+    const xml = bodyXml(handle);
+    expect(xml.match(/<w:tblGrid>/g)).toHaveLength(2);
+    expect(xml.match(/<w:tblW w:type="dxa" w:w="2000"\/>/g)).toHaveLength(2);
+    // the two tables must be kept apart, or a reader merges them again
+    expect(xml).toContain('</w:tbl><w:p></w:p><w:tbl>');
+  });
+
+  it('is one undo entry', async () => {
+    const handle = await editorOf(splittable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 0).start });
+    const before = bodyXml(handle);
+
+    await run(handle, 'table.splitTable');
+    expect(bodyXml(handle).match(/<w:tbl>/g)).toHaveLength(2);
+    await undo(handle);
+    expect(bodyXml(handle)).toBe(before);
+    expect(bodyXml(handle).match(/<w:tbl>/g)).toHaveLength(1);
+  });
+
+  it('refuses a row that would leave one of the tables empty', async () => {
+    const handle = await editorOf(splittable());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    expect(isEnabled(handle, 'table.splitTable')).toBe(false);
+    expect(reasonOf(handle, 'table.splitTable')).toContain('leave the first table empty');
+
+    // splitting at any later row leaves both tables with something in them, so
+    // only the first row is refused
+    for (const row of [1, 2]) {
+      await run(handle, 'selection.setCaret', { pos: slotAt(handle, row, 0).start });
+      expect(isEnabled(handle, 'table.splitTable'), `row ${String(row)}`).toBe(true);
+    }
+  });
+});
+
 describe('sorting rows', () => {
   const sortable = (): string =>
     bodyOf(
