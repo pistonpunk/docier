@@ -271,7 +271,6 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.menu.distributeColumns': 'Distribute Columns Evenly',
   'ui.menu.distributeRows': 'Distribute Rows Evenly',
   'ui.menu.sort': 'Sort',
-  'ui.menu.formula': 'Formula',
   'ui.menu.repeatHeaderRows': 'Repeat Header Rows',
   'ui.control.alignTop': 'Align Top',
   'ui.control.alignMiddle': 'Align Centre',
