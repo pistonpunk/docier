@@ -102,6 +102,7 @@ export interface IngestedDocument {
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
   readonly hasShapeDrawings: boolean;
+  readonly hasTextBoxes: boolean;
   readonly textBoxes: ReadonlyMap<string, XmlElement>;
   readonly diagnostics: readonly LayoutDiagnostic[];
   readonly hash: Hasher;
@@ -229,6 +230,7 @@ interface ParagraphIngest {
   readonly hasDrawings: boolean;
   readonly hasUnresolvedDrawings: boolean;
   readonly hasShapeDrawings: boolean;
+  readonly hasTextBoxes: boolean;
   readonly textBoxes: ReadonlyMap<string, XmlElement>;
   readonly diagnostics: readonly LayoutDiagnostic[];
 }
@@ -383,6 +385,7 @@ export const ingestParagraph = (
   const diagnostics: LayoutDiagnostic[] = [];
   let cursor = start as number;
   let hasThemeFontSeen = hasThemeFont(resolvedParagraph);
+  let hasTextBox = false;
   let hasNotes = false;
   let hasDrawings = false;
   let hasUnresolvedDrawings = false;
@@ -432,12 +435,7 @@ export const ingestParagraph = (
 
     const absorbContent = (content: RunContent): void => {
       if (content instanceof DrawingContent && content.textboxParagraphs.length > 0) {
-        diagnostics.push({
-          code: 'textboxContentNotLaidOut',
-          severity: 'info',
-          message: 'the paragraphs of a shape or text box are not laid out by this slice',
-          docPos: docPos(cursor),
-        });
+        hasTextBox = true;
       }
       absorb(itemFromContent(content, runFormat, docPos(cursor)));
     };
@@ -513,6 +511,7 @@ export const ingestParagraph = (
     hasDrawings,
     hasUnresolvedDrawings,
     hasShapeDrawings,
+    hasTextBoxes: hasTextBox,
     textBoxes,
     diagnostics,
   };
@@ -543,6 +542,7 @@ export const ingestStory = (
       drawings: false,
       unresolvedDrawings: false,
       shapeDrawings: false,
+      textBoxes: false,
     },
     cursor: 0,
   };
@@ -559,6 +559,7 @@ export const ingestStory = (
     hasDrawings: state.flags.drawings,
     hasUnresolvedDrawings: state.flags.unresolvedDrawings,
     hasShapeDrawings: state.flags.shapeDrawings,
+    hasTextBoxes: state.flags.textBoxes,
     textBoxes: state.textBoxes,
     diagnostics,
     hash,

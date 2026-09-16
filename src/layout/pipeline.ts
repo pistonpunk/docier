@@ -802,6 +802,14 @@ export const layoutDocument = (
     }
   }
 
+  if (ingested.hasTextBoxes && objectText.size === 0) {
+    diagnostics.push({
+      code: 'textboxContentNotLaidOut',
+      severity: 'info',
+      message: 'the paragraphs of a shape or text box were not laid out by this slice',
+      docPos: undefined,
+    });
+  }
   if (ingested.hasShapeDrawings && objectText.size === 0) {
     diagnostics.push({
       code: 'shapeContentNotLaidOut',

@@ -99,6 +99,7 @@ export interface IngestFlags {
   drawings: boolean;
   unresolvedDrawings: boolean;
   shapeDrawings: boolean;
+  textBoxes: boolean;
 }
 
 export interface IngestState {
@@ -394,6 +395,7 @@ export const ingestBlockList = (
       state.flags.drawings = state.flags.drawings || result.hasDrawings;
       state.flags.unresolvedDrawings = state.flags.unresolvedDrawings || result.hasUnresolvedDrawings;
       state.flags.shapeDrawings = state.flags.shapeDrawings || result.hasShapeDrawings;
+      state.flags.textBoxes = state.flags.textBoxes || result.hasTextBoxes;
       for (const [id, element] of result.textBoxes) state.textBoxes.set(id, element);
       out.push({ kind: 'paragraph', paragraph: result.paragraph });
       continue;

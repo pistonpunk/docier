@@ -255,7 +255,7 @@ describe('VML and OLE markup in a run', () => {
     expect(lineTexts(result)).toEqual(['after']);
   });
 
-  it('reports the paragraphs of a DrawingML text box that are never laid out', async () => {
+  it('lays out the paragraphs of a DrawingML text box inside its frame', async () => {
     const shape =
       '<w:drawing>' +
       `<wp:inline xmlns:wp="${WP}"><wp:extent cx="${PICTURE_EMU}" cy="${PICTURE_EMU}"/>` +
@@ -272,10 +272,17 @@ describe('VML and OLE markup in a run', () => {
         ),
       ),
     );
-    expect(diagnosticCodes(result)).toContain('textboxContentNotLaidOut');
+    // the shape's paragraphs are laid out inside the box, so nothing is
+    // reported as missing; the body line holds no text of its own
+    expect(diagnosticCodes(result)).not.toContain('textboxContentNotLaidOut');
     expect(diagnosticCodes(result)).not.toContain('alternateContentChoiceSkipped');
     expect(objectAtoms(result).object?.width).toBe(mp(PICTURE_MP));
     expect(lineTexts(result)).toEqual(['after']);
+    const inside = [...result.objectText.values()]
+      .flatMap((blocks) => blocks.flatMap((block) => block.lines))
+      .flatMap((line) => line.runs.map((entry) => entry.text))
+      .join('');
+    expect(inside.replace(/\s+/g, '')).toBe('textinsidethe' + 'shape');
   });
 
   it('keeps the text on both sides of a VML picture in the flow', async () => {
