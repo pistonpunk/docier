@@ -10,8 +10,10 @@ interface Refusal {
   readonly live?: (host: AreaHost) => string;
 }
 
+// the shape half of this sentence stopped being true when insertShape landed: a
+// preset shape is authored and drawn now, and only the chart part is missing
 const NO_DRAWING =
-  'This build authors pictures and text boxes; it has no geometry for a preset shape or a chart part';
+  'This build authors pictures, text boxes and preset shapes; it cannot author a chart part, which needs the chart XML and a renderer for it';
 const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const REFUSALS: readonly Refusal[] = [
