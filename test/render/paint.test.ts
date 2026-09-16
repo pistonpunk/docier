@@ -286,6 +286,7 @@ describe('layout freedom of the painted document', () => {
       characterSpacing: mp(0),
       characterScale: 100,
       rightToLeft: false,
+      revision: undefined,
     };
     const line: LineFragment = {
       id: 7,

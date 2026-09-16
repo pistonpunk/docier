@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { columnBoxesOf } from '../../src/layout/sections.js';
 import type { Section } from '../../src/layout/sections.js';
 import { mp } from '../../src/units/index.js';
-import { layoutOf, paragraphText, bodyOf } from './support.js';
+import { layoutOf, paragraphText } from './support.js';
 
 const COLUMNED = (count: number, space = 720): string =>
   `<w:sectPr><w:cols w:num="${String(count)}" w:space="${String(space)}"/>` +

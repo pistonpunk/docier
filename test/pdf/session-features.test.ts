@@ -129,7 +129,7 @@ describe('a grouped shape in the PDF', () => {
       `<a:off x="${String(EMU)}" y="0"/><a:ext cx="${String(EMU)}" cy="${String(EMU)}"/>` +
       '</a:xfrm><a:blipFill><a:blip r:embed="rId5"/></a:blipFill></wpg:pic>' +
       '</wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing>';
-    const png = await pngOf(4, 4, 'grey');
+    const png = await pngOf(4, 4, 'gray');
     const result = await layoutOf(sampleBody(`<w:p><w:r>${drawing}</w:r></w:p>`), font.measurer);
     const exported = await exportPdf(result, {
       fonts: [font.face],

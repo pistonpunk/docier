@@ -77,7 +77,7 @@ const firstMatrix = (stream: string): readonly number[] | undefined => {
 };
 
 const image = async (): Promise<PdfImageSource> =>
-  imageSource('rId4', 'image/png', await pngOf(8, 8, 'grey'));
+  imageSource('rId4', 'image/png', await pngOf(8, 8, 'gray'));
 
 const WPS = 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape';
 const WORD = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
