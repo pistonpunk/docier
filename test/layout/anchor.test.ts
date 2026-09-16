@@ -196,7 +196,9 @@ describe('top and bottom wrap', () => {
     expect(lineTops(await layoutOf(floatIn({ wrap: 'None' })))).toEqual(await baseline());
   });
 
-  it('leaves the text alone when the wrap is square, which is not applied yet', async () => {
+  it('leaves the text alone when the float is wider than the column', async () => {
+    // this fixture's float is a full inch inside a 1000-twip column, so there is
+    // no room to wrap and the lines keep their full width whatever the mode
     expect(lineTops(await layoutOf(floatIn({ wrap: 'Square' })))).toEqual(await baseline());
   });
 
