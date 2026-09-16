@@ -175,6 +175,8 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.colour.hex': 'Hex colour',
   'ui.colour.apply': 'Apply',
   'ui.colour.more': 'More Colours…',
+  'ui.picture.noEncoder':
+    'This editor has no image encoder; a host supplies one through the images.encode setting',
   'ui.lineNumbers.everyLine': 'Every line',
   'ui.lineNumbers.everyFive': 'Every 5 lines',
   'ui.lineNumbers.everyTen': 'Every 10 lines',

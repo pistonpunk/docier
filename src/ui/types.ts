@@ -94,6 +94,7 @@ export type ChromeActionName =
   | 'openContextMenu'
   | 'openDialog'
   | 'openColourPicker'
+  | 'compressPicture'
   | 'closeDialog'
   | 'setIndent'
   | 'setMargin'

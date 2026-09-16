@@ -1,6 +1,11 @@
 import type { EditorHandle } from '../api/editor.js';
 import type { ChromeMode, CommandDescriptor, Disposable, Unsubscribe } from '../api/types.js';
-import { marksAt, pageBackgroundAt } from '../edit/index.js';
+import {
+  marksAt,
+  objectSelectionOf,
+  pageBackgroundAt,
+  selectedPicturePart,
+} from '../edit/index.js';
 import { toCssPx, mp } from '../units/index.js';
 import { createCommentsPanel } from './comments-panel.js';
 import type { CommentsPanelHandle } from './comments-panel.js';
@@ -72,6 +77,7 @@ const ACTIONS: readonly ChromeActionName[] = [
   'openContextMenu',
   'openDialog',
   'openColourPicker',
+  'compressPicture',
   'closeDialog',
   'setIndent',
   'setMargin',
@@ -298,6 +304,38 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       case 'zoomSet':
         setZoom(Number(args?.zoom ?? 1));
         return;
+      case 'compressPicture': {
+        const encode = handle.config.images.encode;
+        if (encode === undefined) {
+          setMessage(i18n.text('ui.picture.noEncoder'));
+          return;
+        }
+        const session = handle.session;
+        const model = handle.document;
+        if (session === undefined || model === undefined) return;
+        const objectId = objectSelectionOf(session);
+        if (objectId === undefined) return;
+        const part = selectedPicturePart(model, objectId);
+        if (part === undefined) return;
+        void (async () => {
+          const encoded = await encode({
+            bytes: part.bytes,
+            mimeType: part.mimeType,
+            quality: handle.config.images.compression.quality,
+          });
+          if (encoded === undefined) return;
+          void handle.commands.execute(
+            'docier.command.object.compress',
+            {
+              objectId,
+              bytes: encoded.bytes,
+              ...(encoded.mimeType === undefined ? {} : { contentType: encoded.mimeType }),
+            },
+            { source: 'ui' },
+          );
+        })();
+        return;
+      }
       case 'openColourPicker': {
         const command = typeof args?.command === 'string' ? args.command : '';
         if (command === '') return;

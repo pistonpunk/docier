@@ -1188,7 +1188,12 @@ export const PICTURE_TAB: UiTab = {
         IMAGE_ALIGN_MENU,
         IMAGE_WRAP_MENU,
         pending('object.changeImage', 'ui.menu.changePicture', 'CP'),
-        pending('object.compress', 'ui.menu.compressPictures', 'CM'),
+        button({
+          labelKey: 'ui.menu.compressPictures',
+          command: command('object.compress'),
+          keytip: 'CM',
+          action: 'compressPicture',
+        }),
       ],
     },
     {
@@ -1355,7 +1360,11 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     IMAGE_WRAP_MENU,
     separator('ctx:image:sep1'),
     pending('object.changeImage', 'ui.menu.changePicture', 'CP'),
-    pending('object.compress', 'ui.menu.compressPictures', 'CM'),
+    button({
+      labelKey: 'ui.menu.compressPictures',
+      command: command('object.compress'),
+      action: 'compressPicture',
+    }),
     separator('ctx:image:sep2'),
     pending('insert.caption', 'ui.control.insertCaption', 'CA'),
     pending('object.setSize', 'ui.menu.sizePosition', 'SZ'),

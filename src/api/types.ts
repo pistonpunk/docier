@@ -526,6 +526,21 @@ export interface ImageCompressionConfig {
   readonly quality: number;
 }
 
+export interface ImageEncodeRequest {
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+  readonly quality: number;
+}
+
+export interface ImageEncodeResult {
+  readonly bytes: Uint8Array;
+  readonly mimeType?: string;
+}
+
+export type ImageEncoder = (
+  request: ImageEncodeRequest,
+) => Promise<ImageEncodeResult | undefined>;
+
 export interface EditorConfig {
   locale: LocaleCode;
   fallbackLocale: LocaleCode;
@@ -548,7 +563,11 @@ export interface EditorConfig {
   maxInstancesPerPage: number;
   onError?: (error: DocierError) => void;
   units: { imageDpi: number };
-  images: { maxPixels: number; compression: ImageCompressionConfig };
+  images: {
+    maxPixels: number;
+    compression: ImageCompressionConfig;
+    encode?: ImageEncoder;
+  };
   layout: LayoutConfig;
   transport: TransportConfig;
 }

@@ -597,6 +597,94 @@ const changeImageSpec: AreaSpec<ChangeImageArgs> = {
     const objectId = selectedId(host, args);
     const bytes = args?.bytes;
     if (objectId === undefined || bytes === undefined || bytes.byteLength === 0) return false;
+    const picture = selectedPicturePart(host.session.model, objectId);
+    if (picture === undefined) return false;
+    const part = host.session.model.package.getPart(picture.partName);
+    if (part === undefined) return false;
+    const written = writingAt(host, () => {
+      part.setBytes(bytes);
+      if (args?.contentType !== undefined) {
+        host.session.model.package.contentTypes.setOverride(picture.partName, args.contentType);
+      }
+      return true;
+    });
+    if (!written) return false;
+    host.session.relayout();
+    selectObject(host.session, objectId);
+    return true;
+  },
+};
+
+export interface SelectedPicture {
+  readonly partName: string;
+  readonly bytes: Uint8Array;
+  readonly mimeType: string;
+}
+
+export const selectedPicturePart = (
+  model: DocumentModel,
+  objectId: string,
+): SelectedPicture | undefined => {
+  const drawing = descendantIn(
+    model.body().element,
+    (candidate) =>
+      candidate.localName === 'drawing' &&
+      descendantIn(candidate, (child) => child.localName === 'docPr')?.attributes.some(
+        (attribute) => attribute.localName === 'id' && attribute.value === objectId,
+      ) === true,
+  );
+  if (drawing === undefined) return undefined;
+  const relationshipId = blipRelationshipOf(drawing);
+  if (relationshipId === undefined) return undefined;
+  const pkg = model.package;
+  for (const sourcePartName of pkg.relationships.sourceParts()) {
+    const images = pkg.relationships.getRelationships(sourcePartName, IMAGE_RELATIONSHIP);
+    const found = images.find((candidate) => candidate.id === relationshipId);
+    if (found === undefined) continue;
+    const part = pkg.getPart(found.resolvedTarget);
+    if (part === undefined) continue;
+    let bytes: Uint8Array;
+    try {
+      bytes = part.toBytes();
+    } catch {
+      return undefined;
+    }
+    const contentType = pkg.contentTypes.getContentType(found.resolvedTarget);
+    return {
+      partName: found.resolvedTarget,
+      bytes,
+      mimeType: contentType === undefined ? 'application/octet-stream' : contentType,
+    };
+  }
+  return undefined;
+};
+
+export interface CompressArgs {
+  readonly objectId?: string;
+  readonly bytes?: Uint8Array;
+  readonly contentType?: string;
+}
+
+const compressReason = (host: AreaHost, args: CompressArgs | undefined): LocalizedString | undefined => {
+  const objectId = selectedId(host, args as ObjectSelectArgs | undefined);
+  if (objectId === undefined) return NO_SELECTION;
+  if (args?.bytes === undefined || args.bytes.byteLength === 0) {
+    return 'This control needs the re-encoded bytes of the picture';
+  }
+  return selectedPicturePart(host.session.model, objectId) === undefined ? NO_PICTURE : undefined;
+};
+
+const compressSpec: AreaSpec<CompressArgs> = {
+  id: 'docier.command.object.compress',
+  label: 'Compress pictures',
+  category: 'object',
+  permissions: ['insert'],
+  enabledIn: (host, args) => compressReason(host, args) === undefined,
+  reason: (host, args) => compressReason(host, args) ?? 'This command is available here',
+  run: (host, args) => {
+    const bytes = args?.bytes;
+    const objectId = selectedId(host, args as ObjectSelectArgs | undefined);
+    if (objectId === undefined || bytes === undefined || bytes.byteLength === 0) return false;
     const drawing = drawingWithId(host, objectId);
     if (drawing === undefined) return false;
     const relationshipId = blipRelationshipOf(drawing);
@@ -674,6 +762,7 @@ export const objectCommands = (host: AreaHost): readonly CommandDefinition<never
   ),
   areaCommand<ObjectWrapArgs>(host, setWrapSpec),
   areaCommand<ChangeImageArgs>(host, changeImageSpec),
+  areaCommand<CompressArgs>(host, compressSpec),
   areaCommand<AlignArgs>(host, alignSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),
