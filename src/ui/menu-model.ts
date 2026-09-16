@@ -1289,8 +1289,8 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     fontSubmenu('ctx:text'),
     paragraphSubmenu('ctx:text'),
     menu('ui.menu.bullets', [
-      button({ labelKey: 'ui.control.bullets', id: 'ctx:text:bullets', command: command('numbering.bullets'), action: 'openDialog', actionArgs: { dialog: command('numbering.bullets') } }),
-      button({ labelKey: 'ui.control.numbering', id: 'ctx:text:numbers', command: command('numbering.numbers'), action: 'openDialog', actionArgs: { dialog: command('numbering.numbers') } }),
+      button({ labelKey: 'ui.control.bullets', id: 'ctx:text:bullets', command: command('numbering.bullets') }),
+      button({ labelKey: 'ui.control.numbering', id: 'ctx:text:numbers', command: command('numbering.numbers') }),
     ]),
     separator('ctx:text:sep2'),
     menu('ui.menu.insert', [pending('insert.table', 'ui.control.insertTable', 'T'), opensDialog('ctx:page:link', 'insert.link', 'ui.control.insertLink', 'L'), opensDialog('ctx:page:symbol', 'insert.symbol', 'ui.control.insertSymbol', 'SY')]),
@@ -1298,7 +1298,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     node('menu', {
       id: 'ctx:text:synonyms',
       labelKey: 'ui.menu.synonyms',
-      items: [button({ labelKey: 'ui.control.thesaurus', id: 'ctx:text:thesaurus', command: command('proof.thesaurus'), action: 'openDialog', actionArgs: { dialog: command('proof.thesaurus') } })],
+      items: [button({ labelKey: 'ui.control.thesaurus', id: 'ctx:text:thesaurus', command: command('proof.thesaurus') })],
     }),
     button({ labelKey: 'ui.control.translate', id: 'ctx:text:translate', command: command('proof.translate') }),
     pending('comment.create', 'ui.control.newComment', 'NC'),
@@ -1385,7 +1385,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     pending('token.update', 'ui.menu.updateField', 'UF'),
     pending('token.edit', 'ui.menu.editField', 'EF'),
     separator('ctx:field:sep1'),
-    toggle({ labelKey: 'ui.menu.toggleFieldCodes', id: 'ctx:field:codes', command: command('token.toggleCodes'), action: 'openDialog', actionArgs: { dialog: command('token.toggleCodes') } }),
+    toggle({ labelKey: 'ui.menu.toggleFieldCodes', id: 'ctx:field:codes', command: command('token.toggleCodes') }),
     button({ labelKey: 'ui.menu.fieldShading', id: 'ctx:field:shading', action: 'openDialog', actionArgs: { dialog: 'token.shading' } }),
     separator('ctx:field:sep2'),
     pending('token.unlink', 'ui.menu.unlinkField', 'UL'),
@@ -1393,8 +1393,8 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
   ],
   page: [
     menu('ui.menu.pasteOptions', [
-      button({ labelKey: 'ui.control.paste', id: 'ctx:page:paste', command: command('clipboard.paste'), action: 'openDialog', actionArgs: { dialog: command('clipboard.paste') } }),
-      button({ labelKey: 'ui.control.pasteSpecial', id: 'ctx:page:pasteSpecial', command: command('clipboard.pasteSpecial'), action: 'openDialog', actionArgs: { dialog: command('clipboard.pasteSpecial') } }),
+      button({ labelKey: 'ui.control.paste', id: 'ctx:page:paste', command: command('clipboard.paste') }),
+      button({ labelKey: 'ui.control.pasteSpecial', id: 'ctx:page:pasteSpecial', command: command('clipboard.pasteSpecial') }),
     ]),
     separator('ctx:page:sep1'),
     PAGE_COLOUR_MENU,
@@ -1414,7 +1414,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     button({ labelKey: 'ui.control.selectAll', id: 'ctx:page:all', command: command('edit.selectAll') }),
   ],
   pasteboard: [
-    button({ labelKey: 'ui.control.paste', id: 'ctx:pasteboard:paste', command: command('clipboard.paste'), action: 'openDialog', actionArgs: { dialog: command('clipboard.paste') } }),
+    button({ labelKey: 'ui.control.paste', id: 'ctx:pasteboard:paste', command: command('clipboard.paste') }),
     separator('ctx:pasteboard:sep1'),
     button({ labelKey: 'ui.control.insertPageBreak', id: 'ctx:pasteboard:pb', command: command('edit.insertPageBreak') }),
     pending('insert.table', 'ui.control.insertTable', 'T'),
@@ -1485,7 +1485,7 @@ export const STATUS_ITEM_MENU: readonly UiNode[] = [
 
 export const BACKSTAGE_ITEMS: readonly UiNode[] = [
   pending('doc.open', 'ui.control.open', 'O'),
-  button({ labelKey: 'ui.control.save', id: 'backstage:save', command: command('doc.save'), action: 'openDialog', actionArgs: { dialog: command('doc.save') } }),
+  button({ labelKey: 'ui.control.save', id: 'backstage:save', command: command('doc.save') }),
   pending('doc.saveAs', 'ui.control.saveAs', 'A'),
   separator('backstage:sep1'),
   pending('export.pdf', 'ui.control.exportPdf', 'P'),

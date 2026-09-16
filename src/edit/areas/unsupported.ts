@@ -109,6 +109,13 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'This build ships no proofing provider',
   },
   {
+    id: 'docier.command.clipboard.pasteSpecial',
+    label: 'Paste Special',
+    category: 'clipboard',
+    reason:
+      'This build pastes in one form; there is no dialog for choosing between the source formatting and the destination',
+  },
+  {
     id: 'docier.command.proof.thesaurus',
     label: 'Thesaurus',
     category: 'proof',
