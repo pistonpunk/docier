@@ -59,7 +59,6 @@ export type LayoutDiagnosticCode =
   | 'bidiNotLaidOut'
   | 'rtlLayoutPartial'
   | 'tabStopsPartial'
-  | 'verticalAlignmentNotLaidOut'
   | 'lineRuleDegenerate'
   | 'zeroContentBox'
   | 'headerFooterTableNotLaidOut'

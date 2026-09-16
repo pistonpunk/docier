@@ -131,6 +131,7 @@ export interface BlockFragmentRequest {
   readonly block: PaginateBlock;
   readonly id: number;
   readonly page: number;
+  readonly column: number;
   readonly x: Mp;
   readonly width: Mp;
   readonly boxTop: Mp;
@@ -326,7 +327,7 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
         height: mp(y - request.boxTop),
       },
       page: request.page,
-      column: 0,
+      column: request.column,
       docRange: block.docRange,
       split: request.split,
       lines: lineFragments,
@@ -403,25 +404,143 @@ const blockHeightOf = (block: PaginateBlock | undefined, piece: PlacedPiece): Mp
   return mp(total);
 };
 
-const verticalDrop = (
+interface VerticalShift {
+  readonly pieces: readonly Mp[];
+  readonly rows: readonly Mp[];
+  readonly moved: boolean;
+};
+
+const stillShift = (pieces: number, rows: number): VerticalShift => ({
+  pieces: Array.from({ length: pieces }, () => mp(0)),
+  rows: Array.from({ length: rows }, () => mp(0)),
+  moved: false,
+});
+
+const columnIndexAt = (columns: readonly Rect[], x: number, width: number): number => {
+  const centre = x + width / 2;
+  for (let index = 0; index < columns.length; index += 1) {
+    const box = columns[index] as Rect;
+    if (centre >= (box.x as number) && centre <= ((box.x as number) + (box.width as number))) {
+      return index;
+    }
+  }
+  return 0;
+};
+
+const verticalShiftOf = (
   alignment: SectionVerticalAlignment,
   page: PageState,
+  columns: readonly Rect[],
   pieces: readonly PlacedPiece[],
+  rows: readonly PlacedRow[],
   blocks: readonly (PaginateBlock | undefined)[],
-): Mp => {
-  if (alignment === 'top') return mp(0);
-  let top = Number.POSITIVE_INFINITY;
-  let bottom = Number.NEGATIVE_INFINITY;
-  for (const piece of pieces) {
+): VerticalShift => {
+  const pieceCount = pieces.length;
+  const rowCount = rows.length;
+  if (alignment === 'top') return stillShift(pieceCount, rowCount);
+
+  const columnOfPiece = (index: number): number => {
+    const column = (pieces[index] as PlacedPiece).column;
+    return column >= 0 && column < columns.length ? column : 0;
+  };
+  const columnOfRow = (index: number): number => {
+    const row = rows[index] as PlacedRow;
+    return columnIndexAt(columns, row.box.x as number, row.box.width as number);
+  };
+
+  const tops = columns.map(() => Number.POSITIVE_INFINITY);
+  const bottoms = columns.map(() => Number.NEGATIVE_INFINITY);
+  for (let index = 0; index < pieceCount; index += 1) {
+    const column = columnOfPiece(index);
+    const piece = pieces[index] as PlacedPiece;
     const height = blockHeightOf(blocks[piece.block], piece);
-    top = Math.min(top, piece.boxTop as number);
-    bottom = Math.max(bottom, (piece.boxTop as number) + (height as number));
+    tops[column] = Math.min(tops[column] as number, piece.boxTop as number);
+    bottoms[column] = Math.max(
+      bottoms[column] as number,
+      (piece.boxTop as number) + (height as number),
+    );
   }
-  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) return mp(0);
-  const room = mp((page.contentBox.height as number) - (bottom - top));
-  if (room <= 0) return mp(0);
-  if (alignment === 'center') return mp(roundHalfEven(room / 2));
-  return room;
+  const roomOf = (column: number): Mp => {
+    const top = tops[column] as number;
+    const bottom = bottoms[column] as number;
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= top) return mp(0);
+    const box = columns[column] ?? page.contentBox;
+    const room = mp((box.height as number) - (bottom - top));
+    return room > 0 ? room : mp(0);
+  };
+
+  const pieceOffsets = pieces.map(() => mp(0));
+  const rowOffsets = rows.map(() => mp(0));
+
+  if (alignment === 'both') {
+    const items: {
+      readonly column: number;
+      readonly top: number;
+      readonly piece: number | undefined;
+      readonly row: number | undefined;
+    }[] = [];
+    for (let index = 0; index < pieceCount; index += 1) {
+      if ((pieces[index] as PlacedPiece).cell !== undefined) continue;
+      items.push({
+        column: columnOfPiece(index),
+        top: (pieces[index] as PlacedPiece).boxTop as number,
+        piece: index,
+        row: undefined,
+      });
+    }
+    for (let index = 0; index < rowCount; index += 1) {
+      items.push({
+        column: columnOfRow(index),
+        top: (rows[index] as PlacedRow).box.y as number,
+        piece: undefined,
+        row: index,
+      });
+    }
+    const byColumn = new Map<number, typeof items>();
+    for (const item of items) {
+      const list = byColumn.get(item.column);
+      if (list === undefined) byColumn.set(item.column, [item]);
+      else list.push(item);
+    }
+    const rowOffsetOf = new Map<string, Mp>();
+    for (const [column, list] of byColumn) {
+      list.sort((left, right) => left.top - right.top);
+      const room = roomOf(column);
+      if (list.length < 2 || room <= 0) continue;
+      const gaps = list.length - 1;
+      for (let index = 0; index < list.length; index += 1) {
+        const offset = mp(Math.round((index * (room as number)) / gaps));
+        const item = list[index];
+        if (item === undefined) continue;
+        if (item.piece !== undefined) pieceOffsets[item.piece] = offset;
+        if (item.row !== undefined) {
+          const row = rows[item.row] as PlacedRow;
+          rowOffsets[item.row] = offset;
+          rowOffsetOf.set(`${String(row.table)}:${String(row.row)}`, offset);
+        }
+      }
+    }
+    pieces.forEach((piece, index) => {
+      if (piece.cell === undefined) return;
+      pieceOffsets[index] =
+        rowOffsetOf.get(`${String(piece.cell.table)}:${String(piece.cell.row)}`) ?? mp(0);
+    });
+    const moved = pieceOffsets.some((offset) => offset !== 0);
+    return { pieces: pieceOffsets, rows: rowOffsets, moved };
+  }
+
+  const drops = columns.map((_box, column) => {
+    const room = roomOf(column);
+    if (room <= 0) return mp(0);
+    return alignment === 'center' ? mp(roundHalfEven(room / 2)) : room;
+  });
+  pieces.forEach((_piece, index) => {
+    pieceOffsets[index] = drops[columnOfPiece(index)] ?? mp(0);
+  });
+  rows.forEach((_row, index) => {
+    rowOffsets[index] = drops[columnOfRow(index)] ?? mp(0);
+  });
+  return { pieces: pieceOffsets, rows: rowOffsets, moved: drops.some((drop) => drop !== 0) };
 };
 
 const lineNumbersFor = (
@@ -491,13 +610,23 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
     const alignment = input.verticalAlignment.get(page.section) ?? 'top';
     const unshiftedPieces = input.pieces.filter((piece) => piece.page === page.index);
     const unshiftedRows = input.rows.filter((row) => row.page === page.index);
-    const drop = verticalDrop(alignment, page, unshiftedPieces, input.blocks);
-    const pagePieces =
-      drop === 0
-        ? unshiftedPieces
-        : unshiftedPieces.map((piece) => ({ ...piece, boxTop: mp(piece.boxTop + drop) }));
-    const pageRows =
-      drop === 0 ? unshiftedRows : unshiftedRows.map((row) => shiftRow(row, drop));
+    const shift = verticalShiftOf(
+      alignment,
+      page,
+      input.columnBoxes.get(page.section) ?? [page.contentBox],
+      unshiftedPieces,
+      unshiftedRows,
+      input.blocks,
+    );
+    const pagePieces = shift.moved
+      ? unshiftedPieces.map((piece, index) => ({
+          ...piece,
+          boxTop: mp(piece.boxTop + (shift.pieces[index] ?? mp(0))),
+        }))
+      : unshiftedPieces;
+    const pageRows = shift.moved
+      ? unshiftedRows.map((row, index) => shiftRow(row, shift.rows[index] ?? mp(0)))
+      : unshiftedRows;
     const cellFragments = new Map<string, CellFragment>();
     for (const row of pageRows) {
       for (const cell of row.cells) {
@@ -521,6 +650,7 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
         block,
         id: piece.block,
         page: page.index,
+        column: piece.column,
         x,
         width,
         boxTop: piece.boxTop,

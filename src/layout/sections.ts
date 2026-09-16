@@ -196,14 +196,6 @@ export const buildSections = (
           docPos: undefined,
         });
       }
-      if (properties.verticalAlignment === 'both') {
-        diagnostics.push({
-          code: 'verticalAlignmentNotLaidOut',
-          severity: 'info',
-          message: `section ${index} justifies its content vertically; this slice centres the leftover space instead of distributing it`,
-          docPos: undefined,
-        });
-      }
       if (properties.documentGrid !== undefined && properties.documentGridCharSpace === undefined) {
         diagnostics.push({
           code: 'documentGridNotLaidOut',
