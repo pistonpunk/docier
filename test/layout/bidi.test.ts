@@ -158,3 +158,31 @@ describe('numbers in right to left text', () => {
     expect(number?.text).toContain('5');
   });
 });
+
+describe('what the right to left diagnostic still claims', () => {
+  const warnsFor = async (text: string): Promise<boolean> => {
+    const model = await openModel({
+      body: `<w:p><w:pPr><w:bidi/></w:pPr><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`,
+    });
+    const result = await layoutDocument(model);
+    return result.diagnostics.some((entry) => entry.code === 'rtlLayoutPartial');
+  };
+
+  it('says nothing about a latin word with a digit in it, which reads correctly', async () => {
+    // these atoms are left to right and are drawn in the order they are written,
+    // which is what the unicode rule asks for, so warning about them was a false
+    // alarm on correct text
+    expect(await warnsFor('a1')).toBe(false);
+    expect(await warnsFor('abc1def')).toBe(false);
+    expect(await warnsFor('Word 2016')).toBe(false);
+  });
+
+  it('says nothing about a hebrew word with a digit in it', async () => {
+    expect(await warnsFor('שלום1')).toBe(false);
+  });
+
+  it('names the one case it is still true of, a word mixing the two directions', async () => {
+    expect(await warnsFor('abcא')).toBe(true);
+    expect(await warnsFor('a1א')).toBe(true);
+  });
+});

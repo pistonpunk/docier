@@ -345,8 +345,8 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
   };
 };
 
-const STRONG_RTL = /[\u0590-\u05ff\u0600-\u06ff\u0700-\u074f\u0750-\u077f\u08a0-\u08ff\ufb1d-\ufdff\ufdf0-\ufeff]/;
-const STRONG_LTR = /[A-Za-z\u00c0-\u024f\u0370-\u058f]/;
+export const STRONG_RTL = /[\u0590-\u05ff\u0600-\u06ff\u0700-\u074f\u0750-\u077f\u08a0-\u08ff\ufb1d-\ufdff\ufdf0-\ufeff]/;
+export const STRONG_LTR = /[A-Za-z\u00c0-\u024f\u0370-\u058f]/;
 
 // a character with no direction of its own takes the one around it, and when
 // its neighbours disagree it takes the paragraph's, which is the rule that puts

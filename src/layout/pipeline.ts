@@ -29,7 +29,7 @@ import { prepareTables } from './table-prepare.js';
 import type { FlowBlock, PageState, PaginateBlock, PaginationResult } from './paginate.js';
 import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
 import type { PageHeaderFooter } from './finalize.js';
-import { finalize } from './finalize.js';
+import { STRONG_LTR, STRONG_RTL, finalize } from './finalize.js';
 import type { AtomPlacement, BorderSet, FootnoteAreaFragment } from './types.js';
 import type {
   BlockFragment,
@@ -310,14 +310,17 @@ export const layoutDocument = (
     prepared.some(
       (entry) =>
         entry.paragraph.format.direction === 'rtl' &&
-        entry.measured.some((item) => /[0-9]/.test(item.atom.text) && /[^0-9.,\s]/.test(item.atom.text)),
+        entry.measured.some(
+          (item) =>
+            STRONG_RTL.test(item.atom.text) && STRONG_LTR.test(item.atom.text),
+        ),
     )
   ) {
     diagnostics.push({
       code: 'rtlLayoutPartial',
       severity: 'info',
       message:
-        'punctuation written inside a word is drawn in the order it is written, without the Unicode rule for neutrals',
+        'a word mixing right to left and left to right letters takes one direction for the whole word, so its latin part is turned around with it',
       docPos: undefined,
     });
   }
