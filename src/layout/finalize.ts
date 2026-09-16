@@ -77,7 +77,7 @@ const atomsOf = (
 ): readonly AtomPlacement[] =>
   placed.map((item) => {
     const atom = item.measured.atom;
-    return {
+    const placed = {
       atomId: atom.id,
       kind: atom.kind,
       paint: atom.paint,
@@ -89,6 +89,9 @@ const atomsOf = (
       source: atom.source,
       level: atom.level,
     };
+    // only a mirrored line resolves a direction, so the field is absent rather
+    // than undefined everywhere else
+    return item.rightToLeft === undefined ? placed : { ...placed, rightToLeft: item.rightToLeft };
   });
 
 const lineEndOf = (line: LaidLine, fallback: DocPos): DocPos => {
@@ -212,12 +215,13 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
             },
             x: mp(at),
             width: item.width,
+            rightToLeft: true,
           });
         }
       } else {
         let at = start;
         for (const item of group.atoms) {
-          out.push({ measured: item.measured, x: mp(at), width: item.width });
+          out.push({ measured: item.measured, x: mp(at), width: item.width, rightToLeft: false });
           at += item.width as number;
         }
       }

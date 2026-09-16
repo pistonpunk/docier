@@ -140,7 +140,16 @@ export const paintRun = (run: LineRun, paint: RunPaint, context: RunPaintContext
           detail: `${paint.family} (advances from the ${plan.unitsSource})`,
         });
       }
-      content.showGlyphs(plan.glyphs, plan.adjustments);
+      // a right to left atom is placed by the layout but its glyphs are drawn in
+      // the order they are written, and a reader of that script reads the last
+      // one first: the sequence is turned around, advances and all, so the two
+      // arrays stay paired. Latin inside right to left text keeps its own order,
+      // which is why this is the atom's direction and not the run's
+      if (atom.rightToLeft === true) {
+        content.showGlyphs([...plan.glyphs].reverse(), [...plan.adjustments].reverse());
+      } else {
+        content.showGlyphs(plan.glyphs, plan.adjustments);
+      }
     }
   }
   content.endText();

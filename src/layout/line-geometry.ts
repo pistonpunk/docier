@@ -12,6 +12,7 @@ export interface PlacedAtom {
   readonly measured: MeasuredAtom;
   readonly x: Mp;
   readonly width: Mp;
+  readonly rightToLeft?: boolean;
 }
 
 export interface LineGeometry {

@@ -158,6 +158,7 @@ export interface AtomPlacement {
   readonly text: string;
   readonly source: DocRange;
   readonly level: number;
+  readonly rightToLeft?: boolean | undefined;
 }
 
 export interface FootnoteAreaFragment {
