@@ -537,6 +537,47 @@ describe('borders and shading', () => {
   });
 });
 
+describe('a column index that is logical, not physical', () => {
+  // row 0 is ordinary; row 1 has a cell spanning the first two columns, so its
+  // second physical cell is the third logical column
+  const spanning = (): string =>
+    bodyOf(
+      paragraphText('alpha'),
+      '<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="3000"/></w:tblPr>' +
+        '<w:tblGrid><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/></w:tblGrid>' +
+        `<w:tr>${cell('a')}${cell('b')}${cell('z')}</w:tr>` +
+        '<w:tr><w:tc><w:tcPr><w:tcW w:type="dxa" w:w="2000"/><w:gridSpan w:val="2"/></w:tcPr>' +
+        `${paragraphText('7')}</w:tc>${cell('3')}</w:tr>` +
+        '</w:tbl>',
+      paragraphText('beta'),
+    );
+
+  const cellText = (handle: EditorHandle, row: number, column: number): string =>
+    sessionOf(handle).model.body().tables()[0]?.cellAt(row, column)?.logicalText ?? '';
+
+  it('sums the cells at the columns to the left, not at the same indices', async () => {
+    const handle = await editorOf(spanning());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 2).start });
+    await run(handle, 'table.formula', { expression: '=SUM(LEFT)' });
+
+    // one cell lies to the left, across two columns, and it holds 7. Reading by
+    // physical index would also count the cell under the caret and give 10.
+    expect(cellText(handle, 1, 2)).toBe('7');
+  });
+
+  it('sorts by the cell at that logical column, not the one at that index', async () => {
+    const handle = await editorOf(spanning());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 2).start });
+
+    // logical column 2 is "z" then "3", so the rows must swap; reading by
+    // physical index would compare "3" against nothing and leave them alone.
+    // There is no header row here, so both rows take part.
+    await run(handle, 'table.sort', { column: 2, headerRow: false });
+    expect(cellText(handle, 0, 2)).toBe('3');
+    expect(cellText(handle, 1, 2)).toBe('z');
+  });
+});
+
 describe('formulas over table cells', () => {
   const numbers = (): string =>
     bodyOf(

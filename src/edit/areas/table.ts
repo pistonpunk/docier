@@ -691,12 +691,16 @@ const valuesFor = (table: Table, row: number, column: number, direction: Formula
   }
   const current = rows[row];
   if (current === undefined) return out;
-  const cells = current.cells();
+  const width = table.columnCount;
   const from = direction === 'left' ? 0 : column + 1;
-  const to = direction === 'left' ? column : cells.length;
+  const to = direction === 'left' ? column : width;
+  const seen = new Set<TableCell>();
   for (let at = from; at < to; at += 1) {
-    const cell = cells[at];
-    const value = cell === undefined ? undefined : numberIn(cell.logicalText);
+    const cell = current.spanAt(at)?.cell;
+    // a cell spanning several columns is one cell, so it is counted once
+    if (cell === undefined || seen.has(cell)) continue;
+    seen.add(cell);
+    const value = numberIn(cell.logicalText);
     if (value !== undefined) out.push(value);
   }
   return out;
@@ -771,7 +775,9 @@ export interface SortArgs {
 }
 
 const sortKeyOf = (row: TableRow, column: number, type: SortType): string | number => {
-  const cell = row.cells()[column];
+  // spanAt takes a logical column, which is what the caller has; cells() is
+  // physical and the two differ as soon as any cell spans more than one column
+  const cell = row.spanAt(column)?.cell;
   const text = cell === undefined ? '' : cell.logicalText.trim();
   if (type !== 'number') return text.toLowerCase();
   const value = Number.parseFloat(text.replace(/[^0-9.eE+-]/g, ''));
