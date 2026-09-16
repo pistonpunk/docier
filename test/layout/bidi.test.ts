@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { layoutDocument } from '../../src/layout/index.js';
+import { openModel } from '../model/support.js';
 import { layoutOf, paragraphText, bodyOf } from './support.js';
 
 const RTL_TEXT = 'שלום';
@@ -70,3 +72,41 @@ describe('a right to left paragraph', () => {
   });
 });
 
+
+describe('latin runs inside a right to left paragraph', () => {
+  const rtlWith = async (runs: string) => {
+    const model = await openModel({
+      body: `<w:p><w:pPr><w:bidi/></w:pPr>${runs}</w:p>`,
+    });
+    const result = await layoutDocument(model);
+    const line = result.pages[0]?.blocks[0]?.lines[0];
+    return (line?.atoms ?? []).map((atom) => ({
+      text: atom.text,
+      x: atom.x as number,
+      end: (atom.x as number) + (atom.width as number),
+    }));
+  };
+
+  it('keeps the letters of a latin word in their written order', async () => {
+    const atoms = await rtlWith(`<w:r><w:t>${RTL_TEXT} abc</w:t></w:r>`);
+    const latin = atoms.find((atom) => atom.text === 'abc');
+    expect(latin).toBeDefined();
+    // the word is one atom, so its letters are drawn in the order they are
+    // written rather than turned around with the line
+    expect(latin?.text).toBe('abc');
+    const hebrew = atoms.filter((atom) => /[\u0590-\u05ff]/.test(atom.text));
+    expect(Math.max(...hebrew.map((atom) => atom.end))).toBeGreaterThan(latin?.x ?? 0);
+  });
+
+  it('keeps a sequence of latin words in their written order', async () => {
+    const atoms = await rtlWith(
+      `<w:r><w:t>${RTL_TEXT}</w:t></w:r><w:r><w:t xml:space="preserve"> one two</w:t></w:r>`,
+    );
+    const one = atoms.find((atom) => atom.text === 'one');
+    const two = atoms.find((atom) => atom.text === 'two');
+    expect(one).toBeDefined();
+    expect(two).toBeDefined();
+    // "one" is written before "two" and sits to its left
+    expect(one?.x).toBeLessThan(two?.x ?? 0);
+  });
+});

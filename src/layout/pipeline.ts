@@ -285,14 +285,14 @@ export const layoutDocument = (
     prepared.some(
       (entry) =>
         entry.paragraph.format.direction === 'rtl' &&
-        entry.measured.some((item) => /[A-Za-z]{2,}/.test(item.atom.text)),
+        entry.measured.some((item) => /[0-9]/.test(item.atom.text)),
     )
   ) {
     diagnostics.push({
-      code: 'bidiNotLaidOut',
+      code: 'rtlLayoutPartial',
       severity: 'info',
       message:
-        'a left to right run inside a right to left paragraph is placed by its run order, without the Unicode reordering rule',
+        'a number inside a right to left paragraph is placed by its direction group, without the Unicode rule for numbers',
       docPos: undefined,
     });
   }

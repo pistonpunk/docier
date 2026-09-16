@@ -1,6 +1,7 @@
 import { mp, roundHalfEven } from '../units/index.js';
 import type { Mp } from '../units/index.js';
 import type { LaidLine } from './assembly.js';
+import type { Atom } from './atoms.js';
 import type { PageState, PaginateBlock, PlacedPiece } from './paginate.js';
 import type { PlacedRow, PlacedTable } from './table-flow.js';
 import { buildIndices } from './indices.js';
@@ -172,14 +173,55 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return line.placed;
     const left = mp(min);
     const right = mp(max);
-    return line.placed.map((item) => ({
-      measured: {
-        ...item.measured,
-        offsets: item.measured.offsets.map((offset) => mp((item.width as number) - (offset as number))),
-      },
-      x: mp((left as number) + (right as number) - (item.x as number) - (item.width as number)),
-      width: item.width,
-    }));
+
+    // the runs of a right to left line read from the right, but a run of latin
+    // text inside it reads from the left, and a sequence of them keeps its
+    // order: the line is turned around in direction groups rather than atom by
+    // atom
+    const groups: { readonly atoms: PlacedAtom[]; readonly rtl: boolean; readonly width: number }[] = [];
+    let rtl = true;
+    for (const item of line.placed) {
+      const direction = directionOfAtom(item.measured.atom);
+      if (direction !== undefined) rtl = direction;
+      const current = groups[groups.length - 1];
+      if (current === undefined || current.rtl !== rtl) {
+        groups.push({ atoms: [item], rtl, width: item.width as number });
+        continue;
+      }
+      current.atoms.push(item);
+      (current as { width: number }).width += item.width as number;
+    }
+
+    const out: PlacedAtom[] = [];
+    let cursor = right as number;
+    for (const group of groups) {
+      const start = cursor - group.width;
+      if (group.rtl) {
+        let at = cursor;
+        for (const item of group.atoms) {
+          at -= item.width as number;
+          out.push({
+            measured: {
+              ...item.measured,
+              offsets: item.measured.offsets.map((offset) =>
+                mp((item.width as number) - (offset as number)),
+              ),
+            },
+            x: mp(at),
+            width: item.width,
+          });
+        }
+      } else {
+        let at = start;
+        for (const item of group.atoms) {
+          out.push({ measured: item.measured, x: mp(at), width: item.width });
+          at += item.width as number;
+        }
+      }
+      cursor = start;
+    }
+    void left;
+    return out;
   };
 
   const topAndBottomBands = (): readonly Rect[] => {
@@ -294,6 +336,18 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     caretStops,
     nextLineId: lineId,
   };
+};
+
+const STRONG_RTL = /[\u0590-\u05ff\u0600-\u06ff\u0700-\u074f\u0750-\u077f\u08a0-\u08ff\ufb1d-\ufdff\ufdf0-\ufeff]/;
+const STRONG_LTR = /[A-Za-z\u00c0-\u024f\u0370-\u058f]/;
+
+const directionOfAtom = (atom: Atom): boolean | undefined => {
+  const text = atom.text;
+  if (text === '') return undefined;
+  if (STRONG_RTL.test(text)) return true;
+  if (STRONG_LTR.test(text)) return false;
+  if (/[0-9]/.test(text)) return false;
+  return undefined;
 };
 
 const shiftRect = (rect: Rect, delta: Mp): Rect =>
