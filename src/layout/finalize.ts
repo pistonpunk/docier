@@ -11,6 +11,7 @@ import { pageOrigins } from './page-geometry.js';
 import type {
   AtomPlacement,
   BlockFragment,
+  BorderSet,
   CaretStop,
   CellFragment,
   CellRef,
@@ -33,6 +34,9 @@ import type {
 } from './types.js';
 import { LAYOUT_RESULT_VERSION, docPos } from './types.js';
 import { deepFreeze } from './freeze.js';
+import { emptyBorderSet } from './table-borders.js';
+
+const EMPTY_PAGE_BORDERS = emptyBorderSet();
 
 export interface PageHeaderFooter {
   readonly header: HeaderFooterFragment | undefined;
@@ -58,6 +62,7 @@ export interface FinalizeInput {
   readonly stories: readonly StoryLayout[];
   readonly lineIdBase: number;
   readonly marks: boolean;
+  readonly pageBorders: ReadonlyMap<number, BorderSet>;
 }
 
 const atomsOf = (line: LaidLine): readonly AtomPlacement[] =>
@@ -413,6 +418,7 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
       footer: regions?.footer,
       blocks,
       tables,
+      pageBorders: input.pageBorders.get(page.section) ?? EMPTY_PAGE_BORDERS,
     });
   }
 

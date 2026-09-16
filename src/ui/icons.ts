@@ -216,7 +216,8 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'ui.control.margins':
     '<rect x="2.5" y="2.5" width="11" height="11" rx="1.2"/><path d="M5.5 5.5h5v5h-5z"/>',
   'doc.setPageBackground':
-    '<rect x="2.5" y="2.5" width="9.5" height="11" rx="1"/><rect x="9.6" y="9.6" width="4" height="4" rx="1"/><path d="m10.3 13 2.9-2.9"/>',
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/>' +
+    '<path d="M2.5 9.5h11"/><path d="M6 13.5V9.5"/><path d="M11 9.5v4"/>',
   'doc.setWatermark':
     '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M4.6 10.2 10.2 4.6"/><path d="M6.4 11.9 11.9 6.4"/>',
   'doc.setPageBorders':

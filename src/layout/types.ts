@@ -334,6 +334,7 @@ export interface PageFragment {
   readonly footnotes: FootnoteAreaFragment | undefined;
   readonly blocks: readonly BlockFragment[];
   readonly tables: readonly TableFragment[];
+  readonly pageBorders: BorderSet;
 }
 
 export interface StoryLayout {

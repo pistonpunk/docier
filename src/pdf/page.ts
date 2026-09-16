@@ -285,6 +285,9 @@ export const paintFootnotes = (
 
 export const paintPage = (page: PageFragment, context: PagePaintContext): void => {
   const frame = pdfFrame(page);
+  if (hasBorders(page.pageBorders)) {
+    paintBorders(context.content, page.pageBorders, page.page, frame);
+  }
   const blocks = blocksById(page);
   for (const block of page.blocks) {
     if (block.cell === undefined) paintBlock(block, frame, context);

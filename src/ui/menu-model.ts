@@ -129,6 +129,31 @@ const pendingDialog = (name: string, labelKey: string, keytip: string): UiNode =
     actionArgs: { dialog: command(name) },
   });
 
+export const PAGE_BORDERS_MENU: UiNode = menu('ui.menu.pageBorders', [
+  ...(
+    [
+      ['single', 4, 'ui.pageBorder.box'],
+      ['double', 6, 'ui.pageBorder.double'],
+      ['thick', 12, 'ui.pageBorder.thick'],
+      ['dashed', 8, 'ui.pageBorder.dashed'],
+      ['dotted', 8, 'ui.pageBorder.dotted'],
+    ] as const
+  ).map(([style, size, labelKey]) =>
+    button({
+      labelKey,
+      id: `pageborder:${style}`,
+      command: command('doc.setPageBorders'),
+      args: { style, sizeEighths: size },
+    }),
+  ),
+  button({
+    labelKey: 'ui.pageBorder.none',
+    id: 'pageborder:none',
+    command: command('doc.setPageBorders'),
+    args: { none: true },
+  }),
+]);
+
 export const PAGE_COLOUR_MENU: UiNode = menu('ui.menu.pageColour', [
   ...(
     [
@@ -634,7 +659,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         nodes: [
           PAGE_COLOUR_MENU,
           pending('doc.setWatermark', 'ui.menu.watermark', 'WM'),
-          pending('doc.setPageBorders', 'ui.menu.pageBorders', 'PBD'),
+          PAGE_BORDERS_MENU,
         ],
       },
     ],

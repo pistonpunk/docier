@@ -229,6 +229,15 @@ export const paintPage = (
   if (page.footer !== undefined) paintRegion(sheet, page.footer, frame, context);
   if (page.footnotes !== undefined) paintFootnotes(sheet, page.footnotes, frame, context);
 
+  const borderFrame: Frame = { dx: page.page.x, dy: page.page.y };
+  paintBorders(
+    sheet,
+    page.pageBorders,
+    page.page,
+    borderFrame,
+    context.scale,
+  );
+
   const front = box('docier-floats-front');
   applyStyle(front, positionStyle({ left: 0, top: 0, width: context.scale.px(page.page.width), height: context.scale.px(page.page.height) }));
   const frontCount = paintFloats(front, { page, blocks: page.blocks, frame, scale: context.scale, images: context.images }, false);

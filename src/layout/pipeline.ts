@@ -21,7 +21,7 @@ import type { FlowBlock, PageState, PaginateBlock, PaginationResult } from './pa
 import { flowParagraphBlock, flowTableBlock, paginateFlow } from './paginate.js';
 import type { PageHeaderFooter } from './finalize.js';
 import { finalize } from './finalize.js';
-import type { FootnoteAreaFragment } from './types.js';
+import type { BorderSet, FootnoteAreaFragment } from './types.js';
 import type {
   BlockFragment,
   HeaderFooterFragment,
@@ -35,6 +35,8 @@ import type { HeaderFooterSlot, RegionLayout } from './header-footer.js';
 import { HEADER_FOOTER_VARIANTS, layoutRegion, resolveHeaderFooterPlan, storyLayoutOf } from './header-footer.js';
 import type { PageFieldValues } from './fields.js';
 import { maxMp, minMp } from '../units/index.js';
+import { SectionProperties } from '../model/index.js';
+import { borderSetOf } from './table-borders.js';
 
 export const DEFAULT_TAB_STOP_TWIPS = 720;
 
@@ -499,6 +501,19 @@ export const layoutDocument = (
     return { byPage, reserves };
   };
 
+  const sectionPageBorders = (): ReadonlyMap<number, BorderSet> => {
+    const out = new Map<number, BorderSet>();
+    for (const section of sections) {
+      const element = section.propertiesElement;
+      if (element === undefined) continue;
+      const set = borderSetOf(SectionProperties.of(element).borders);
+      const painted =
+        set.top !== undefined || set.right !== undefined || set.bottom !== undefined || set.left !== undefined;
+      if (painted) out.set(section.index, set);
+    }
+    return out;
+  };
+
   const REBUILDABLE: ReadonlySet<string> = new Set(['square', 'tight', 'through']);
 
   const bandsEqual = (
@@ -760,6 +775,7 @@ export const layoutDocument = (
     hash: hash.digest(),
     storyId: options.storyId ?? model.body().id,
     marks: showMarks,
+    pageBorders: sectionPageBorders(),
     storyKind: model.body().kind,
     blockCount: ingested.blocks.length,
     headerFooters: paginated.pages.map(

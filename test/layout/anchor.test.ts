@@ -319,3 +319,32 @@ describe('square wrap', () => {
     }
   });
 });
+
+describe('page borders reach the pages they apply to', () => {
+  const bordered = (borders: string): string =>
+    bodyOf(paragraphText('alpha')).replace(
+      '<w:sectPr>',
+      `<w:sectPr>${borders}`,
+    );
+
+  const SIDES =
+    '<w:pgBorders><w:top w:val="single" w:sz="8" w:color="FF0000"/>' +
+    '<w:left w:val="single" w:sz="8" w:color="FF0000"/>' +
+    '<w:bottom w:val="single" w:sz="8" w:color="FF0000"/>' +
+    '<w:right w:val="single" w:sz="8" w:color="FF0000"/></w:pgBorders>';
+
+  it('carries the section borders onto the page', async () => {
+    const result = await layoutOf(bordered(SIDES));
+    const borders = result.pages[0]?.pageBorders;
+    expect(borders?.top).toBeDefined();
+    expect(borders?.top?.color).toBe('FF0000');
+    expect(borders?.left).toBeDefined();
+  });
+
+  it('reports no borders when the section declares none', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('alpha')));
+    const borders = result.pages[0]?.pageBorders;
+    expect(borders?.top).toBeUndefined();
+    expect(borders?.left).toBeUndefined();
+  });
+});
