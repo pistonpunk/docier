@@ -8,7 +8,7 @@ import { atomize } from './atoms.js';
 import { NO_ANNOTATION } from '../model/index.js';
 import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 import { measureAtoms, nextTabStop } from './intrinsic.js';
-import type { LaidLine, NumberingPlacement } from './assembly.js';
+import type { LaidLine, NumberingPlacement, SideBand } from './assembly.js';
 import { assembleParagraph } from './assembly.js';
 import type { PlacedAtom } from './line-geometry.js';
 import type { FontResolver } from './fonts.js';
@@ -264,6 +264,7 @@ export const buildParagraphBlock = (
   contentX: Mp,
   contentWidth: Mp,
   context: ParagraphBlockContext,
+  externalBands?: readonly SideBand[] | undefined,
 ): PaginateBlock => {
   const paragraph = prepared.paragraph;
   const format = paragraph.format;
@@ -280,6 +281,7 @@ export const buildParagraphBlock = (
     numbering: numberPlacement(prepared, contentX, measureContext),
     contentX,
     contentWidth,
+    externalBands,
   });
   return {
     index: paragraph.index,

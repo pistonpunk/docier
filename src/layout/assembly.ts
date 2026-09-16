@@ -36,6 +36,7 @@ export interface AssembleRequest {
   readonly numbering: NumberingPlacement | undefined;
   readonly contentX: Mp;
   readonly contentWidth: Mp;
+  readonly externalBands?: readonly SideBand[] | undefined;
 }
 
 const hyphenAtomOf = (atom: Atom): Atom | undefined => {
@@ -59,7 +60,7 @@ const hyphenAtomOf = (atom: Atom): Atom | undefined => {
 const HYPHEN_TEXT = '-';
 const SIDE_GAP_MP = mp(1000);
 
-interface SideBand {
+export interface SideBand {
   readonly side: 'left' | 'right';
   readonly top: Mp;
   readonly bottom: Mp;
@@ -98,7 +99,7 @@ export const assembleParagraph = (request: AssembleRequest): readonly LaidLine[]
     mp(0),
   );
 
-  const floatBands = sideBandsOf(measured);
+  const floatBands = [...sideBandsOf(measured), ...(request.externalBands ?? [])];
   const bandFor =
     floatBands.length === 0
       ? undefined

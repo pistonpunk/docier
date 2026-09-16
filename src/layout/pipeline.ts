@@ -14,6 +14,7 @@ import type { RunFormat } from './format.js';
 import { DEFAULT_FONT_SIZE } from './format.js';
 import type { IntrinsicWidths, PreparedParagraph } from './paragraph-blocks.js';
 import { buildParagraphBlock, intrinsicWidths, prepareParagraphs } from './paragraph-blocks.js';
+import type { SideBand } from './assembly.js';
 import type { PreparedTable, TablePrepareRequest } from './table-prepare.js';
 import { prepareTables } from './table-prepare.js';
 import type { FlowBlock, PaginateBlock, PaginationResult } from './paginate.js';
@@ -232,16 +233,20 @@ export const layoutDocument = (
   for (const block of tablePrepare.blocks) paragraphBlocks[block.index] = block;
 
   const flow: FlowBlock[] = [];
-  for (const block of ingested.blocks) {
-    if (block.kind === 'paragraph') {
-      const laid = paragraphBlocks[block.paragraph.index];
-      if (laid !== undefined) flow.push(flowParagraphBlock(laid));
-      continue;
+  const rebuildFlow = (): void => {
+    flow.length = 0;
+    for (const block of ingested.blocks) {
+      if (block.kind === 'paragraph') {
+        const laid = paragraphBlocks[block.paragraph.index];
+        if (laid !== undefined) flow.push(flowParagraphBlock(laid));
+        continue;
+      }
+      const at = requestOrder.get(block.table);
+      const table: PreparedTable | undefined = at === undefined ? undefined : tablePrepare.tables[at];
+      if (table !== undefined) flow.push(flowTableBlock(table));
     }
-    const at = requestOrder.get(block.table);
-    const table: PreparedTable | undefined = at === undefined ? undefined : tablePrepare.tables[at];
-    if (table !== undefined) flow.push(flowTableBlock(table));
-  }
+  };
+  rebuildFlow();
 
   for (const diagnostic of ingested.diagnostics) diagnostics.push(diagnostic);
   for (const diagnostic of tablePrepare.diagnostics) diagnostics.push(diagnostic);
@@ -494,6 +499,108 @@ export const layoutDocument = (
     return { byPage, reserves };
   };
 
+  const REBUILDABLE: ReadonlySet<string> = new Set(['square', 'tight', 'through']);
+
+  const bandsEqual = (
+    first: ReadonlyMap<number, readonly SideBand[]>,
+    second: ReadonlyMap<number, readonly SideBand[]>,
+  ): boolean => {
+    if (first.size !== second.size) return false;
+    for (const [index, list] of first) {
+      const other = second.get(index);
+      if (other === undefined || other.length !== list.length) return false;
+      for (let at = 0; at < list.length; at += 1) {
+        const a = list[at];
+        const b = other[at];
+        if (a === undefined || b === undefined) return false;
+        if (a.side !== b.side || a.top !== b.top || a.bottom !== b.bottom || a.extent !== b.extent) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const bandsFrom = (
+    paginated: PaginationResult,
+  ): ReadonlyMap<number, readonly SideBand[]> => {
+    const placedFloats: {
+      readonly page: number;
+      readonly top: Mp;
+      readonly bottom: Mp;
+      readonly side: 'left' | 'right';
+      readonly extent: Mp;
+    }[] = [];
+    for (const piece of paginated.pieces) {
+      const block = paragraphBlocks[piece.block];
+      if (block === undefined) continue;
+      for (const line of block.lines) {
+        for (const item of line.placed) {
+          const object = item.measured.atom.object;
+          const anchor = object?.anchor;
+          if (object === undefined || anchor === undefined) continue;
+          if (!REBUILDABLE.has(anchor.wrap)) continue;
+          if (anchor.vertical !== 'paragraph') continue;
+          const top = mp(piece.boxTop + anchor.y);
+          placedFloats.push({
+            page: piece.page,
+            top,
+            bottom: mp(top + object.height),
+            side: anchor.x <= 0 ? 'left' : 'right',
+            extent: mp(object.width + 1000),
+          });
+        }
+      }
+    }
+    if (placedFloats.length === 0) return new Map();
+
+    const out = new Map<number, SideBand[]>();
+    for (const piece of paginated.pieces) {
+      const block = paragraphBlocks[piece.block];
+      if (block === undefined || piece.cell !== undefined) continue;
+      const height = mp(
+        block.lines
+          .slice(piece.lineStart, piece.lineEnd)
+          .reduce((total, line) => total + (line.geometry.height as number), 0),
+      );
+      const low = piece.boxTop;
+      const high = mp(piece.boxTop + height);
+      const bands: SideBand[] = [];
+      for (const float of placedFloats) {
+        if (float.page !== piece.page) continue;
+        if (float.bottom <= low || float.top >= high) continue;
+        bands.push({
+          side: float.side,
+          top: mp(float.top - piece.boxTop),
+          bottom: mp(float.bottom - piece.boxTop),
+          extent: float.extent,
+        });
+      }
+      if (bands.length > 0) out.set(piece.block, bands);
+    }
+    return out;
+  };
+
+  let appliedBands: ReadonlyMap<number, readonly SideBand[]> = new Map();
+  const applyBands = (bands: ReadonlyMap<number, readonly SideBand[]>): boolean => {
+    if (bandsEqual(appliedBands, bands)) return false;
+    appliedBands = bands;
+    for (const [index, list] of bands) {
+      const preparedEntry = prepared[index];
+      const box = contentBoxOf(sections[0]);
+      if (preparedEntry === undefined) continue;
+      paragraphBlocks[index] = buildParagraphBlock(
+        preparedEntry,
+        box.x,
+        box.width,
+        { defaultTabStop: defaultTabStopMp },
+        list,
+      );
+    }
+    rebuildFlow();
+    return true;
+  };
+
   let reserves: ReserveMap = new Map();
   let footnoteReserves: ReadonlyMap<number, Mp> = new Map();
   let reserved = sectionsWithReserve(sections, reserves, defaultLineBox.height);
@@ -503,7 +610,17 @@ export const layoutDocument = (
   });
   let regions = regionsFor(paginated);
   let footnotes = footnoteAreasFor(paginated, regions);
+  let bandsMoved = applyBands(bandsFrom(paginated));
+  if (bandsMoved) {
+    paginated = paginateFlow(flow, reserved.sections, diagnostics, {
+      widowControlEnabled: options.widowControl ?? true,
+      evenAndOddHeaders,
+    });
+    regions = regionsFor(paginated);
+    footnotes = footnoteAreasFor(paginated, regions);
+  }
   let converged =
+    !bandsMoved &&
     reservesEqual(reserves, regions.reserves) &&
     footnoteReservesEqual(footnoteReserves, footnotes.reserves);
   for (let attempt = 0; !converged && attempt < MAX_PAGE_COUNT_ITERATIONS; attempt += 1) {
@@ -517,7 +634,18 @@ export const layoutDocument = (
     });
     regions = regionsFor(paginated);
     footnotes = footnoteAreasFor(paginated, regions);
+    const moved = applyBands(bandsFrom(paginated));
+    if (moved) {
+      paginated = paginateFlow(flow, reserved.sections, diagnostics, {
+        widowControlEnabled: options.widowControl ?? true,
+        evenAndOddHeaders,
+        bottomReserve: (page) => footnoteReserves.get(page),
+      });
+      regions = regionsFor(paginated);
+      footnotes = footnoteAreasFor(paginated, regions);
+    }
     converged =
+      !moved &&
       reservesEqual(reserves, regions.reserves) &&
       footnoteReservesEqual(footnoteReserves, footnotes.reserves);
   }

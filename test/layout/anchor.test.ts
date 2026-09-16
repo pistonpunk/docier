@@ -254,6 +254,33 @@ describe('square wrap', () => {
     expect(none?.atoms[0]?.x).toBe(plain?.atoms[0]?.x);
   });
 
+  it('starts the paragraph after the float further right, beside it', async () => {
+    const tall = anchorDrawing({
+      wrap: 'Square',
+      relativeV: 'paragraph',
+      relativeH: 'paragraph',
+      offsetX: 0,
+      offsetY: 0,
+      widthEmu: NARROW,
+      heightEmu: 2000000,
+    });
+    const withFloat = await layoutOf(
+      bodyOf(
+        `<w:p><w:r>${tall}<w:t xml:space="preserve">float</w:t></w:r></w:p>`,
+        paragraphText('alpha beta gamma delta'),
+      ),
+    );
+    const without = await layoutOf(
+      bodyOf(
+        '<w:p><w:r><w:t xml:space="preserve">float</w:t></w:r></w:p>',
+        paragraphText('alpha beta gamma delta'),
+      ),
+    );
+    const after = withFloat.pages[0]?.blocks[1]?.lines[0]?.atoms[0]?.x ?? 0;
+    const plain = without.pages[0]?.blocks[1]?.lines[0]?.atoms[0]?.x ?? 0;
+    expect(after).toBeGreaterThan(plain);
+  });
+
   it('leaves the lines below the float full width', async () => {
     const wrapped = await layoutOf(paragraphWith(sideFloat('left')));
     const lines = wrapped.pages[0]?.blocks[0]?.lines ?? [];
