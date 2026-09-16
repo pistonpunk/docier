@@ -122,6 +122,27 @@ const pending = (name: string, labelKey: string, keytip: string): UiNode =>
     actionArgs: { dialog: command(name) },
   });
 
+export const PAGE_COLOUR_MENU: UiNode = menu('ui.menu.pageColour', [
+  ...(
+    [
+      ['FFFFFF', 'ui.pageColour.white'],
+      ['FFF2CC', 'ui.pageColour.cream'],
+      ['E2EFDA', 'ui.pageColour.mint'],
+      ['DEEBF7', 'ui.pageColour.sky'],
+      ['FCE4EC', 'ui.pageColour.blush'],
+      ['F2F2F2', 'ui.pageColour.grey'],
+      ['none', 'ui.pageColour.none'],
+    ] as const
+  ).map(([color, labelKey]) =>
+    button({
+      labelKey,
+      id: `pagecolours:${color}`,
+      command: command('doc.setPageBackground'),
+      args: { color },
+    }),
+  ),
+]);
+
 export const IMAGE_ALIGN_MENU: UiNode = menu('ui.menu.alignObjects', [
   ...(
     [
@@ -604,7 +625,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         labelKey: 'ui.group.pageBackground',
         large: true,
         nodes: [
-          pending('doc.setPageBackground', 'ui.menu.pageColour', 'PC'),
+          PAGE_COLOUR_MENU,
           pending('doc.setWatermark', 'ui.menu.watermark', 'WM'),
           pending('doc.setPageBorders', 'ui.menu.pageBorders', 'PBD'),
         ],
@@ -1149,7 +1170,7 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
       button({ labelKey: 'ui.control.pasteSpecial', id: 'ctx:page:pasteSpecial', command: command('clipboard.pasteSpecial'), action: 'openDialog', actionArgs: { dialog: command('clipboard.pasteSpecial') } }),
     ]),
     separator('ctx:page:sep1'),
-    pending('doc.setPageBackground', 'ui.menu.pageColour', 'PC'),
+    PAGE_COLOUR_MENU,
     pending('doc.setWatermark', 'ui.menu.watermark', 'WM'),
     pending('doc.setPageBorders', 'ui.menu.pageBorders', 'PB'),
     separator('ctx:page:sep2'),

@@ -53,6 +53,10 @@ export interface NumberingSnapshot {
   readonly root: XmlElement | undefined;
 }
 
+export interface BackgroundSnapshot {
+  readonly element: XmlElement | undefined;
+}
+
 export interface StylesSnapshot {
   readonly root: XmlElement | undefined;
 }
@@ -86,6 +90,7 @@ export interface EditSnapshot {
   readonly relationships: readonly Relationship[];
   readonly numbering: NumberingSnapshot;
   readonly styles: StylesSnapshot;
+  readonly background: BackgroundSnapshot;
   readonly regions: readonly RegionSnapshot[];
   readonly media: readonly MediaSnapshot[];
 }
@@ -133,6 +138,7 @@ export interface EditSession {
   restore(snapshot: EditSnapshot): void;
   changeNumbering(write: () => unknown): boolean;
   changeStyles(write: () => unknown): boolean;
+  changeBackground(write: () => unknown): boolean;
   changeRegions(write: () => unknown): boolean;
   rememberBodyPosition(pos: DocPos): void;
   rememberedBodyPosition(): DocPos;
@@ -162,6 +168,37 @@ const captureNumbering = (model: DocumentModel): NumberingSnapshot => {
 const captureStyles = (model: DocumentModel): StylesSnapshot => {
   const styles = model.styles;
   return styles === undefined ? { root: undefined } : { root: cloneElement(styles.element) };
+};
+
+const backgroundElementOf = (model: DocumentModel): XmlElement | undefined => {
+  const root = model.body().element.parent;
+  if (root === undefined) return undefined;
+  return root.children.find(
+    (child): child is XmlElement => child.kind === 'element' && child.localName === 'background',
+  );
+};
+
+const captureBackground = (model: DocumentModel): BackgroundSnapshot => {
+  const element = backgroundElementOf(model);
+  return { element: element === undefined ? undefined : cloneElement(element) };
+};
+
+const restoreBackground = (model: DocumentModel, snapshot: BackgroundSnapshot): boolean => {
+  const root = model.body().element.parent;
+  if (root === undefined) return false;
+  const before = serializeXmlNode(root);
+  const live = backgroundElementOf(model);
+  if (live !== undefined) {
+    live.parent = undefined;
+    root.children = root.children.filter((child) => child !== live);
+  }
+  if (snapshot.element !== undefined) {
+    const restored = cloneNode(snapshot.element) as XmlElement;
+    restored.parent = root;
+    root.children.unshift(restored);
+  }
+  model.context.forgetSubtree(root);
+  return serializeXmlNode(root) !== before;
 };
 
 const restoreStyles = (model: DocumentModel, snapshot: StylesSnapshot): boolean => {
@@ -727,6 +764,7 @@ export const createEditSession = (
       relationships: [...relationshipsOf(model)],
       numbering: numberedCapture(),
       styles: captureStyles(model),
+      background: captureBackground(model),
       regions: capturedRegions(),
       media: capturedMedia(model),
     }),
@@ -739,6 +777,7 @@ export const createEditSession = (
       restoreRelationships(model, snapshot.relationships);
       restoreMedia(model, snapshot.media);
       restoreStyles(model, snapshot.styles);
+      restoreBackground(model, snapshot.background);
       if (restoreNumbering(model, snapshot.numbering)) {
         model.invalidateNumbering();
         numberingStale = true;
@@ -746,6 +785,18 @@ export const createEditSession = (
       if (restoreRegions(model, snapshot.regions)) regionsStale = true;
       model.context.forgetSubtree(body);
       markChanged();
+    },
+    changeBackground: (write) => {
+      const root = model.body().element.parent;
+      if (root === undefined) {
+        write();
+        return false;
+      }
+      const before = serializeXmlNode(root);
+      write();
+      if (serializeXmlNode(root) === before) return false;
+      model.context.forgetSubtree(root);
+      return true;
     },
     changeStyles: (write) => {
       const styles = model.styles;

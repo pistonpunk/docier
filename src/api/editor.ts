@@ -408,13 +408,31 @@ export const createEditor = (
     return width <= 0 ? undefined : mp(fromCssPx(width, 1));
   };
 
+  const pageBackgroundOf = (source: DocumentModel | undefined): string | undefined => {
+    if (source === undefined) return undefined;
+    const root = source.body().element.parent;
+    if (root === undefined) return undefined;
+    const background = root.children.find(
+      (child) => child.kind === 'element' && child.localName === 'background',
+    );
+    if (background === undefined || background.kind !== 'element') return undefined;
+    const fill = background.children.find(
+      (child) => child.kind === 'element' && child.localName === 'color',
+    );
+    if (fill === undefined || fill.kind !== 'element') return undefined;
+    const value = fill.attributes.find((attribute) => attribute.localName === 'val')?.value;
+    return value === undefined || value === 'auto' ? undefined : `#${value.toLowerCase()}`;
+  };
+
   const paint = (): void => {
     const active = session;
     if (active === undefined) return;
     const previous = renderedDocument;
     const provider = options.render?.imageProvider ?? defaultImageProvider;
+    const documentBackground = pageBackgroundOf(model);
     renderedDocument = renderDocument(active.layout, rendered, {
       ...options.render,
+      ...(documentBackground === undefined ? {} : { pageBackground: documentBackground }),
       ...(provider === undefined ? {} : { imageProvider: provider }),
       zoom,
       viewMode,

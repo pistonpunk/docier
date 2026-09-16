@@ -16,12 +16,6 @@ const NO_PART = (part: string): string =>
   `This build cannot create a ${part} part from the editing layer; it edits only the parts the document already has`;
 const REFUSALS: readonly Refusal[] = [
   {
-    id: 'docier.command.doc.setPageBackground',
-    label: 'Page colour',
-    category: 'doc',
-    reason: 'A page colour is a w:background element on the document root, which the undo history does not cover',
-  },
-  {
     id: 'docier.command.doc.setWatermark',
     label: 'Watermark',
     category: 'doc',

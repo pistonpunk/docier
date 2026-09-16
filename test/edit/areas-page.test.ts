@@ -255,3 +255,55 @@ describe('page and section commands', () => {
     });
   });
 });
+
+describe('the page colour', () => {
+  const rootOf = (handle: EditorHandle): string =>
+    serializeXmlNode(handle.document!.body().element.parent!);
+
+  it('writes a w:background on the document root, before the body', async () => {
+    const handle = await editorOf(FIXTURE);
+    const result = await handle.commands.execute('docier.command.doc.setPageBackground', {
+      color: 'FFF2CC',
+    });
+    expect(result.status).toBe('ok');
+
+    const xml = rootOf(handle);
+    expect(xml).toContain('<w:background><w:color w:val="FFF2CC"/></w:background>');
+    expect(xml.indexOf('<w:background')).toBeLessThan(xml.indexOf('<w:body'));
+  });
+
+  it('paints it as the page background', async () => {
+    const handle = await editorOf(FIXTURE);
+    await handle.commands.execute('docier.command.doc.setPageBackground', { color: 'FFF2CC' });
+    const sheet = handle.root.querySelector<HTMLElement>('[data-docier-page]');
+    expect(sheet?.style.backgroundColor).toBe('rgb(255, 242, 204)');
+  });
+
+  it('clears it again with none', async () => {
+    const handle = await editorOf(FIXTURE);
+    await handle.commands.execute('docier.command.doc.setPageBackground', { color: 'FFF2CC' });
+    await handle.commands.execute('docier.command.doc.setPageBackground', { color: 'none' });
+    expect(rootOf(handle)).not.toContain('w:background');
+  });
+
+  it('covers the root in the undo history, which is why it used to be refused', async () => {
+    const handle = await editorOf(FIXTURE);
+    const before = rootOf(handle);
+
+    await handle.commands.execute('docier.command.doc.setPageBackground', { color: 'CCE5FF' });
+    expect(rootOf(handle)).toContain('CCE5FF');
+
+    await handle.commands.execute('docier.command.history.undo');
+    expect(rootOf(handle)).toBe(before);
+    const sheet = handle.root.querySelector<HTMLElement>('[data-docier-page]');
+    expect(sheet?.style.backgroundColor).not.toBe('rgb(204, 229, 255)');
+  });
+
+  it('refuses a colour that is not six hexadecimal digits', async () => {
+    const handle = await editorOf(FIXTURE);
+    expect(handle.commands.isEnabled('docier.command.doc.setPageBackground')).toBe(false);
+    expect(
+      handle.commands.disabledReason('docier.command.doc.setPageBackground', { color: 'red' }),
+    ).toContain('six hexadecimal digits');
+  });
+});

@@ -97,6 +97,23 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="2" y="2.5" width="12" height="4.5" rx="1"/>' +
     '<rect x="2" y="9" width="12" height="4.5" rx="1"/>' +
     '<path d="M8 7v2"/>',
+  'doc.setPageBackground':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/>' +
+    '<path d="M2.5 9.5h11"/><path d="M6 13.5V9.5"/><path d="M11 9.5v4"/>',
+  'pagecolours:FFF2CC':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
+  'pagecolours:FFFFFF':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
+  'pagecolours:E2EFDA':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
+  'pagecolours:DEEBF7':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
+  'pagecolours:FCE4EC':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
+  'pagecolours:F2F2F2':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/>',
+  'pagecolours:none':
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M2.5 9.5h11"/><path d="m3 13 10-10"/>',
   'table.formula':
     '<path d="M2.5 3.5h6"/><path d="M5.5 3.5v9"/><path d="M2.5 12.5h6"/>' +
     '<path d="M9.5 6.5h4"/><path d="M9.5 9.5h4"/><path d="M9.5 12.5h4"/>',
