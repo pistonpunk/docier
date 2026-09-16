@@ -348,17 +348,20 @@ export const insertionPoint = (
   };
 };
 
+export type RevisionEvent = 'ins' | 'del' | 'moveFrom' | 'moveTo';
+
 export interface RevisionMark {
   readonly author: string;
   readonly date: string;
   readonly id: number;
+  readonly event?: RevisionEvent | undefined;
 }
 
 const REVISION_KIND_ATTRIBUTE = 'author';
 
 const revisionElement = (
   parent: XmlElement,
-  kind: 'ins' | 'del',
+  kind: RevisionEvent,
   mark: RevisionMark,
 ): XmlElement => {
   const element = createWElement(parent, kind);
@@ -376,7 +379,7 @@ const wrapInRevision = (
   parent: XmlElement,
   index: number,
   run: XmlElement,
-  event: 'ins' | 'del',
+  event: RevisionEvent,
   mark: RevisionMark,
 ): void => {
   const previous = parent.children[index - 1];
@@ -419,7 +422,7 @@ export const insertTextAt = (
   appendText(run, text);
   if (patch !== undefined) applyRunPatchToElement(run, patch);
   if (revision !== undefined) {
-    wrapInRevision(point.parent, point.index, run, 'ins', revision);
+    wrapInRevision(point.parent, point.index, run, revision.event ?? 'ins', revision);
   }
   model.context.forgetSubtree(paragraph);
   return true;
@@ -477,7 +480,7 @@ const markRunDeleted = (run: XmlElement, mark: RevisionMark): void => {
     run.children[run.children.indexOf(child)] = replacement;
   }
   if (run.children.length === 0) return;
-  const wrapper = revisionElement(parent, 'del', mark);
+  const wrapper = revisionElement(parent, mark.event ?? 'del', mark);
   insertChild(parent, index, wrapper);
   wrapper.children.push(run);
   run.parent = wrapper;
@@ -536,6 +539,40 @@ const recordDeletionIn = (
   const target = from === 0 ? run : splitRunAt(run, from);
   if (target === undefined) return;
   markRunDeleted(target, mark);
+};
+
+// wraps the runs a range covers, which is how the far end of a move is marked
+export const wrapRangeAsRevision = (
+  model: DocumentModel,
+  paragraph: XmlElement,
+  start: number,
+  end: number,
+  mark: RevisionMark,
+): boolean => {
+  const event = mark.event ?? 'ins';
+  const covered: XmlElement[] = [];
+  for (const span of runSpans(model, paragraph)) {
+    const from = Math.max(span.start, start);
+    const to = Math.min(span.end, end);
+    if (to <= from) continue;
+    if (from <= span.start && to >= span.end) {
+      covered.push(span.element);
+      continue;
+    }
+    const piece = from <= span.start ? span.element : splitRunAt(span.element, from - span.start);
+    if (piece === undefined) continue;
+    if (to - from < contentLength(piece)) splitRunAt(piece, to - from);
+    covered.push(piece);
+  }
+  let changed = false;
+  for (const run of covered) {
+    const parent = run.parent;
+    if (parent === undefined || isWElement(parent, event)) continue;
+    wrapInRevision(parent, indexOfChild(parent, run), run, event, mark);
+    changed = true;
+  }
+  if (changed) model.context.forgetSubtree(paragraph);
+  return changed;
 };
 
 export const splitParagraphAt = (

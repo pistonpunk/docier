@@ -24,6 +24,7 @@ import type { InsertOptions, InsertResult } from './insert.js';
 import { plainTextOfNodes } from './text.js';
 import { readFromData, writeSystemClipboardText, writeToData } from './transfer.js';
 import type { ClipboardBuffer, ClipboardRead } from './transfer.js';
+import type { RevisionMark } from '../mutation.js';
 import type {
   ClipboardDataLike,
   ClipboardDegradation,
@@ -163,7 +164,12 @@ const insertInto = (
   host: ClipboardCommandHost,
   options: Omit<InsertOptions, 'model' | 'session'>,
 ): InsertResult => {
-  let result: InsertResult = { changed: false, caret: undefined, degraded: [] };
+  let result: InsertResult = {
+    changed: false,
+    caret: undefined,
+    inserted: undefined,
+    degraded: [],
+  };
   host.session.changeRegions(() => {
     result = insertFragment({ model: host.session.model, session: host.session, ...options });
   });
@@ -222,6 +228,7 @@ const applyPaste = (
   const degraded = [...chosen.degraded, ...result.degraded];
   if (degraded.length > 0) host.announceDegraded(degraded);
   if (!result.changed) return false;
+  markMoveDestination(host, result);
   const caret = result.caret;
   commit(host, ctx, caret === undefined ? undefined : caretSelection(caret, 'downstream'));
   return true;
@@ -306,9 +313,26 @@ const runCopy = (
   const degraded = publishPayload(host, payload, args.data);
   host.announceCopied(payloadFlavours(payload), degraded);
   if (!remove) return undefined;
-  if (!host.session.deleteRange(range)) return NOOP;
+  // a cut under track changes is the source half of a move; the id it leaves in
+  // the buffer is what a paste back into this document completes
+  const tracking = host.session.model.settings?.trackChanges === true;
+  const move = tracking ? host.session.revisionMark('moveFrom') : undefined;
+  host.buffer.rememberMove(move?.id);
+  if (!host.session.deleteRange(range, move)) return NOOP;
   commit(host, ctx, caretSelection(range.start, 'downstream'));
   return undefined;
+};
+
+const markMoveDestination = (host: ClipboardCommandHost, result: InsertResult): void => {
+  const id = host.buffer.moveId();
+  if (id === undefined || result.inserted === undefined) return;
+  if (host.session.model.settings?.trackChanges !== true) return;
+  const range = result.inserted;
+  host.buffer.rememberMove(undefined);
+  const mark: RevisionMark = { ...host.session.revisionMark('moveTo'), id };
+  host.session.changeRegions(() => {
+    host.session.markRange(range, mark);
+  });
 };
 
 const runMove = (

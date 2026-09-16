@@ -12,19 +12,28 @@ import { decodeFragment, encodeFragment } from './fragment.js';
 export interface ClipboardBuffer {
   remember(payload: ClipboardPayload): void;
   recalled(): ClipboardPayload | undefined;
+  rememberMove(id: number | undefined): void;
+  moveId(): number | undefined;
   clear(): void;
   readonly hasContent: boolean;
 }
 
 export const createClipboardBuffer = (): ClipboardBuffer => {
   let stored: ClipboardPayload | undefined;
+  let move: number | undefined;
   return {
     remember: (payload) => {
       stored = payload;
     },
     recalled: () => stored,
+    // the id that ties a cut to the paste that completes the move
+    rememberMove: (id) => {
+      move = id;
+    },
+    moveId: () => move,
     clear: () => {
       stored = undefined;
+      move = undefined;
     },
     get hasContent(): boolean {
       return stored !== undefined;

@@ -185,3 +185,49 @@ describe('the author a revision is attributed to', () => {
     expect(body(handle)).toContain('w:author="docier"');
   });
 });
+
+describe('recording a move', () => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+  const tracking = (body: string) =>
+    editorOfSpec({
+      body,
+      settings: `${DECL}<w:settings xmlns:w="${W}"><w:trackChanges/></w:settings>`,
+      documentRelationships: [settingsRelationship()],
+    });
+
+  it('marks a cut as a move and the paste that answers it as its destination', async () => {
+    const handle = await tracking('<w:p><w:r><w:t>alpha beta gamma</w:t></w:r></w:p>');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    await handle.commands.execute('docier.command.selection.extendTo', { pos: pos(11) });
+
+    const cut = await handle.commands.execute('docier.command.clipboard.cut');
+    expect(cut.status).toBe('ok');
+    const afterCut = body(handle);
+    // the cut is a move, not a plain deletion
+    expect(afterCut).toContain('<w:moveFrom');
+    expect(afterCut).not.toContain('<w:del ');
+
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    const pasted = await handle.commands.execute('docier.command.clipboard.paste', {
+      text: ' beta',
+    });
+    expect(pasted.status).toBe('ok');
+
+    const xml = body(handle);
+    const from = /<w:moveFrom w:id="(\d+)"/.exec(xml)?.[1];
+    const to = /<w:moveTo w:id="(\d+)"/.exec(xml)?.[1];
+    expect(from).toBeDefined();
+    expect(to).toBeDefined();
+    // the two halves of one move share its id
+    expect(to).toBe(from);
+
+    // and rejecting the move puts the text back where it came from
+    await handle.commands.execute('docier.command.doc.rejectChange', { all: true });
+    const settled = body(handle);
+    expect(settled).not.toContain('<w:moveFrom');
+    expect(settled).not.toContain('<w:moveTo');
+    expect(texts(handle)).toContain('alpha beta gamma');
+  });
+});

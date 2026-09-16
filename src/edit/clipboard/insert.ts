@@ -1,4 +1,4 @@
-import type { DocPos } from '../../layout/index.js';
+import type { DocPos, DocRange } from '../../layout/index.js';
 import { docPos } from '../../layout/index.js';
 import type { DocumentModel } from '../../model/index.js';
 import {
@@ -15,7 +15,7 @@ import { cloneNode, indexOfChild, insertChild, removeChild } from '../../ooxml/x
 import { splitParagraphAt } from '../mutation.js';
 import type { EditSession } from '../session.js';
 import { appendWElement } from './fragment.js';
-import { logicalLengthOfNodes, logicalLengthOfParagraph } from './text.js';
+import { logicalLengthOfNodes, logicalLengthOfParagraph, plainTextOfNodes } from './text.js';
 import type {
   ClipboardDegradation,
   ClipboardFragment,
@@ -37,10 +37,16 @@ export interface InsertOptions {
 export interface InsertResult {
   readonly changed: boolean;
   readonly caret: DocPos | undefined;
+  readonly inserted: DocRange | undefined;
   readonly degraded: readonly ClipboardDegradation[];
 }
 
-const NO_CHANGE: InsertResult = { changed: false, caret: undefined, degraded: [] };
+const NO_CHANGE: InsertResult = {
+  changed: false,
+  caret: undefined,
+  inserted: undefined,
+  degraded: [],
+};
 
 const degrade = (
   list: ClipboardDegradation[],
@@ -322,6 +328,20 @@ export const insertFragment = (options: InsertOptions): InsertResult => {
   applyPolicies(model, created, fragment.relationships, before, degraded);
   model.context.forgetSubtree(parent);
   session.markChanged();
-  const caret = docPos((target.slot.start as number) + target.offset + inserted);
-  return { changed: true, caret, degraded };
+  // what arrived is the logical length of everything the insert created, which
+  // is not the same as the paragraph it lands in growing: a text-only paste
+  // leaves the mark and everything else in the paragraph it split
+  // what arrived is the text the fragment carries, counted with a mark for
+  // every paragraph it brought: the nodes it creates are not always the ones
+  // the paragraph-length helpers can measure
+  const landed =
+    inserted > 0
+      ? inserted
+      : fragment.blocks.reduce(
+          (total, block) => total + plainTextOfNodes(childElements(block)).length + 1,
+          plainTextOfNodes(fragment.tail).length,
+        );
+  const from = docPos((target.slot.start as number) + target.offset);
+  const caret = docPos((from as number) + landed);
+  return { changed: true, caret, inserted: { start: from, end: caret }, degraded };
 };

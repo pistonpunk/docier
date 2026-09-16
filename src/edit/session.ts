@@ -1,4 +1,5 @@
-import type { RevisionMark } from './mutation.js';
+import type { RevisionEvent, RevisionMark } from './mutation.js';
+import { wrapRangeAsRevision } from './mutation.js';
 import type { CellRef, DocPos, DocRange, LayoutResult, StoryId } from '../layout/index.js';
 import { docPos, layoutDocument } from '../layout/index.js';
 import type { LayoutOptions } from '../layout/index.js';
@@ -133,7 +134,9 @@ export interface EditSession {
   markChanged(): void;
   insertText(range: DocRange, text: string, patch?: RunFormatPatch): boolean;
   insertBreak(range: DocRange, kind?: 'line' | 'page' | 'column'): boolean;
-  deleteRange(range: DocRange): boolean;
+  deleteRange(range: DocRange, mark?: RevisionMark): boolean;
+  revisionMark(event: RevisionEvent): RevisionMark;
+  markRange(range: DocRange, mark: RevisionMark): boolean;
   splitAt(pos: DocPos): boolean;
   joinAt(pos: DocPos): boolean;
   joinWithPrevious(pos: DocPos): boolean;
@@ -505,13 +508,14 @@ export const createEditSession = (
   let author = identity;
   let nextRevisionId = 1;
 
-  const revisionFor = (): RevisionMark | undefined => {
+  const revisionFor = (event: RevisionEvent = 'ins'): RevisionMark | undefined => {
     if (model.settings?.trackChanges !== true) return undefined;
     nextRevisionId += 1;
     return {
       author: author.name,
       date: new Date().toISOString(),
       id: nextRevisionId,
+      event,
     };
   };
   let layoutOptions = initialLayoutOptions;
@@ -713,6 +717,31 @@ export const createEditSession = (
     layoutOptions,
     spansContainers,
     crossing,
+    revisionMark: (event) => {
+      nextRevisionId += 1;
+      return {
+        author: author.name,
+        date: new Date().toISOString(),
+        id: nextRevisionId,
+        event,
+      };
+    },
+    markRange: (range, mark) => {
+      const bounds = splitBoundaries(range);
+      if (bounds === undefined) return false;
+      const first = bounds.first;
+      const last = bounds.last;
+      let changed = false;
+      for (const slot of slots()) {
+        if (slot.container !== first.slot.container) continue;
+        if (slot.index < first.slot.index || slot.index > last.slot.index) continue;
+        const from = slot.index === first.slot.index ? first.offset : 0;
+        const to = slot.index === last.slot.index ? last.offset : slot.length;
+        if (wrapRangeAsRevision(model, slot.element, from, to, mark)) changed = true;
+      }
+      if (changed) markMutated(bodyStoryId);
+      return changed;
+    },
     insertText: (range, text, patch) => {
       const target = resolve(range.start);
       if (target === undefined || text === '') return false;
@@ -734,7 +763,7 @@ export const createEditSession = (
       if (changed) markMutated(target.slot.story);
       return changed;
     },
-    deleteRange: (range) => {
+    deleteRange: (range, mark) => {
       if ((range.end as number) <= (range.start as number)) return false;
       const bounds = splitBoundaries(range);
       if (bounds === undefined) return false;
@@ -742,7 +771,7 @@ export const createEditSession = (
       const first = bounds.first;
       const last = bounds.last;
       if (first.slot.container !== last.slot.container) return false;
-      const revision = revisionFor();
+      const revision = mark ?? revisionFor('del');
       const changed =
         first.slot.index === last.slot.index
           ? deleteRangeIn(model, first.slot.element, first.offset, last.offset, revision)
