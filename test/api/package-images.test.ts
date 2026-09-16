@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createEditor } from '../../src/api/editor.js';
 import type { EditorHandle } from '../../src/api/editor.js';
+import { escapeHtml } from '../../src/edit/clipboard/html-export.js';
 import { MISSING_IMAGE_LABEL } from '../../src/render/inline-object.js';
 import { openModel } from '../model/support.js';
 import {
@@ -89,5 +90,17 @@ describe('pictures render without a host-supplied provider', () => {
 
     expect(paintedImages(handle)).toHaveLength(1);
     expect(asked).toBeGreaterThan(0);
+  });
+});
+
+describe('escaping the exported html', () => {
+  it('escapes a document id that tries to close the title element', () => {
+    expect(escapeHtml('</title><script>alert(1)</script>')).toBe(
+      '&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;',
+    );
+  });
+
+  it('escapes the attribute-significant characters too', () => {
+    expect(escapeHtml(`a"b'c&d`)).toBe('a&quot;b&#39;c&amp;d');
   });
 });

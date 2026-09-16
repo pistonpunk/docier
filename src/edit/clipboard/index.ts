@@ -51,7 +51,7 @@ export {
   writeSystemClipboardText,
   writeToData,
 } from './transfer.js';
-export { generatorMeta, htmlOfFragment, htmlOfNode, htmlOfParagraph } from './html-export.js';
+export { escapeHtml, generatorMeta, htmlOfFragment, htmlOfNode, htmlOfParagraph } from './html-export.js';
 export { importHtml } from './html-import.js';
 export type {
   ClipboardCommandArgs,

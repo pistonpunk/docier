@@ -6,10 +6,12 @@ const ESCAPES: Readonly<Record<string, string>> = {
   '&': '&amp;',
   '<': '&lt;',
   '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
 };
 
-const escapeHtml = (value: string): string =>
-  value.replace(/[&<>]/g, (character) => ESCAPES[character] ?? character);
+export const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (character) => ESCAPES[character] ?? character);
 
 const TWIPS_PER_POINT = 20;
 

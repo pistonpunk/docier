@@ -27,7 +27,7 @@ import { attachInput } from '../edit/input.js';
 import type { InputHandle, InputHost } from '../edit/input.js';
 import { installAreaCommands } from '../edit/areas/index.js';
 import type { DocumentAreaHost } from '../edit/areas/index.js';
-import { generatorMeta, htmlOfNode } from '../edit/clipboard/index.js';
+import { escapeHtml, generatorMeta, htmlOfNode } from '../edit/clipboard/index.js';
 import { DOCX_MIME } from '../edit/clipboard/types.js';
 import { beginPrint } from '../render/index.js';
 import { installClipboardCommands } from '../edit/clipboard/commands.js';
@@ -492,8 +492,8 @@ export const createEditor = (
     for (const block of active.body().blocks()) {
       parts.push(htmlOfNode(block.element));
     }
-    return `<!doctype html><html><head><meta charset="utf-8">${generatorMeta()}<title>${fileName(
-      'html',
+    return `<!doctype html><html><head><meta charset="utf-8">${generatorMeta()}<title>${escapeHtml(
+      fileName('html'),
     )}</title></head><body>${parts.join('')}</body></html>`;
   };
 
