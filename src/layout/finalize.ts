@@ -144,10 +144,43 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
   let lineId = request.lineIdStart;
   let y = request.boxTop;
 
+  const topAndBottomBands = (): readonly Rect[] => {
+    const bands: Rect[] = [];
+    for (const line of block.lines) {
+      for (const item of line.placed) {
+        const anchor = item.measured.atom.object?.anchor;
+        if (anchor === undefined || anchor.wrap !== 'topAndBottom') continue;
+        if (anchor.vertical !== 'paragraph') continue;
+        const object = item.measured.atom.object;
+        if (object === undefined) continue;
+        bands.push({
+          x: request.x,
+          y: mp(request.boxTop + anchor.y),
+          width: request.width,
+          height: object.height,
+        });
+      }
+    }
+    return bands;
+  };
+  const bands = topAndBottomBands();
+  const pushedPast = (lineTop: Mp, lineBottom: Mp, width: Mp): Mp => {
+    let pushed = lineTop;
+    for (const band of bands) {
+      const bottom = mp(band.y + band.height);
+      if (bottom <= pushed) continue;
+      if (band.y >= lineBottom) continue;
+      if (band.width < width) continue;
+      pushed = bottom;
+    }
+    return pushed;
+  };
+
   for (let index = request.lineStart; index < request.lineEnd; index += 1) {
     const line = block.lines[index];
     if (line === undefined) continue;
     const geometry = line.geometry;
+    y = pushedPast(y, mp(y + geometry.height), geometry.width);
     const baselineY = mp(y + geometry.aboveBaseline);
     const markPos = docPos((block.docRange.end as number) - 1);
     const end = lineEndOf(line, markPos);

@@ -101,3 +101,102 @@ describe('an anchored drawing in a laid-out document', () => {
     expect(objects[0]?.width).toBe(0);
   });
 });
+
+describe('top and bottom wrap', () => {
+  const floatIn = (options: {
+    readonly wrap: string;
+    readonly relativeV?: string;
+    readonly offsetY?: number;
+    readonly heightEmu?: number;
+  }): string =>
+    bodyOf(
+      '<w:p>' +
+        `<w:r>${anchorDrawing({
+          wrap: options.wrap,
+          relativeV: options.relativeV ?? 'paragraph',
+          offsetY: options.offsetY ?? 0,
+        })}<w:t xml:space="preserve">first</w:t></w:r>` +
+        '</w:p>',
+      paragraphText('second'),
+      paragraphText('third'),
+    );
+
+  const lineTops = (result: Awaited<ReturnType<typeof layoutOf>>): readonly number[] =>
+    result.pages[0]?.blocks.flatMap((block) => block.lines.map((line) => line.box.y as number)) ?? [];
+
+  // the same three paragraphs with nothing floating over them
+  const baseline = async (): Promise<readonly number[]> =>
+    lineTops(
+      await layoutOf(
+        bodyOf(
+          '<w:p><w:r><w:t xml:space="preserve">first</w:t></w:r></w:p>',
+          paragraphText('second'),
+          paragraphText('third'),
+        ),
+      ),
+    );
+
+  const longParagraph = (wrapXml: string): string =>
+    bodyOf(
+      '<w:p>' +
+        `<w:r>${wrapXml}<w:t xml:space="preserve">${'word '.repeat(40)}</w:t></w:r>` +
+        '</w:p>',
+    );
+
+  it('pushes the lines after a float past it, inside the paragraph it sits in', async () => {
+    const float = anchorDrawing({
+      wrap: 'TopAndBottom',
+      relativeV: 'paragraph',
+      offsetY: 0,
+    });
+    const wrapped = await layoutOf(longParagraph(float));
+    const plain = await layoutOf(longParagraph(''));
+    const wrappedLines = wrapped.pages[0]?.blocks[0]?.lines ?? [];
+    const plainLines = plain.pages[0]?.blocks[0]?.lines ?? [];
+    expect(plainLines.length).toBeGreaterThan(2);
+
+    // the first line sits above the float and the second is pushed below it
+    const floatBottom = 457200 / 360;
+    const second = wrappedLines[1]?.box.y ?? 0;
+    const plainSecond = plainLines[1]?.box.y ?? 0;
+    expect(second).toBeGreaterThan(plainSecond);
+    expect(second).toBeGreaterThanOrEqual(floatBottom);
+  });
+
+  it('starts every line below a float anchored at the top of the paragraph', async () => {
+    const float = anchorDrawing({ wrap: 'TopAndBottom', relativeV: 'paragraph', offsetY: 0 });
+    const wrapped = await layoutOf(longParagraph(float));
+    const lines = wrapped.pages[0]?.blocks[0]?.lines ?? [];
+    const floatBottom = 457200 / 360;
+    // a top-and-bottom float leaves no room beside it, so nothing sits next to it
+    for (const line of lines) {
+      expect(line.box.y as number).toBeGreaterThanOrEqual(floatBottom);
+    }
+  });
+
+  it('leaves a paragraph with room above the float to start at its usual place', async () => {
+    const float = anchorDrawing({ wrap: 'TopAndBottom', relativeV: 'paragraph', offsetY: 0 });
+    const tall = anchorDrawing({ wrap: 'TopAndBottom', relativeV: 'paragraph', offsetY: 0 });
+    const wrapped = await layoutOf(longParagraph(float));
+    const plain = await layoutOf(longParagraph(''));
+    expect(tall.length).toBeGreaterThan(0);
+    // the paragraph still has as many lines as it would have; they have moved
+    expect(wrapped.pages[0]?.blocks[0]?.lines.length).toBe(
+      plain.pages[0]?.blocks[0]?.lines.length,
+    );
+  });
+
+  it('leaves the text alone when the wrap is none', async () => {
+    expect(lineTops(await layoutOf(floatIn({ wrap: 'None' })))).toEqual(await baseline());
+  });
+
+  it('leaves the text alone when the wrap is square, which is not applied yet', async () => {
+    expect(lineTops(await layoutOf(floatIn({ wrap: 'Square' })))).toEqual(await baseline());
+  });
+
+  it('leaves the text alone when the float is anchored to the page, which has no page yet', async () => {
+    expect(
+      lineTops(await layoutOf(floatIn({ wrap: 'TopAndBottom', relativeV: 'page', offsetY: 100000 }))),
+    ).toEqual(await baseline());
+  });
+});
