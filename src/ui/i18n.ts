@@ -440,6 +440,12 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.dialog.notImplemented': '{name} is not available yet',
   'ui.dialog.goToPage': 'Go To Page',
   'ui.dialog.wordCount': 'Word Count',
+  'ui.wordCount.pages': 'Pages',
+  'ui.wordCount.words': 'Words',
+  'ui.wordCount.characters': 'Characters (no spaces)',
+  'ui.wordCount.charactersSpaced': 'Characters (with spaces)',
+  'ui.wordCount.paragraphs': 'Paragraphs',
+  'ui.wordCount.lines': 'Lines',
   'ui.dialog.setLanguage': 'Set Language',
   'ui.dialog.save': 'Save',
 };

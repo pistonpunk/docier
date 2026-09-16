@@ -220,6 +220,14 @@ const harness = (): Harness => {
 
   const context: ChromeContext = {
     commands: {} as unknown as CommandRegistry,
+    statistics: () => ({
+      pages: 0,
+      words: 0,
+      characters: 0,
+      charactersNoSpaces: 0,
+      paragraphs: 0,
+      lines: 0,
+    }),
     get state(): ChromeState {
       return state;
     },

@@ -6,6 +6,7 @@ export const PICTURE_DIALOG_NAME = 'picture';
 export const FIND_DIALOG_NAME = 'find';
 export const TABLE_DIALOG_NAME = 'table';
 export const BORDERS_DIALOG_NAME = 'borders';
+export const WORD_COUNT_DIALOG_NAME = 'wordCount';
 
 export const DIALOG_LABEL_KEYS: Readonly<Record<string, string>> = {
   goToPage: 'ui.dialog.goToPage',

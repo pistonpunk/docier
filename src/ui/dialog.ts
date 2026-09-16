@@ -11,6 +11,7 @@ import {
   FIND_DIALOG_NAME,
   TABLE_DIALOG_NAME,
   BORDERS_DIALOG_NAME,
+  WORD_COUNT_DIALOG_NAME,
 } from './dialog-names.js';
 export {
   FONT_DIALOG_NAME,
@@ -32,6 +33,7 @@ import {
 } from './insert-dialogs.js';
 import type { InsertDialogOptions } from './insert-dialogs.js';
 import { createParagraphDialog } from './paragraph-dialog.js';
+import { createWordCountDialog } from './word-count-dialog.js';
 import { createDisposableStore, markPart, make, setText } from './dom.js';
 import type { DisposableStore } from './dom.js';
 import { UNIT_SPECS } from './ruler.js';
@@ -863,6 +865,9 @@ export const DIALOG_ALIASES: Readonly<Record<string, string>> = {
   'table.propertiesDialog': TABLE_DIALOG_NAME,
   'docier.command.table.setProperties': TABLE_DIALOG_NAME,
   'table.setProperties': TABLE_DIALOG_NAME,
+  [WORD_COUNT_DIALOG_NAME]: WORD_COUNT_DIALOG_NAME,
+  'docier.command.proof.wordCount': WORD_COUNT_DIALOG_NAME,
+  'proof.wordCount': WORD_COUNT_DIALOG_NAME,
 };
 
 export const dialogNameFor = (dialog: string): string | undefined => DIALOG_ALIASES[dialog];
@@ -909,6 +914,15 @@ export const createEditorDialog = (
   }
   if (request.dialog === BORDERS_DIALOG_NAME) {
     return createBordersDialog({
+      context,
+      mount: request.mount,
+      onClose: request.onClose,
+      placement: request.placement,
+      width: request.width,
+    });
+  }
+  if (request.dialog === WORD_COUNT_DIALOG_NAME) {
+    return createWordCountDialog({
       context,
       mount: request.mount,
       onClose: request.onClose,

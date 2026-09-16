@@ -10,11 +10,10 @@ import {
 import type { UiNode } from '../../src/ui/menu-model.js';
 import { dialogNameFor } from '../../src/ui/dialog.js';
 
-// One row still opens a dialog this build has not written, and it is named here
-// rather than left to be rediscovered: Word Count wants the counts dialog
-// described in the progress file, not a different row. Anything else appearing
-// in this list is a row that should be running its command.
-const STILL_OPEN = ['docier.command.proof.wordCount'];
+// Nothing is left. Every row that opens a dialog either names one this build
+// has, or names a command it should be running. Keep this empty: a row added
+// here is a row that should be running its command instead.
+const STILL_OPEN: readonly string[] = [];
 
 const everyNode = (nodes: readonly UiNode[]): readonly UiNode[] => {
   const found: UiNode[] = [];

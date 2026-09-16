@@ -121,12 +121,6 @@ const REFUSALS: readonly Refusal[] = [
     category: 'proof',
     reason: 'This build ships no thesaurus provider',
   },
-  {
-    id: 'docier.command.proof.wordCount',
-    label: 'Word count',
-    category: 'proof',
-    reason: 'Word count is reported by the status bar; this build has no word count dialog',
-  },
 
   {
     id: 'docier.command.view.setGridlines',

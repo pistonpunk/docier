@@ -7,10 +7,11 @@ import { DEFAULT_ZOOM } from '../api/constants.js';
 import { ATTR } from '../render/dom.js';
 import { tableOf } from '../edit/tables.js';
 import type { RulerIndents } from './ruler.js';
-import type { ContextSurface, SaveState } from './types.js';
+import type { ContextSurface, DocumentStatistics, SaveState } from './types.js';
 
 export interface EditorQueries {
   readonly words: () => number;
+  readonly statistics: () => DocumentStatistics;
   readonly page: () => number;
   readonly pages: () => number;
   readonly zoom: () => number;
@@ -105,6 +106,36 @@ export const countWords = (handle: EditorHandle): number => {
   return total;
 };
 
+export const statisticsOf = (handle: EditorHandle): DocumentStatistics => {
+  const session = handle.session;
+  if (session === undefined) {
+    return { pages: 0, words: 0, characters: 0, charactersNoSpaces: 0, paragraphs: 0, lines: 0 };
+  }
+  let words = 0;
+  let characters = 0;
+  let charactersNoSpaces = 0;
+  for (const span of session.index.paragraphs) {
+    const text = blockText(span);
+    characters += text.length;
+    charactersNoSpaces += text.replace(/\s/g, '').length;
+    for (const run of wordRuns(text)) {
+      if (run.word) words += 1;
+    }
+  }
+  let lines = 0;
+  for (const page of session.layout.pages) {
+    for (const block of page.blocks) lines += block.lines.length;
+  }
+  return {
+    pages: session.layout.pages.length,
+    words,
+    characters,
+    charactersNoSpaces,
+    paragraphs: session.index.paragraphs.length,
+    lines,
+  };
+};
+
 export const createEditorQueries = (
   handle: EditorHandle,
   options?: EditorQueryOptions,
@@ -140,6 +171,7 @@ export const createEditorQueries = (
 
   const self: Omit<EditorQueries, 'setSurface'> = {
     words: () => countWords(handle),
+    statistics: () => statisticsOf(handle),
     page: () => {
       const session = handle.session;
       if (session === undefined) return 1;
@@ -190,6 +222,7 @@ export const createEditorQueries = (
 
 export const NO_QUERIES: EditorQueries = {
   words: () => 0,
+  statistics: () => ({ pages: 0, words: 0, characters: 0, charactersNoSpaces: 0, paragraphs: 0, lines: 0 }),
   page: () => 1,
   pages: () => 1,
   zoom: () => DEFAULT_ZOOM,

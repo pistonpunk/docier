@@ -976,13 +976,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         nodes: [
           pending('proof.spelling', 'ui.control.spelling', 'SP'),
           pending('proof.thesaurus', 'ui.control.thesaurus', 'TH'),
-          button({
-            labelKey: 'ui.control.wordCount',
-            command: command('proof.wordCount'),
-            keytip: 'WC',
-            action: 'openDialog',
-            actionArgs: { dialog: command('proof.wordCount') },
-          }),
+          opensDialog('docier.command.proof.wordCount', 'wordCount', 'ui.control.wordCount', 'WC'),
         ],
       },
       {

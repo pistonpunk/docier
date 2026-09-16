@@ -336,12 +336,29 @@ describe('dialogs', () => {
     expect(live?.textContent).toContain('styles');
   });
 
+  it('opens the word count dialog from the status bar and counts the document', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    chrome.context.run('openDialog', { dialog: 'wordCount' });
+    const dialog = document.querySelector<HTMLElement>('[data-docier-dialog]');
+    expect(dialog).not.toBeNull();
+    const shown = dialog?.textContent ?? '';
+    expect(shown).toContain('Word Count');
+    for (const label of ['Pages', 'Words', 'Characters (with spaces)', 'Paragraphs', 'Lines']) {
+      expect(shown).toContain(label);
+    }
+    const stats = chrome.context.statistics();
+    expect(stats.pages).toBeGreaterThan(1);
+    expect(stats.words).toBeGreaterThan(20);
+    expect(stats.characters).toBeGreaterThan(stats.charactersNoSpaces);
+    expect(stats.lines).toBeGreaterThanOrEqual(stats.paragraphs);
+  });
+
   it('names the dialog a reader asked for, not the identifier behind it', async () => {
     const { chrome } = await mountWith(longBody(), { mode: 'full' });
-    // the status bar asks for wordCount, goToPage, setLanguage and save, none of
-    // which are built, and the message used to show those identifiers verbatim
+    // the status bar asks for goToPage, setLanguage and save, none of which are
+    // built, and the message used to show those identifiers verbatim. wordCount
+    // used to be among them and now has a dialog, so it is no longer a message
     for (const [requested, label] of [
-      ['wordCount', 'Word Count'],
       ['goToPage', 'Go To Page'],
       ['setLanguage', 'Set Language'],
       ['save', 'Save'],

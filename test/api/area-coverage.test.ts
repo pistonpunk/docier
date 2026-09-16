@@ -120,9 +120,12 @@ describe('chrome command coverage', () => {
 
     // the number rises whenever a menu entry is wired from a dialog stub to the
     // command it names, or when a menu row that named nothing gains a command.
-    // The last rise was Paste Special, which the page context menu asked for by a
-    // name nothing carried: it is now declared as a refusal, so the registry knows
-    // it and the row is pruned rather than opening a dialog that does not exist.
+    // The last fall was Word Count: the ribbon row named a command that only ever
+    // opened a dialog, and now it is a dialog row with no command behind it.
+    // Before that the last rise was Paste Special, which the page context menu
+    // asked for by a name nothing carried: it is now declared as a refusal, so the
+    // registry knows it and the row is pruned rather than opening a dialog that
+    // does not exist.
     // Before that, Group and Ungroup became real commands rather than one
     // refusal, and before that Change Case, a new Home > Font menu of five modes.
     // The last fall was Table Properties: the ribbon and the context menu used to
@@ -131,7 +134,7 @@ describe('chrome command coverage', () => {
     // Before that it was the whole field set behind Insert > Field, and before
     // that Find and Replace, which open the find dialog instead of being executed
     // from the ribbon, so the dialog dispatches them rather than the chrome
-    expect(registered).toBe(142);
+    expect(registered).toBe(141);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -223,9 +226,10 @@ describe('the chrome does not show placeholders', () => {
 describe('deliberately unavailable commands', () => {
   it('registers each of them with a specific reason instead of a generic one', async () => {
     const handle = await editorOf(FIXTURE);
-    // one lower than it was: Group left this list when it became a command that
-    // groups the floating pictures the selection holds
-    expect(unsupportedIds.length).toBeGreaterThan(33);
+    // two lower than it was: Group left this list when it became a command that
+    // groups the floating pictures the selection holds, and Word Count left it
+    // when the counts dialog was written
+    expect(unsupportedIds.length).toBeGreaterThan(32);
 
     const missing: string[] = [];
     const generic: string[] = [];

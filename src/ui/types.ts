@@ -138,8 +138,18 @@ export interface ResolvedControl {
   readonly value?: string | undefined;
 }
 
+export interface DocumentStatistics {
+  readonly pages: number;
+  readonly words: number;
+  readonly characters: number;
+  readonly charactersNoSpaces: number;
+  readonly paragraphs: number;
+  readonly lines: number;
+}
+
 export interface ChromeContext {
   readonly commands: CommandRegistry;
+  readonly statistics: () => DocumentStatistics;
   readonly state: ChromeState;
   readonly i18n: UI18n;
   readonly host: HTMLElement;

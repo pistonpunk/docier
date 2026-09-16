@@ -544,6 +544,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
   const context: ChromeContext = {
     commands: handle.commands,
+    statistics: () => queries.statistics(),
     get state(): ChromeState {
       return store.get();
     },
