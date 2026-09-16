@@ -109,6 +109,8 @@ export interface EditorHandle {
   setZoom(zoom: number): void;
   setViewMode(mode: RenderViewMode): void;
   readonly viewMode: RenderViewMode;
+  setMarks(show: boolean): void;
+  readonly showMarks: boolean;
   getDiagnostics(): readonly Diagnostic[];
   destroy(): void;
 }
@@ -335,6 +337,7 @@ export const createEditor = (
   let input: InputHandle | undefined = undefined;
   let zoom = options.zoom ?? DEFAULT_ZOOM;
   let viewMode: RenderViewMode = options.render?.viewMode ?? 'print';
+  let showMarks = options.render?.showMarks ?? false;
   let flowWidth: Mp | undefined;
   let defaultImageProvider: RenderImageProvider | undefined = undefined;
   let destroyed = false;
@@ -1081,6 +1084,7 @@ export const createEditor = (
     return {
       ...(measurer === undefined ? {} : { measurer }),
       ...(flowWidth === undefined ? {} : { flowWidth }),
+      showMarks,
     };
   };
 
@@ -1247,6 +1251,18 @@ export const createEditor = (
     },
     get viewMode(): RenderViewMode {
       return viewMode;
+    },
+    setMarks: (value) => {
+      if (showMarks === value) return;
+      showMarks = value;
+      if (session !== undefined) {
+        session.setLayoutOptions(layoutOptions());
+        session.relayout();
+      }
+      paint();
+    },
+    get showMarks(): boolean {
+      return showMarks;
     },
     getDiagnostics: () => diagnostics,
     destroy: () => {

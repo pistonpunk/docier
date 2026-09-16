@@ -155,6 +155,7 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.control.viewDraft': 'Draft',
   'ui.control.viewRead': 'Read Mode',
   'ui.control.showRuler': 'Ruler',
+  'ui.control.showMarks': 'Formatting Marks',
   'ui.control.showGridlines': 'Gridlines',
   'ui.control.showNavigation': 'Navigation Pane',
   'ui.control.zoomIn': 'Zoom In',

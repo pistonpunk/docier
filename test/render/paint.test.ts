@@ -309,6 +309,7 @@ describe('layout freedom of the painted document', () => {
       justified: false,
       bidiLevels: [],
       breakAfter: 'none',
+      marks: [],
     };
     const parent = document.createElement('div');
     target.appendChild(parent);
@@ -416,5 +417,50 @@ describe('the view mode', () => {
     renderDocument(result, target, { viewMode: 'draft' });
     const surface = target.querySelector<HTMLElement>(`[${ATTR.surface}]`);
     expect(surface?.getAttribute(ATTR.viewMode)).toBe('draft');
+  });
+});
+
+describe('formatting marks in the painted document', () => {
+  const markNodes = (root: HTMLElement): readonly HTMLElement[] =>
+    Array.from(root.querySelectorAll<HTMLElement>(`[${ATTR.mark}]`));
+
+  it('paints nothing when the layout carries no marks', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('one two')));
+    const target = host();
+    renderDocument(result, target);
+    expect(markNodes(target)).toHaveLength(0);
+  });
+
+  it('paints a glyph per mark when the layout carries them', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('one two')), { showMarks: true });
+    const target = host();
+    renderDocument(result, target);
+
+    const expected = result.pages[0]?.blocks.flatMap((block) => block.lines.flatMap((line) => line.marks)) ?? [];
+    expect(expected.length).toBeGreaterThan(0);
+    const nodes = markNodes(target);
+    expect(nodes).toHaveLength(expected.length);
+
+    const kinds = nodes.map((node) => node.getAttribute(ATTR.mark));
+    expect(kinds).toContain('paragraph');
+    expect(kinds).toContain('space');
+    expect(nodes.find((node) => node.getAttribute(ATTR.mark) === 'paragraph')?.textContent).toBe('¶');
+    expect(nodes.find((node) => node.getAttribute(ATTR.mark) === 'space')?.textContent).toBe('·');
+  });
+
+  it('paints a mark where the engine put it, and lets clicks through', async () => {
+    const result = await layoutOf(bodyOf(paragraphText('one two')), { showMarks: true });
+    const target = host();
+    renderDocument(result, target);
+    const block = result.pages[0]?.blocks[0];
+    const line = block?.lines[0];
+    const mark = line?.marks.find((entry) => entry.kind === 'space');
+    if (mark === undefined) throw new Error('no space mark');
+    const node = markNodes(target)[0];
+    const space = markNodes(target).find((entry) => entry.getAttribute(ATTR.mark) === 'space');
+    expect(space).toBeDefined();
+    expect(space?.style.left).toBe(localPx(mark.x, block?.box.x ?? 0));
+    expect(node?.style.position).toBe('absolute');
+    expect(space?.style.pointerEvents).toBe('none');
   });
 });

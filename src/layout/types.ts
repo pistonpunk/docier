@@ -164,6 +164,15 @@ export interface CaretStop {
   readonly affinity: 'upstream' | 'downstream';
 }
 
+export type LineMarkKind = 'paragraph' | 'space' | 'tab' | 'break';
+
+export interface LineMark {
+  readonly kind: LineMarkKind;
+  readonly x: Mp;
+  readonly width: Mp;
+  readonly baselineY: Mp;
+}
+
 export interface LineFragment {
   readonly id: number;
   readonly box: Rect;
@@ -177,6 +186,7 @@ export interface LineFragment {
   readonly justified: boolean;
   readonly bidiLevels: readonly number[];
   readonly breakAfter: ForcedBreak;
+  readonly marks: readonly LineMark[];
 }
 
 export interface BlockFragment {

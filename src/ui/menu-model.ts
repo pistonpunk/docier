@@ -797,6 +797,7 @@ export const RIBBON_TABS: readonly UiTab[] = [
         large: true,
         nodes: [
           toggle({ labelKey: 'ui.control.showRuler', action: 'toggleRuler', keytip: 'RU' }),
+          toggle({ labelKey: 'ui.control.showMarks', action: 'toggleMarks', keytip: 'PM' }),
           pending('view.setGridlines', 'ui.control.showGridlines', 'GL'),
           pending('view.setNavigation', 'ui.control.showNavigation', 'NP'),
         ],

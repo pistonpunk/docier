@@ -41,6 +41,7 @@ export const ATTR = {
   header: 'data-docier-header',
   footer: 'data-docier-footer',
   regionVariant: 'data-docier-region-variant',
+  mark: 'data-docier-mark',
 } as const;
 
 export const element = (tag: string, className: string): HTMLElement => {

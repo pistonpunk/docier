@@ -7,6 +7,7 @@ import { formatPx } from './scale.js';
 import { applyStyle, positionStyle, runFontSpecAt, runStyle } from './style.js';
 import { highlightColorOf } from './color.js';
 import { ATTR, box, geometryAt, stamp } from './dom.js';
+import { MARK_GLYPHS, paintMarks } from './marks.js';
 import type { ImageRegistry } from './images.js';
 import { paintObjects } from './objects.js';
 
@@ -131,4 +132,9 @@ export const paintLine = (parent: HTMLElement, input: LinePaintInput): void => {
     }
     paintObjects(parent, { line, run, frame, scale, images });
   });
+  if (line.marks.length > 0) {
+    paintMarks(parent, { line, frame, scale });
+  }
 };
+
+export { MARK_GLYPHS };

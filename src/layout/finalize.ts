@@ -21,6 +21,7 @@ import type {
   LayoutDiagnostic,
   LayoutResult,
   LineFragment,
+  LineMark,
   LineRun,
   PageFragment,
   Rect,
@@ -56,6 +57,7 @@ export interface FinalizeInput {
   readonly flowWidth: Mp | undefined;
   readonly stories: readonly StoryLayout[];
   readonly lineIdBase: number;
+  readonly marks: boolean;
 }
 
 const atomsOf = (line: LaidLine): readonly AtomPlacement[] =>
@@ -82,6 +84,35 @@ const lineEndOf = (line: LaidLine, fallback: DocPos): DocPos => {
 
 const cellKey = (table: number, row: number, column: number): string => `${table}:${row}:${column}`;
 
+const MARK_KINDS: Readonly<Record<string, LineMark['kind']>> = {
+  space: 'space',
+  tab: 'tab',
+  break: 'break',
+};
+
+const lineEndOfPlaced = (line: LaidLine): Mp => {
+  const last = line.placed[line.placed.length - 1];
+  return last === undefined ? line.textOrigin : mp(last.x + last.width);
+};
+
+const marksOfPlaced = (
+  line: LaidLine,
+  baselineY: Mp,
+  lastOfBlock: boolean,
+): readonly LineMark[] => {
+  const marks: LineMark[] = [];
+  for (const item of line.placed) {
+    const atom = item.measured.atom;
+    const kind = MARK_KINDS[atom.kind];
+    if (kind === undefined) continue;
+    marks.push({ kind, x: item.x, width: item.width, baselineY });
+  }
+  if (!lastOfBlock) return marks;
+  const tail = lineEndOfPlaced(line);
+  marks.push({ kind: 'paragraph', x: tail, width: mp(0), baselineY });
+  return marks;
+};
+
 export interface BlockFragmentRequest {
   readonly block: PaginateBlock;
   readonly id: number;
@@ -95,6 +126,7 @@ export interface BlockFragmentRequest {
   readonly cell: CellRef | undefined;
   readonly lineIdStart: number;
   readonly collect: boolean;
+  readonly marks: boolean;
 }
 
 export interface BlockFragmentResult {
@@ -123,6 +155,9 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     const stops = request.collect
       ? caretStopsOfPlaced(line.placed, baselineY, end, endsWithBreak, line.textOrigin)
       : [];
+    const marks = request.marks
+      ? marksOfPlaced(line, baselineY, index === block.lines.length - 1)
+      : [];
     const runs: LineRun[] = [];
     for (const run of runsOfPlaced(line.prefix)) runs.push(run);
     for (const run of runsOfPlaced(line.placed)) runs.push(run);
@@ -139,6 +174,7 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
       justified: line.justified,
       bidiLevels: [],
       breakAfter: line.breakAfter,
+      marks,
     };
     lineFragments.push(fragment);
     lineId += 1;
@@ -300,6 +336,7 @@ const flowedPage = (page: PageState, width: Mp, blocks: readonly BlockFragment[]
         cell: piece.cell,
         lineIdStart: lineId,
         collect: !piece.repeat,
+        marks: input.marks,
       });
       for (const ref of result.refs) refs.push(ref);
       for (const stop of result.caretStops) caretStops.push(stop);

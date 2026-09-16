@@ -58,6 +58,7 @@ const ACTIONS: readonly ChromeActionName[] = [
   'openBackstage',
   'closeBackstage',
   'toggleRuler',
+  'toggleMarks',
   'setUnits',
   'toggleStatusItem',
   'toggleKeyTips',
@@ -129,6 +130,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       density: options?.density,
       statusItems: options?.statusItems,
       rulerVisible: mode === 'full',
+      marks: handle.showMarks,
       collapse: mode === 'minimal' ? 'hidden' : 'expanded',
     }),
   );
@@ -177,6 +179,8 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     switch (spec.action) {
       case 'toggleRuler':
         return state.rulerVisible;
+      case 'toggleMarks':
+        return state.marks;
       case 'ribbonToggle':
       case 'ribbonCollapse':
         return state.collapse === 'collapsed';
@@ -343,6 +347,12 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       case 'toggleRuler':
         store.set({ rulerVisible: typeof args?.visible === 'boolean' ? args.visible : !state.rulerVisible });
         return;
+      case 'toggleMarks': {
+        const wanted = typeof args?.visible === 'boolean' ? args.visible : !state.marks;
+        store.set({ marks: wanted });
+        handle.setMarks(wanted);
+        return;
+      }
       case 'setUnits': {
         if (args?.cycle === true) {
           const index = RULER_UNITS.indexOf(state.units);

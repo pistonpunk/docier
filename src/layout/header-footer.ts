@@ -108,6 +108,7 @@ export interface RegionRequest {
   readonly defaultFontFamily: string;
   readonly defaultTabStop: Mp;
   readonly diagnostics: LayoutDiagnostic[];
+  readonly marks: boolean;
 }
 
 export interface RegionLayout {
@@ -166,6 +167,7 @@ export const layoutRegion = (request: RegionRequest): RegionLayout => {
       cell: undefined,
       lineIdStart: lineId,
       collect: true,
+      marks: request.marks,
     });
     lineId = result.nextLineId;
     blocks.push(result.fragment);

@@ -27,6 +27,8 @@ export type {
   LayoutIndices,
   LayoutResult,
   LineFragment,
+  LineMark,
+  LineMarkKind,
   LineRun,
   ObjectPlacement,
   PageFragment,

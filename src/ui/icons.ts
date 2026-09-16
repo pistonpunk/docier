@@ -65,6 +65,9 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'cover:lines':
     '<rect x="3" y="2.5" width="10" height="11" rx="1"/>' +
     '<path d="M3 5h10"/><path d="M3 11h10"/><path d="M5.5 7.5h5"/>',
+  'toggleMarks':
+    '<path d="M9 2.5h4v11"/><path d="M11 2.5v11"/><path d="M4 2.5h3.5a3 3 0 0 1 0 6H4z"/>' +
+    '<path d="M4 8.5h3.5a3 3 0 0 1 0 6H4z"/>',
   'table.splitTable':
     '<rect x="2" y="2.5" width="12" height="4.5" rx="1"/>' +
     '<rect x="2" y="9" width="12" height="4.5" rx="1"/>' +

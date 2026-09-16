@@ -101,6 +101,7 @@ export interface RenderOptions {
   readonly zoom?: number;
   readonly zoomMode?: ZoomMode;
   readonly viewMode?: RenderViewMode;
+  readonly showMarks?: boolean;
   readonly pageGapPx?: number;
   readonly pageBackground?: string;
   readonly surfaceBackground?: string;

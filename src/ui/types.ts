@@ -62,6 +62,7 @@ export interface ChromeState {
   readonly tableProperties: TablePropertiesState | undefined;
   readonly selectionEmpty: boolean;
   readonly rulerVisible: boolean;
+  readonly marks: boolean;
   readonly units: RulerUnit;
   readonly density: Density;
   readonly viewMode: ViewMode;
@@ -83,6 +84,7 @@ export type ChromeActionName =
   | 'openBackstage'
   | 'closeBackstage'
   | 'toggleRuler'
+  | 'toggleMarks'
   | 'setUnits'
   | 'toggleStatusItem'
   | 'toggleKeyTips'

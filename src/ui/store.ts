@@ -71,6 +71,7 @@ const BASE_STATE: ChromeState = {
   tableProperties: undefined,
   selectionEmpty: true,
   rulerVisible: false,
+  marks: false,
   units: 'cm',
   density: 'comfortable',
   viewMode: 'print',

@@ -52,6 +52,7 @@ export interface LayoutOptions {
   readonly defaultTabStop?: Twip;
   readonly widowControl?: boolean;
   readonly storyId?: string;
+  readonly showMarks?: boolean;
 }
 
 const rectOf = (x: Mp, y: Mp, width: Mp, height: Mp): Rect => ({ x, y, width, height });
@@ -160,7 +161,9 @@ export const layoutDocument = (
   hash.field(measurer.id);
   hash.field(defaultFontFamily);
   hash.field(defaultTabStop);
+  const showMarks = options.showMarks ?? false;
   hash.field(options.widowControl ?? true);
+  hash.field(showMarks);
   const evenAndOddHeaders =
     model.settings?.evenAndOddHeaders === true || sections.some((section) => section.evenAndOddHeaders);
   hash.field(evenAndOddHeaders);
@@ -324,6 +327,7 @@ export const layoutDocument = (
       defaultFontFamily,
       defaultTabStop: defaultTabStopMp,
       diagnostics,
+      marks: showMarks,
     });
     const distance = slot.kind === 'header' ? section.headerDistance : section.footerDistance;
     const y = slot.kind === 'header'
@@ -413,6 +417,7 @@ export const layoutDocument = (
           defaultFontFamily,
           defaultTabStop: defaultTabStopMp,
           diagnostics,
+          marks: showMarks,
         });
         laid.push(one);
         stacked += one.height;
@@ -579,6 +584,7 @@ export const layoutDocument = (
         defaultFontFamily,
         defaultTabStop: defaultTabStopMp,
         diagnostics,
+        marks: showMarks,
       });
       const placed = placeBlocks(laid.blocks, mp(0), objectLineId);
       objectLineId = placed.nextLineId;
@@ -608,6 +614,7 @@ export const layoutDocument = (
     diagnostics: dedupe(diagnostics),
     hash: hash.digest(),
     storyId: options.storyId ?? model.body().id,
+    marks: showMarks,
     storyKind: model.body().kind,
     blockCount: ingested.blocks.length,
     headerFooters: paginated.pages.map(
