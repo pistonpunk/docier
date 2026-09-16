@@ -127,7 +127,7 @@ describe('chrome command coverage', () => {
     // Before that it was the whole field set behind Insert > Field, and before
     // that Find and Replace, which open the find dialog instead of being executed
     // from the ribbon, so the dialog dispatches them rather than the chrome
-    expect(registered).toBe(140);
+    expect(registered).toBe(139);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -151,7 +151,7 @@ describe('chrome command coverage', () => {
     expect(areas.get('format')).toBe(25);
     // one fewer than it was: Table Properties was two commands, one of which was
     // the dialog refusal, and is now a single command that opens the dialog
-    expect(areas.get('table')).toBe(33);
+    expect(areas.get('table')).toBe(32);
     expect(areas.get('object')).toBe(12);
     // one fewer than it was: Insert > Field used to dispatch token.insert, which
     // is the template-token subsystem rather than a field, and now dispatches the

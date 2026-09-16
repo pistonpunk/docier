@@ -272,12 +272,6 @@ const REFUSALS: readonly Refusal[] = [
       'A table spans several cell containers and no edit command accepts a range crossing one, so selecting it would leave a selection that swallows every keystroke',
   },
   {
-    id: 'docier.command.table.setBorders',
-    label: 'Borders and shading',
-    category: 'table',
-    reason: 'This build edits table borders as cell properties and has no borders-and-shading dialog',
-  },
-  {
     id: 'docier.command.table.setTextDirection',
     label: 'Text direction',
     category: 'table',

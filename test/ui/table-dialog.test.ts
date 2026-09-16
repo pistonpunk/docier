@@ -127,6 +127,77 @@ describe('the table properties dialog', () => {
   });
 });
 
+describe('the borders dialog', () => {
+  it('normalises a colour and rejects anything that is not one', async () => {
+    const borders = await import('../../src/ui/borders-dialog.js');
+    expect(borders.normaliseColour('#ff0000')).toBe('FF0000');
+    expect(borders.normaliseColour('00ff00')).toBe('00FF00');
+    expect(borders.normaliseColour('red')).toBeUndefined();
+    expect(borders.normaliseColour('')).toBeUndefined();
+  });
+
+  it('sends the preset, the line and the scope, and omits the line for none', async () => {
+    const chrome = await withTable();
+    const borders = await import('../../src/ui/borders-dialog.js');
+    const dialog = borders.createBordersDialog({ context: chrome.context });
+    dialog.open();
+
+    const executed: { id: string; args: unknown }[] = [];
+    chrome.context.commands.execute = ((id: string, args: unknown) => {
+      executed.push({ id, args });
+      return Promise.resolve({ status: 'ok' });
+    }) as typeof chrome.context.commands.execute;
+
+    const style = fieldOf(dialog.element, 'docier-borders-style');
+    style.value = 'double';
+    style.dispatchEvent(new Event('change', { bubbles: true }));
+    dialog.applyButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+
+    expect(executed[0]?.id).toBe('docier.command.table.setBorders');
+    expect(executed[0]?.args).toMatchObject({ preset: 'all', style: 'double', scope: 'table' });
+
+    dialog.dispose();
+  });
+
+  it('omits the line and the colour when the preset is no borders', async () => {
+    const chrome = await withTable();
+    const borders = await import('../../src/ui/borders-dialog.js');
+    const dialog = borders.createBordersDialog({ context: chrome.context });
+    dialog.open();
+
+    const executed: { id: string; args: unknown }[] = [];
+    chrome.context.commands.execute = ((id: string, args: unknown) => {
+      executed.push({ id, args });
+      return Promise.resolve({ status: 'ok' });
+    }) as typeof chrome.context.commands.execute;
+
+    const preset = fieldOf(dialog.element, 'docier-borders-preset');
+    preset.value = 'none';
+    preset.dispatchEvent(new Event('change', { bubbles: true }));
+    dialog.applyButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await Promise.resolve();
+
+    expect(executed[0]?.args).toEqual({ preset: 'none', scope: 'table' });
+    dialog.dispose();
+  });
+
+  it('disables the line fields when the preset is no borders', async () => {
+    const chrome = await withTable();
+    const borders = await import('../../src/ui/borders-dialog.js');
+    const dialog = borders.createBordersDialog({ context: chrome.context });
+    dialog.open();
+
+    const preset = fieldOf(dialog.element, 'docier-borders-preset') as HTMLSelectElement;
+    preset.value = 'none';
+    preset.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect((fieldOf(dialog.element, 'docier-borders-style') as HTMLSelectElement).disabled).toBe(true);
+    expect((fieldOf(dialog.element, 'docier-borders-width') as HTMLSelectElement).disabled).toBe(true);
+    dialog.dispose();
+  });
+});
+
 describe('the table dialog is reachable from the chrome', () => {
   it('resolves the dialog name the table menu rows ask for', async () => {
     await chromeOf(TABLE_BODY);
@@ -136,6 +207,8 @@ describe('the table dialog is reachable from the chrome', () => {
     expect(dialogNameFor('table')).toBe(TABLE_DIALOG_NAME);
     expect(dialogNameFor('docier.command.table.propertiesDialog')).toBe(TABLE_DIALOG_NAME);
     expect(dialogNameFor('docier.command.table.setProperties')).toBe(TABLE_DIALOG_NAME);
+    expect(dialogNameFor('borders')).toBe('borders');
+    expect(dialogNameFor('docier.command.table.setBorders')).toBe('borders');
   });
 
   it('opens the table dialog through openEditorDialog', async () => {

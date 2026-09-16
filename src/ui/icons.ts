@@ -56,6 +56,10 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'table:properties':
     '<rect x="2" y="3" width="12" height="10" rx="1"/>' +
     '<path d="M2 6.6h12"/><path d="M6 6.6V13"/><path d="M10 6.6V13"/>',
+  'table:borders':
+    '<rect x="2" y="3" width="12" height="10" rx="1"/>' +
+    '<path d="M2 6.6h12"/><path d="M6 6.6V13"/><path d="M10 6.6V13"/>' +
+    '<path d="m10.5 10.5 2.5 2.5"/>',
   'format.changeCase':
     '<path d="M1.5 12.5 4.6 3.5h1.2l3.1 9"/><path d="M2.6 9.4h6.2"/>' +
     '<path d="M9.8 12.5c0-2 .3-3.3 1.9-3.3s1.9 1.3 1.9 3.3" />' +

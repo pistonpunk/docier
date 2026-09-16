@@ -2,7 +2,7 @@ import type { CommandDefinition, LocalizedString } from '../../api/types.js';
 import type { DocPos } from '../../layout/index.js';
 import type { Mp } from '../../units/index.js';
 import { mpToTwip, twip } from '../../units/index.js';
-import type { Paragraph, Table, TableCell, TableRow } from '../../model/index.js';
+import type { BorderSide, Paragraph, Table, TableCell, TableRow } from '../../model/index.js';
 import { isWElement, propertyOf, setWAttr } from '../../model/index.js';
 import type { XmlElement } from '../../ooxml/xml/index.js';
 import { caretSelection, rangeAsDocRange } from '../selection.js';
@@ -469,6 +469,102 @@ const setPropertiesSpec: AreaSpec<TablePropertiesArgs> = {
     });
     if (!changed) return false;
     host.session.model.context.forgetSubtree(table.element);
+    placeCaret(host, firstParagraphOf(target.cell.element));
+    return true;
+  },
+};
+
+export type BorderPreset = 'all' | 'outside' | 'inside' | 'none';
+
+export interface BordersArgs {
+  readonly preset?: BorderPreset;
+  readonly style?: string;
+  readonly sizeEighths?: number;
+  readonly color?: string;
+  readonly fill?: string;
+  readonly scope?: 'table' | 'cell';
+}
+
+const OUTSIDE_SIDES: readonly BorderSide[] = ['top', 'left', 'bottom', 'right'];
+const INSIDE_SIDES: readonly BorderSide[] = ['insideH', 'insideV'];
+const ALL_SIDES: readonly BorderSide[] = [...OUTSIDE_SIDES, ...INSIDE_SIDES];
+
+const PRESET_SIDES: Readonly<Record<BorderPreset, readonly BorderSide[]>> = {
+  all: ALL_SIDES,
+  outside: OUTSIDE_SIDES,
+  inside: INSIDE_SIDES,
+  none: ALL_SIDES,
+};
+
+const PAINT_STYLES: ReadonlySet<string> = new Set([
+  'single',
+  'double',
+  'dashed',
+  'dotted',
+  'dotDash',
+  'thick',
+  'wave',
+]);
+
+const HEX = /^[0-9a-fA-F]{6}$/;
+
+const bordersReason = (args: BordersArgs | undefined): LocalizedString | undefined => {
+  if (args === undefined || args.preset === undefined) return NEEDS_PROPERTY;
+  if (args.style !== undefined && !PAINT_STYLES.has(args.style)) return NEEDS_PROPERTY;
+  if (args.color !== undefined && !HEX.test(args.color) && args.color !== 'auto') {
+    return NEEDS_PROPERTY;
+  }
+  if (args.fill !== undefined && !HEX.test(args.fill)) return NEEDS_PROPERTY;
+  return undefined;
+};
+
+const setBordersSpec: AreaSpec<BordersArgs> = {
+  id: 'docier.command.table.setBorders',
+  label: 'Borders and shading',
+  category: 'table',
+  permissions: ['format'],
+  code: 'INAPPLICABLE',
+  enabledIn: (host, args) =>
+    host.session.aligned && bordersReason(args) === undefined && targetAt(host) !== undefined,
+  reason: (host) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    if (targetAt(host) === undefined) return PLACE_CARET;
+    return NEEDS_PROPERTY;
+  },
+  run: (host, args) => {
+    const reason = bordersReason(args);
+    if (reason !== undefined || args?.preset === undefined) return false;
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const preset = args.preset;
+    const clearing = preset === 'none';
+    const style = args.style ?? 'single';
+    const size = Math.max(2, Math.min(96, Math.round(args.sizeEighths ?? 4)));
+    const color = args.color ?? 'auto';
+    const fill = args.fill;
+    const container =
+      args.scope === 'cell' ? target.cell.properties.borders : target.table.properties.borders;
+    const shaded = args.scope === 'cell' ? target.cell.properties.shading : undefined;
+    const changed = changedBy([target.table.element], () => {
+      for (const side of PRESET_SIDES[preset]) {
+        const border = container.side(side);
+        if (clearing) {
+          border.style = 'none';
+          border.size = undefined;
+          border.color = undefined;
+          continue;
+        }
+        border.style = style;
+        border.size = size as never;
+        border.color = color;
+      }
+      if (shaded !== undefined) {
+        shaded.pattern = fill === undefined ? undefined : 'clear';
+        shaded.fill = fill;
+      }
+    });
+    if (!changed) return false;
+    host.session.model.context.forgetSubtree(target.table.element);
     placeCaret(host, firstParagraphOf(target.cell.element));
     return true;
   },
@@ -1011,6 +1107,7 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<CountArgs>(host, mergeSpec),
   areaCommand<CountArgs>(host, splitSpec),
   areaCommand<TablePropertiesArgs>(host, setPropertiesSpec),
+  areaCommand<BordersArgs>(host, setBordersSpec),
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
   areaCommand<TableWidthArgs>(host, setTableWidthSpec),
   areaCommand<RowHeightArgs>(host, setRowHeightSpec),

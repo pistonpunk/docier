@@ -10,6 +10,7 @@ import {
   SYMBOL_DIALOG_NAME,
   FIND_DIALOG_NAME,
   TABLE_DIALOG_NAME,
+  BORDERS_DIALOG_NAME,
 } from './dialog-names.js';
 export {
   FONT_DIALOG_NAME,
@@ -19,9 +20,11 @@ export {
   PICTURE_DIALOG_NAME,
   FIND_DIALOG_NAME,
   TABLE_DIALOG_NAME,
+  BORDERS_DIALOG_NAME,
 } from './dialog-names.js';
 import { createFindDialog } from './find-dialog.js';
 import { createTableDialog } from './table-dialog.js';
+import { createBordersDialog } from './borders-dialog.js';
 import { createFontDialog } from './font-dialog.js';
 import {
   createLinkDialog,
@@ -852,6 +855,9 @@ export const DIALOG_ALIASES: Readonly<Record<string, string>> = {
   [FIND_DIALOG_NAME]: FIND_DIALOG_NAME,
   'docier.command.find.find': FIND_DIALOG_NAME,
   'find.find': FIND_DIALOG_NAME,
+  [BORDERS_DIALOG_NAME]: BORDERS_DIALOG_NAME,
+  'docier.command.table.setBorders': BORDERS_DIALOG_NAME,
+  'table.setBorders': BORDERS_DIALOG_NAME,
   [TABLE_DIALOG_NAME]: TABLE_DIALOG_NAME,
   'docier.command.table.propertiesDialog': TABLE_DIALOG_NAME,
   'table.propertiesDialog': TABLE_DIALOG_NAME,
@@ -894,6 +900,15 @@ export const createEditorDialog = (
   };
   if (request.dialog === FIND_DIALOG_NAME) {
     return createFindDialog({
+      context,
+      mount: request.mount,
+      onClose: request.onClose,
+      placement: request.placement,
+      width: request.width,
+    });
+  }
+  if (request.dialog === BORDERS_DIALOG_NAME) {
+    return createBordersDialog({
       context,
       mount: request.mount,
       onClose: request.onClose,

@@ -463,6 +463,79 @@ describe('deleting and setting up a table', () => {
   });
 });
 
+describe('borders and shading', () => {
+  it('writes every side for the all preset and clears them again for none', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+
+    await run(handle, 'table.setBorders', { preset: 'all', style: 'single', sizeEighths: 8, color: 'FF0000' });
+    const xml = bodyXml(handle);
+    for (const side of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+      expect(xml, side).toContain(`<w:${side} w:val="single" w:sz="8" w:color="FF0000"/>`);
+    }
+
+    await run(handle, 'table.setBorders', { preset: 'none' });
+    expect(bodyXml(handle)).not.toContain('w:val="single"');
+  });
+
+  it('writes only the outside sides for the outside preset', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    await run(handle, 'table.setBorders', { preset: 'outside' });
+
+    const xml = bodyXml(handle);
+    for (const side of ['top', 'left', 'bottom', 'right']) {
+      expect(xml, side).toContain(`<w:${side} `);
+    }
+    expect(xml).not.toContain('<w:insideH');
+    expect(xml).not.toContain('<w:insideV');
+  });
+
+  it('shades a single cell when the scope is the cell', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    await run(handle, 'table.setBorders', { preset: 'all', scope: 'cell', fill: 'FFFF00' });
+
+    const xml = bodyXml(handle);
+    expect(xml).toContain('<w:shd w:val="clear" w:fill="FFFF00"');
+    expect(xml).toContain('<w:tcBorders>');
+  });
+
+  it('is one undo entry and comes back whole', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    const before = bodyXml(handle);
+
+    await run(handle, 'table.setBorders', { preset: 'all', sizeEighths: 12, color: '00FF00' });
+    expect(bodyXml(handle)).not.toBe(before);
+
+    await undo(handle);
+    expect(bodyXml(handle)).toBe(before);
+  });
+
+  it('reports why it cannot act when the caret is outside a table', async () => {
+    const handle = await editorOf(PLAIN);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    expect(isEnabled(handle, 'table.setBorders')).toBe(false);
+    expect(reasonOf(handle, 'table.setBorders')).toContain('Place the caret inside a table');
+    expect(reasonOf(handle, 'table.setBorders', { preset: 'all' })).toContain(
+      'Place the caret inside a table',
+    );
+  });
+
+  it('refuses a preset it does not know and a malformed colour', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    expect(isEnabled(handle, 'table.setBorders')).toBe(false);
+    expect(reasonOf(handle, 'table.setBorders', { preset: 'all', style: 'zigzag' })).toBe(
+      'This control needs a table property to apply',
+    );
+    expect(reasonOf(handle, 'table.setBorders', { preset: 'all', color: 'red' })).toBe(
+      'This control needs a table property to apply',
+    );
+  });
+});
+
 describe('a table inside a cell', () => {
   it('nests, edits and unwinds a table in a cell', async () => {
     const handle = await editorOf(FIXTURE);

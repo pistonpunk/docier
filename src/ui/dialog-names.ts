@@ -5,3 +5,4 @@ export const SYMBOL_DIALOG_NAME = 'symbol';
 export const PICTURE_DIALOG_NAME = 'picture';
 export const FIND_DIALOG_NAME = 'find';
 export const TABLE_DIALOG_NAME = 'table';
+export const BORDERS_DIALOG_NAME = 'borders';
