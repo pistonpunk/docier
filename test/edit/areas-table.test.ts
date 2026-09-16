@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { EditorHandle } from '../../src/api/editor.js';
 import type { ParagraphSlot } from '../../src/edit/session.js';
 import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
+import { parseFormula } from '../../src/edit/areas/table.js';
 import {
   bodyOf,
   disposeEditors,
@@ -533,6 +534,95 @@ describe('borders and shading', () => {
     expect(reasonOf(handle, 'table.setBorders', { preset: 'all', color: 'red' })).toBe(
       'This control needs a table property to apply',
     );
+  });
+});
+
+describe('formulas over table cells', () => {
+  const numbers = (): string =>
+    bodyOf(
+      paragraphText('alpha'),
+      '<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="2000"/></w:tblPr>' +
+        '<w:tblGrid><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/></w:tblGrid>' +
+        `<w:tr>${cell('Item')}${cell('Count')}</w:tr>` +
+        `<w:tr>${cell('one')}${cell('10')}</w:tr>` +
+        `<w:tr>${cell('two')}${cell('20')}</w:tr>` +
+        `<w:tr>${cell('three')}${cell('30')}</w:tr>` +
+        `<w:tr>${cell('total')}${cell('')}</w:tr>` +
+        '</w:tbl>',
+      paragraphText('beta'),
+    );
+
+  const cellText = (handle: EditorHandle, row: number, column: number): string =>
+    sessionOf(handle).model.body().tables()[0]?.cellAt(row, column)?.logicalText ?? '';
+
+  it('parses the functions and directions it supports, and nothing else', () => {
+    expect(parseFormula('=SUM(ABOVE)')).toEqual({ name: 'SUM', direction: 'above' });
+    expect(parseFormula('sum(left)')).toEqual({ name: 'SUM', direction: 'left' });
+    expect(parseFormula('=AVERAGE(BELOW)')).toEqual({ name: 'AVERAGE', direction: 'below' });
+    expect(parseFormula('=SUM(A1:B2)')).toBeUndefined();
+    expect(parseFormula('=MEDIAN(ABOVE)')).toBeUndefined();
+    expect(parseFormula('nonsense')).toBeUndefined();
+  });
+
+  it('totals the numbers above the caret', async () => {
+    const handle = await editorOf(numbers());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 4, 1).start });
+
+    await run(handle, 'table.formula', { expression: '=SUM(ABOVE)' });
+    expect(cellText(handle, 4, 1)).toBe('60');
+  });
+
+  it('counts, averages, and finds the largest and smallest', async () => {
+    for (const [expression, expected] of [
+      ['=COUNT(ABOVE)', '3'],
+      ['=AVERAGE(ABOVE)', '20'],
+      ['=MAX(ABOVE)', '30'],
+      ['=MIN(ABOVE)', '10'],
+      ['=PRODUCT(ABOVE)', '6000'],
+    ] as const) {
+      const handle = await editorOf(numbers());
+      await run(handle, 'selection.setCaret', { pos: slotAt(handle, 4, 1).start });
+      await run(handle, 'table.formula', { expression });
+      expect(cellText(handle, 4, 1), expression).toBe(expected);
+    }
+  });
+
+  it('totals the numbers to the left of the caret', async () => {
+    const handle = await editorOf(
+      bodyOf(
+        '<w:tbl><w:tblPr><w:tblW w:type="dxa" w:w="3000"/></w:tblPr>' +
+          '<w:tblGrid><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/><w:gridCol w:w="1000"/></w:tblGrid>' +
+          `<w:tr>${cell('4')}${cell('5')}${cell('')}</w:tr>` +
+          '</w:tbl>',
+      ),
+    );
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 2).start });
+    await run(handle, 'table.formula', { expression: '=SUM(LEFT)' });
+    expect(cellText(handle, 0, 2)).toBe('9');
+  });
+
+  it('is one undo entry, and replaces what was in the cell', async () => {
+    const handle = await editorOf(numbers());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 4, 1).start });
+    const before = bodyXml(handle);
+
+    await run(handle, 'table.formula', {});
+    expect(cellText(handle, 4, 1)).toBe('60');
+    await undo(handle);
+    expect(bodyXml(handle)).toBe(before);
+  });
+
+  it('reports why it cannot act', async () => {
+    const handle = await editorOf(numbers());
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 1).start });
+    // nothing numeric in the cells above the first data row
+    expect(isEnabled(handle, 'table.formula', { expression: '=SUM(ABOVE)' })).toBe(true);
+    expect(isEnabled(handle, 'table.formula', { expression: '=MEDIAN(ABOVE)' })).toBe(false);
+    expect(reasonOf(handle, 'table.formula', { expression: '=MEDIAN(ABOVE)' })).toContain('=SUM');
+
+    const outside = await editorOf(PLAIN);
+    await run(outside, 'selection.setCaret', { pos: pos(0) });
+    expect(reasonOf(outside, 'table.formula')).toContain('Place the caret inside a table');
   });
 });
 

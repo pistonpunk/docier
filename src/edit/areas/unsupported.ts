@@ -269,12 +269,6 @@ const REFUSALS: readonly Refusal[] = [
     category: 'table',
     reason: 'This build reads w:textDirection and never writes it',
   },
-  {
-    id: 'docier.command.table.formula',
-    label: 'Formula',
-    category: 'table',
-    reason: 'This build evaluates no field formula; fields are preserved exactly as they were loaded',
-  },
 ];
 
 const tokenReason = (host: AreaHost): string =>

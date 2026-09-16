@@ -44,6 +44,8 @@ const NOT_MERGED: LocalizedString =
 const LAST_ROW: LocalizedString = 'This table has a single row; delete the table instead';
 const LAST_COLUMN: LocalizedString = 'This table has a single column; delete the table instead';
 const NEEDS_PROPERTY: LocalizedString = 'This control needs a table property to apply';
+const FORMULA_UNSUPPORTED: LocalizedString =
+  'This build evaluates =SUM, =AVERAGE, =COUNT, =MAX, =MIN and =PRODUCT over the cells above, below, left or right of the caret, and nothing else';
 const BAD_SHAPE: LocalizedString = 'This build creates tables of 1 to 63 rows and columns';
 const TOO_DEEP: LocalizedString =
   `This build nests tables at most ${String(MAX_TABLE_DEPTH)} levels deep, and the caret is already at that depth`;
@@ -630,6 +632,131 @@ const splitTableSpec: AreaSpec<Record<string, never>> = {
     });
     if (!changed) return false;
     host.session.relayout();
+    return true;
+  },
+};
+
+export type FormulaDirection = 'above' | 'below' | 'left' | 'right';
+
+export interface FormulaArgs {
+  readonly expression?: string;
+}
+
+const FORMULA_FUNCTIONS: Readonly<Record<string, (values: readonly number[]) => number>> = {
+  SUM: (values) => values.reduce((total, value) => total + value, 0),
+  AVERAGE: (values) => (values.length === 0 ? 0 : values.reduce((t, v) => t + v, 0) / values.length),
+  COUNT: (values) => values.length,
+  MAX: (values) => (values.length === 0 ? 0 : Math.max(...values)),
+  MIN: (values) => (values.length === 0 ? 0 : Math.min(...values)),
+  PRODUCT: (values) => values.reduce((total, value) => total * value, 1),
+};
+
+export interface ParsedFormula {
+  readonly name: string;
+  readonly direction: FormulaDirection;
+}
+
+export const parseFormula = (expression: string): ParsedFormula | undefined => {
+  const match = /^=?\s*([A-Za-z]+)\s*\(\s*(ABOVE|BELOW|LEFT|RIGHT)\s*\)\s*$/i.exec(
+    expression.trim(),
+  );
+  if (match === null) return undefined;
+  const name = (match[1] ?? '').toUpperCase();
+  if (FORMULA_FUNCTIONS[name] === undefined) return undefined;
+  return { name, direction: (match[2] ?? 'ABOVE').toLowerCase() as FormulaDirection };
+};
+
+const numberIn = (text: string): number | undefined => {
+  const cleaned = text.trim().replace(/[^0-9.eE+-]/g, '');
+  if (cleaned === '') return undefined;
+  const value = Number.parseFloat(cleaned);
+  return Number.isFinite(value) ? value : undefined;
+};
+
+const formatResult = (value: number): string =>
+  Number.isInteger(value) ? String(value) : String(Math.round(value * 1000) / 1000);
+
+const valuesFor = (table: Table, row: number, column: number, direction: FormulaDirection): readonly number[] => {
+  const out: number[] = [];
+  const rows = table.rows();
+  if (direction === 'above' || direction === 'below') {
+    const from = direction === 'above' ? 0 : row + 1;
+    const to = direction === 'above' ? row : rows.length;
+    for (let at = from; at < to; at += 1) {
+      const cell = table.cellAt(at, column);
+      const value = cell === undefined ? undefined : numberIn(cell.logicalText);
+      if (value !== undefined) out.push(value);
+    }
+    return out;
+  }
+  const current = rows[row];
+  if (current === undefined) return out;
+  const cells = current.cells();
+  const from = direction === 'left' ? 0 : column + 1;
+  const to = direction === 'left' ? column : cells.length;
+  for (let at = from; at < to; at += 1) {
+    const cell = cells[at];
+    const value = cell === undefined ? undefined : numberIn(cell.logicalText);
+    if (value !== undefined) out.push(value);
+  }
+  return out;
+};
+
+const writeCellText = (cell: TableCell, text: string): void => {
+  const element = cell.element;
+  const paragraphs = childElements(element).filter((child) => child.localName === 'p');
+  for (const paragraph of paragraphs) paragraph.parent = undefined;
+  element.children = element.children.filter((child) => !paragraphs.includes(child as XmlElement));
+  const paragraph = createWElement(element, 'p');
+  paragraph.parent = element;
+  const run = createWElement(paragraph, 'r');
+  run.parent = paragraph;
+  const node = createWElement(run, 't');
+  node.parent = run;
+  node.children.push({ kind: 'text', value: text, parent: node });
+  run.children.push(node);
+  paragraph.children.push(run);
+  element.children.push(paragraph);
+};
+
+const DEFAULT_FORMULA = '=SUM(ABOVE)';
+
+const formulaReason = (args: FormulaArgs | undefined): LocalizedString | undefined => {
+  const expression = args?.expression ?? DEFAULT_FORMULA;
+  return parseFormula(expression) === undefined ? FORMULA_UNSUPPORTED : undefined;
+};
+
+const formulaSpec: AreaSpec<FormulaArgs> = {
+  id: 'docier.command.table.formula',
+  label: 'Formula',
+  category: 'table',
+  permissions: ['edit'],
+  code: 'INAPPLICABLE',
+  enabledIn: (host, args) =>
+    host.session.aligned && formulaReason(args) === undefined && targetAt(host) !== undefined,
+  reason: (host, args) => {
+    if (!host.session.aligned) return NOT_ALIGNED;
+    if (formulaReason(args) !== undefined) return FORMULA_UNSUPPORTED;
+    return targetAt(host) === undefined ? PLACE_CARET : NEEDS_PROPERTY;
+  },
+  run: (host, args) => {
+    const expression = args?.expression ?? DEFAULT_FORMULA;
+    const parsed = parseFormula(expression);
+    if (parsed === undefined) return false;
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const values = valuesFor(target.table, target.row, target.column, parsed.direction);
+    if (values.length === 0) return false;
+    const compute = FORMULA_FUNCTIONS[parsed.name];
+    if (compute === undefined) return false;
+    const text = formatResult(compute(values));
+    const changed = changedBy([target.cell.element], () => {
+      writeCellText(target.cell, text);
+      host.session.model.context.forgetSubtree(target.cell.element);
+    });
+    if (!changed) return false;
+    host.session.relayout();
+    placeCaret(host, firstParagraphOf(target.cell.element));
     return true;
   },
 };
@@ -1265,6 +1392,7 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   areaCommand<BordersArgs>(host, setBordersSpec),
   areaCommand<SortArgs>(host, sortSpec),
   areaCommand<Record<string, never>>(host, splitTableSpec),
+  areaCommand<FormulaArgs>(host, formulaSpec),
   areaCommand<ColumnWidthArgs>(host, setColumnWidthSpec),
   areaCommand<TableWidthArgs>(host, setTableWidthSpec),
   areaCommand<RowHeightArgs>(host, setRowHeightSpec),

@@ -899,6 +899,25 @@ export const TABLE_TAB: UiTab = {
           command: command('table.sort'),
           keytip: 'SO',
         }),
+        menu('ui.menu.formula', [
+          ...(
+            [
+              ['=SUM(ABOVE)', 'ui.formula.sumAbove'],
+              ['=SUM(LEFT)', 'ui.formula.sumLeft'],
+              ['=AVERAGE(ABOVE)', 'ui.formula.averageAbove'],
+              ['=COUNT(ABOVE)', 'ui.formula.countAbove'],
+              ['=MAX(ABOVE)', 'ui.formula.maxAbove'],
+              ['=MIN(ABOVE)', 'ui.formula.minAbove'],
+            ] as const
+          ).map(([expression, labelKey]) =>
+            button({
+              labelKey,
+              id: `formula:${expression}`,
+              command: command('table.formula'),
+              args: { expression },
+            }),
+          ),
+        ]),
       ],
     },
     {

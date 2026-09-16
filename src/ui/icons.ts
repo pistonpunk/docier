@@ -97,6 +97,9 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="2" y="2.5" width="12" height="4.5" rx="1"/>' +
     '<rect x="2" y="9" width="12" height="4.5" rx="1"/>' +
     '<path d="M8 7v2"/>',
+  'table.formula':
+    '<path d="M2.5 3.5h6"/><path d="M5.5 3.5v9"/><path d="M2.5 12.5h6"/>' +
+    '<path d="M9.5 6.5h4"/><path d="M9.5 9.5h4"/><path d="M9.5 12.5h4"/>',
   'table.sort':
     '<path d="M2.5 4h6"/><path d="M2.5 7h4"/><path d="M2.5 10h6"/>' +
     '<path d="M11 3v9"/><path d="m8.8 9.8 2.2 2.2 2.2-2.2"/>',
