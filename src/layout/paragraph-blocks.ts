@@ -290,6 +290,73 @@ export interface ParagraphBlockContext {
   readonly documentGrid?: DocumentGrid | undefined;
 }
 
+// the character grid gives every character a fixed pitch: an East Asian
+// character takes one cell, and a run of others is centred across the cells it
+// needs, so a line holds a fixed number of characters
+const snapAtomsToGrid = (
+  measured: readonly MeasuredAtom[],
+  pitch: Mp,
+): readonly MeasuredAtom[] => {
+  const step = pitch as number;
+  if (step <= 0) return measured;
+  const out: MeasuredAtom[] = [];
+  let index = 0;
+  while (index < measured.length) {
+    const item = measured[index];
+    if (item === undefined) break;
+    if (item.positionDependent) {
+      out.push(item);
+      index += 1;
+      continue;
+    }
+    const eastAsian = isEastAsian(item.atom.text);
+    if (eastAsian && !item.positionDependent) {
+      // one cell per character, so the glyphs are placed a pitch apart rather
+      // than sharing the width the font gives them
+      const count = [...item.atom.text].length;
+      if (count > 0) {
+        const offsets: Mp[] = [];
+        for (let at = 0; at <= count; at += 1) offsets.push(mp(step * at));
+        out.push({ ...item, offsets, width: mp(step * count) });
+        index += 1;
+        continue;
+      }
+    }
+    let group = 1;
+    if (!eastAsian) {
+      while (index + group < measured.length) {
+        const next = measured[index + group];
+        if (next === undefined || next.positionDependent || isEastAsian(next.atom.text)) break;
+        group += 1;
+      }
+    }
+    const slice = measured.slice(index, index + group);
+    const total = slice.reduce((sum, entry) => sum + (entry.width as number), 0);
+    const snapped = Math.max(step, Math.ceil(total / step) * step);
+    const lead = eastAsian ? 0 : mp((snapped - total) / 2);
+    const trailing = mp(snapped - total - (lead as number));
+    slice.forEach((entry, at) => {
+      const first = at === 0;
+      const last = at === slice.length - 1;
+      out.push({
+        ...entry,
+        offsets: first
+          ? entry.offsets.map((value) => mp((value as number) + (lead as number)))
+          : entry.offsets,
+        width: mp(
+          (entry.width as number) + (first ? (lead as number) : 0) + (last ? (trailing as number) : 0),
+        ),
+      });
+    });
+    index += group;
+  }
+  return out;
+};
+
+const EAST_ASIAN = /[\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uff60]/;
+
+const isEastAsian = (text: string): boolean => EAST_ASIAN.test(text);
+
 // a document grid rounds every line up to its pitch, so the text sits on a
 // baseline grid the way Word lays it out
 const snapToGrid = (line: LaidLine, pitch: Mp): LaidLine => {
@@ -323,8 +390,13 @@ export const buildParagraphBlock = (
     tabStops: format.tabStops,
     defaultTabStop: context.defaultTabStop,
   };
+  const grid = context.documentGrid;
+  const measured =
+    grid?.charPitch === undefined
+      ? prepared.measured
+      : snapAtomsToGrid(prepared.measured, grid.charPitch);
   const lines: readonly LaidLine[] = assembleParagraph({
-    measured: prepared.measured,
+    measured,
     format,
     fallbackBox: prepared.markBox,
     context: measureContext,
@@ -333,7 +405,6 @@ export const buildParagraphBlock = (
     contentWidth,
     externalBands,
   });
-  const grid = context.documentGrid;
   const finalLines =
     grid === undefined ? lines : lines.map((line) => snapToGrid(line, grid.linePitch));
   return {

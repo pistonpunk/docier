@@ -43,6 +43,7 @@ export interface Section {
 export interface DocumentGrid {
   readonly linePitch: Mp;
   readonly charSpace: number | undefined;
+  readonly charPitch: Mp | undefined;
 }
 
 const documentGridOf = (properties: SectionProperties | undefined): DocumentGrid | undefined => {
@@ -50,7 +51,11 @@ const documentGridOf = (properties: SectionProperties | undefined): DocumentGrid
   if (type === undefined || type === 'default') return undefined;
   const pitch = properties?.documentGridLinePitch;
   if (pitch === undefined) return undefined;
-  return { linePitch: twipToMp(pitch), charSpace: properties?.documentGridCharSpace };
+  return {
+    linePitch: twipToMp(pitch),
+    charSpace: properties?.documentGridCharSpace,
+    charPitch: undefined,
+  };
 };
 
 export type SectionVerticalAlignment = 'top' | 'center' | 'bottom' | 'both';
@@ -199,11 +204,11 @@ export const buildSections = (
           docPos: undefined,
         });
       }
-      if (properties.documentGrid !== undefined && properties.documentGridCharSpace !== undefined) {
+      if (properties.documentGrid !== undefined && properties.documentGridCharSpace === undefined) {
         diagnostics.push({
           code: 'documentGridNotLaidOut',
           severity: 'info',
-          message: `section ${index} snaps its lines to a document grid; the character grid is not applied by this slice`,
+          message: `section ${index} snaps its lines to a document grid and declares no character pitch`,
           docPos: undefined,
         });
       }

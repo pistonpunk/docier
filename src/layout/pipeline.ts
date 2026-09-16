@@ -9,6 +9,7 @@ import { ingest } from './ingest.js';
 import { themeResolutionOf } from './theme-resolution.js';
 import type { IngestedTable } from './table-ingest.js';
 import type { Section } from './sections.js';
+import type { DocumentGrid } from './sections.js';
 import {
   buildSections,
   columnBoxesOf,
@@ -18,7 +19,8 @@ import {
 } from './sections.js';
 import { FontResolver } from './fonts.js';
 import { PaintRegistry } from './paint.js';
-import { fallbackRunFormat } from './format.js';
+import type { ThemeResolution } from './format.js';
+import { DEFAULT_FONT_SIZE, fallbackRunFormat, runFormatOf } from './format.js';
 import type { IntrinsicWidths, PreparedParagraph } from './paragraph-blocks.js';
 import { buildParagraphBlock, intrinsicWidths, prepareParagraphs } from './paragraph-blocks.js';
 import type { SideBand } from './assembly.js';
@@ -108,6 +110,39 @@ const dedupe = (diagnostics: readonly LayoutDiagnostic[]): readonly LayoutDiagno
 
 const DEFAULT_FLOAT_GAP = mp(9000);
 
+// the character grid's pitch is the normal font's pitch plus the delta the
+// document declares, which is in 4096ths of a point
+const CHAR_SPACE_DIVISOR = 4096;
+
+const normalSizeOf = (
+  model: DocumentModel,
+  family: string,
+  theme: ThemeResolution | undefined,
+): Mp => {
+  const styles = model.styles;
+  const element = styles?.defaultRunPropertiesElement();
+  if (element === undefined) return DEFAULT_FONT_SIZE;
+  return runFormatOf(
+    model.resolver.resolveRun({
+      runProperties: element,
+      paragraphProperties: undefined,
+      tableStyle: undefined,
+      numbering: undefined,
+    }),
+    family,
+    theme,
+  ).size;
+};
+
+const gridWithPitch = (
+  grid: DocumentGrid | undefined,
+  normalSize: Mp,
+): DocumentGrid | undefined => {
+  if (grid === undefined || grid.charSpace === undefined) return grid;
+  const delta = mp((grid.charSpace / CHAR_SPACE_DIVISOR) * 1000);
+  return { ...grid, charPitch: mp((normalSize as number) + (delta as number)) };
+};
+
 const tabStopTwips = (model: DocumentModel): Twip => {
   const raw = model.settings?.defaultTabStop;
   return raw === undefined || raw <= 0 ? twip(DEFAULT_TAB_STOP_TWIPS) : twip(raw);
@@ -142,6 +177,8 @@ export const layoutDocument = (
 ): LayoutResult => {
   const measurer = options.measurer ?? createDeterministicMeasurer();
   const defaultFontFamily = options.defaultFontFamily ?? measurer.fallbackFamily;
+  // the grid's character pitch is measured against the normal style's size
+  const normalSize = normalSizeOf(model, defaultFontFamily, themeResolutionOf(model));
   const defaultTabStop = options.defaultTabStop ?? tabStopTwips(model);
   const defaultTabStopMp: Mp = twipToMp(defaultTabStop);
   const diagnostics: LayoutDiagnostic[] = [];
@@ -214,7 +251,10 @@ export const layoutDocument = (
       entry,
       box.x,
       box.width,
-      { defaultTabStop: defaultTabStopMp, documentGrid: owner?.documentGrid },
+      {
+        defaultTabStop: defaultTabStopMp,
+        documentGrid: gridWithPitch(owner?.documentGrid, normalSize),
+      },
     );
   }
 
@@ -712,7 +752,10 @@ export const layoutDocument = (
         preparedEntry,
         box.x,
         box.width,
-        { defaultTabStop: defaultTabStopMp, documentGrid: sections[0]?.documentGrid },
+        {
+          defaultTabStop: defaultTabStopMp,
+          documentGrid: gridWithPitch(sections[0]?.documentGrid, normalSize),
+        },
         list,
       );
     }
