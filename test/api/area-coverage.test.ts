@@ -120,10 +120,11 @@ describe('chrome command coverage', () => {
 
     // the number rises whenever a menu entry is wired from a dialog stub to the
     // command it names, or when a menu row that named nothing gains a command.
-    // The last rise was the whole field set behind Insert > Field; the last fall
-    // was Find and Replace, which open the find dialog instead of being executed
+    // The last rise was Change Case, a new Home > Font menu of five modes; before
+    // that it was the whole field set behind Insert > Field, and before that a
+    // fall, Find and Replace, which open the find dialog instead of being executed
     // from the ribbon, so the dialog dispatches them rather than the chrome
-    expect(registered).toBe(141);
+    expect(registered).toBe(142);
     expect([...areas.keys()].sort()).toEqual([
       'clipboard',
       'comment',
@@ -144,7 +145,7 @@ describe('chrome command coverage', () => {
     ]);
     expect(areas.get('doc')).toBe(15);
     expect(areas.get('insert')).toBe(22);
-    expect(areas.get('format')).toBe(24);
+    expect(areas.get('format')).toBe(25);
     expect(areas.get('table')).toBe(35);
     expect(areas.get('object')).toBe(12);
     // one fewer than it was: Insert > Field used to dispatch token.insert, which

@@ -294,6 +294,25 @@ export const RIBBON_TABS: readonly UiTab[] = [
             action: 'openColourPicker',
             actionArgs: { command: command('format.setHighlight') },
           }),
+          menu('ui.control.changeCase', [
+            ...(
+              [
+                ['sentence', 'ui.control.caseSentence'],
+                ['lower', 'ui.control.caseLower'],
+                ['upper', 'ui.control.caseUpper'],
+                ['capitalize', 'ui.control.caseCapitalize'],
+                ['toggle', 'ui.control.caseToggle'],
+              ] as const
+            ).map(([mode, labelKey]) =>
+              button({
+                labelKey,
+                command: command('format.changeCase'),
+                args: { mode },
+                action: 'openDialog',
+                actionArgs: { dialog: command('format.changeCase') },
+              }),
+            ),
+          ]),
           button({
             labelKey: 'ui.control.clearFormatting',
             command: command('format.clearCharacterFormatting'),

@@ -5,7 +5,12 @@ import { ParagraphProperties, RunProperties } from '../../model/index.js';
 import type { LineSpacingRule, TabStop } from '../../model/index.js';
 import { activeMarks, setRunFormat } from '../actions.js';
 import { runSpans } from '../mutation.js';
-import { areaCommand, forEachSlot, NEEDS_VALUE, rangeOfSelection } from './support.js';
+import { docPos } from '../../layout/index.js';
+import type { DocPos, DocRange } from '../../layout/index.js';
+import { caretSelection } from '../selection.js';
+import { applyCase, isCaseMode } from '../text-case.js';
+import type { CaseMode } from '../text-case.js';
+import { areaCommand, forEachSlot, NEEDS_VALUE, rangeOfSelection, writingAt } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
 export interface IndentArgs {
@@ -227,7 +232,66 @@ const stepFontSpec = (id: string, label: string, grow: boolean): AreaSpec<Record
   },
 });
 
+export interface CaseArgs {
+  readonly mode?: CaseMode | undefined;
+}
+
+const wordRangeAround = (host: AreaHost, pos: DocPos): DocRange => {
+  const slot = host.session.resolve(pos)?.slot;
+  if (slot === undefined) return { start: pos, end: pos };
+  const text = host.session.textOf({ start: slot.start, end: slot.textEnd });
+  const offset = Math.min(Math.max(0, (pos as number) - (slot.start as number)), text.length);
+  const letter = /[\p{L}\p{N}]/u;
+  let from = offset;
+  let to = offset;
+  while (from > 0 && letter.test(text[from - 1] ?? '')) from -= 1;
+  while (to < text.length && letter.test(text[to] ?? '')) to += 1;
+  if (from === to) return { start: pos, end: pos };
+  return {
+    start: docPos((slot.start as number) + from),
+    end: docPos((slot.start as number) + to),
+  };
+};
+
+const changeCaseSpec: AreaSpec<CaseArgs> = {
+  id: 'docier.command.format.changeCase',
+  label: 'Change Case',
+  category: 'format',
+  permissions: ['edit'],
+  enabledIn: (host, args) => host.loaded && host.editable && isCaseMode(args?.mode),
+  reason: (host, args) => {
+    if (!isCaseMode(args?.mode)) return NEEDS_VALUE;
+    if (!host.loaded) return 'No document is loaded';
+    return 'The document is read-only';
+  },
+  run: (host, args) => {
+    const mode = args?.mode;
+    if (!isCaseMode(mode) || !host.editable) return false;
+    const selection = host.selection;
+    const range =
+      (selection.focus as number) === (selection.anchor as number)
+        ? wordRangeAround(host, selection.focus)
+        : rangeOfSelection(selection);
+    if ((range.end as number) <= (range.start as number)) return false;
+    const before = host.session.textOf(range);
+    const after = applyCase(before, mode);
+    if (after === before) return false;
+    return writingAt(host, () => {
+      const removed = host.session.deleteRange(range);
+      const inserted = host.session.insertText(
+        { start: range.start, end: range.start },
+        after,
+      );
+      if (removed || inserted) {
+        host.setSelection(caretSelection(docPos(range.start), 'downstream'), 'input');
+      }
+      return removed || inserted;
+    });
+  },
+};
+
 export const paragraphCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
+  areaCommand<CaseArgs>(host, changeCaseSpec),
   areaCommand<IndentArgs>(host, indentSpec),
   areaCommand<IndentArgs>(
     host,
