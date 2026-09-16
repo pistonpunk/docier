@@ -542,6 +542,83 @@ const alignSpec: AreaSpec<AlignArgs> = {
   },
 };
 
+export interface ChangeImageArgs {
+  readonly objectId?: string;
+  readonly bytes?: Uint8Array;
+  readonly contentType?: string;
+}
+
+const IMAGE_RELATIONSHIP =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+
+const blipRelationshipOf = (drawing: XmlElement): string | undefined => {
+  const blip = descendantIn(
+    drawing,
+    (candidate) => candidate.localName === 'blip' && candidate.uri.startsWith('http://schemas.openxmlformats.org/drawingml'),
+  );
+  if (blip === undefined) return undefined;
+  return blip.attributes.find((attribute) => attribute.localName === 'embed')?.value;
+};
+
+const mediaPartFor = (
+  host: AreaHost,
+  relationshipId: string,
+): string | undefined => {
+  const pkg = host.session.model.package;
+  // relationship ids are only unique within their source part, so each part's
+  // image relationships are searched rather than the whole package
+  for (const sourcePartName of pkg.relationships.sourceParts()) {
+    const images = pkg.relationships.getRelationships(sourcePartName, IMAGE_RELATIONSHIP);
+    const found = images.find((candidate) => candidate.id === relationshipId);
+    if (found !== undefined) return found.resolvedTarget;
+  }
+  return undefined;
+};
+
+const changeImageSpec: AreaSpec<ChangeImageArgs> = {
+  id: 'docier.command.object.changeImage',
+  label: 'Change picture',
+  category: 'object',
+  permissions: ['insert'],
+  enabledIn: (host, args) => {
+    const objectId = selectedId(host, args);
+    if (objectId === undefined || args?.bytes === undefined) return false;
+    const drawing = drawingWithId(host, objectId);
+    if (drawing === undefined) return false;
+    const relationshipId = blipRelationshipOf(drawing);
+    return relationshipId !== undefined && mediaPartFor(host, relationshipId) !== undefined;
+  },
+  reason: (host, args) => {
+    if (selectedId(host, args) === undefined) return NO_SELECTION;
+    if (args?.bytes === undefined) return 'This control needs the bytes of a picture';
+    return NO_PICTURE;
+  },
+  run: (host, args) => {
+    const objectId = selectedId(host, args);
+    const bytes = args?.bytes;
+    if (objectId === undefined || bytes === undefined || bytes.byteLength === 0) return false;
+    const drawing = drawingWithId(host, objectId);
+    if (drawing === undefined) return false;
+    const relationshipId = blipRelationshipOf(drawing);
+    if (relationshipId === undefined) return false;
+    const partName = mediaPartFor(host, relationshipId);
+    if (partName === undefined) return false;
+    const part = host.session.model.package.getPart(partName);
+    if (part === undefined) return false;
+    const written = writingAt(host, () => {
+      part.setBytes(bytes);
+      if (args?.contentType !== undefined) {
+        host.session.model.package.contentTypes.setOverride(partName, args.contentType);
+      }
+      return true;
+    });
+    if (!written) return false;
+    host.session.relayout();
+    selectObject(host.session, objectId);
+    return true;
+  },
+};
+
 const deleteSpec: AreaSpec<ObjectSelectArgs> = {
   id: 'docier.command.object.delete',
   label: 'Delete object',
@@ -596,6 +673,7 @@ export const objectCommands = (host: AreaHost): readonly CommandDefinition<never
     stackingSpec('docier.command.object.sendBackward', 'Send backward', false),
   ),
   areaCommand<ObjectWrapArgs>(host, setWrapSpec),
+  areaCommand<ChangeImageArgs>(host, changeImageSpec),
   areaCommand<AlignArgs>(host, alignSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),

@@ -132,13 +132,6 @@ const REFUSALS: readonly Refusal[] = [
   { id: 'docier.command.object.insertShape', label: 'Shape', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
   {
-    id: 'docier.command.object.changeImage',
-    label: 'Change picture',
-    category: 'object',
-    reason:
-      'Replacing a picture means rewriting the media part, and this build inserts media without ever rewriting bytes a document already carries',
-  },
-  {
     id: 'docier.command.object.compress',
     label: 'Compress pictures',
     category: 'object',

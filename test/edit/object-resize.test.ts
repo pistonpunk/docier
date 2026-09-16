@@ -533,6 +533,61 @@ describe('resizing a picture through the surface', () => {
   });
 });
 
+describe('changing the picture a drawing points at', () => {
+  const handleWithPicture = async (): Promise<EditorHandle> => {
+    const model = await openModel(pictureSpec({ blip: BLIP }));
+    return track(createEditor(mountPoint(), {}, { document: model }));
+  };
+
+  const mediaBytes = async (handle: EditorHandle): Promise<number> => {
+    const part = handle.document?.package.getPart('word/media/image1.png');
+    if (part === undefined) throw new Error('no media part');
+    return (await part.bytes()).byteLength;
+  };
+
+  it('replaces the bytes of the media part the drawing points at', async () => {
+    const handle = await handleWithPicture();
+    const before = await mediaBytes(handle);
+    await selectByClick(handle);
+
+    const replacement = new Uint8Array(64).fill(7);
+    const result = await handle.commands.execute('docier.command.object.changeImage', {
+      bytes: replacement,
+    });
+    expect(result.status).toBe('ok');
+    const part = handle.document?.package.getPart('word/media/image1.png');
+    expect((await part?.bytes())?.byteLength).toBe(64);
+    expect(before).not.toBe(64);
+  });
+
+  it('is one undo entry and puts the old bytes back', async () => {
+    const handle = await handleWithPicture();
+    const before = await mediaBytes(handle);
+    await selectByClick(handle);
+
+    await handle.commands.execute('docier.command.object.changeImage', {
+      bytes: new Uint8Array(64).fill(7),
+    });
+    expect(await mediaBytes(handle)).toBe(64);
+
+    await handle.commands.execute('docier.command.history.undo');
+    expect(await mediaBytes(handle)).toBe(before);
+  });
+
+  it('refuses until a picture is selected, and needs bytes', async () => {
+    const handle = await handleWithPicture();
+    expect(handle.commands.isEnabled('docier.command.object.changeImage')).toBe(false);
+    expect(String(handle.commands.disabledReason('docier.command.object.changeImage'))).toContain(
+      'No picture is selected',
+    );
+
+    await selectByClick(handle);
+    expect(
+      handle.commands.disabledReason('docier.command.object.changeImage', { bytes: new Uint8Array(4) }),
+    ).toBeUndefined();
+  });
+});
+
 describe('aligning a floating picture', () => {
   const ANCHORED = bodyOf(
     wrap(

@@ -90,10 +90,12 @@ export const createPackageImageProvider = (
     const relationship = relationshipFor(model, id);
     if (relationship === undefined) return undefined;
     const cache = cacheFor(model);
-    let bytes = cache.get(relationship.target);
+    const part = model.package.getPart(relationship.target);
+    if (part === undefined) return undefined;
+    // a part the editing layer has written is re-read rather than served from the
+    // cache, which is what makes replacing a picture show the new bytes
+    let bytes = part.isDirty ? undefined : cache.get(relationship.target);
     if (bytes === undefined) {
-      const part = model.package.getPart(relationship.target);
-      if (part === undefined) return undefined;
       try {
         bytes = part.toBytes();
         cache.set(relationship.target, bytes);

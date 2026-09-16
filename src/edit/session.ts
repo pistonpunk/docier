@@ -4,6 +4,7 @@ import type { LayoutOptions } from '../layout/index.js';
 import type { XmlElement, XmlNode } from '../ooxml/xml/index.js';
 import { createDeclaration, createDocument, serializeXmlNode } from '../ooxml/xml/index.js';
 import { cloneNode } from '../ooxml/xml/tree.js';
+import { bytesEqual } from '../ooxml/bytes.js';
 import type { Relationship } from '../ooxml/relationships.js';
 import type { DocumentModel, Story } from '../model/index.js';
 import { Paragraph, childElements, storyKindForPartName, wAttr } from '../model/index.js';
@@ -395,11 +396,23 @@ const restoreMedia = (model: DocumentModel, before: readonly MediaSnapshot[]): v
   }
   for (const entry of before) {
     if (entry.bytes === undefined) continue;
-    if (model.package.getPart(entry.partName) !== undefined) continue;
-    model.package.createPart(entry.partName, entry.bytes, {
-      contentType: entry.contentType ?? 'application/octet-stream',
-      role: 'media',
-    });
+    const part = model.package.getPart(entry.partName);
+    if (part === undefined) {
+      model.package.createPart(entry.partName, entry.bytes, {
+        contentType: entry.contentType ?? 'application/octet-stream',
+        role: 'media',
+      });
+      continue;
+    }
+    // a part that still exists can have had its bytes replaced, so its contents
+    // are restored rather than only its presence
+    let current: Uint8Array | undefined;
+    try {
+      current = part.toBytes();
+    } catch {
+      current = undefined;
+    }
+    if (current === undefined || !bytesEqual(current, entry.bytes)) part.setBytes(entry.bytes);
   }
 };
 
