@@ -213,17 +213,22 @@ describe('rows across pages', () => {
 });
 
 describe('table diagnostics', () => {
-  it('reports a floating table as laid out in the flow', async () => {
+  it('places a floating table against its anchor instead of in the flow', async () => {
     const result = await layoutOf(
       bodyOf(
-        table(
-          `${FIXED(1000)}<w:tblpPr w:vertAnchor="text" w:horzAnchor="text"/>`,
-          grid([500, 500]),
-          [row('', twoCells(para('aa')))],
-        ),
+        `<w:p><w:r><w:t>above</w:t></w:r></w:p>` +
+          table(
+            `${FIXED(1000)}<w:tblpPr w:tblpY="2000" w:vertAnchor="page" w:horzAnchor="page"/>`,
+            grid([500, 500]),
+            [row('', twoCells(para('aa')))],
+          ) +
+          '<w:p><w:r><w:t>below</w:t></w:r></w:p>',
       ),
     );
-    expect(tableDiags(result)).toContain('floatingTableNotLaidOut');
+    const box = result.pages[0]?.tables[0]?.box;
+    // 2000 twips down the page, not below the paragraph that precedes it
+    expect(box?.y).toBe(2000 * 50);
+    expect(tableDiags(result)).not.toContain('floatingTableNotLaidOut');
   });
 
   it('reports cell spacing as unsupported', async () => {

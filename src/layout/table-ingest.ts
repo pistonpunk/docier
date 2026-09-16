@@ -353,11 +353,12 @@ export const ingestTable = (state: IngestState, table: Table, depth: number): In
   for (let index = 0; index < columnCount; index += 1) grid.push(declared[index]);
 
   const floating = floatingPositionOf(properties);
-  if (floating !== undefined) {
+  if (floating !== undefined && properties.floatingLeftFromText !== undefined) {
     state.diagnostics.push({
       code: 'floatingTableNotLaidOut',
       severity: 'info',
-      message: 'a floating table is placed against its anchor; text does not wrap around it yet',
+      message:
+        'the gap between a floating table and the text beside it is a fixed width, not the w:tblpPr distance',
       docPos: start,
     });
   }

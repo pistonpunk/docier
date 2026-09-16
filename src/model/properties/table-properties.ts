@@ -159,6 +159,11 @@ export class TableProperties {
     return this.prop('tblpPr').attribute('vertAnchor');
   }
 
+  get floatingLeftFromText(): Twip | undefined {
+    const raw = integerFrom(this.prop('tblpPr').attribute('leftFromText'));
+    return raw === undefined ? undefined : (raw as Twip);
+  }
+
   get look(): XmlElement | undefined {
     return this.prop('tblLook').element;
   }

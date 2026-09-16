@@ -57,16 +57,52 @@ describe('a floating table', () => {
     expect(floated).toEqual(bareTops);
   });
 
-  it('says what it does not do about wrapping', async () => {
+  it('reports the one thing about it that is still fixed', async () => {
     const result = await layoutOf(
+      body(
+        '<w:tblpPr w:tblpX="2000" w:tblpY="3000" w:leftFromText="180" w:horzAnchor="page" w:vertAnchor="page"/>',
+      ),
+    );
+    const diagnostic = result.diagnostics.find(
+      (entry) => entry.code === 'floatingTableNotLaidOut',
+    );
+    expect(diagnostic?.message).toContain('fixed width');
+    // and says nothing when the document asks for no particular distance
+    const quiet = await layoutOf(
       body('<w:tblpPr w:tblpX="2000" w:tblpY="3000" w:horzAnchor="page" w:vertAnchor="page"/>'),
     );
-    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+    expect(quiet.diagnostics.map((entry) => entry.code)).not.toContain(
       'floatingTableNotLaidOut',
     );
-    expect(
-      result.diagnostics.find((diagnostic) => diagnostic.code === 'floatingTableNotLaidOut')
-        ?.message,
-    ).toContain('does not wrap');
+  });
+});
+
+describe('text beside a floating table', () => {
+  const WIDE = (properties: string): string =>
+    bodyOf(
+      `<w:p><w:r><w:t>${'word '.repeat(30)}</w:t></w:r></w:p>${floatWith(properties)}${PAGE}`,
+    );
+
+  const firstLine = async (body: string) => {
+    const result = await layoutOf(body);
+    return result.pages[0]?.blocks[0]?.lines[0];
+  };
+
+  it('starts beside a table that sits in its way', async () => {
+    const plain = await firstLine(WIDE(''));
+    const floated = await firstLine(
+      WIDE(
+        '<w:tblpPr w:tblpXSpec="left" w:tblpYSpec="top" w:horzAnchor="margin" w:vertAnchor="margin"/>',
+      ),
+    );
+    expect(floated?.atoms[0]?.x ?? 0).toBeGreaterThan(plain?.atoms[0]?.x ?? 0);
+  });
+
+  it('leaves the text alone when the table is below it', async () => {
+    const plain = await firstLine(WIDE(''));
+    const floated = await firstLine(
+      WIDE('<w:tblpPr w:tblpXSpec="left" w:tblpY="6000" w:horzAnchor="margin" w:vertAnchor="page"/>'),
+    );
+    expect(floated?.atoms[0]?.x).toBe(plain?.atoms[0]?.x);
   });
 });

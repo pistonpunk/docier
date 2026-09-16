@@ -614,6 +614,49 @@ export const layoutDocument = (
         }
       }
     }
+    // a floating table is a float like any anchored object: the text beside it
+    // wraps rather than being written over
+    const floatingTables = new Set(
+      tablePrepare.tables.filter((table) => table.floating !== undefined).map((table) => table.id),
+    );
+    if (floatingTables.size > 0) {
+      const byTable = new Map<number, { top: Mp; bottom: Mp; left: Mp; right: Mp; page: number }>();
+      for (const row of paginated.rows) {
+        if (!floatingTables.has(row.table)) continue;
+        const box = row.box;
+        const existing = byTable.get(row.table);
+        if (existing === undefined) {
+          byTable.set(row.table, {
+            top: box.y,
+            bottom: mp(box.y + box.height),
+            left: box.x,
+            right: mp(box.x + box.width),
+            page: row.page,
+          });
+          continue;
+        }
+        existing.top = mp(Math.min(existing.top, box.y));
+        existing.bottom = mp(Math.max(existing.bottom, box.y + box.height));
+        existing.left = mp(Math.min(existing.left, box.x));
+        existing.right = mp(Math.max(existing.right, box.x + box.width));
+      }
+      for (const entry of byTable.values()) {
+        const state = pageState(entry.page);
+        const boxCentre = mp(
+          (state?.contentBox.x ?? mp(0)) + (state?.contentBox.width ?? mp(0)) / 2,
+        );
+        const centre = mp(entry.left + (entry.right - entry.left) / 2);
+        placedFloats.push({
+          page: entry.page,
+          top: entry.top,
+          bottom: entry.bottom,
+          left: entry.left,
+          right: entry.right,
+          side: centre <= boxCentre ? 'left' : 'right',
+          extent: mp(entry.right - entry.left + 1000),
+        });
+      }
+    }
     if (placedFloats.length === 0) return new Map();
 
     const out = new Map<number, SideBand[]>();
