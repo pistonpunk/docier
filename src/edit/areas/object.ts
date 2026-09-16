@@ -18,7 +18,7 @@ import {
   isWElement,
   resolvedRunContents,
 } from '../../model/index.js';
-import { buildGroupDrawing, buildInlineDrawing } from '../../ooxml/drawing.js';
+import { buildGroupDrawing, buildInlineDrawing, buildShapeDrawing } from '../../ooxml/drawing.js';
 import type { GroupChildRequest } from '../../ooxml/drawing.js';
 import { createWElement } from '../../model/index.js';
 import { objectIdOfDrawing } from '../../layout/objects.js';
@@ -759,6 +759,65 @@ const deleteSpec: AreaSpec<ObjectSelectArgs> = {
   },
 };
 
+export interface InsertShapeArgs {
+  readonly preset?: string | undefined;
+  readonly fill?: string | undefined;
+  readonly outline?: string | undefined;
+  readonly widthTwips?: number | undefined;
+  readonly heightTwips?: number | undefined;
+  readonly name?: string | undefined;
+  readonly docPrId?: number | undefined;
+}
+
+const SHAPE_PRESETS: readonly string[] = ['rect', 'roundRect', 'ellipse', 'line', 'triangle', 'diamond'];
+
+const insertShapeSpec: AreaSpec<InsertShapeArgs> = {
+  id: 'docier.command.object.insertShape',
+  label: 'Shape',
+  category: 'object',
+  permissions: ['insert'],
+  enabledIn: (host, args) =>
+    host.session.aligned &&
+    (args?.preset === undefined || SHAPE_PRESETS.includes(args.preset)),
+  reason: (host) =>
+    host.session.aligned
+      ? 'Name a preset this build knows, such as rect or ellipse'
+      : NOT_ALIGNED,
+  run: (host, args) => {
+    const preset = args?.preset ?? 'rect';
+    if (!SHAPE_PRESETS.includes(preset)) return false;
+    const doc = host.session.resolve(host.selection.focus);
+    if (doc === undefined) return false;
+    const width = Math.max(MIN_OBJECT_TWIPS, Math.floor(args?.widthTwips ?? DEFAULT_IMAGE_TWIPS.width));
+    const height = Math.max(
+      MIN_OBJECT_TWIPS,
+      Math.floor(args?.heightTwips ?? DEFAULT_IMAGE_TWIPS.height),
+    );
+    const docPrId = args?.docPrId ?? nextDocPrId(host.session.model);
+    const drawing = buildShapeDrawing({
+      cx: twipToEmu(twip(width)),
+      cy: twipToEmu(twip(height)),
+      docPrId,
+      name: args?.name ?? `Shape ${String(docPrId)}`,
+      preset,
+      fill: args?.fill ?? 'D9E2F3',
+      outline: args?.outline ?? '2E74B5',
+      outlineWidthEmu: 12700,
+    });
+    const inserted = writingAt(host, () =>
+      insertRunChildAt(host.session.model, doc.slot.element, doc.offset, (run) => {
+        run.children.push(drawing);
+        drawing.parent = run;
+      }),
+    );
+    if (!inserted) return false;
+    host.session.model.context.forgetSubtree(doc.slot.element);
+    host.session.relayout();
+    selectObject(host.session, objectIdOfDrawing(drawing, docPrId));
+    return true;
+  },
+};
+
 export interface ObjectGroupArgs {
   readonly objectIds?: readonly string[];
   readonly name?: string;
@@ -1052,6 +1111,7 @@ export const objectCommands = (host: AreaHost): readonly CommandDefinition<never
   areaCommand<AlignArgs>(host, alignSpec),
   areaCommand<ObjectSelectArgs>(host, selectSpec),
   areaCommand<InsertImageArgs>(host, insertImageSpec),
+  areaCommand<InsertShapeArgs>(host, insertShapeSpec),
   areaCommand<ObjectGroupArgs>(host, groupSpec),
   areaCommand<ObjectUngroupArgs>(host, ungroupSpec),
 ];

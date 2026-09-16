@@ -78,17 +78,17 @@ describe('ribbon controls', () => {
 
     // a command with no implementation behind it is not shown at all: a greyed
     // button that can never become enabled is a placeholder, not a control
-    const insertShape = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
-      '[data-docier-id="docier.command.object.insertShape"]',
+    const insertChart = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
+      '[data-docier-id="docier.command.object.insertChart"]',
     );
-    expect(insertShape).toBeNull();
+    expect(insertChart).toBeNull();
 
     // the registry still answers honestly about it, which is what the API and
     // the disabled-state tests rely on
-    const shape = chrome.context.describe({ command: 'docier.command.object.insertShape' });
-    expect(shape.enabled).toBe(false);
-    expect(shape.registered).toBe(true);
-    expect(shape.reason).toContain('no geometry for a preset shape');
+    const chart = chrome.context.describe({ command: 'docier.command.object.insertChart' });
+    expect(chart.enabled).toBe(false);
+    expect(chart.registered).toBe(true);
+    expect(chart.reason).toContain('no geometry for a preset shape');
 
     const unregistered = chrome.context.describe({ command: 'docier.command.nope.missing' });
     expect(unregistered.enabled).toBe(false);

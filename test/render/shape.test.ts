@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { buildShapeDrawing } from '../../src/ooxml/drawing.js';
+import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
 import { ATTR, renderDocument } from '../../src/render/index.js';
 import { bodyOf, host, layoutOf } from './support.js';
 
@@ -61,6 +63,28 @@ describe('a preset shape', () => {
     expect(node).not.toBeNull();
     expect(node?.style.backgroundColor).toBe('');
     expect(node?.style.outlineStyle).toBe('');
+  });
+
+  it('reads back a shape this build wrote, so the writer and the reader agree', async () => {
+    const drawing = buildShapeDrawing({
+      cx: EMU,
+      cy: EMU,
+      docPrId: 9,
+      name: 'Shape 9',
+      preset: 'rect',
+      fill: 'FF0000',
+      outline: '0000FF',
+      outlineWidthEmu: 12700,
+    });
+    const result = await layoutOf(bodyOf(`<w:p><w:r>${serializeXmlNode(drawing)}</w:r></w:p>`));
+    const found = result.pages[0]?.blocks[0]?.lines[0]?.atoms.find((atom) => atom.object !== undefined);
+    expect(found?.object?.shape).toEqual({
+      preset: 'rect',
+      fill: 'FF0000',
+      outline: '0000FF',
+      outlineWidthMp: 1000,
+    });
+    expect(found?.object?.objectId).toBe('9');
   });
 
   it('leaves a preset it cannot draw faithfully alone rather than drawing its box', async () => {

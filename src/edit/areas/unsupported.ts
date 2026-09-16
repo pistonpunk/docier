@@ -99,7 +99,6 @@ const REFUSALS: readonly Refusal[] = [
       'List numbers come from w:numFmt/w:lvlText rather than from w:t, so this build cannot turn them into literal text',
   },
 
-  { id: 'docier.command.object.insertShape', label: 'Shape', category: 'object', reason: NO_DRAWING },
   { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
 
   {

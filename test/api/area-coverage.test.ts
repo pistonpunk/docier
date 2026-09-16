@@ -218,7 +218,7 @@ describe('the chrome does not show placeholders', () => {
     const wouldHaveBeenShown = unsupportedIds.filter((id) => raw.has(id));
     // the floor tracks how many refusals there still are; it falls as features
     // are built, which is the direction it is meant to fall in
-    expect(wouldHaveBeenShown.length).toBeGreaterThan(25);
+    expect(wouldHaveBeenShown.length).toBeGreaterThan(24);
     expect(prunedIds().size).toBeLessThan(raw.size);
   });
 });
@@ -292,7 +292,7 @@ describe('deliberately unavailable commands', () => {
       'Place the caret inside a table',
     );
     expect(reasonOf(handle, 'docier.command.object.insertImage')).toContain('needs the bytes of a picture');
-    expect(reasonOf(handle, 'docier.command.object.insertShape')).toContain('no geometry for a preset shape');
+    expect(reasonOf(handle, 'docier.command.object.insertChart')).toContain('no geometry for a preset shape');
     expect(handle.commands.isEnabled('docier.command.insert.header')).toBe(true);
     expect(reasonOf(handle, 'docier.command.insert.closeHeaderFooter')).toContain('not in a header');
     expect(reasonOf(handle, 'docier.command.numbering.cleanup')).toContain('w:abstractNum');

@@ -603,3 +603,129 @@ export const buildTextBoxDrawing = (request: TextBoxRequest): XmlElement => {
   inline.parent = drawing;
   return drawing;
 };
+
+export interface ShapeRequest {
+  readonly cx: number;
+  readonly cy: number;
+  readonly docPrId: number;
+  readonly name: string;
+  readonly preset: string;
+  readonly fill: string | undefined;
+  readonly outline: string | undefined;
+  readonly outlineWidthEmu: number;
+}
+
+export const buildShapeDrawing = (request: ShapeRequest): XmlElement => {
+  const drawing = namespaced('drawing', 'w', WORD_NAMESPACE);
+  drawing.selfClosing = false;
+  for (const [prefix, uri] of Object.entries(DRAWING_NAMESPACES)) {
+    declareNamespace(drawing, prefix, uri);
+  }
+  declareNamespace(drawing, 'wps', WPS_NAMESPACE);
+
+  const inline = namespaced('inline', 'wp', DRAWING_NAMESPACES.wp);
+  inline.selfClosing = false;
+  withAttributes(inline, [
+    ['distT', '0', '', ''],
+    ['distB', '0', '', ''],
+    ['distL', '0', '', ''],
+    ['distR', '0', '', ''],
+  ]);
+  const extent = namespaced('extent', 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(extent, [
+    ['cx', String(request.cx), '', ''],
+    ['cy', String(request.cy), '', ''],
+  ]);
+  const docPr = namespaced('docPr', 'wp', DRAWING_NAMESPACES.wp);
+  withAttributes(docPr, [
+    ['id', String(request.docPrId), '', ''],
+    ['name', request.name, '', ''],
+  ]);
+
+  const graphic = namespaced('graphic', 'a', DRAWING_NAMESPACES.a);
+  graphic.selfClosing = false;
+  const graphicData = namespaced('graphicData', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(graphicData, [['uri', WPS_NAMESPACE, '', '']]);
+  graphicData.selfClosing = false;
+
+  const wsp = namespaced('wsp', 'wps', WPS_NAMESPACE);
+  wsp.selfClosing = false;
+  const spPr = namespaced('spPr', 'wps', WPS_NAMESPACE);
+  spPr.selfClosing = false;
+  const xfrm = namespaced('xfrm', 'a', DRAWING_NAMESPACES.a);
+  xfrm.selfClosing = false;
+  const off = namespaced('off', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(off, [
+    ['x', '0', '', ''],
+    ['y', '0', '', ''],
+  ]);
+  const ext = namespaced('ext', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(ext, [
+    ['cx', String(request.cx), '', ''],
+    ['cy', String(request.cy), '', ''],
+  ]);
+  xfrm.children.push(off, ext);
+  off.parent = xfrm;
+  ext.parent = xfrm;
+  const geometry = namespaced('prstGeom', 'a', DRAWING_NAMESPACES.a);
+  withAttributes(geometry, [['prst', request.preset, '', '']]);
+  geometry.selfClosing = false;
+  const avLst = namespaced('avLst', 'a', DRAWING_NAMESPACES.a);
+  geometry.children.push(avLst);
+  avLst.parent = geometry;
+  spPr.children.push(xfrm, geometry);
+  xfrm.parent = spPr;
+  geometry.parent = spPr;
+
+  const colourOf = (name: string, value: string): XmlElement => {
+    const solid = namespaced(name, 'a', DRAWING_NAMESPACES.a);
+    solid.selfClosing = false;
+    const colour = namespaced('srgbClr', 'a', DRAWING_NAMESPACES.a);
+    withAttributes(colour, [['val', value, '', '']]);
+    solid.children.push(colour);
+    colour.parent = solid;
+    return solid;
+  };
+
+  if (request.fill === undefined) {
+    const noFill = namespaced('noFill', 'a', DRAWING_NAMESPACES.a);
+    spPr.children.push(noFill);
+    noFill.parent = spPr;
+  } else {
+    const solid = colourOf('solidFill', request.fill);
+    spPr.children.push(solid);
+    solid.parent = spPr;
+  }
+
+  const line = namespaced('ln', 'a', DRAWING_NAMESPACES.a);
+  line.selfClosing = false;
+  withAttributes(line, [['w', String(request.outlineWidthEmu), '', '']]);
+  if (request.outline === undefined) {
+    const noFill = namespaced('noFill', 'a', DRAWING_NAMESPACES.a);
+    line.children.push(noFill);
+    noFill.parent = line;
+  } else {
+    const solid = colourOf('solidFill', request.outline);
+    line.children.push(solid);
+    solid.parent = line;
+  }
+  spPr.children.push(line);
+  line.parent = spPr;
+
+  const bodyPr = namespaced('bodyPr', 'wps', WPS_NAMESPACE);
+  wsp.children.push(spPr, bodyPr);
+  spPr.parent = wsp;
+  bodyPr.parent = wsp;
+
+  graphicData.children.push(wsp);
+  wsp.parent = graphicData;
+  graphic.children.push(graphicData);
+  graphicData.parent = graphic;
+  inline.children.push(extent, docPr, graphic);
+  extent.parent = inline;
+  docPr.parent = inline;
+  graphic.parent = inline;
+  drawing.children.push(inline);
+  inline.parent = drawing;
+  return drawing;
+};
