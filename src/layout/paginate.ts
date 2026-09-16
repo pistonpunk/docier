@@ -97,6 +97,7 @@ const fallbackSection = (): Section => {
     columnSpace: mp(0),
     lineNumbering: undefined,
     verticalAlignment: 'top',
+    documentGrid: undefined,
     propertiesElement: undefined,
   };
 };

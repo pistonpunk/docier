@@ -207,11 +207,12 @@ export const layoutDocument = (
     const entry = prepared[block.paragraph.index];
     if (entry === undefined) continue;
     const box = contentBoxOf(sectionOfBlock(sections, block.paragraph.index) ?? sections[0]);
+    const owner = sectionOfBlock(sections, block.paragraph.index) ?? sections[0];
     paragraphBlocks[block.paragraph.index] = buildParagraphBlock(
       entry,
       box.x,
       box.width,
-      { defaultTabStop: defaultTabStopMp },
+      { defaultTabStop: defaultTabStopMp, documentGrid: owner?.documentGrid },
     );
   }
 
@@ -654,7 +655,7 @@ export const layoutDocument = (
         preparedEntry,
         box.x,
         box.width,
-        { defaultTabStop: defaultTabStopMp },
+        { defaultTabStop: defaultTabStopMp, documentGrid: sections[0]?.documentGrid },
         list,
       );
     }

@@ -223,6 +223,20 @@ export class SectionProperties {
     return this.prop('docGrid').element;
   }
 
+  get documentGridType(): string | undefined {
+    return this.prop('docGrid').attribute('type');
+  }
+
+  get documentGridLinePitch(): Twip | undefined {
+    const raw = integerFrom(this.prop('docGrid').attribute('linePitch'));
+    return raw === undefined || raw <= 0 ? undefined : twip(raw);
+  }
+
+  get documentGridCharSpace(): number | undefined {
+    const raw = integerFrom(this.prop('docGrid').attribute('charSpace'));
+    return raw === undefined || raw <= 0 ? undefined : raw;
+  }
+
   get lineNumbering(): XmlElement | undefined {
     return this.prop('lnNumType').element;
   }

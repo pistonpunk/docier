@@ -10,6 +10,7 @@ import type { MeasuredAtom, MeasureContext } from './intrinsic.js';
 import { measureAtoms, nextTabStop } from './intrinsic.js';
 import type { LaidLine, NumberingPlacement, SideBand } from './assembly.js';
 import { assembleParagraph } from './assembly.js';
+import type { DocumentGrid } from './sections.js';
 import type { PlacedAtom } from './line-geometry.js';
 import type { FontFace, FontResolver } from './fonts.js';
 import type { PaintRegistry } from './paint.js';
@@ -286,7 +287,27 @@ export const intrinsicWidths = (measured: readonly MeasuredAtom[]): IntrinsicWid
 
 export interface ParagraphBlockContext {
   readonly defaultTabStop: Mp;
+  readonly documentGrid?: DocumentGrid | undefined;
 }
+
+// a document grid rounds every line up to its pitch, so the text sits on a
+// baseline grid the way Word lays it out
+const snapToGrid = (line: LaidLine, pitch: Mp): LaidLine => {
+  const height = line.geometry.height as number;
+  const step = pitch as number;
+  if (step <= 0 || height <= 0) return line;
+  const snapped = Math.ceil(height / step) * step;
+  if (snapped === height) return line;
+  const extra = snapped - height;
+  return {
+    ...line,
+    geometry: {
+      ...line.geometry,
+      height: mp(snapped),
+      belowBaseline: mp((line.geometry.belowBaseline as number) + extra),
+    },
+  };
+};
 
 export const buildParagraphBlock = (
   prepared: PreparedParagraph,
@@ -312,11 +333,14 @@ export const buildParagraphBlock = (
     contentWidth,
     externalBands,
   });
+  const grid = context.documentGrid;
+  const finalLines =
+    grid === undefined ? lines : lines.map((line) => snapToGrid(line, grid.linePitch));
   return {
     index: paragraph.index,
     format,
     paragraphGroup: paragraph.paragraphGroup,
-    lines,
+    lines: finalLines,
     docRange: { start: paragraph.docStart, end: paragraph.docEnd },
     lineHeight: prepared.markBox.height,
     originX: contentX,

@@ -36,8 +36,22 @@ export interface Section {
   readonly columnSpace: Mp;
   readonly lineNumbering: LineNumbering | undefined;
   readonly verticalAlignment: SectionVerticalAlignment;
+  readonly documentGrid: DocumentGrid | undefined;
   readonly propertiesElement: XmlElement | undefined;
 }
+
+export interface DocumentGrid {
+  readonly linePitch: Mp;
+  readonly charSpace: number | undefined;
+}
+
+const documentGridOf = (properties: SectionProperties | undefined): DocumentGrid | undefined => {
+  const type = properties?.documentGridType;
+  if (type === undefined || type === 'default') return undefined;
+  const pitch = properties?.documentGridLinePitch;
+  if (pitch === undefined) return undefined;
+  return { linePitch: twipToMp(pitch), charSpace: properties?.documentGridCharSpace };
+};
 
 export type SectionVerticalAlignment = 'top' | 'center' | 'bottom' | 'both';
 
@@ -185,11 +199,11 @@ export const buildSections = (
           docPos: undefined,
         });
       }
-      if (properties.documentGrid !== undefined) {
+      if (properties.documentGrid !== undefined && properties.documentGridCharSpace !== undefined) {
         diagnostics.push({
           code: 'documentGridNotLaidOut',
           severity: 'info',
-          message: `section ${index} document grid is ignored by this slice`,
+          message: `section ${index} snaps its lines to a document grid; the character grid is not applied by this slice`,
           docPos: undefined,
         });
       }
@@ -211,6 +225,7 @@ export const buildSections = (
       footerDistance: twipToMp(margins?.footer ?? DEFAULT_FOOTER_DISTANCE),
       lineNumbering: lineNumberingOf(properties),
       verticalAlignment: verticalAlignmentOf(properties),
+      documentGrid: documentGridOf(properties),
       columnCount: properties?.columnCount ?? 1,
       columnSpace: twipToMp(properties?.columnSpacing ?? twip(DEFAULT_COLUMN_SPACE)),
       propertiesElement: element,
