@@ -1,7 +1,7 @@
 import type { Disposable } from '../api/types.js';
 import { ATTR } from '../render/dom.js';
 import { createDisposableStore } from './dom.js';
-import { CONTEXT_MENUS, STATUS_ITEM_MENU } from './menu-model.js';
+import { CONTEXT_MENUS, STATUS_ITEM_MENU, visibleNodes } from './menu-model.js';
 import type { UiNode } from './menu-model.js';
 import { menuHasItems, openMenu } from './menu.js';
 import type { MenuHandle } from './menu.js';
@@ -47,7 +47,7 @@ export const SURFACE_LABEL_KEYS: Readonly<Record<ContextSurface, string>> = {
 };
 
 export const itemsFor = (surface: ContextSurface): readonly UiNode[] =>
-  surface === 'statusBar' ? STATUS_ITEM_MENU : CONTEXT_MENUS[surface];
+  visibleNodes(surface === 'statusBar' ? STATUS_ITEM_MENU : CONTEXT_MENUS[surface]);
 
 export interface ContextMenuOptions {
   readonly context: ChromeContext;

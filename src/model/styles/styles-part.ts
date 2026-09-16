@@ -8,6 +8,7 @@ import {
   insertOrdered,
 } from '../schema-order.js';
 import { createWElement, setWAttr, wAttr } from '../xml.js';
+import { builtinStyle, styleElementOf } from './builtin.js';
 import type { StyleType } from './style.js';
 import { Style } from './style.js';
 
@@ -68,6 +69,17 @@ export class StylesPart {
       const name = style.name;
       if (name !== undefined && !this.idByName.has(name)) this.idByName.set(name, styleId);
     }
+  }
+
+  ensure(styleId: string): Style | undefined {
+    this.build();
+    const existing = this.styleById.get(styleId);
+    if (existing !== undefined) return existing;
+    const definition = builtinStyle(styleId);
+    if (definition === undefined) return undefined;
+    const element = styleElementOf(this.root, definition);
+    this.invalidate();
+    return this.context.view(element, (id, target) => new Style(id, target));
   }
 
   invalidate(): void {

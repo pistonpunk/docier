@@ -4,7 +4,7 @@ import { createEditor } from '../../src/api/editor.js';
 import { Paragraph, ParagraphProperties, RunProperties, findOrderedChild } from '../../src/model/index.js';
 import type { XmlElement } from '../../src/ooxml/xml/index.js';
 import { serializeXmlNode } from '../../src/ooxml/xml/index.js';
-import { openModel, stylesXml } from '../model/support.js';
+import { memberText, openModel, stylesXml } from '../model/support.js';
 import {
   bodyOf,
   disposeEditors,
@@ -300,6 +300,46 @@ describe('style application', () => {
 
     await run(handle, 'history.undo');
     expect(ParagraphProperties.inOwner(firstSlot(handle)).styleId).toBeUndefined();
+  });
+
+  it('defines a built-in style the document does not have, and undoes it', async () => {
+    const handle = await styled();
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+
+    // Heading 2 is not in this document's styles part, but it is a built-in, so
+    // applying it is allowed and brings the definition with it
+    expect(handle.commands.disabledReason('docier.command.style.apply', { styleId: 'Heading2' })).toBeUndefined();
+    expect(handle.session?.model.styles?.style('Heading2')).toBeUndefined();
+
+    await run(handle, 'style.apply', { styleId: 'Heading2' });
+    expect(ParagraphProperties.inOwner(firstSlot(handle)).styleId).toBe('Heading2');
+    expect(handle.session?.model.styles?.style('Heading2')).toBeDefined();
+
+    await run(handle, 'history.undo');
+    expect(ParagraphProperties.inOwner(firstSlot(handle)).styleId).toBeUndefined();
+    expect(handle.session?.model.styles?.style('Heading2')).toBeUndefined();
+  });
+
+  it('writes the defined style into the saved package', async () => {
+    const handle = await styled();
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    await run(handle, 'style.apply', { styleId: 'Title' });
+
+    const model = handle.session?.model;
+    if (model === undefined) throw new Error('no model');
+    const saved = memberText(await model.save(), 'word/styles.xml');
+    expect(saved).toContain('w:styleId="Title"');
+    expect(saved).toContain('<w:jc w:val="center"/>');
+  });
+
+  it('still refuses a style that is neither present nor a built-in', async () => {
+    const handle = await styled();
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    expect(await resultOf(handle, 'style.apply', { styleId: 'Nope' })).toEqual({
+      status: 'blocked',
+      code: 'STYLE_NOT_FOUND',
+      reason: 'There is no style called "Nope" in this document',
+    });
   });
 
   it('reports the missing style id when the control carries no value', async () => {

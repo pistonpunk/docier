@@ -76,12 +76,19 @@ describe('ribbon controls', () => {
     expect(insertPicture).not.toBeNull();
     expect(insertPicture!.getAttribute('aria-disabled')).not.toBe('true');
 
+    // a command with no implementation behind it is not shown at all: a greyed
+    // button that can never become enabled is a placeholder, not a control
     const insertShape = chrome.menuBar!.ribbon.querySelector<HTMLElement>(
       '[data-docier-id="docier.command.object.insertShape"]',
     );
-    expect(insertShape).not.toBeNull();
-    expect(insertShape!.getAttribute('aria-disabled')).toBe('true');
-    expect(insertShape!.getAttribute('aria-description')).toContain('no shape, chart or text-box geometry');
+    expect(insertShape).toBeNull();
+
+    // the registry still answers honestly about it, which is what the API and
+    // the disabled-state tests rely on
+    const shape = chrome.context.describe({ command: 'docier.command.object.insertShape' });
+    expect(shape.enabled).toBe(false);
+    expect(shape.registered).toBe(true);
+    expect(shape.reason).toContain('no shape, chart or text-box geometry');
 
     const unregistered = chrome.context.describe({ command: 'docier.command.nope.missing' });
     expect(unregistered.enabled).toBe(false);

@@ -1,3 +1,4 @@
+import { unsupportedIds } from '../edit/areas/unsupported.js';
 import { FONT_FAMILIES as FONT_FAMILY_NAMES, FONT_SIZES as FONT_SIZE_POINTS } from './font-family.js';
 import type {
   ChromeActionArgs,
@@ -1147,3 +1148,47 @@ export const isSeparator = (value: UiNode): boolean => value.kind === 'separator
 
 export const menuHeads = (items: readonly UiNode[]): readonly UiNode[] =>
   items.filter((item) => !isSeparator(item));
+
+const UNSUPPORTED: ReadonlySet<string> = new Set(unsupportedIds);
+
+const isPlaceholder = (node: UiNode): boolean =>
+  node.command !== undefined && UNSUPPORTED.has(node.command);
+
+const withoutLooseSeparators = (nodes: readonly UiNode[]): readonly UiNode[] => {
+  const out: UiNode[] = [];
+  for (const node of nodes) {
+    if (node.kind === 'separator' && (out.length === 0 || out[out.length - 1]?.kind === 'separator')) {
+      continue;
+    }
+    out.push(node);
+  }
+  while (out.length > 0 && out[out.length - 1]?.kind === 'separator') out.pop();
+  return out;
+};
+
+const withoutPlaceholders = (nodes: readonly UiNode[]): readonly UiNode[] => {
+  const out: UiNode[] = [];
+  for (const node of nodes) {
+    if (isPlaceholder(node)) continue;
+    if (node.items === undefined) {
+      out.push(node);
+      continue;
+    }
+    const items = withoutPlaceholders(node.items);
+    if (items.length === 0) continue;
+    out.push({ ...node, items });
+  }
+  return withoutLooseSeparators(out);
+};
+
+export const visibleGroups = (groups: readonly UiGroup[]): readonly UiGroup[] =>
+  groups
+    .map((group) => ({ ...group, nodes: withoutPlaceholders(group.nodes) }))
+    .filter((group) => group.nodes.length > 0);
+
+export const visibleNodes = withoutPlaceholders;
+
+export const visibleTabs = (tabs: readonly UiTab[]): readonly UiTab[] =>
+  tabs
+    .map((tab) => ({ ...tab, groups: visibleGroups(tab.groups) }))
+    .filter((tab) => tab.groups.length > 0);

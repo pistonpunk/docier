@@ -133,12 +133,20 @@ describe('styles gallery', () => {
   const styleButton = (chrome: ChromeHandle, id: string): HTMLElement | null =>
     chrome.menuBar!.ribbon.querySelector<HTMLElement>(`[data-docier-id="style:${id}"]`);
 
-  it('enables only the styles the document defines', async () => {
+  it('offers every style it lists, defining a built-in the document lacks', async () => {
     const { chrome } = await chromeOfDocx({ body: PLAIN_BODY, styles: STYLES });
     expect(styleButton(chrome, 'Heading1')!.getAttribute('aria-disabled')).toBeNull();
     expect(styleButton(chrome, 'Heading1')!.getAttribute('title')).toBe('Heading 1');
-    expect(styleButton(chrome, 'Caption')!.getAttribute('aria-disabled')).toBe('true');
+
+    // Caption is absent from this document, but it is one of the built-ins, so
+    // applying it defines it. A gallery entry that could never be applied would
+    // be a placeholder, and the gallery does not carry any.
+    expect(styleButton(chrome, 'Caption')!.getAttribute('aria-disabled')).toBeNull();
     expect(styleButton(chrome, 'Caption')!.getAttribute('title')).toContain('Caption');
+
+    for (const id of ['Heading1', 'Heading2', 'Heading3', 'Title', 'Subtitle', 'Quote', 'Caption']) {
+      expect(styleButton(chrome, id)!.getAttribute('aria-disabled'), id).toBeNull();
+    }
   });
 
   it('re-decides every item after the document arrives', async () => {

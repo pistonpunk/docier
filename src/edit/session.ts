@@ -53,6 +53,10 @@ export interface NumberingSnapshot {
   readonly root: XmlElement | undefined;
 }
 
+export interface StylesSnapshot {
+  readonly root: XmlElement | undefined;
+}
+
 export interface RegionSnapshot {
   readonly partName: string;
   readonly root: XmlElement;
@@ -81,6 +85,7 @@ export interface EditSnapshot {
   readonly body: readonly XmlNode[];
   readonly relationships: readonly Relationship[];
   readonly numbering: NumberingSnapshot;
+  readonly styles: StylesSnapshot;
   readonly regions: readonly RegionSnapshot[];
   readonly media: readonly MediaSnapshot[];
 }
@@ -127,6 +132,7 @@ export interface EditSession {
   snapshot(): EditSnapshot;
   restore(snapshot: EditSnapshot): void;
   changeNumbering(write: () => unknown): boolean;
+  changeStyles(write: () => unknown): boolean;
   changeRegions(write: () => unknown): boolean;
   rememberBodyPosition(pos: DocPos): void;
   rememberedBodyPosition(): DocPos;
@@ -151,6 +157,24 @@ const captureNumbering = (model: DocumentModel): NumberingSnapshot => {
   return numbering === undefined
     ? { name: undefined, root: undefined }
     : { name: model.parts.numbering, root: cloneElement(numbering.element) };
+};
+
+const captureStyles = (model: DocumentModel): StylesSnapshot => {
+  const styles = model.styles;
+  return styles === undefined ? { root: undefined } : { root: cloneElement(styles.element) };
+};
+
+const restoreStyles = (model: DocumentModel, snapshot: StylesSnapshot): boolean => {
+  const styles = model.styles;
+  if (styles === undefined || snapshot.root === undefined) return false;
+  const live = styles.element;
+  const before = serializeXmlNode(live);
+  for (const child of live.children) child.parent = undefined;
+  live.children = snapshot.root.children.map((node) => cloneNode(node));
+  for (const child of live.children) child.parent = live;
+  model.context.forgetSubtree(live);
+  styles.invalidate();
+  return serializeXmlNode(live) !== before;
 };
 
 const applyNumberingChildren = (
@@ -702,6 +726,7 @@ export const createEditSession = (
       body: model.body().element.children.map((child) => cloneNode(child)),
       relationships: [...relationshipsOf(model)],
       numbering: numberedCapture(),
+      styles: captureStyles(model),
       regions: capturedRegions(),
       media: capturedMedia(model),
     }),
@@ -713,6 +738,7 @@ export const createEditSession = (
       if (restoreRegionParts(model, snapshot.regions)) regionsStale = true;
       restoreRelationships(model, snapshot.relationships);
       restoreMedia(model, snapshot.media);
+      restoreStyles(model, snapshot.styles);
       if (restoreNumbering(model, snapshot.numbering)) {
         model.invalidateNumbering();
         numberingStale = true;
@@ -720,6 +746,18 @@ export const createEditSession = (
       if (restoreRegions(model, snapshot.regions)) regionsStale = true;
       model.context.forgetSubtree(body);
       markChanged();
+    },
+    changeStyles: (write) => {
+      const styles = model.styles;
+      if (styles === undefined) {
+        write();
+        return false;
+      }
+      const before = serializeXmlNode(styles.element);
+      write();
+      if (serializeXmlNode(styles.element) === before) return false;
+      styles.invalidate();
+      return true;
     },
     changeNumbering: (write) => {
       const current = model.numbering;

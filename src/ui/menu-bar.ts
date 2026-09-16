@@ -4,6 +4,7 @@ import { createDisposableStore, markPart, markSlot, make, setText } from './dom.
 import { attachRoving, normaliseKeyTip } from './keyboard.js';
 import type { UiNode, UiTab } from './menu-model.js';
 import { ALL_RIBBON_TABS, BACKSTAGE_ITEMS, QUICK_ACCESS } from './menu-model.js';
+import { visibleNodes, visibleTabs } from './menu-model.js';
 import { openMenu } from './menu.js';
 import type { MenuHandle } from './menu.js';
 import type { ChromeContext, ControlSpec, ResolvedControl } from './types.js';
@@ -51,9 +52,9 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   const { context } = options;
   const store = createDisposableStore();
   const doc = context.host.ownerDocument;
-  const tabs = options.tabs ?? ALL_RIBBON_TABS;
-  const quickAccess = options.quickAccess ?? QUICK_ACCESS;
-  const backstage = options.backstage ?? BACKSTAGE_ITEMS;
+  const tabs = options.tabs ?? visibleTabs(ALL_RIBBON_TABS);
+  const quickAccess = options.quickAccess ?? visibleNodes(QUICK_ACCESS);
+  const backstage = options.backstage ?? visibleNodes(BACKSTAGE_ITEMS);
   const bound: Bound[] = [];
   let openDropdown: MenuHandle | null = null;
   let transientTab: string | null = null;

@@ -2,7 +2,7 @@ import type { Disposable } from '../api/types.js';
 import { ATTR } from '../render/dom.js';
 import { applyResolved, applyValue, createControl, specOf } from './controls.js';
 import { createDisposableStore, markPart, markSlot, make } from './dom.js';
-import { FLOATING_CONTROLS } from './menu-model.js';
+import { FLOATING_CONTROLS, visibleNodes } from './menu-model.js';
 import type { UiNode } from './menu-model.js';
 import type { ChromeContext } from './types.js';
 
@@ -39,7 +39,7 @@ export const createFloatingToolbar = (
 ): FloatingToolbarHandle => {
   const { context } = options;
   const store = createDisposableStore();
-  const items = options.items ?? FLOATING_CONTROLS;
+  const items = options.items ?? visibleNodes(FLOATING_CONTROLS);
   const element = make('div', 'docier-floating');
   markPart(element, 'floating-controls');
   markSlot(element, 'floatingControls');

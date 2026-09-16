@@ -9,6 +9,8 @@ import {
   FLOATING_CONTROLS,
   QUICK_ACCESS,
   STATUS_ITEM_MENU,
+  visibleNodes,
+  visibleTabs,
 } from '../../src/ui/menu-model.js';
 import type { UiNode } from '../../src/ui/menu-model.js';
 import {
@@ -151,6 +153,46 @@ describe('chrome command coverage', () => {
     expect(areas.get('token')).toBe(5);
     expect(areas.get('theme')).toBe(3);
     expect(areas.get('view')).toBe(2);
+  });
+});
+
+describe('the chrome does not show placeholders', () => {
+  const collectPruned = (nodes: readonly UiNode[], into: Set<string>): void => {
+    for (const node of nodes) {
+      if (node.command !== undefined) into.add(node.command);
+      if (node.items !== undefined) collectPruned(node.items, into);
+    }
+  };
+
+  const prunedIds = (): ReadonlySet<string> => {
+    const ids = new Set<string>();
+    for (const tab of visibleTabs(ALL_RIBBON_TABS)) {
+      for (const group of tab.groups) collectPruned(group.nodes, ids);
+    }
+    for (const surface of Object.keys(CONTEXT_MENUS) as readonly (keyof typeof CONTEXT_MENUS)[]) {
+      collectPruned(visibleNodes(CONTEXT_MENUS[surface]), ids);
+    }
+    collectPruned(visibleNodes(QUICK_ACCESS), ids);
+    collectPruned(visibleNodes(STATUS_ITEM_MENU), ids);
+    collectPruned(visibleNodes(FLOATING_CONTROLS), ids);
+    collectPruned(visibleNodes(BACKSTAGE_ITEMS), ids);
+    return ids;
+  };
+
+  it('renders no command that the registry cannot ever run', () => {
+    const shown = prunedIds();
+    const placeholders = unsupportedIds.filter((id) => shown.has(id));
+    expect(placeholders).toEqual([]);
+  });
+
+  it('still refuses a good number of them in the registry, so the rule has teeth', () => {
+    const raw = new Set<string>();
+    for (const tab of ALL_RIBBON_TABS) {
+      for (const group of tab.groups) collectPruned(group.nodes, raw);
+    }
+    const wouldHaveBeenShown = unsupportedIds.filter((id) => raw.has(id));
+    expect(wouldHaveBeenShown.length).toBeGreaterThan(30);
+    expect(prunedIds().size).toBeLessThan(raw.size);
   });
 });
 
