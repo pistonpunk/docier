@@ -156,3 +156,32 @@ describe('recording changes while tracking is on', () => {
     expect(xml).not.toContain('<w:del');
   });
 });
+
+describe('the author a revision is attributed to', () => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+  const withAuthor = (name: string, initials: string) =>
+    editorOfSpec(
+      {
+        body: '<w:p><w:r><w:t>alpha</w:t></w:r></w:p>',
+        settings: `${DECL}<w:settings xmlns:w="${W}"><w:trackChanges/></w:settings>`,
+        documentRelationships: [settingsRelationship()],
+      },
+      { author: { name, initials } },
+    );
+
+  it('writes the configured name into the mark', async () => {
+    const handle = await withAuthor('Dana Whitfield', 'DW');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    await handle.commands.execute('docier.command.edit.insertText', { text: 'X' });
+    expect(body(handle)).toContain('w:author="Dana Whitfield"');
+  });
+
+  it('falls back to the package name when the host sets none', async () => {
+    const handle = await withAuthor('docier', 'D');
+    await handle.commands.execute('docier.command.selection.setCaret', { pos: pos(5) });
+    await handle.commands.execute('docier.command.edit.insertText', { text: 'X' });
+    expect(body(handle)).toContain('w:author="docier"');
+  });
+});

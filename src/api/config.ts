@@ -24,6 +24,7 @@ export const defaultConfig = (): EditorConfig => ({
     smartQuotes: false,
     overwriteDefault: false,
   },
+  author: { name: 'docier', initials: 'D' },
   permissions: { readOnly: false, allow: [], regionEnforcement: false },
   tokenization: {
     enabled: false,
@@ -66,6 +67,7 @@ const KNOWN_KEYS: readonly string[] = [
   'messages',
   'document',
   'editing',
+  'author',
   'permissions',
   'tokenization',
   'a11y',
@@ -108,6 +110,7 @@ const SHAPES: FieldTable = {
     smartQuotes: 'boolean',
     overwriteDefault: 'boolean',
   },
+  author: { name: 'string', initials: 'string' },
   permissions: {
     readOnly: 'boolean',
     allow: 'array',

@@ -1110,7 +1110,10 @@ export const createEditor = (
     if (model === undefined) return;
     input?.dispose();
     input = undefined;
-    const created = createEditSession(model, layoutOptions());
+    const created = createEditSession(model, layoutOptions(), {
+      name: settings.author.name,
+      initials: settings.author.initials,
+    });
     session = created;
     selection = caretSelection(created.index.documentStart, 'downstream');
     revision += 1;

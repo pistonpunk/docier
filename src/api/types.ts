@@ -438,6 +438,11 @@ export interface EditingConfig {
   readonly overwriteDefault: boolean;
 }
 
+export interface AuthorConfig {
+  readonly name: string;
+  readonly initials: string;
+}
+
 export interface PermissionsConfig {
   readonly readOnly: boolean;
   readonly allow: readonly PermissionKey[];
@@ -527,6 +532,7 @@ export interface EditorConfig {
   messages: Readonly<Partial<Record<LocaleCode, Readonly<Record<string, string>>>>>;
   document: DocumentConfig;
   editing: EditingConfig;
+  author: AuthorConfig;
   permissions: PermissionsConfig;
   tokenization: TokenizationConfig;
   a11y: A11yConfig;
