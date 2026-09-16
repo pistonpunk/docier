@@ -168,6 +168,30 @@ describe('grouping floating pictures', () => {
     const handle = await editorOf(bodyOf(`<w:p><w:r>${inline}</w:r></w:p>${paragraphText('x')}`));
     expect(await run(handle, 'object.group', { objectIds: ['7', '41'] })).toContain('blocked');
   });
+
+  it('groups the set that shift-clicking built, with no ids given', async () => {
+    const handle = await editorOf(TWO);
+    expect(await run(handle, 'object.select', { objectId: '41' })).toBe('ok');
+    expect(await run(handle, 'object.select', { objectId: '42', additive: true })).toBe('ok');
+    expect(await run(handle, 'object.group')).toBe('ok');
+    expect(groupNodesIn(handle)).toBe(1);
+  });
+
+  it('removes an object that a second additive click lands on again', async () => {
+    const handle = await editorOf(TWO);
+    await run(handle, 'object.select', { objectId: '41' });
+    await run(handle, 'object.select', { objectId: '42', additive: true });
+    await run(handle, 'object.select', { objectId: '42', additive: true });
+    expect(await run(handle, 'object.group')).toContain('blocked');
+  });
+
+  it('replaces the whole set when a click carries no modifier', async () => {
+    const handle = await editorOf(TWO);
+    await run(handle, 'object.select', { objectId: '41' });
+    await run(handle, 'object.select', { objectId: '42', additive: true });
+    await run(handle, 'object.select', { objectId: '42' });
+    expect(await run(handle, 'object.group')).toContain('blocked');
+  });
 });
 
 describe('breaking a group apart', () => {

@@ -47,6 +47,7 @@ export interface ObjectSizeArgs {
 
 export interface ObjectSelectArgs {
   readonly objectId?: string;
+  readonly additive?: boolean;
 }
 
 export interface InsertImageArgs {
@@ -345,7 +346,7 @@ const selectSpec: AreaSpec<ObjectSelectArgs> = {
       return true;
     }
     if (findObjectBox(host.session.layout, id) === undefined) return false;
-    selectObject(host.session, id);
+    selectObject(host.session, id, { additive: args?.additive === true });
     return true;
   },
 };

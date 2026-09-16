@@ -945,8 +945,9 @@ export const attachInput = (host: InputHost): InputHandle => {
       if (object !== undefined) {
         event.preventDefault();
         composer.focus({ preventScroll: true });
-        if (selectedObject() !== object.objectId) {
-          run(`${PREFIX}object.select`, { objectId: object.objectId });
+        const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+        if (additive || selectedObject() !== object.objectId) {
+          run(`${PREFIX}object.select`, { objectId: object.objectId, additive });
         }
         paintObjectHandles();
         paintCaret();
