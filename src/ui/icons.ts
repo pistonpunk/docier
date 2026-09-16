@@ -23,6 +23,8 @@ const GLYPHS: Readonly<Record<string, string>> = {
   'format.growFont': '<path d="M2.5 12.5 6 4l3.5 8.5"/><path d="M3.8 9.8h4.4"/><path d="M12.5 10.5v-6"/><path d="m10.5 6.5 2-2 2 2"/>',
   'format.shrinkFont': '<path d="M2.5 12.5 6 4l3.5 8.5"/><path d="M3.8 9.8h4.4"/><path d="M12.5 5.5v6"/><path d="m10.5 9.5 2 2 2-2"/>',
   'format.bold': '<path d="M4.5 3h3.8a2.5 2.5 0 0 1 0 5H4.5z"/><path d="M4.5 8h4.4a2.5 2.5 0 0 1 0 5H4.5z"/>',
+  'table.insertCells':
+    '<rect x="2.5" y="4.5" width="11" height="7" rx="1"/><path d="M7 4.5v7"/><path d="M10.5 4.5v7"/><path d="M4.75 8h.01"/>',
   'format.setDirection':
     '<path d="M3 4.5h10"/><path d="M3 8h6"/><path d="M3 11.5h10"/><path d="m11 6.5 2 1.5-2 1.5"/>',
   'format.italic': '<path d="M6.5 3h5"/><path d="M4.5 13h5"/><path d="M9.5 3 6.5 13"/>',

@@ -161,13 +161,6 @@ const REFUSALS: readonly Refusal[] = [
     reason: 'This build has no translation backend; the host application owns anything that leaves the machine',
   },
   {
-    id: 'docier.command.table.insertCells',
-    label: 'Insert cells',
-    category: 'table',
-    reason:
-      'Shifting cells sideways rewrites the grid spans of the whole row, which this build does not do; insert a row or a column instead',
-  },
-  {
     id: 'docier.command.table.distributeRows',
     label: 'Distribute rows evenly',
     category: 'table',

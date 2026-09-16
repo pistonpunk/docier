@@ -362,6 +362,36 @@ export class Table extends BlockNode {
     }
   }
 
+  // Word's "shift cells right": one row gains a cell at the given grid column
+  // and the rest of that row moves right. The table's grid gains the column, so
+  // the rows that did not change say how many columns they now leave empty.
+  insertCellAt(rowIndex: number, columnIndex: number): XmlElement | undefined {
+    const rows = this.rows();
+    const row = rows[rowIndex];
+    if (row === undefined) return undefined;
+    const span = row.spanAt(columnIndex);
+    if (span === undefined || span.start !== columnIndex) return undefined;
+
+    const grid = this.ensureGrid();
+    const columns = childElements(grid).filter((child) => isWElement(child, 'gridCol'));
+    const column = createWElement(grid, 'gridCol');
+    column.parent = grid;
+    const reference = columns[columnIndex];
+    if (reference === undefined) grid.children.push(column);
+    else grid.children.splice(grid.children.indexOf(reference), 0, column);
+
+    const cell = createCell(row.element);
+    cell.parent = row.element;
+    row.element.children.splice(row.element.children.indexOf(span.cell.element), 0, cell);
+    row.element.selfClosing = false;
+
+    for (const other of rows) {
+      if (other === row) continue;
+      other.properties.gridAfter = (other.gridAfter ?? 0) + 1;
+    }
+    return cell;
+  }
+
   removeColumn(index: number): void {
     const grid = this.gridElement;
     if (grid === undefined) return;

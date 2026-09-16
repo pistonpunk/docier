@@ -312,6 +312,30 @@ const insertColumnsSpec = (
     runInsertColumns(host, right ?? args?.side !== 'left', countOf(args)),
 });
 
+export interface InsertCellsArgs {
+  readonly direction?: 'right';
+}
+
+const MERGED_CELL = 'The caret is inside a merged cell, which this build will not split to insert one';
+
+const insertCellsSpec: AreaSpec<InsertCellsArgs> = {
+  id: 'docier.command.table.insertCells',
+  label: 'Insert cells',
+  category: 'table',
+  permissions: ['insert'],
+  ...gate((target) => (target.cell.gridSpan > 1 ? MERGED_CELL : undefined)),
+  run: (host, args) => {
+    const target = targetAt(host);
+    if (target === undefined || target.cell.gridSpan > 1) return false;
+    if ((args?.direction ?? 'right') !== 'right') return false;
+    const inserted = target.table.insertCellAt(target.row, target.column);
+    if (inserted === undefined) return false;
+    host.session.model.context.forgetSubtree(target.table.element);
+    caretInto(host, target.table, target.row, target.column);
+    return true;
+  },
+};
+
 const deleteRowSpec: AreaSpec<CountArgs> = {
   id: 'docier.command.table.deleteRow',
   label: 'Delete row',
@@ -1377,6 +1401,7 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
     host,
     insertRowsSpec('docier.command.table.insertRowsBelow', 'Insert rows below', true),
   ),
+  areaCommand<InsertCellsArgs>(host, insertCellsSpec),
   areaCommand<RowArgs>(host, insertRowsSpec('docier.command.table.insertRow', 'Insert row', undefined)),
   areaCommand<ColumnArgs>(
     host,

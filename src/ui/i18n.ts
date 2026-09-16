@@ -308,6 +308,7 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.menu.insertRowsAbove': 'Insert Rows Above',
   'ui.menu.insertRowsBelow': 'Insert Rows Below',
   'ui.menu.insertColumns': 'Insert Columns',
+  'ui.menu.insertCellsRight': 'Insert Cell (shift right)',
   'ui.menu.insertColumnsLeft': 'Insert Columns to the Left',
   'ui.menu.insertColumnsRight': 'Insert Columns to the Right',
   'ui.menu.cellAlignment': 'Cell Alignment',

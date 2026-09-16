@@ -1104,6 +1104,12 @@ export const TABLE_TAB: UiTab = {
         button({ labelKey: 'ui.menu.insertRowsBelow', id: 'ctx:table:rowsBelow', command: command('table.insertRowsBelow') }),
         button({ labelKey: 'ui.menu.insertColumnsLeft', id: 'ctx:table:colsLeft', command: command('table.insertColumnsLeft') }),
         button({ labelKey: 'ui.menu.insertColumnsRight', id: 'ctx:table:colsRight', command: command('table.insertColumnsRight') }),
+        button({
+          labelKey: 'ui.menu.insertCellsRight',
+          id: 'ctx:table:insertCells',
+          command: command('table.insertCells'),
+          args: { direction: 'right' },
+        }),
       ],
     },
     {

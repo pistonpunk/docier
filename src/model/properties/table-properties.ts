@@ -230,6 +230,10 @@ export class TableRowProperties {
     return this.prop('gridAfter').integer;
   }
 
+  set gridAfter(to: number | undefined) {
+    this.prop('gridAfter').integer = to;
+  }
+
   get widthBefore(): Twip | undefined {
     const raw = integerFrom(this.prop('wBefore').attribute('w'));
     return raw === undefined ? undefined : (raw as Twip);
