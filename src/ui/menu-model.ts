@@ -564,8 +564,6 @@ export const RIBBON_TABS: readonly UiTab[] = [
                 labelKey,
                 command: command('format.changeCase'),
                 args: { mode },
-                action: 'openDialog',
-                actionArgs: { dialog: command('format.changeCase') },
               }),
             ),
           ]),
