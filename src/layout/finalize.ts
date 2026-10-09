@@ -273,9 +273,20 @@ export const blockFragmentOf = (request: BlockFragmentRequest): BlockFragmentRes
     const end = lineEndOf(line, markPos);
     const endsWithBreak = index < block.lines.length - 1 || line.breakAfter !== 'none';
     const placedAtoms = placedOf(line);
-    const stops = request.collect
+    const rawStops = request.collect
       ? caretStopsOfPlaced(placedAtoms, baselineY, end, endsWithBreak, mp(line.textOrigin + shift))
       : [];
+    // a cell clips its content to the content box, so a caret stop that the
+    // unbreakable text has pushed past the box must be held inside it too, or
+    // the caret is painted over the cell border
+    const stops =
+      request.cell === undefined
+        ? rawStops
+        : rawStops.map((stop) =>
+            stop.x <= request.x || stop.x >= mp(request.x + request.width)
+              ? { ...stop, x: mp(Math.min(Math.max(stop.x, request.x), mp(request.x + request.width))) }
+              : stop,
+          );
     const marks = request.marks
       ? marksOfPlaced(line, baselineY, index === block.lines.length - 1).map((mark) =>
           shift === 0 ? mark : { ...mark, x: mp(mark.x + shift) },

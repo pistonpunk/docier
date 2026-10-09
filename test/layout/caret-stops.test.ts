@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaretStop, LayoutResult } from '../../src/layout/index.js';
 import { bodyOf, layoutOf, paragraphText, run, wrap } from './support.js';
+import { BORDERS, FIXED, NO_CELL_MARGINS, cell, cellAt, grid, para, row, table } from './table-support.js';
 
 const stopsOfBlock = (result: LayoutResult, block: number): readonly CaretStop[] =>
   result.pages[0]?.blocks[block]?.lines.flatMap((line) => line.caretStops) ?? [];
@@ -53,5 +54,30 @@ describe('caret stops and index invariants', () => {
     for (let position = 0; position < 19; position += 1) {
       expect(result.indices.fragmentToPage(position as never)).toBe(0);
     }
+  });
+});
+
+describe('caret stops inside a table cell', () => {
+  it('holds every stop inside the content box so the caret cannot cross the border', async () => {
+    const long = 'b'.repeat(40);
+    const result = await layoutOf(
+      bodyOf(
+        table(
+          `${FIXED(1000)}${BORDERS}${NO_CELL_MARGINS}`,
+          grid([500, 500]),
+          [row('', [cell('', para(long)), cell('', para('aa'))])],
+        ),
+      ),
+    );
+    const target = cellAt(result, 0, 0, 0);
+    expect(target).toBeDefined();
+    const contentRight = (target!.contentBox.x as number) + (target!.contentBox.width as number);
+    const stops = stopsOfBlock(result, 0);
+    expect(stops.length).toBeGreaterThan(1);
+    for (const stop of stops) {
+      expect(stop.x as number).toBeLessThanOrEqual(contentRight);
+      expect(stop.x as number).toBeGreaterThanOrEqual(target!.contentBox.x as number);
+    }
+    expect(stops[stops.length - 1]?.x as number).toBe(contentRight);
   });
 });

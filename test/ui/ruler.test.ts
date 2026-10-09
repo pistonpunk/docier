@@ -87,21 +87,20 @@ describe('one ruler for the document', () => {
     expect(ruler.getAttribute('aria-orientation')).toBe('horizontal');
 
     const sliders = [...ruler.querySelectorAll<HTMLElement>('[role="slider"]')];
-    expect(sliders.length).toBe(6);
+    expect(sliders.length).toBe(3);
     const labels = sliders.map((slider) => slider.getAttribute('aria-label'));
-    expect(labels).toEqual([
-      'Left margin',
-      'Right margin',
-      'First line indent',
-      'Hanging indent',
-      'Left indent',
-      'Right indent',
-    ]);
+    expect(labels).toEqual(['First line indent', 'Left indent', 'Right indent']);
     for (const slider of sliders) {
       expect(slider.getAttribute('aria-valuenow')).not.toBeNull();
       expect(slider.getAttribute('aria-valuetext')).not.toBeNull();
     }
-    expect(chrome.ruler!.markers.length).toBe(6);
+    expect(chrome.ruler!.markers.length).toBe(3);
+
+    const margins = [...ruler.querySelectorAll<HTMLElement>('[data-docier-part^="margin-"]')];
+    expect(margins.map((zone) => zone.getAttribute('data-docier-part'))).toEqual([
+      'margin-left',
+      'margin-right',
+    ]);
   });
 
   it('hides and shows with the ruler state', async () => {
@@ -214,16 +213,16 @@ describe('ruler interaction', () => {
 
     const left = markerFor(chrome, 'indent-left');
     const firstLine = markerFor(chrome, 'indent-first-line');
-    expect(valuenow(left)).toBe(MARGIN_TWIPS + 720);
-    expect(valuenow(firstLine)).toBe(MARGIN_TWIPS + 960);
+    expect(valuenow(left)).toBe(720);
+    expect(valuenow(firstLine)).toBe(240);
 
     const seen = recordCommands(handle);
     key(left, 'ArrowRight');
     await handle.whenReady();
     expect(seen[0]?.args).toMatchObject({ leftTwips: 721, firstLineTwips: 240 });
     expect(indentationOf(handle)).toMatchObject({ left: 721, firstLine: 240 });
-    expect(valuenow(left)).toBe(MARGIN_TWIPS + 721);
-    expect(valuenow(firstLine)).toBe(MARGIN_TWIPS + 961);
+    expect(valuenow(left)).toBe(721);
+    expect(valuenow(firstLine)).toBe(240);
   });
 
   it('cycles units from the ruler corner', async () => {

@@ -481,7 +481,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
         }
         if (target === 'read' && state.viewMode !== 'read') {
           readingRestore = { collapse: state.collapse, ruler: state.rulerVisible };
-          store.set({ viewMode: target, collapse: 'hidden', rulerVisible: false });
+          store.set({ viewMode: target, collapse: 'hidden' });
           ruler?.refresh();
           verticalRuler?.refresh();
           handle.setViewMode(target);

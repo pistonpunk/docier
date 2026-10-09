@@ -63,15 +63,14 @@ export const formatRulerValue = (valueMp: number, units: RulerUnit): string => {
   return value.toFixed(spec.decimals);
 };
 
-const MARKER_DEFS: readonly {
+interface MarkerDef {
   readonly part: string;
   readonly labelKey: string;
-  readonly kind: string;
-}[] = [
-  { part: 'margin-left', labelKey: 'ui.ruler.marginLeft', kind: 'margin' },
-  { part: 'margin-right', labelKey: 'ui.ruler.marginRight', kind: 'margin' },
+  readonly kind: 'first-line' | 'left' | 'right';
+}
+
+const MARKER_DEFS: readonly MarkerDef[] = [
   { part: 'indent-first-line', labelKey: 'ui.ruler.indentFirstLine', kind: 'first-line' },
-  { part: 'indent-hanging', labelKey: 'ui.ruler.indentHanging', kind: 'hanging' },
   { part: 'indent-left', labelKey: 'ui.ruler.indentLeft', kind: 'left' },
   { part: 'indent-right', labelKey: 'ui.ruler.indentRight', kind: 'right' },
 ];
@@ -116,6 +115,18 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
   element.appendChild(strip);
   element.appendChild(badge);
 
+  const marginZones = new Map<'left' | 'right', HTMLElement>();
+  for (const side of ['left', 'right'] as const) {
+    const zone = make('div', `docier-ruler-margin-zone docier-ruler-margin-zone-${side}`);
+    zone.setAttribute('data-docier-part', `margin-${side}`);
+    zone.setAttribute('role', 'separator');
+    zone.setAttribute('aria-orientation', 'vertical');
+    zone.setAttribute('aria-label', context.i18n.text(`ui.ruler.margin${side === 'left' ? 'Left' : 'Right'}`));
+    zone.tabIndex = 0;
+    marginZones.set(side, zone);
+    strip.appendChild(zone);
+  }
+
   const markers = new Map<string, HTMLElement>();
   for (const definition of MARKER_DEFS) {
     const marker = make('button', `docier-ruler-marker docier-ruler-marker-${definition.kind}`);
@@ -140,19 +151,18 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     return text === key ? value : text;
   };
 
-  const positionMarker = (
-    part: string,
-    valueMp: number,
-    zoom: number,
-    offsetPx: number,
-    reportedMp: number = valueMp,
-  ): void => {
+  const place = (node: HTMLElement, valueMp: number, zoom: number, offsetPx: number): void => {
+    node.style.left = `${String(offsetPx + toCssPx(mp(Math.round(valueMp)) as Mp, zoom))}px`;
+  };
+
+  const reportMarker = (part: string, valueTwips: number): void => {
     const marker = markers.get(part);
     if (marker === undefined) return;
-    const px = toCssPx(mp(Math.round(valueMp)) as Mp, zoom);
-    marker.style.left = `${String(offsetPx + px)}px`;
-    marker.setAttribute('aria-valuenow', String(Math.round(mpToTwip(mp(Math.round(reportedMp))))));
-    marker.setAttribute('aria-valuetext', `${formatRulerValue(reportedMp, units())} ${unitSuffix(units())}`);
+    marker.setAttribute('aria-valuenow', String(Math.round(valueTwips)));
+    marker.setAttribute(
+      'aria-valuetext',
+      `${formatRulerValue(twipToMp(twip(Math.round(valueTwips))) as Mp, units())} ${unitSuffix(units())}`,
+    );
   };
 
   const renderTicks = (
@@ -204,25 +214,45 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     textArea.style.left = `${String(offsetPx + toCssPx(left, zoom))}px`;
     textArea.style.width = `${String(toCssPx(mp(right - left) as Mp, zoom))}px`;
 
-    positionMarker('margin-left', left, zoom, offsetPx, mp(left - pageStart));
-    positionMarker('margin-right', right, zoom, offsetPx, mp(pageEnd - right));
-
     const indents = current.indents ?? ZERO_INDENTS;
-    const leftIndentMp = left + gutterMp + indents.leftTwips * MP_PER_TWIP;
-    positionMarker('indent-left', leftIndentMp, zoom, offsetPx);
-    positionMarker(
-      'indent-first-line',
-      leftIndentMp + indents.firstLineTwips * MP_PER_TWIP,
-      zoom,
-      offsetPx,
-    );
-    positionMarker(
-      'indent-hanging',
-      leftIndentMp + Math.min(0, indents.firstLineTwips) * MP_PER_TWIP,
-      zoom,
-      offsetPx,
-    );
-    positionMarker('indent-right', right - indents.rightTwips * MP_PER_TWIP, zoom, offsetPx);
+    const baseLeft = mp(left + gutterMp);
+    const leftIndentMp = mp(baseLeft + indents.leftTwips * MP_PER_TWIP);
+    const firstLineMp = mp(leftIndentMp + indents.firstLineTwips * MP_PER_TWIP);
+    const rightIndentMp = mp(right - indents.rightTwips * MP_PER_TWIP);
+
+    place(markers.get('indent-left')!, leftIndentMp, zoom, offsetPx);
+    place(markers.get('indent-first-line')!, firstLineMp, zoom, offsetPx);
+    place(markers.get('indent-right')!, rightIndentMp, zoom, offsetPx);
+
+    const maxIndentTwips = Math.round(mpToTwip(mp(right - left)));
+    const leftMarker = markers.get('indent-left');
+    if (leftMarker !== undefined) {
+      leftMarker.setAttribute('aria-valuemax', String(maxIndentTwips));
+    }
+    const firstMarker = markers.get('indent-first-line');
+    if (firstMarker !== undefined) {
+      firstMarker.setAttribute('aria-valuemin', String(-Math.round(indents.leftTwips)));
+      firstMarker.setAttribute('aria-valuemax', String(maxIndentTwips));
+    }
+    const rightMarker = markers.get('indent-right');
+    if (rightMarker !== undefined) {
+      rightMarker.setAttribute('aria-valuemax', String(maxIndentTwips));
+    }
+
+    reportMarker('indent-left', indents.leftTwips);
+    reportMarker('indent-first-line', indents.firstLineTwips);
+    reportMarker('indent-right', indents.rightTwips);
+
+    const leftZone = marginZones.get('left');
+    const rightZone = marginZones.get('right');
+    if (leftZone !== undefined) {
+      leftZone.style.left = '0px';
+      leftZone.style.width = `${String(offsetPx + toCssPx(mp(left) as Mp, zoom))}px`;
+    }
+    if (rightZone !== undefined) {
+      rightZone.style.left = `${String(offsetPx + toCssPx(mp(right) as Mp, zoom))}px`;
+      rightZone.style.right = '0px';
+    }
 
     renderTicks(pageStart, pageEnd, zoom, offsetPx, left);
   };
@@ -249,11 +279,42 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
   > = {
     'indent-left': (delta, base) => ({ ...base, leftTwips: base.leftTwips + delta }),
     'indent-first-line': (delta, base) => ({ ...base, firstLineTwips: base.firstLineTwips + delta }),
-    'indent-hanging': (delta, base) => ({
-      ...base,
-      firstLineTwips: Math.min(0, base.firstLineTwips) + delta,
-    }),
     'indent-right': (delta, base) => ({ ...base, rightTwips: base.rightTwips - delta }),
+  };
+
+  let guide: HTMLElement | undefined;
+  let cancelDrag: (() => void) | undefined;
+
+  const guideHost = (): HTMLElement | undefined => {
+    const canvas = element.parentElement?.querySelector('.docier-canvas');
+    return canvas instanceof HTMLElement ? canvas : undefined;
+  };
+
+  const showGuide = (viewportX: number): void => {
+    const host = guideHost();
+    if (host === undefined) return;
+    if (guide === undefined) {
+      guide = make('div', 'docier-guide-line');
+      markPart(guide, 'margin-guide');
+      Object.assign(guide.style, {
+        position: 'absolute',
+        top: '0',
+        bottom: '0',
+        width: '1px',
+        zIndex: '5',
+        pointerEvents: 'none',
+        backgroundImage:
+          'repeating-linear-gradient(to bottom, var(--docier-guide) 0 6px, transparent 6px 12px)',
+      });
+      host.appendChild(guide);
+    }
+    const box = host.getBoundingClientRect();
+    guide.style.left = `${String(Math.round(viewportX - box.left))}px`;
+    guide.hidden = false;
+  };
+
+  const hideGuide = (): void => {
+    if (guide !== undefined) guide.hidden = true;
   };
 
   const indentDrag = (part: string, event: PointerEvent): void => {
@@ -265,8 +326,9 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     const zoom = current.zoom === 0 ? 1 : current.zoom;
     const base = currentIndents();
     const startX = event.clientX;
-    const markerX = marker.getBoundingClientRect().left;
+    const markerX = marker.getBoundingClientRect().left + marker.getBoundingClientRect().width / 2;
     let pending = base;
+    let applied = base;
 
     const onMove = (moveEvent: PointerEvent): void => {
       const travel = moveEvent.clientX - startX;
@@ -275,7 +337,18 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
       showGuide(markerX + travel);
       badge.hidden = false;
       badge.style.left = `${String(Math.round(markerX + travel))}px`;
-      setText(badge, `${formatRulerValue(twipToMp(twip(pending.leftTwips)) as Mp, units())} ${unitSuffix(units())}`);
+      setText(
+        badge,
+        `${formatRulerValue(twipToMp(twip(Math.round(pending.leftTwips))) as Mp, units())} ${unitSuffix(units())}`,
+      );
+      const moved =
+        pending.leftTwips !== applied.leftTwips ||
+        pending.firstLineTwips !== applied.firstLineTwips ||
+        pending.rightTwips !== applied.rightTwips;
+      if (moved) {
+        applied = pending;
+        commitIndent(pending);
+      }
     };
     const onUp = (): void => {
       hideGuide();
@@ -284,18 +357,19 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
       doc.removeEventListener('pointerup', onUp);
       doc.removeEventListener('keydown', onKey);
       cancelDrag = undefined;
-      const moved =
-        pending.leftTwips !== base.leftTwips ||
-        pending.firstLineTwips !== base.firstLineTwips ||
-        pending.rightTwips !== base.rightTwips;
-      if (moved) commitIndent(pending);
-      else refresh();
+      refresh();
     };
     const onKey = (keyEvent: KeyboardEvent): void => {
       if (keyEvent.key !== 'Escape') return;
       keyEvent.preventDefault();
-      pending = base;
-      onUp();
+      hideGuide();
+      badge.hidden = true;
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('keydown', onKey);
+      cancelDrag = undefined;
+      if (applied !== base) commitIndent(base);
+      else refresh();
     };
     doc.addEventListener('pointermove', onMove);
     doc.addEventListener('pointerup', onUp);
@@ -357,61 +431,30 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
     context.run('setMargin', { side, twips: value });
   };
 
-  let guide: HTMLElement | undefined;
-  let cancelDrag: (() => void) | undefined;
-
-  const guideHost = (): HTMLElement | undefined => {
-    const canvas = element.parentElement?.querySelector('.docier-canvas');
-    return canvas instanceof HTMLElement ? canvas : undefined;
-  };
-
-  const showGuide = (viewportX: number): void => {
-    const host = guideHost();
-    if (host === undefined) return;
-    if (guide === undefined) {
-      guide = make('div', 'docier-guide-line');
-      markPart(guide, 'margin-guide');
-      Object.assign(guide.style, {
-        position: 'absolute',
-        top: '0',
-        bottom: '0',
-        width: '1px',
-        zIndex: '5',
-        pointerEvents: 'none',
-        backgroundImage:
-          'repeating-linear-gradient(to bottom, var(--docier-guide) 0 6px, transparent 6px 12px)',
-      });
-      host.appendChild(guide);
-    }
-    const box = host.getBoundingClientRect();
-    guide.style.left = `${String(Math.round(viewportX - box.left))}px`;
-    guide.hidden = false;
-  };
-
-  const hideGuide = (): void => {
-    if (guide !== undefined) guide.hidden = true;
-  };
-
   const marginDrag = (side: 'left' | 'right', event: PointerEvent): void => {
-    const marker = markers.get(`margin-${side}`);
+    const zone = marginZones.get(side);
     const current = options.metrics();
-    if (marker === undefined || current === undefined) return;
+    if (zone === undefined || current === undefined) return;
     event.preventDefault();
     const zoom = current.zoom === 0 ? 1 : current.zoom;
     const sign = side === 'left' ? 1 : -1;
     const base = Math.round(marginBase(side) / MP_PER_TWIP);
     const startX = event.clientX;
-    const markerX = marker.getBoundingClientRect().left;
+    const rect = zone.getBoundingClientRect();
+    const edgeX = side === 'left' ? rect.right : rect.left;
     let pending = base;
 
     const onMove = (moveEvent: PointerEvent): void => {
       const travel = moveEvent.clientX - startX;
       pending = Math.round(base + sign * mpToTwip(fromCssPx(travel, zoom)));
-      marker.style.left = `${String(Math.round(markerX + travel))}px`;
-      showGuide(markerX + travel);
+      const x = edgeX + travel;
+      showGuide(x);
       badge.hidden = false;
-      badge.style.left = `${String(Math.round(markerX + travel))}px`;
-      setText(badge, `${formatRulerValue(twipToMp(twip(pending)) as Mp, units())} ${unitSuffix(units())}`);
+      badge.style.left = `${String(Math.round(x))}px`;
+      setText(
+        badge,
+        `${formatRulerValue(twipToMp(twip(pending)) as Mp, units())} ${unitSuffix(units())}`,
+      );
     };
     const onUp = (): void => {
       hideGuide();
@@ -419,14 +462,20 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
       doc.removeEventListener('pointermove', onMove);
       doc.removeEventListener('pointerup', onUp);
       doc.removeEventListener('keydown', onKey);
+      cancelDrag = undefined;
       if (pending !== base) commitMargin(side, pending);
       else refresh();
     };
     const onKey = (keyEvent: KeyboardEvent): void => {
       if (keyEvent.key !== 'Escape') return;
       keyEvent.preventDefault();
-      pending = base;
-      onUp();
+      hideGuide();
+      badge.hidden = true;
+      doc.removeEventListener('pointermove', onMove);
+      doc.removeEventListener('pointerup', onUp);
+      doc.removeEventListener('keydown', onKey);
+      cancelDrag = undefined;
+      refresh();
     };
     doc.addEventListener('pointermove', onMove);
     doc.addEventListener('pointerup', onUp);
@@ -442,13 +491,13 @@ export const createRuler = (options: RulerOptions): RulerHandle => {
   };
 
   for (const side of ['left', 'right'] as const) {
-    const marker = markers.get(`margin-${side}`);
-    if (marker === undefined) continue;
+    const zone = marginZones.get(side);
+    if (zone === undefined) continue;
     const sign = side === 'left' ? 1 : -1;
-    store.listen<PointerEvent>(marker, 'pointerdown', (event) => {
+    store.listen<PointerEvent>(zone, 'pointerdown', (event) => {
       marginDrag(side, event);
     });
-    store.listen<KeyboardEvent>(marker, 'keydown', (event) => {
+    store.listen<KeyboardEvent>(zone, 'keydown', (event) => {
       const step = event.shiftKey ? 10 : 1;
       const delta = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0;
       if (delta === 0) return;

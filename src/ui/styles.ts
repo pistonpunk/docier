@@ -109,17 +109,18 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ruler[hidden]{display:none}
 .docier-ruler-corner{position:absolute;inset-inline-start:0;inset-block:0;width:var(--docier-ruler-size);display:flex;align-items:center;justify-content:center;border-inline-end:1px solid var(--docier-border);background:var(--docier-surface-raised);z-index:2}
 .docier-ruler-unit{appearance:none;border:0;background:transparent;color:var(--docier-text-muted);font:inherit;cursor:pointer;padding:0 2px;height:100%}
-.docier-ruler-strip{position:absolute;inset-block:0;inset-inline-start:0;will-change:transform}
+.docier-ruler-strip{position:absolute;inset:0;overflow:hidden;will-change:transform}
 .docier-ruler-text-area{position:absolute;inset-block:0;background:var(--docier-page)}
+.docier-ruler-ticks{position:absolute;inset:0}
 .docier-ruler-tick{position:absolute;bottom:0;width:1px;background:var(--docier-border)}
 .docier-ruler-tick-label{position:absolute;top:1px;left:2px;font-size:9px;line-height:1;color:var(--docier-text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-.docier-ruler-marker{position:absolute;appearance:none;border:0;padding:0;background:var(--docier-accent);cursor:ew-resize;border-radius:1px}
-.docier-ruler-marker-margin{width:2px;inset-block:0}
-.docier-ruler-marker-first-line{width:var(--docier-handle-size);height:var(--docier-handle-size);clip-path:polygon(50% 100%,0 0,100% 0);top:1px}
-.docier-ruler-marker-hanging{width:var(--docier-handle-size);height:var(--docier-handle-size);clip-path:polygon(50% 0,0 100%,100% 100%);top:calc(var(--docier-handle-size) + 1px)}
-.docier-ruler-marker-left{width:var(--docier-handle-size);height:calc(var(--docier-handle-size) / 1.6);bottom:1px;border-radius:2px}
-.docier-ruler-marker-right{width:var(--docier-handle-size);height:var(--docier-handle-size);clip-path:polygon(0 0,100% 50%,0 100%);top:calc(var(--docier-handle-size) / 2)}
-.docier-ruler-marker-gutter{width:2px;inset-block:0;background:var(--docier-guide)}
+.docier-ruler-margin-zone{position:absolute;inset-block:0;cursor:ew-resize;z-index:1;touch-action:none}
+.docier-ruler-margin-zone:hover{background:var(--docier-state-hover)}
+.docier-ruler-marker{position:absolute;appearance:none;border:0;padding:0;transform:translateX(-50%);background:var(--docier-accent);cursor:ew-resize;border-radius:1px;z-index:2;touch-action:none}
+.docier-ruler-marker:hover{background:var(--docier-accent-strong, var(--docier-accent))}
+.docier-ruler-marker-first-line{width:calc(var(--docier-handle-size) * 1.5);height:3px;top:2px}
+.docier-ruler-marker-left{width:var(--docier-handle-size);height:calc(var(--docier-handle-size) * 0.8);bottom:1px;clip-path:polygon(50% 0,0 100%,100% 100%)}
+.docier-ruler-marker-right{width:var(--docier-handle-size);height:calc(var(--docier-handle-size) * 0.8);bottom:1px;clip-path:polygon(50% 0,0 100%,100% 100%)}
 .docier-ruler-badge{position:absolute;top:0;transform:translateX(-50%);background:var(--docier-text);color:var(--docier-surface-raised);font-size:calc(var(--docier-ui-font-size) - 2px);padding:0 4px;border-radius:var(--docier-radius);pointer-events:none;z-index:3}
 .docier-status{display:flex;grid-area:status;align-items:center;gap:calc(var(--docier-gap) * 2);background:var(--docier-surface);border-top:1px solid var(--docier-border);padding-inline:calc(var(--docier-gap) * 2);min-height:var(--docier-status-height);font-size:12px;overflow-x:auto}
 .docier-status-item{appearance:none;border:1px solid transparent;background:transparent;color:var(--docier-text-muted);font:inherit;cursor:pointer;padding:0 var(--docier-gap);min-height:var(--docier-status-height);border-radius:var(--docier-radius)}
