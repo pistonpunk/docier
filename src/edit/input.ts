@@ -377,6 +377,9 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const index = (): PositionIndex | undefined => host.session?.index;
 
+  const insideTable = (): boolean =>
+    host.session?.resolve(host.selection.focus)?.slot.cell !== undefined;
+
   const sheets = (): readonly HTMLElement[] =>
     Array.from(host.rendered.querySelectorAll<HTMLElement>(`[${ATTR.page}]`)).sort(
       (first, second) =>
@@ -1104,6 +1107,18 @@ export const attachInput = (host: InputHost): InputHandle => {
       event.preventDefault();
       dropObjectSelection();
       paintCaret();
+      return;
+    }
+    if (
+      event.key === 'Tab' &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      insideTable()
+    ) {
+      event.preventDefault();
+      dropObjectSelection();
+      run(`${PREFIX}table.navigate`, { direction: event.shiftKey ? 'previous' : 'next' });
       return;
     }
     if ((event.key === 'PageDown' || event.key === 'PageUp') && !event.ctrlKey && !event.altKey && !event.metaKey) {

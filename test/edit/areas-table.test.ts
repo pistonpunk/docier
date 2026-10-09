@@ -350,6 +350,44 @@ describe('rows and columns', () => {
   });
 });
 
+describe('tabbing between cells', () => {
+  it('steps forward and back one cell at a time, wrapping rows', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    await run(handle, 'table.navigate', { direction: 'next' });
+    expect(handle.selection.anchor).toBe(slotAt(handle, 0, 1).start);
+    await run(handle, 'table.navigate', { direction: 'next' });
+    expect(handle.selection.anchor).toBe(slotAt(handle, 1, 0).start);
+    await run(handle, 'table.navigate', { direction: 'previous' });
+    expect(handle.selection.anchor).toBe(slotAt(handle, 0, 1).start);
+    expect(canUndo(handle)).toBe(false);
+  });
+
+  it('appends a row past the last cell, and prepends one before the first', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 1, 1).start });
+    await run(handle, 'table.navigate', { direction: 'next' });
+    expect(bodyXml(handle).match(/<w:tr>/g)).toHaveLength(3);
+    expect(handle.selection.anchor).toBe(slotAt(handle, 2, 0).start);
+    await undo(handle);
+    expect(bodyXml(handle).match(/<w:tr>/g)).toHaveLength(2);
+
+    await run(handle, 'selection.setCaret', { pos: slotAt(handle, 0, 0).start });
+    await run(handle, 'table.navigate', { direction: 'previous' });
+    expect(bodyXml(handle).match(/<w:tr>/g)).toHaveLength(3);
+    expect(handle.selection.anchor).toBe(slotAt(handle, 0, 0).start);
+    await undo(handle);
+    expect(bodyXml(handle).match(/<w:tr>/g)).toHaveLength(2);
+    expect(canUndo(handle)).toBe(false);
+  });
+
+  it('is disabled when the caret is outside a table', async () => {
+    const handle = await editorOf(PLAIN);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+    expect(isEnabled(handle, 'table.navigate')).toBe(false);
+  });
+});
+
 describe('merging and splitting cells', () => {
   it('merges a row and splits it again, one undo entry each', async () => {
     const handle = await editorOf(FIXTURE);

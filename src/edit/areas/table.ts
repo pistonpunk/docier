@@ -26,7 +26,7 @@ import {
   tableDepthAllowed,
   tableOf,
 } from '../tables.js';
-import { areaCommand, caretInRegion, changedBy, documentSection } from './support.js';
+import { areaCommand, caretInRegion, changedBy, documentSection, BODY_INVALIDATION } from './support.js';
 import type { AreaHost, AreaSpec } from './support.js';
 
 const NOT_ALIGNED: LocalizedString =
@@ -1391,6 +1391,79 @@ const rowSettable = (target: CellTarget | undefined, args: RowHeightArgs | undef
   return index >= 0 && index < target.table.rows().length;
 };
 
+export interface NavigateCellArgs {
+  readonly direction?: 'next' | 'previous';
+}
+
+// Tab and Shift+Tab move the caret cell to cell the way Word does: forward past
+// the last cell appends a row, backward before the first prepends one. A plain
+// caret move stays off the undo stack; growing the table records its own edit.
+const navigateSpec: AreaSpec<NavigateCellArgs> = {
+  id: 'docier.command.table.navigate',
+  label: 'Move to the next cell',
+  category: 'table',
+  layer: 'chrome',
+  chrome: true,
+  undoable: true,
+  enabledIn: (host) => host.session.aligned && targetAt(host) !== undefined,
+  reason: (host) => (host.session.aligned ? PLACE_CARET : NOT_ALIGNED),
+  run: (host, args, ctx) => {
+    const target = targetAt(host);
+    if (target === undefined) return false;
+    const backward = args?.direction === 'previous';
+    const rows = target.table.rows();
+    const row = rows[target.row];
+    if (row === undefined) return false;
+    const spans = row.cellSpans();
+    const at = spans.findIndex(
+      (span) => span.start <= target.column && target.column < span.start + span.span,
+    );
+    if (at < 0) return false;
+    const step = backward ? -1 : 1;
+    let nextRow = target.row;
+    let nextSpan = at + step;
+    if (nextSpan < 0) {
+      nextRow -= 1;
+      if (nextRow < 0) {
+        if (!host.editable) return false;
+        insertRowAt(target.table, 0);
+        host.session.model.context.forgetSubtree(target.table.element);
+        ctx.mutate(() => ({
+          value: undefined,
+          changed: true,
+          affectedRanges: [],
+          invalidation: BODY_INVALIDATION,
+        }));
+        caretInto(host, target.table, 0, 0);
+        return true;
+      }
+      const previous = rows[nextRow];
+      nextSpan = previous === undefined ? 0 : Math.max(0, previous.cellSpans().length - 1);
+    } else if (nextSpan >= spans.length) {
+      nextRow += 1;
+      if (nextRow >= rows.length) {
+        if (!host.editable) return false;
+        insertRowAt(target.table, rows.length);
+        host.session.model.context.forgetSubtree(target.table.element);
+        ctx.mutate(() => ({
+          value: undefined,
+          changed: true,
+          affectedRanges: [],
+          invalidation: BODY_INVALIDATION,
+        }));
+        caretInto(host, target.table, rows.length, 0);
+        return true;
+      }
+      nextSpan = 0;
+    }
+    const destination = target.table.rows()[nextRow];
+    const span = destination?.cellSpans()[nextSpan];
+    if (span === undefined) return false;
+    placeCaret(host, firstParagraphOf(span.cell.element));
+    return true;
+  },
+};
+
 export const tableCommands = (host: AreaHost): readonly CommandDefinition<never, void>[] => [
   areaCommand<InsertTableArgs>(host, insertTableSpec),
   areaCommand<RowArgs>(
@@ -1432,4 +1505,5 @@ export const tableCommands = (host: AreaHost): readonly CommandDefinition<never,
   ...CELL_ALIGNMENTS.map((alignment) => areaCommand<never>(host, cellAlignmentSpec(alignment))),
   ...AUTO_FIT.map((mode) => areaCommand<never>(host, autoFitSpec(mode))),
   areaCommand<CountArgs>(host, deleteSpec),
+  areaCommand<NavigateCellArgs>(host, navigateSpec),
 ];
