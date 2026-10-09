@@ -20,6 +20,7 @@ import {
   handlePointsOf,
   startObjectResize,
 } from './object-resize.js';
+import { listKindAt } from './list.js';
 import type { ClipboardDataLike } from './clipboard/types.js';
 import { firstImageFile, imageArgsOf } from './image-file.js';
 
@@ -379,6 +380,13 @@ export const attachInput = (host: InputHost): InputHandle => {
 
   const insideTable = (): boolean =>
     host.session?.resolve(host.selection.focus)?.slot.cell !== undefined;
+
+  const insideList = (): boolean => {
+    const session = host.session;
+    if (session === undefined) return false;
+    const slot = session.resolve(host.selection.focus)?.slot;
+    return slot !== undefined && listKindAt(session.model, slot.element) !== undefined;
+  };
 
   const sheets = (): readonly HTMLElement[] =>
     Array.from(host.rendered.querySelectorAll<HTMLElement>(`[${ATTR.page}]`)).sort(
@@ -1109,16 +1117,24 @@ export const attachInput = (host: InputHost): InputHandle => {
       paintCaret();
       return;
     }
-    if (
-      event.key === 'Tab' &&
-      !event.ctrlKey &&
-      !event.altKey &&
-      !event.metaKey &&
-      insideTable()
-    ) {
+    if (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (insideTable()) {
+        event.preventDefault();
+        dropObjectSelection();
+        run(`${PREFIX}table.navigate`, { direction: event.shiftKey ? 'previous' : 'next' });
+        return;
+      }
+      if (insideList()) {
+        event.preventDefault();
+        dropObjectSelection();
+        run(event.shiftKey ? `${PREFIX}numbering.promote` : `${PREFIX}numbering.demote`);
+        return;
+      }
       event.preventDefault();
-      dropObjectSelection();
-      run(`${PREFIX}table.navigate`, { direction: event.shiftKey ? 'previous' : 'next' });
+      if (!event.shiftKey && selectedObject() === undefined) {
+        dropObjectSelection();
+        run(`${PREFIX}edit.insertTab`);
+      }
       return;
     }
     if ((event.key === 'PageDown' || event.key === 'PageUp') && !event.ctrlKey && !event.altKey && !event.metaKey) {

@@ -116,6 +116,17 @@ export const insertText = (host: EditActionHost, text: string): ActionResult => 
   return rangeAction(session, { start: at, end: after }, caretSelection(after, 'downstream'), 'input');
 };
 
+export const insertTab = (host: EditActionHost): ActionResult => {
+  if (!host.editable) return NO_CHANGE;
+  const session = host.session;
+  const range = rangeAt(host);
+  const at = range.start;
+  if (!isCollapsed(host.selection) && !session.deleteRange(range)) return NO_CHANGE;
+  if (!session.insertTab({ start: at, end: at })) return NO_CHANGE;
+  const after = docPos((at as number) + 1);
+  return rangeAction(session, { start: at, end: after }, caretSelection(after, 'downstream'), 'input');
+};
+
 export const insertBreak = (
   host: EditActionHost,
   kind: 'line' | 'page' | 'column',

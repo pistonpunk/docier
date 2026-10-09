@@ -29,6 +29,7 @@ import {
   deleteWord,
   extendSelectionTo,
   insertBreak,
+  insertTab,
   insertText,
   joinParagraph,
   moveCaret,
@@ -309,6 +310,7 @@ const historyAction = (reason: SelectionReason, outcome: HistoryOutcome): Action
 export const editCommandIds: readonly string[] = [
   'docier.command.edit.insertText',
   'docier.command.edit.insertLineBreak',
+  'docier.command.edit.insertTab',
   'docier.command.edit.insertPageBreak',
   'docier.command.edit.insertColumnBreak',
   'docier.command.edit.splitParagraph',
@@ -386,6 +388,15 @@ export const installEditCommands = (
       reason: editReasonInside,
       code: 'READ_ONLY',
       bindings: [{ key: 'Enter', shift: true }],
+    }),
+    mutating(host, {
+      action: 'insertTab',
+      label: 'Insert a tab',
+      area: 'edit',
+      run: (h) => insertTab(h),
+      enabledIn: editableInside,
+      reason: editReasonInside,
+      code: 'READ_ONLY',
     }),
     mutating(host, {
       action: 'insertPageBreak',

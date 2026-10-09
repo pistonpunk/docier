@@ -27,6 +27,7 @@ import {
   clearRunPropertiesElement,
   deleteRangeIn,
   insertBreakAt,
+  insertTabAt,
   insertTextAt,
   joinParagraphInto,
   paragraphLength,
@@ -134,6 +135,7 @@ export interface EditSession {
   markChanged(): void;
   insertText(range: DocRange, text: string, patch?: RunFormatPatch): boolean;
   insertBreak(range: DocRange, kind?: 'line' | 'page' | 'column'): boolean;
+  insertTab(range: DocRange): boolean;
   deleteRange(range: DocRange, mark?: RevisionMark): boolean;
   revisionMark(event: RevisionEvent): RevisionMark;
   markRange(range: DocRange, mark: RevisionMark): boolean;
@@ -760,6 +762,13 @@ export const createEditSession = (
       const target = resolve(range.start);
       if (target === undefined) return false;
       const changed = insertBreakAt(model, target.slot.element, target.offset, kind);
+      if (changed) markMutated(target.slot.story);
+      return changed;
+    },
+    insertTab: (range) => {
+      const target = resolve(range.start);
+      if (target === undefined) return false;
+      const changed = insertTabAt(model, target.slot.element, target.offset);
       if (changed) markMutated(target.slot.story);
       return changed;
     },

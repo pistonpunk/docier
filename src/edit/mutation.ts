@@ -448,6 +448,24 @@ export const insertBreakAt = (
   return true;
 };
 
+export const insertTabAt = (
+  model: DocumentModel,
+  paragraph: XmlElement,
+  offset: number,
+): boolean => {
+  const total = paragraphLength(model, paragraph);
+  const at = Math.max(0, Math.min(total, offset));
+  const point = insertionPoint(model, paragraph, at);
+  if (point === undefined) return false;
+  const run = insertRunAt(point.parent, point.index, point.properties);
+  const tab = createWElement(run, 'tab');
+  tab.parent = run;
+  run.children.push(tab);
+  run.selfClosing = false;
+  model.context.forgetSubtree(paragraph);
+  return true;
+};
+
 const deleteFromRun = (run: XmlElement, start: number, end: number): void => {
   const total = contentLength(run);
   const from = Math.max(0, Math.min(total, start));
