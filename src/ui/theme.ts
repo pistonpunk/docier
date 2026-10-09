@@ -35,6 +35,7 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-handle-size': '10px',
   '--docier-ruler-size': '20px',
   '--docier-ribbon-group-height': '70px',
+  '--docier-ribbon-height': '107px',
   '--docier-tab-height': '24px',
   '--docier-status-height': '22px',
   '--docier-radius': '4px',
@@ -117,6 +118,7 @@ export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, st
     '--docier-handle-size': '9px',
     '--docier-gap': '3px',
     '--docier-menu-item-height': '20px',
+    '--docier-ribbon-height': '96px',
   },
   comfortable: {
     '--docier-control-height': '32px',
@@ -130,6 +132,7 @@ export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, st
     '--docier-handle-size': '20px',
     '--docier-gap': '8px',
     '--docier-menu-item-height': '44px',
+    '--docier-ribbon-height': '128px',
   },
 };
 

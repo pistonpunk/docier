@@ -451,6 +451,12 @@ describe('keyboard and labels', () => {
     expect(unnamed.map((button) => button.outerHTML)).toEqual([]);
   });
 
+  it('reserves one ribbon height so switching tabs cannot move the document', async () => {
+    const { chrome } = await mountWith(longBody(), { mode: 'full' });
+    const ribbon = chrome.menuBar!.ribbon;
+    expect(getComputedStyle(ribbon).minHeight).not.toBe('0px');
+  });
+
   it('shows key tips on Alt and activates the matching control', async () => {
     const { handle, chrome } = await mountWith(longBody(), { mode: 'full' });
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }));
