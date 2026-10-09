@@ -51,6 +51,8 @@ export const PAINT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
   'transform',
   'transform-origin',
   'unicode-bidi',
+  'user-select',
+  '-webkit-user-select',
   'visibility',
   'white-space',
   'width',

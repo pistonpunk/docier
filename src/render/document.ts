@@ -87,7 +87,11 @@ const paintDefault = (
     [ATTR.zoom]: String(options.zoom),
     [ATTR.viewMode]: renderOptions.viewMode,
   });
-  applyStyle(surface, { position: 'relative', 'background-color': options.surfaceBackground });
+  applyStyle(surface, {
+    position: 'relative',
+    'background-color': options.surfaceBackground,
+    cursor: 'text',
+  });
 
   const scaleLayer = box('docier-scale-layer');
   stamp(scaleLayer, { [ATTR.scaleLayer]: '', [ATTR.zoom]: String(options.zoom) });
@@ -95,7 +99,13 @@ const paintDefault = (
 
   const pagesLayer = box('docier-pages');
   stamp(pagesLayer, { [ATTR.pages]: '' });
-  applyStyle(pagesLayer, { position: 'relative', left: '0px', top: '0px' });
+  applyStyle(pagesLayer, {
+    position: 'relative',
+    left: '0px',
+    top: '0px',
+    'user-select': 'none',
+    '-webkit-user-select': 'none',
+  });
 
   scaleLayer.appendChild(pagesLayer);
   surface.appendChild(scaleLayer);

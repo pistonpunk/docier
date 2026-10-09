@@ -4,6 +4,8 @@ import type { LayoutInvalidation, TextRange } from '../api/types.js';
 import { noInvalidation } from '../api/types.js';
 import type { Mp } from '../units/index.js';
 import type { ParagraphFormatPatch, RunFormatPatch } from './mutation.js';
+import { spanText } from './positions.js';
+import { wordAt } from './words.js';
 import type { MarkState, ParagraphMarks, RunMarks } from './inspect.js';
 import { markStateOver, marksAt, marksFrom, paragraphMarksAt } from './inspect.js';
 import {
@@ -415,6 +417,25 @@ export const extendSelectionTo = (host: EditActionHost, pos: DocPos): ActionResu
   );
   if (selectionEquals(next, host.selection)) return NO_CHANGE;
   return selectionAction(next, 'extend');
+};
+
+export const selectWordAt = (host: EditActionHost, pos: DocPos): ActionResult => {
+  const index = host.session.index;
+  const span = index.paragraphAt(index.clamp(pos));
+  if (span === undefined) return setCaretAt(host, pos);
+  const text = spanText(span);
+  const offset = Math.min(Math.max(0, (index.clamp(pos) as number) - (span.start as number)), text.length);
+  const found = wordAt(text, offset);
+  const anchor = docPos((span.start as number) + found.start);
+  const focus = docPos((span.start as number) + found.end);
+  return setSelectionRange(host, anchor, focus);
+};
+
+export const selectParagraphAt = (host: EditActionHost, pos: DocPos): ActionResult => {
+  const index = host.session.index;
+  const span = index.paragraphAt(index.clamp(pos));
+  if (span === undefined) return setCaretAt(host, pos);
+  return setSelectionRange(host, span.start, span.textEnd);
 };
 
 export const collapseSelectionTo = (host: EditActionHost, to: 'start' | 'end'): ActionResult => {

@@ -305,7 +305,8 @@ export const attachInput = (host: InputHost): InputHandle => {
   applyStyle(caret, {
     position: 'absolute',
     width: '1px',
-    'background-color': '#000',
+    'background-color': 'var(--docier-caret, var(--docier-text, #242424))',
+    'box-shadow': '0 0 0 0.5px var(--docier-caret-halo, rgba(255, 255, 255, 0.35))',
     display: 'none',
   });
   const blink =
@@ -970,6 +971,21 @@ export const attachInput = (host: InputHost): InputHandle => {
     if (button === 0) dropObjectSelection();
     event.preventDefault();
     composer.focus({ preventScroll: true });
+    if (button === 0 && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+      const clicks = Number.isFinite(event.detail) ? event.detail : 1;
+      if (clicks >= 3) {
+        run(`${PREFIX}selection.selectParagraph`, { pos: hit.pos });
+        paintCaret();
+        paintSelection();
+        return;
+      }
+      if (clicks === 2) {
+        run(`${PREFIX}selection.selectWord`, { pos: hit.pos });
+        paintCaret();
+        paintSelection();
+        return;
+      }
+    }
     if (!event.shiftKey && inSelection(hit.pos)) {
       armed = { from: rangeAsDocRange(host.selection), x: event.clientX, y: event.clientY };
     } else if (event.shiftKey) {
