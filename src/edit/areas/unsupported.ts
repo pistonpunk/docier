@@ -197,7 +197,9 @@ export const unsupportedCommands = (host: AreaHost): readonly CommandDefinition<
   ...tokenRefusals().map((refusal) => refusalCommand(host, refusal)),
 ];
 
-export const unsupportedIds: readonly string[] = [
-  ...REFUSALS.map((refusal) => refusal.id),
-  ...tokenRefusals().map((refusal) => refusal.id),
-];
+// Only the refusals that no feature can ever answer belong here: the chrome hides
+// every id in this list. The token refusals are deliberately absent, because a host
+// that enables tokenization replaces them with working commands (see
+// tokens/module.ts). They stay registered so the field menu can show them disabled
+// with a reason while the module is unattached, and enabled once it is.
+export const unsupportedIds: readonly string[] = REFUSALS.map((refusal) => refusal.id);

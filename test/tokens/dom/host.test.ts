@@ -10,6 +10,7 @@ import type { TokenHost } from '../../../src/tokens/module.js';
 import type { TokenCatalogue } from '../../../src/tokens/types.js';
 import { disposeEditors, mountPoint, pos, track } from '../../edit/support.js';
 import { openModel } from '../../model/support.js';
+import { CONTEXT_MENUS, visibleNodes } from '../../../src/ui/menu-model.js';
 import { catalogueOf, field, tagOf, tokenElements } from '../support.js';
 
 const WIDE_PAGE =
@@ -73,6 +74,19 @@ describe('the module against a real editor handle', () => {
     }
     const listed = handle.commands.list({ area: 'token' }).map((entry) => entry.id);
     expect(listed).toContain('docier.command.token.insert');
+    attachment.dispose();
+  });
+
+  it('lists the token commands in the field menu, disabled until the module is attached', async () => {
+    const handle = await editorOf({ tokenization: { enabled: true } });
+    const listed = visibleNodes(CONTEXT_MENUS.field).map((node) => node.command);
+    expect(listed).toContain('docier.command.token.edit');
+    expect(handle.commands.isEnabled('docier.command.token.edit')).toBe(false);
+    expect(String(handle.commands.disabledReason('docier.command.token.edit'))).toContain(
+      'no token subsystem',
+    );
+    const attachment = createTokenAttachment(handle, { catalogue: CATALOGUE });
+    expect(handle.commands.isEnabled('docier.command.token.edit')).toBe(true);
     attachment.dispose();
   });
 

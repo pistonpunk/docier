@@ -327,7 +327,6 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.menu.updateField': 'Update Field',
   'ui.menu.editField': 'Edit Field',
   'ui.menu.toggleFieldCodes': 'Toggle Field Codes',
-  'ui.menu.fieldShading': 'Field Shading',
   'ui.menu.unlinkField': 'Unlink Field',
   'ui.menu.pageColour': 'Page Colour',
   'ui.menu.watermark': 'Watermark',

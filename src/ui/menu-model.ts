@@ -1215,7 +1215,6 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     pending('token.edit', 'ui.menu.editField', 'EF'),
     separator('ctx:field:sep1'),
     toggle({ labelKey: 'ui.menu.toggleFieldCodes', id: 'ctx:field:codes', command: command('token.toggleCodes') }),
-    button({ labelKey: 'ui.menu.fieldShading', id: 'ctx:field:shading', action: 'openDialog', actionArgs: { dialog: 'token.shading' } }),
     separator('ctx:field:sep2'),
     pending('token.unlink', 'ui.menu.unlinkField', 'UL'),
     pending('token.setValue', 'ui.control.insertField', 'IF'),
