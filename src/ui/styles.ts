@@ -34,7 +34,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-chrome *,.docier-chrome *::before,.docier-chrome *::after{box-sizing:border-box}
 .docier-chrome [hidden]{display:none}
 .docier-chrome-menubar{display:flex;grid-area:menubar;flex-direction:column;align-items:stretch;background:var(--docier-surface);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
-.docier-titlebar{display:flex;align-items:center;gap:8px;height:32px;padding-inline:8px;background:var(--docier-surface-raised);border-bottom:1px solid var(--docier-border)}
+.docier-titlebar{display:flex;align-items:center;gap:8px;height:28px;padding-inline:8px;background:var(--docier-surface-raised);border-bottom:1px solid var(--docier-border)}
 .docier-titlebar-title{flex:1;text-align:center;font-size:12px;color:var(--docier-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .docier-quick-access{display:flex;align-items:center;gap:2px}
 .docier-quick-access .docier-control{min-width:22px;min-height:22px}
@@ -51,7 +51,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ribbon-toggle{position:absolute;top:2px;inset-inline-end:4px;min-width:20px;min-height:20px;line-height:1;color:var(--docier-text-muted);z-index:2}
 .docier-ribbon[data-docier-collapsed="collapsed"] .docier-group-label{display:none}
 .docier-chrome .docier-ribbon{--docier-control-height:26px;--docier-gap:3px}
-.docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:4px 6px;width:100%}
+.docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:3px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
 @container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}
 .docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;min-height:var(--docier-ribbon-group-height);border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
@@ -71,7 +71,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-control[aria-disabled="true"]{color:var(--docier-text-disabled);cursor:default}
 .docier-control[data-docier-toggle="true"][aria-pressed="true"]{font-weight:700}
 .docier-control-wide{min-width:calc(var(--docier-control-height) * 2)}
-.docier-ribbon .docier-control-large{flex-direction:column;justify-content:flex-start;gap:2px;min-height:46px;min-width:40px;padding:2px 5px;white-space:normal;text-align:center;align-self:flex-start}
+.docier-ribbon .docier-control-large{flex-direction:column;justify-content:flex-start;gap:1px;min-height:40px;min-width:36px;padding:2px 4px;white-space:normal;text-align:center;align-self:flex-start}
 .docier-ribbon .docier-control-large .docier-control-icon{width:28px;height:28px}
 .docier-ribbon .docier-control-large .docier-control-icon svg{width:28px;height:28px}
 .docier-ribbon .docier-control-large .docier-control-label{display:block;font-size:calc(var(--docier-ui-font-size) - 2px);line-height:1.15;max-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
