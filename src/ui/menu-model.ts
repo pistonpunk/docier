@@ -663,23 +663,6 @@ export const RIBBON_TABS: readonly UiTab[] = [
         id: 'editing',
         labelKey: 'ui.group.editing',
         nodes: [
-          // No command on these two: a spec that names one is executed rather than
-          // opened, and the dialog is the only sensible entry point for a search box.
-          button({
-            id: command('find.find'),
-            labelKey: 'ui.control.find',
-            action: 'openDialog',
-            actionArgs: { dialog: command('find.find') },
-            keytip: 'FD',
-            large: true,
-          }),
-          button({
-            id: command('find.replace'),
-            labelKey: 'ui.control.replace',
-            action: 'openDialog',
-            actionArgs: { dialog: command('find.find') },
-            keytip: 'HR',
-          }),
           button({
             labelKey: 'ui.control.selectAll',
             command: command('edit.selectAll'),
@@ -736,7 +719,6 @@ export const RIBBON_TABS: readonly UiTab[] = [
         nodes: [
           picturePicker('ui.control.insertImage', 'P'),
           pending('object.insertShape', 'ui.control.insertShape', 'SH'),
-          pending('object.insertChart', 'ui.control.insertChart', 'CH'),
         ],
       },
       {
@@ -744,16 +726,6 @@ export const RIBBON_TABS: readonly UiTab[] = [
         labelKey: 'ui.group.links',
         large: true,
         nodes: [opensDialog('docier.command.insert.link', 'insert.link', 'ui.control.insertLink', 'L')],
-      },
-      {
-        id: 'headerFooter',
-        labelKey: 'ui.group.headerFooter',
-        large: true,
-        nodes: [
-          pending('insert.header', 'ui.control.insertHeader', 'HD'),
-          pending('insert.footer', 'ui.control.insertFooter', 'FT'),
-          pending('insert.pageNumber', 'ui.control.insertPageNumber', 'PN'),
-        ],
       },
       {
         id: 'text',
@@ -922,122 +894,6 @@ export const RIBBON_TABS: readonly UiTab[] = [
     ],
   },
   {
-    id: 'references',
-    labelKey: 'ui.tab.references',
-    keytip: 'R',
-    groups: [
-      {
-        id: 'toc',
-        labelKey: 'ui.group.tableOfContents',
-        large: true,
-        nodes: [
-          pending('insert.tableOfContents', 'ui.control.tableOfContents', 'TOC'),
-          pending('insert.updateTable', 'ui.control.updateTable', 'UT'),
-        ],
-      },
-      {
-        id: 'notes',
-        labelKey: 'ui.group.footnotes',
-        large: true,
-        nodes: [
-          pending('insert.footnote', 'ui.control.insertFootnote', 'FN'),
-          pending('insert.endnote', 'ui.control.insertEndnote', 'EN'),
-        ],
-      },
-      {
-        id: 'captions',
-        labelKey: 'ui.group.captions',
-        large: true,
-        nodes: [
-          pending('insert.caption', 'ui.control.insertCaption', 'CP'),
-          pending('insert.crossReference', 'ui.control.crossReference', 'CR'),
-        ],
-      },
-      {
-        id: 'index',
-        labelKey: 'ui.group.index',
-        large: true,
-        nodes: [
-          pending('insert.index', 'ui.control.insertIndex', 'IX'),
-          pending('insert.bibliography', 'ui.control.bibliography', 'BI'),
-        ],
-      },
-    ],
-  },
-  {
-    id: 'review',
-    labelKey: 'ui.tab.review',
-    keytip: 'E',
-    groups: [
-      {
-        id: 'proofing',
-        labelKey: 'ui.group.proofing',
-        large: true,
-        nodes: [
-          pending('proof.spelling', 'ui.control.spelling', 'SP'),
-          pending('proof.thesaurus', 'ui.control.thesaurus', 'TH'),
-          opensDialog('docier.command.proof.wordCount', 'wordCount', 'ui.control.wordCount', 'WC'),
-        ],
-      },
-      {
-        id: 'language',
-        labelKey: 'ui.group.language',
-        large: true,
-        nodes: [pending('proof.setLanguage', 'ui.control.setLanguage', 'SL')],
-      },
-      {
-        id: 'comments',
-        labelKey: 'ui.group.comments',
-        large: true,
-        nodes: [
-          pending('comment.create', 'ui.control.newComment', 'NC'),
-          pending('comment.delete', 'ui.control.deleteComment', 'DC'),
-          button({
-            labelKey: 'ui.control.commentsPane',
-            id: 'docier.command.view.toggleComments',
-            action: 'toggleComments',
-            keytip: 'CP',
-          }),
-        ],
-      },
-      {
-        id: 'tracking',
-        labelKey: 'ui.group.tracking',
-        large: true,
-        nodes: [
-          toggle({
-            labelKey: 'ui.control.trackChanges',
-            command: command('doc.toggleTrackChanges'),
-            keytip: 'TC',
-            valueKey: 'trackChanges',
-          }),
-          button({
-            labelKey: 'ui.control.acceptChange',
-            command: command('doc.acceptChange'),
-            keytip: 'AC',
-          }),
-          button({
-            labelKey: 'ui.control.rejectChange',
-            command: command('doc.rejectChange'),
-            keytip: 'RC',
-          }),
-          menu('ui.control.acceptAllChanges', [
-            button({
-              labelKey: 'ui.control.acceptAllChanges',
-              command: command('doc.acceptChange'),
-              args: { all: true },
-            }),
-            button({
-              labelKey: 'ui.control.rejectAllChanges',
-              command: command('doc.rejectChange'),
-              args: { all: true },
-            }),
-          ]),
-        ],
-      },
-    ],
-  },
-  {
     id: 'view',
     labelKey: 'ui.tab.view',
     keytip: 'W',
@@ -1200,13 +1056,6 @@ export const PICTURE_TAB: UiTab = {
         pending('object.bringForward', 'ui.control.arrangeBringForward', 'BF'),
         pending('object.sendBackward', 'ui.control.arrangeSendBackward', 'BK'),
         pending('object.setSize', 'ui.menu.sizePosition', 'SZ'),
-      ],
-    },
-    {
-      id: 'pictureCaption',
-      labelKey: 'ui.group.captions',
-      nodes: [
-        pending('insert.caption', 'ui.control.insertCaption', 'CA'),
         pending('object.delete', 'ui.menu.delete', 'DL'),
       ],
     },
@@ -1285,15 +1134,6 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     separator('ctx:text:sep2'),
     menu('ui.menu.insert', [pending('insert.table', 'ui.control.insertTable', 'T'), opensDialog('ctx:page:link', 'insert.link', 'ui.control.insertLink', 'L'), opensDialog('ctx:page:symbol', 'insert.symbol', 'ui.control.insertSymbol', 'SY')]),
     separator('ctx:text:sep3'),
-    node('menu', {
-      id: 'ctx:text:synonyms',
-      labelKey: 'ui.menu.synonyms',
-      items: [button({ labelKey: 'ui.control.thesaurus', id: 'ctx:text:thesaurus', command: command('proof.thesaurus') })],
-    }),
-    button({ labelKey: 'ui.control.translate', id: 'ctx:text:translate', command: command('proof.translate') }),
-    pending('comment.create', 'ui.control.newComment', 'NC'),
-    separator('ctx:text:sep4'),
-    button({ labelKey: 'ui.control.find', id: 'ctx:text:find', action: 'openDialog', actionArgs: { dialog: command('find.find') } }),
     button({ labelKey: 'ui.control.selectAll', id: 'ctx:text:all', command: command('edit.selectAll') }),
   ],
   table: [
@@ -1363,7 +1203,6 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
       action: 'compressPicture',
     }),
     separator('ctx:image:sep2'),
-    pending('insert.caption', 'ui.control.insertCaption', 'CA'),
     pending('object.setSize', 'ui.menu.sizePosition', 'SZ'),
     pending('object.bringForward', 'ui.control.arrangeBringForward', 'BF'),
     pending('object.sendBackward', 'ui.control.arrangeSendBackward', 'BK'),
@@ -1397,8 +1236,6 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     pending('doc.setOrientation', 'ui.control.orientation', 'OR'),
     pending('doc.setPageSize', 'ui.control.pageSize', 'SZ'),
     separator('ctx:page:sep3'),
-    pending('insert.header', 'ui.control.insertHeader', 'HD'),
-    pending('insert.footer', 'ui.control.insertFooter', 'FT'),
     pending('insert.pageNumber', 'ui.control.insertPageNumber', 'PN'),
     separator('ctx:page:sep4'),
     button({ labelKey: 'ui.control.selectAll', id: 'ctx:page:all', command: command('edit.selectAll') }),
@@ -1423,14 +1260,9 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
     toggle({ labelKey: 'ui.control.showRuler', id: 'ctx:pasteboard:ruler', action: 'toggleRuler' }),
   ],
   headerFooter: [
-    menu('ui.menu.editHeader', [
-      pending('insert.header', 'ui.menu.editHeader', 'EH'),
-      pending('insert.footer', 'ui.menu.editFooter', 'EF'),
-    ]),
-    separator('ctx:hf:sep1'),
     pending('insert.pageNumber', 'ui.control.insertPageNumber', 'PN'),
     pending('insert.dateTime', 'ui.control.insertDate', 'DT'),
-    separator('ctx:hf:sep2'),
+    separator('ctx:hf:sep1'),
     pending('insert.closeHeaderFooter', 'ui.menu.closeHeaderFooter', 'CH'),
     button({ labelKey: 'ui.control.selectAll', id: 'ctx:hf:all', command: command('edit.selectAll') }),
   ],
@@ -1467,7 +1299,6 @@ export const CONTEXT_MENUS: Readonly<Record<ContextSurface, readonly UiNode[]>> 
 export const STATUS_ITEM_MENU: readonly UiNode[] = [
   toggle({ labelKey: 'ui.status.item.page', id: 'status:page', action: 'toggleStatusItem', actionArgs: { item: 'page' } }),
   toggle({ labelKey: 'ui.status.item.words', id: 'status:words', action: 'toggleStatusItem', actionArgs: { item: 'words' } }),
-  toggle({ labelKey: 'ui.status.item.language', id: 'status:language', action: 'toggleStatusItem', actionArgs: { item: 'language' } }),
   toggle({ labelKey: 'ui.status.item.save', id: 'status:save', action: 'toggleStatusItem', actionArgs: { item: 'save' } }),
   toggle({ labelKey: 'ui.status.item.view', id: 'status:view', action: 'toggleStatusItem', actionArgs: { item: 'view' } }),
   toggle({ labelKey: 'ui.status.item.zoom', id: 'status:zoom', action: 'toggleStatusItem', actionArgs: { item: 'zoom' } }),

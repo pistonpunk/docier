@@ -40,7 +40,7 @@ export type Density = 'compact' | 'comfortable' | 'touch';
 
 export type ViewMode = 'print' | 'web' | 'draft' | 'read';
 
-export type StatusItemId = 'page' | 'words' | 'language' | 'save' | 'view' | 'zoom';
+export type StatusItemId = 'page' | 'words' | 'save' | 'view' | 'zoom';
 
 export interface TablePropertiesState {
   readonly alignment: 'left' | 'center' | 'right' | undefined;
@@ -56,7 +56,6 @@ export interface ChromeState {
   readonly words: number;
   readonly zoom: number;
   readonly save: SaveState;
-  readonly language: string | undefined;
   readonly surface: ContextSurface | null;
   readonly caretSurface: 'table' | 'image' | null;
   readonly tableProperties: TablePropertiesState | undefined;
@@ -88,7 +87,6 @@ export type ChromeActionName =
   | 'setUnits'
   | 'toggleStatusItem'
   | 'toggleKeyTips'
-  | 'toggleComments'
   | 'showFloatingControls'
   | 'hideFloatingControls'
   | 'openContextMenu'
@@ -177,7 +175,6 @@ export const CONTEXT_SURFACES: readonly ContextSurface[] = [
 export const STATUS_ITEM_IDS: readonly StatusItemId[] = [
   'page',
   'words',
-  'language',
   'save',
   'view',
   'zoom',

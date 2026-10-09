@@ -351,26 +351,3 @@ describe('style application', () => {
     });
   });
 });
-
-describe('proofing language', () => {
-  it('writes the language over the selection and undoes it', async () => {
-    const handle = await editorOf(FIXTURE);
-    handle.setSelection(pos(0), pos(5));
-
-    await run(handle, 'proof.setLanguage', { language: 'fr-FR' });
-    expect(xmlOf(handle)).toContain('w:lang');
-    expect(xmlOf(handle)).toContain('fr-FR');
-
-    await run(handle, 'history.undo');
-    expect(xmlOf(handle)).not.toContain('fr-FR');
-  });
-
-  it('reports the missing language tag', async () => {
-    const handle = await editorOf(FIXTURE);
-    expect(await resultOf(handle, 'proof.setLanguage')).toEqual({
-      status: 'blocked',
-      code: 'INAPPLICABLE',
-      reason: 'This control needs a language tag such as en-GB',
-    });
-  });
-});

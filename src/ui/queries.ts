@@ -16,14 +16,12 @@ export interface EditorQueries {
   readonly pages: () => number;
   readonly zoom: () => number;
   readonly save: () => SaveState;
-  readonly language: () => string | undefined;
   readonly selectionEmpty: () => boolean;
   readonly caretSurface: () => 'table' | 'image' | null;
   readonly tableProperties: () => TablePropertiesSummary | undefined;
   readonly surface: () => ContextSurface | null;
   setSurface(value: ContextSurface | null): void;
   readonly indents: () => RulerIndents | undefined;
-  readonly comments: () => readonly CommentSummary[];
   readonly pageFragment: (index: number) => PageFragment | undefined;
   readonly offsetPx: () => number;
   readonly offsetYPx: () => number;
@@ -62,36 +60,7 @@ const tablePropertiesOf = (handle: EditorHandle): TablePropertiesSummary | undef
 
 export interface EditorQueryOptions {
   readonly indents?: ((page: number) => RulerIndents | undefined) | undefined;
-  readonly language?: (() => string | undefined) | undefined;
 }
-
-export interface CommentSummary {
-  readonly id: number;
-  readonly author: string;
-  readonly initials: string | undefined;
-  readonly date: string | undefined;
-  readonly text: string;
-}
-
-const attributeOf = (element: { readonly attributes: readonly { readonly localName: string; readonly value: string }[] }, name: string): string | undefined =>
-  element.attributes.find((entry) => entry.localName === name)?.value;
-
-export const documentComments = (handle: EditorHandle): readonly CommentSummary[] => {
-  const model = handle.document;
-  if (model === undefined) return [];
-  const story = model.stories().find((candidate) => candidate.kind === 'comment');
-  if (story === undefined) return [];
-  return story
-    .notes()
-    .filter((note) => note.noteKind === 'normal')
-    .map((note) => ({
-      id: note.noteId,
-      author: attributeOf(note.element, 'author') ?? '',
-      initials: attributeOf(note.element, 'initials'),
-      date: attributeOf(note.element, 'date'),
-      text: note.logicalText.trim(),
-    }));
-};
 
 export const countWords = (handle: EditorHandle): number => {
   const session = handle.session;
@@ -189,7 +158,6 @@ export const createEditorQueries = (
       return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_ZOOM;
     },
     save: () => save,
-    language: () => options?.language?.() ?? handle.config.locale,
     selectionEmpty: () => handle.selection.anchor === handle.selection.focus,
     caretSurface: () => {
       const session = handle.session;
@@ -200,7 +168,6 @@ export const createEditorQueries = (
     tableProperties: () => tablePropertiesOf(handle),
     surface: () => surface,
     indents: () => options?.indents?.(self.page()) ?? DEFAULT_INDENTS,
-    comments: () => documentComments(handle),
     pageFragment: (index) => handle.layout?.pages[index],
     offsetPx: () => pageOriginPx(),
     offsetYPx: () => pageOriginYPx(),
@@ -227,14 +194,12 @@ export const NO_QUERIES: EditorQueries = {
   pages: () => 1,
   zoom: () => DEFAULT_ZOOM,
   save: () => 'saved',
-  language: () => undefined,
   selectionEmpty: () => true,
   caretSurface: () => null,
   tableProperties: () => undefined,
   surface: () => null,
   setSurface: () => {},
   indents: () => DEFAULT_INDENTS,
-  comments: () => [],
   pageFragment: () => undefined,
   offsetPx: () => 0,
   offsetYPx: () => 0,

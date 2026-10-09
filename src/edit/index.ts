@@ -40,7 +40,6 @@ export {
   insertCommands,
   pageCommands,
   paragraphCommands,
-  proofCommands,
   styleCommands,
   unsupportedCommands,
 } from './areas/index.js';

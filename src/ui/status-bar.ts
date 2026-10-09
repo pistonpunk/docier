@@ -14,7 +14,6 @@ export interface StatusBarHandle extends Disposable {
   readonly element: HTMLElement;
   readonly page: HTMLElement;
   readonly words: HTMLElement;
-  readonly language: HTMLElement;
   readonly save: HTMLElement;
   readonly zoom: HTMLInputElement;
   refresh(): void;
@@ -87,9 +86,6 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
   const words = button('words');
   words.addEventListener('click', () => context.run('openDialog', { dialog: 'wordCount' }));
 
-  const language = button('language');
-  language.addEventListener('click', () => context.run('openDialog', { dialog: 'setLanguage' }));
-
   const save = button('save');
   save.addEventListener('click', () => context.run('openDialog', { dialog: 'save' }));
 
@@ -140,23 +136,12 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
   const slots: Record<StatusItemId, HTMLElement | undefined> = {
     page,
     words,
-    language,
     save,
     view: viewGroup,
     zoom: zoomGroup,
   };
 
-  const languageNameOf = (tag: string | undefined): string => {
-    if (tag === undefined || tag === '') return '';
-    try {
-      const names = new Intl.DisplayNames([tag], { type: 'language' });
-      return names.of(tag) ?? tag;
-    } catch {
-      return tag;
-    }
-  };
-
-  const order: readonly StatusItemId[] = ['page', 'words', 'language', 'save', 'view', 'zoom'];
+  const order: readonly StatusItemId[] = ['page', 'words', 'save', 'view', 'zoom'];
 
   let appliedOrder = '';
 
@@ -199,9 +184,6 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
         : context.i18n.text('ui.status.words', { count: context.i18n.formatNumber(state.words) }),
     );
     words.setAttribute('title', words.textContent ?? '');
-    setText(language, languageNameOf(state.language));
-    language.dataset.docierTag = state.language ?? '';
-    language.setAttribute('title', context.i18n.text('ui.status.language'));
     setText(save, context.i18n.text(SAVE_KEYS[state.save]));
     save.setAttribute('title', context.i18n.text('ui.status.save'));
     save.setAttribute('data-docier-save', state.save);
@@ -240,7 +222,6 @@ export const createStatusBar = (options: StatusBarOptions): StatusBarHandle => {
     element,
     page,
     words,
-    language,
     save,
     zoom,
     refresh,

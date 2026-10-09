@@ -104,25 +104,12 @@ const REFUSALS: readonly Refusal[] = [
   { id: 'docier.command.object.insertChart', label: 'Chart', category: 'object', reason: NO_DRAWING },
 
   {
-    id: 'docier.command.proof.spelling',
-    label: 'Spelling',
-    category: 'proof',
-    reason: 'This build ships no proofing provider',
-  },
-  {
     id: 'docier.command.clipboard.pasteSpecial',
     label: 'Paste Special',
     category: 'clipboard',
     reason:
       'This build pastes in one form; there is no dialog for choosing between the source formatting and the destination',
   },
-  {
-    id: 'docier.command.proof.thesaurus',
-    label: 'Thesaurus',
-    category: 'proof',
-    reason: 'This build ships no thesaurus provider',
-  },
-
   {
     id: 'docier.command.view.setGridlines',
     label: 'Gridlines',
@@ -137,23 +124,11 @@ const REFUSALS: readonly Refusal[] = [
   },
 
   {
-    id: 'docier.command.comment.delete',
-    label: 'Delete comment',
-    category: 'comment',
-    reason: 'This build writes a comment but does not remove one',
-  },
-  {
     id: 'docier.command.clipboard.formatPainter',
     label: 'Format painter',
     category: 'clipboard',
     reason:
       'This build has no format painter: it would have to hold a character format independently of the selection, and nothing in the editing layer carries one between edits',
-  },
-  {
-    id: 'docier.command.proof.translate',
-    label: 'Translate',
-    category: 'proof',
-    reason: 'This build has no translation backend; the host application owns anything that leaves the machine',
   },
   {
     id: 'docier.command.table.distributeRows',

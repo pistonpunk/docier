@@ -355,12 +355,11 @@ describe('dialogs', () => {
 
   it('names the dialog a reader asked for, not the identifier behind it', async () => {
     const { chrome } = await mountWith(longBody(), { mode: 'full' });
-    // the status bar asks for goToPage, setLanguage and save, none of which are
+    // the status bar asks for goToPage and save, neither of which are
     // built, and the message used to show those identifiers verbatim. wordCount
     // used to be among them and now has a dialog, so it is no longer a message
     for (const [requested, label] of [
       ['goToPage', 'Go To Page'],
-      ['setLanguage', 'Set Language'],
       ['save', 'Save'],
     ] as const) {
       chrome.context.run('openDialog', { dialog: requested });
@@ -489,18 +488,6 @@ describe('localisation', () => {
     const { chrome } = await mountWith(longBody(), { mode: 'full' }, { locale: 'de' });
     expect(chrome.context.i18n.text('ui.control.bold')).toBe('Fett');
     expect(chrome.context.i18n.text('ui.control.italic')).toBe('Italic');
-  });
-
-  it('takes an injectable language probe for the status bar', async () => {
-    const { chrome } = await mountWith(longBody(), {
-      mode: 'full',
-      language: () => 'de-DE',
-    });
-    expect(chrome.store.get().language).toBe('de-DE');
-    expect(chrome.statusBar!.language.dataset.docierTag).toBe('de-DE');
-    expect(chrome.statusBar!.language.textContent).not.toBe('de-DE');
-    expect(chrome.statusBar!.language.textContent).not.toBe('');
-    expect(chrome.statusBar!.language.getAttribute('title')).toBe('Proofing language');
   });
 
   it('ships English only', () => {

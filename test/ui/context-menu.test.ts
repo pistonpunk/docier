@@ -129,23 +129,11 @@ describe('right-click routing', () => {
     rightClick(region!);
     expect(chrome.contextMenus!.current).toBe('headerFooter');
     expect(menus()[0]?.getAttribute('aria-label')).toBe('Header and footer menu');
-    expect(menuItemByText('Edit Header')).toBeDefined();
-    const enter = itemFor('insert.header');
-    expect(enter, 'the header entry').toBeDefined();
-    expect(enter!.getAttribute('aria-disabled')).not.toBe('true');
     const close = itemFor('insert.closeHeaderFooter');
     expect(close, 'the close entry').toBeDefined();
     expect(close!.getAttribute('aria-disabled')).toBe('true');
     expect(close!.getAttribute('aria-description') ?? '').toContain('not in a header');
-    const footer = itemFor('insert.footer');
-    expect(footer!.getAttribute('aria-disabled')).not.toBe('true');
-    const entered = await chrome.context.commands.execute('docier.command.insert.header');
-    expect(entered.status).toBe('ok');
     chrome.contextMenus!.close();
-    rightClick(region!);
-    expect(chrome.contextMenus!.current).toBe('headerFooter');
-    const closeAgain = itemFor('insert.closeHeaderFooter');
-    expect(closeAgain!.getAttribute('aria-disabled')).not.toBe('true');
   });
 
   it('routes a right-click on the page background to the page menu', async () => {
