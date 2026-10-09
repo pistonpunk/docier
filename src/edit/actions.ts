@@ -38,7 +38,8 @@ import {
   selectionOf,
   startOf,
 } from './selection.js';
-import type { EditSession } from './session.js';
+import type { EditSession, ParagraphSlot } from './session.js';
+import { listKindAt, listLevelOf, setListLevel } from './list.js';
 
 export interface EditActionHost {
   readonly session: EditSession;
@@ -176,6 +177,27 @@ const joinResult = (
     containerInvalidation(),
   );
 
+const outdentList = (host: EditActionHost, slot: ParagraphSlot): ActionResult | undefined => {
+  const session = host.session;
+  const model = session.model;
+  if (listKindAt(model, slot.element) === undefined) return undefined;
+  if (listLevelOf(model, slot.element) <= 0) return undefined;
+  let outdented = false;
+  session.changeRegions(() => {
+    session.changeNumbering(() => {
+      outdented = setListLevel(model, [slot.element], { delta: -1 });
+    });
+  });
+  if (!outdented) return undefined;
+  return rangeAction(
+    session,
+    { start: slot.start, end: slot.end },
+    host.selection,
+    'input',
+    containerInvalidation(),
+  );
+};
+
 export const deleteCharacter = (
   host: EditActionHost,
   direction: 'backward' | 'forward',
@@ -188,6 +210,10 @@ export const deleteCharacter = (
   if (target === undefined) return NO_CHANGE;
   const slot = target.slot;
   if (target.offset === 0) {
+    if (direction === 'backward') {
+      const outdented = outdentList(host, slot);
+      if (outdented !== undefined) return outdented;
+    }
     const previous = session.slots()[slot.index - 1];
     if (previous === undefined || previous.container !== slot.container) return NO_CHANGE;
     if (!session.joinWithPrevious(slot.start)) return NO_CHANGE;

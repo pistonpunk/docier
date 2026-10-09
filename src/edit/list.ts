@@ -320,11 +320,11 @@ export const setListLevel = (
   let changed = false;
   for (const element of elements) {
     const properties = numberingPropertiesOf(element);
-    const numId = model.numberingFor(properties.element)?.numId;
-    if (numId === undefined) continue;
-    const instance = model.numbering?.instance(numId);
+    const context = model.numberingFor(properties.element);
+    if (context === undefined) continue;
+    const instance = model.numbering?.instance(context.numId);
     if (instance === undefined) continue;
-    const current = clampLevel(properties.numbering.level ?? 0);
+    const current = clampLevel(context.ilvl);
     const wanted = clampLevel(request.level ?? current + (request.delta ?? 0));
     if (wanted === current) continue;
     if (ensureLevel(model, instance, wanted) === undefined) continue;
