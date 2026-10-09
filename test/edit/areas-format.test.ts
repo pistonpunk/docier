@@ -112,6 +112,29 @@ describe('paragraph indents', () => {
     expect(handle.commands.isEnabled('docier.command.history.undo')).toBe(false);
   });
 
+  it('writes a negative first line as a hanging indent, which is what OOXML has', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+
+    await run(handle, 'format.setParagraphIndent', {
+      leftTwips: 720,
+      firstLineTwips: -360,
+    });
+    const xml = xmlOf(handle);
+    expect(xml).toContain('w:hanging="360"');
+    expect(xml).not.toContain('w:firstLine="-360"');
+  });
+
+  it('clamps a negative left indent rather than writing an unsigned attribute as negative', async () => {
+    const handle = await editorOf(FIXTURE);
+    await run(handle, 'selection.setCaret', { pos: pos(0) });
+
+    await run(handle, 'format.setParagraphIndent', { leftTwips: -600, rightTwips: -120 });
+    const xml = xmlOf(handle);
+    expect(xml).not.toContain('w:left="-600"');
+    expect(xml).not.toContain('w:right="-120"');
+  });
+
   it('steps the indent in and out and clamps at zero', async () => {
     const handle = await editorOf(FIXTURE);
     await run(handle, 'selection.setCaret', { pos: pos(0) });

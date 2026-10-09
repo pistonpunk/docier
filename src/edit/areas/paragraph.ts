@@ -76,12 +76,28 @@ const applyIndent = (element: XmlElement, args: IndentArgs): boolean => {
     else if (target === 'firstLine') firstLine = next;
     else left = next;
   }
-  if (left === currentLeft && right === currentRight && firstLine === currentFirst) return false;
-  if (left !== currentLeft) indentation.left = left === undefined ? undefined : twip(left);
-  if (right !== currentRight) indentation.right = right === undefined ? undefined : twip(right);
+  const clampedLeft = left === undefined ? undefined : Math.max(0, left);
+  const clampedRight = right === undefined ? undefined : Math.max(0, right);
+  if (clampedLeft === currentLeft && clampedRight === currentRight && firstLine === currentFirst) {
+    return false;
+  }
+  if (clampedLeft !== currentLeft) {
+    indentation.left = clampedLeft === undefined ? undefined : twip(clampedLeft);
+  }
+  if (clampedRight !== currentRight) {
+    indentation.right = clampedRight === undefined ? undefined : twip(clampedRight);
+  }
   if (firstLine !== currentFirst) {
-    indentation.firstLine = firstLine === undefined ? undefined : twip(firstLine);
-    if (firstLine !== undefined) indentation.hanging = undefined;
+    if (firstLine === undefined) {
+      indentation.firstLine = undefined;
+      indentation.hanging = undefined;
+    } else if (firstLine < 0) {
+      indentation.firstLine = undefined;
+      indentation.hanging = twip(-firstLine);
+    } else {
+      indentation.firstLine = twip(firstLine);
+      indentation.hanging = undefined;
+    }
   }
   return true;
 };

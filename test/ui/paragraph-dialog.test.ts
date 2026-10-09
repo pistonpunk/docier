@@ -63,13 +63,19 @@ const openParagraph = (
 const indentationOf = (
   handle: EditorHandle,
   index = 0,
-): { readonly left: number | undefined; readonly firstLine: number | undefined; readonly right: number | undefined } => {
+): {
+  readonly left: number | undefined;
+  readonly firstLine: number | undefined;
+  readonly hanging: number | undefined;
+  readonly right: number | undefined;
+} => {
   const slot = handle.session?.slots()[index];
   if (slot === undefined) throw new Error('no slot');
   const indentation = ParagraphProperties.inOwner(slot.element).indentation;
   return {
     left: indentation.left as number | undefined,
     firstLine: indentation.firstLine as number | undefined,
+    hanging: indentation.hanging as number | undefined,
     right: indentation.right as number | undefined,
   };
 };
@@ -184,7 +190,8 @@ describe('the paragraph dialog', () => {
       'docier.command.format.setParagraphIndent',
     ]);
     expect(seen[0]?.args.firstLineTwips).toBe(-unitToTwips(0.5, unit));
-    expect(indentationOf(handle).firstLine).toBe(-unitToTwips(0.5, unit));
+    expect(indentationOf(handle).hanging).toBe(unitToTwips(0.5, unit));
+    expect(indentationOf(handle).firstLine).toBeUndefined();
   });
 
   it('applies nothing when OK is pressed without a change', async () => {
