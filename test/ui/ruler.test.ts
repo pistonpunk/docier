@@ -103,6 +103,15 @@ describe('one ruler for the document', () => {
     ]);
   });
 
+  it('keeps the ruler painted when the view switches to Read mode', async () => {
+    const { chrome } = await chromeOf(longBody());
+    expect(chrome.ruler!.element.hidden).toBe(false);
+    chrome.context.run('setViewMode', { mode: 'read' });
+    expect(chrome.ruler!.element.hidden).toBe(false);
+    chrome.context.run('setViewMode', { mode: 'print' });
+    expect(chrome.ruler!.element.hidden).toBe(false);
+  });
+
   it('hides and shows with the ruler state', async () => {
     const { chrome } = await chromeOf(longBody());
     expect(chrome.ruler!.element.hidden).toBe(false);
@@ -134,6 +143,31 @@ describe('ruler interaction', () => {
     await handle.whenReady();
     expect(seen[0]?.args.leftTwips).toBe(11);
     expect(indentationOf(handle).left).toBe(11);
+  });
+
+  it('applies each indent move while the drag is still happening', async () => {
+    const { handle, chrome } = await chromeOf(longBody());
+    const seen = recordCommands(handle);
+    const marker = markerFor(chrome, 'indent-left');
+    const down = new MouseEvent('pointerdown', { clientX: 100, clientY: 5, bubbles: true, cancelable: true });
+    marker.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 130, clientY: 5, bubbles: true }));
+    await handle.whenReady();
+    const indent = seen.find(
+      (entry) => entry.commandId === 'docier.command.format.setParagraphIndent',
+    );
+    expect(indent, 'the drag applied the indent before the pointer came up').toBeDefined();
+    expect(indentationOf(handle).left).toBeGreaterThan(0);
+
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 160, clientY: 5, bubbles: true }));
+    await handle.whenReady();
+    const after = indentationOf(handle).left ?? 0;
+    document.dispatchEvent(new MouseEvent('pointerup', { clientX: 160, clientY: 5, bubbles: true }));
+    await handle.whenReady();
+    expect(after).toBeGreaterThan(indent!.args.leftTwips as number);
+    expect(indentationOf(handle).left).toBe(after);
   });
 
   it('commits margin changes through the command surface', async () => {
