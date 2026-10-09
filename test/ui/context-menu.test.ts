@@ -13,7 +13,6 @@ import {
   contextMenuEvent,
   disposeChromes,
   longBody,
-  menuItemByText,
   menuItems,
   menus,
   paragraphText,

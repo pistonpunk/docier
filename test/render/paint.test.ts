@@ -308,6 +308,7 @@ describe('layout freedom of the painted document', () => {
           text: 'gone',
           source: range(0, 4),
           annotation: NO_ANNOTATION,
+          token: undefined,
         },
       ],
       caretStops: [],
