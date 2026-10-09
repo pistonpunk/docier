@@ -1,4 +1,4 @@
-import { DARK_THEME_TOKENS, DEFAULT_THEME_TOKENS, DENSITY_TOKENS } from './theme.js';
+import { DARK_THEME_TOKENS, DEFAULT_THEME_TOKENS, DENSITY_TOKENS, DOCUMENT_THEME_TOKENS } from './theme.js';
 import type { Density } from './types.js';
 
 export const STYLE_ELEMENT_ATTRIBUTE = 'data-docier-styles';
@@ -16,6 +16,7 @@ export const themeStyles = (): string =>
   [
     tokenRule(':where(.docier-chrome)', DEFAULT_THEME_TOKENS),
     tokenRule(':where(.docier-portal)', DEFAULT_THEME_TOKENS),
+    tokenRule(':where(.docier-editor)', DOCUMENT_THEME_TOKENS),
     tokenRule(':where(.docier-chrome[data-docier-theme="dark"])', DARK_THEME_TOKENS),
     tokenRule(':where(.docier-portal[data-docier-theme="dark"])', DARK_THEME_TOKENS),
     `@media (prefers-color-scheme: dark){${tokenRule(

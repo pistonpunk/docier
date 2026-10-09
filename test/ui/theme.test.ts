@@ -4,6 +4,7 @@ import {
   DARK_THEME_TOKENS,
   DEFAULT_THEME_TOKENS,
   DENSITY_TOKENS,
+  DOCUMENT_THEME_TOKENS,
   TOKEN_NAMES,
   applyTheme,
   readTheme,
@@ -92,6 +93,17 @@ describe('default stylesheet', () => {
     expect(literals.length).toBe(0);
     expect(css).toContain('var(--docier-surface)');
     expect(css).toContain('var(--docier-focus-ring)');
+  });
+
+  it('gives the document world its own tokens so dark chrome cannot wash out the page', () => {
+    const css = themeStyles();
+    expect(css).toContain(':where(.docier-editor){');
+    expect(css).toContain('--docier-caret:#242424');
+    expect(css).toContain('--docier-text:#242424');
+    expect(DOCUMENT_THEME_TOKENS['--docier-caret']).toBe('#242424');
+    expect(DOCUMENT_THEME_TOKENS['--docier-selection']).not.toBe(
+      DARK_THEME_TOKENS['--docier-selection'],
+    );
   });
 
   it('injects one style element per document', () => {

@@ -86,6 +86,30 @@ export const DARK_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-token-border': 'rgba(110, 168, 254, 0.45)',
 };
 
+// The document world is a sheet of paper, not chrome: it stays light however the
+// UI is themed, so the caret, selection and page rules keep their contrast on
+// white paper even when the surrounding chrome is dark. A host that wants a
+// different page world still overrides these through theme.vars, which lands as
+// an inline style on the editor root and wins over this rule.
+export const DOCUMENT_THEME_TOKENS: Readonly<Record<string, string>> = {
+  '--docier-text': '#242424',
+  '--docier-caret': '#242424',
+  '--docier-caret-halo': 'rgba(255, 255, 255, 0.35)',
+  '--docier-selection': 'rgba(24, 90, 189, 0.20)',
+  '--docier-link': '#1f6feb',
+  '--docier-mark': '#7a7a7a',
+  '--docier-page-rule': 'rgba(0, 0, 0, 0.55)',
+  '--docier-page-shadow': '0 2px 6px rgba(0, 0, 0, 0.10), 0 0 1px rgba(0, 0, 0, 0.10)',
+  '--docier-surface': '#ffffff',
+  '--docier-surface-raised': '#ffffff',
+  '--docier-error': '#b3261e',
+  '--docier-accent': '#1f6feb',
+  '--docier-token-placeholder-bg': 'rgba(24, 90, 189, 0.12)',
+  '--docier-token-placeholder-border': 'rgba(24, 90, 189, 0.55)',
+  '--docier-token-bg': 'rgba(24, 90, 189, 0.08)',
+  '--docier-token-border': 'rgba(24, 90, 189, 0.35)',
+};
+
 export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, string>>>> = {
   compact: {
     '--docier-control-height': '28px',
