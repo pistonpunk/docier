@@ -50,16 +50,16 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ribbon[data-docier-collapsed="hidden"]{display:none}
 .docier-ribbon-toggle{position:absolute;top:2px;inset-inline-end:4px;min-width:20px;min-height:20px;line-height:1;color:var(--docier-text-muted);z-index:2}
 .docier-ribbon[data-docier-collapsed="collapsed"] .docier-group-label{display:none}
-.docier-chrome .docier-ribbon{--docier-control-height:26px;--docier-gap:3px}
+.docier-chrome .docier-ribbon{--docier-control-height:22px;--docier-gap:2px}
 .docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:3px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
 @container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}
 .docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;min-height:var(--docier-ribbon-group-height);border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
 .docier-group:last-child{border-inline-end:0}
-.docier-group-controls{display:flex;align-items:center;flex-wrap:wrap;align-content:center;gap:2px;row-gap:2px;flex:1 1 auto;min-width:0}
+.docier-group-controls{display:flex;align-items:center;flex-wrap:wrap;align-content:center;gap:2px;row-gap:1px;flex:1 1 auto;min-width:0}
 .docier-group-controls > *{flex:0 0 auto}
 .docier-group-controls > .docier-menu-gallery{flex:0 1 auto;min-width:0}
-.docier-group-label{display:flex;align-items:center;justify-content:center;gap:var(--docier-gap);color:var(--docier-text-muted);font-size:var(--docier-group-label-size);padding-block-start:2px;text-align:center}
+.docier-group-label{display:flex;align-items:center;justify-content:center;gap:var(--docier-gap);color:var(--docier-text-muted);font-size:calc(var(--docier-group-label-size) - 1px);padding-block-start:1px;text-align:center}
 .docier-group-launcher{appearance:none;border:0;background:transparent;color:var(--docier-text-muted);cursor:pointer;line-height:1;padding:0 2px}
 .docier-group-launcher:hover{color:var(--docier-accent)}
 .docier-group[data-docier-grow="true"]{flex:0 1 auto;min-width:0}
@@ -71,9 +71,9 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-control[aria-disabled="true"]{color:var(--docier-text-disabled);cursor:default}
 .docier-control[data-docier-toggle="true"][aria-pressed="true"]{font-weight:700}
 .docier-control-wide{min-width:calc(var(--docier-control-height) * 2)}
-.docier-ribbon .docier-control-large{flex-direction:column;justify-content:flex-start;gap:1px;min-height:40px;min-width:36px;padding:2px 4px;white-space:normal;text-align:center;align-self:flex-start}
-.docier-ribbon .docier-control-large .docier-control-icon{width:28px;height:28px}
-.docier-ribbon .docier-control-large .docier-control-icon svg{width:28px;height:28px}
+.docier-ribbon .docier-control-large{flex-direction:column;justify-content:flex-start;gap:1px;min-height:36px;min-width:34px;padding:1px 4px;white-space:normal;text-align:center;align-self:flex-start}
+.docier-ribbon .docier-control-large .docier-control-icon{width:24px;height:24px}
+.docier-ribbon .docier-control-large .docier-control-icon svg{width:24px;height:24px}
 .docier-ribbon .docier-control-large .docier-control-label{display:block;font-size:calc(var(--docier-ui-font-size) - 2px);line-height:1.15;max-width:88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .docier-ribbon .docier-control-large.docier-control-iconic > .docier-control-label{display:block}
 .docier-control-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:0 0 auto}
