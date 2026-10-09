@@ -432,7 +432,7 @@ export const ingestParagraph = (
     });
   }
 
-  const annotations = annotateRuns(paragraph.inlineChildren());
+  const annotations = annotateRuns(paragraph.children());
 
   for (const run of paragraph.runs()) {
     const resolvedRun = model.resolveRunProperties(paragraph, run.properties.element);

@@ -104,6 +104,14 @@ export const paintLine = (parent: HTMLElement, input: LinePaintInput): void => {
       if (run.annotation.commentIds.length > 0) {
         stamp(node, { [ATTR.comment]: run.annotation.commentIds.join(' ') });
       }
+      const token = run.token;
+      if (token !== undefined) {
+        stamp(node, {
+          [ATTR.token]: token.key,
+          [ATTR.tokenKind]: token.kind,
+          [ATTR.tokenPlaceholder]: token.placeholder ? 'true' : 'false',
+        });
+      }
       applyStyle(
         node,
         positionStyle(
@@ -123,6 +131,19 @@ export const paintLine = (parent: HTMLElement, input: LinePaintInput): void => {
               ? {}
               : {
                   'background-color': 'var(--docier-comment-range, rgba(255, 214, 0, 0.24))',
+                }),
+            ...(token === undefined
+              ? {}
+              : {
+                  'background-color': token.placeholder
+                    ? 'var(--docier-token-placeholder-bg, rgba(24, 90, 189, 0.12))'
+                    : 'var(--docier-token-bg, rgba(24, 90, 189, 0.08))',
+                  outline: token.placeholder
+                    ? '1px solid var(--docier-token-placeholder-border, rgba(24, 90, 189, 0.55))'
+                    : '1px dashed var(--docier-token-border, rgba(24, 90, 189, 0.35))',
+                  'outline-offset': '-1px',
+                  'border-radius': '2px',
+                  color: 'var(--docier-token-text, inherit)',
                 }),
           }),
         ),

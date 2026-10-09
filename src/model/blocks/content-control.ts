@@ -3,6 +3,7 @@ import type { ModelContext } from '../context.js';
 import type { NodeId } from '../ids.js';
 import { ParagraphProperties } from '../properties/paragraph-properties.js';
 import { RunProperties } from '../properties/run-properties.js';
+import type { InlineNode } from '../inline/index.js';
 import { buildInlineChildren } from '../inline/index.js';
 import { insertOrdered } from '../schema-order.js';
 import { W, childElements, createWElement, isWElement, removeElement, setElementText, setWAttr, textOfElement, wAttr } from '../xml.js';
@@ -285,6 +286,12 @@ export class ContentControl extends BlockNodeBase {
     const content = this.contentElement;
     if (content === undefined) return [];
     return buildBlocks(this.context, content);
+  }
+
+  inlineChildren(): readonly InlineNode[] {
+    const content = this.contentElement;
+    if (content === undefined) return [];
+    return buildInlineChildren(this.context, content);
   }
 
   get logicalText(): string {

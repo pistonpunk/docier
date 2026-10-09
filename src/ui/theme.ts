@@ -43,6 +43,10 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-menu-min-width': '200px',
   '--docier-menu-item-height': '22px',
   '--docier-page-shadow': '0 2px 6px rgba(0, 0, 0, 0.10), 0 0 1px rgba(0, 0, 0, 0.10)',
+  '--docier-token-placeholder-bg': 'rgba(24, 90, 189, 0.12)',
+  '--docier-token-placeholder-border': 'rgba(24, 90, 189, 0.55)',
+  '--docier-token-bg': 'rgba(24, 90, 189, 0.08)',
+  '--docier-token-border': 'rgba(24, 90, 189, 0.35)',
 };
 
 export const DARK_THEME_TOKENS: Readonly<Record<string, string>> = {
@@ -72,6 +76,10 @@ export const DARK_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-shadow-2': '0 2px 8px rgba(0, 0, 0, 0.6)',
   '--docier-shadow-3': '0 8px 24px rgba(0, 0, 0, 0.7)',
   '--docier-page-shadow': '0 2px 8px rgba(0, 0, 0, 0.55), 0 0 1px rgba(0, 0, 0, 0.5)',
+  '--docier-token-placeholder-bg': 'rgba(110, 168, 254, 0.20)',
+  '--docier-token-placeholder-border': 'rgba(110, 168, 254, 0.70)',
+  '--docier-token-bg': 'rgba(110, 168, 254, 0.14)',
+  '--docier-token-border': 'rgba(110, 168, 254, 0.45)',
 };
 
 export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, string>>>> = {

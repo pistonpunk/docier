@@ -554,6 +554,7 @@ describe('layout divergence detection', () => {
       'shift',
       'source',
       'text',
+      'token',
       'width',
       'x',
     ]);

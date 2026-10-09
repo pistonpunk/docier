@@ -125,7 +125,9 @@ const sameAnnotation = (left: RunAnnotation, right: RunAnnotation): boolean =>
   left.link?.relationshipId === right.link?.relationshipId &&
   left.link?.anchor === right.link?.anchor &&
   left.commentIds.length === right.commentIds.length &&
-  left.commentIds.every((id, at) => id === right.commentIds[at]);
+  left.commentIds.every((id, at) => id === right.commentIds[at]) &&
+  left.token?.key === right.token?.key &&
+  left.token?.placeholder === right.token?.placeholder;
 
 const sameRun = (previous: LineRun, atom: Atom): boolean =>
   previous.paint === atom.paint &&
@@ -159,6 +161,7 @@ export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] 
         text: previous.text + atom.text,
         source: { start: previous.source.start, end: atom.source.end },
         annotation: previous.annotation,
+        token: previous.token,
       };
       continue;
     }
@@ -173,6 +176,7 @@ export const runsOfPlaced = (placed: readonly PlacedAtom[]): readonly LineRun[] 
       text: atom.text,
       source: atom.source,
       annotation: atom.annotation,
+      token: atom.annotation.token,
     });
   }
   return runs;

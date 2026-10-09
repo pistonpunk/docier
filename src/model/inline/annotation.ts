@@ -1,4 +1,5 @@
 import type { InlineNode } from './nodes.js';
+import type { ContentControl } from '../blocks/content-control.js';
 import {
   AlternateContent,
   Hyperlink,
@@ -7,6 +8,8 @@ import {
   Run as RunView,
   SimpleField,
 } from './nodes.js';
+import { parseTokenTag } from '../../tokens/keys.js';
+import type { TokenKind } from '../../tokens/types.js';
 
 export interface LinkAnnotation {
   readonly relationshipId: string | undefined;
@@ -14,12 +17,30 @@ export interface LinkAnnotation {
   readonly tooltip: string | undefined;
 }
 
+export interface TokenAnnotation {
+  readonly key: string;
+  readonly kind: TokenKind;
+  readonly placeholder: boolean;
+}
+
 export interface RunAnnotation {
   readonly link: LinkAnnotation | undefined;
   readonly commentIds: readonly number[];
+  readonly token: TokenAnnotation | undefined;
 }
 
-export const NO_ANNOTATION: RunAnnotation = { link: undefined, commentIds: [] };
+export const NO_ANNOTATION: RunAnnotation = { link: undefined, commentIds: [], token: undefined };
+
+export type AnnotatableChild = InlineNode | ContentControl;
+
+const isContentControl = (node: AnnotatableChild): node is ContentControl =>
+  node.inlineKind === 'contentControl';
+
+const tokenOf = (control: ContentControl): TokenAnnotation | undefined => {
+  const parsed = parseTokenTag(control.tag);
+  if (parsed === undefined) return undefined;
+  return { key: parsed.key, kind: parsed.kind, placeholder: control.isShowingPlaceholder };
+};
 
 export const commentIdOf = (id: string | undefined): number | undefined => {
   if (id === undefined) return undefined;
@@ -30,13 +51,25 @@ export const commentIdOf = (id: string | undefined): number | undefined => {
 export const annotationIsEmpty = (annotation: RunAnnotation): boolean =>
   annotation.link === undefined && annotation.commentIds.length === 0;
 
-export const annotateRuns = (inlines: readonly InlineNode[]): ReadonlyMap<RunView, RunAnnotation> => {
+export const annotateRuns = (
+  children: readonly AnnotatableChild[],
+): ReadonlyMap<RunView, RunAnnotation> => {
   const out = new Map<RunView, RunAnnotation>();
-  const walk = (nodes: readonly InlineNode[], link: LinkAnnotation | undefined, open: readonly number[]): void => {
+  const walk = (
+    nodes: readonly AnnotatableChild[],
+    link: LinkAnnotation | undefined,
+    open: readonly number[],
+    token: TokenAnnotation | undefined,
+  ): void => {
     let scoped = open;
     for (const node of nodes) {
       if (node instanceof RunView) {
-        out.set(node, { link, commentIds: scoped });
+        out.set(node, { link, commentIds: scoped, token });
+        continue;
+      }
+      if (isContentControl(node)) {
+        const nested = tokenOf(node) ?? token;
+        walk(node.inlineChildren(), link, scoped, nested);
         continue;
       }
       if (node instanceof Hyperlink) {
@@ -48,6 +81,7 @@ export const annotateRuns = (inlines: readonly InlineNode[]): ReadonlyMap<RunVie
             tooltip: node.tooltip,
           },
           scoped,
+          token,
         );
         continue;
       }
@@ -65,10 +99,10 @@ export const annotateRuns = (inlines: readonly InlineNode[]): ReadonlyMap<RunVie
         node instanceof SimpleField ||
         node instanceof AlternateContent
       ) {
-        walk(node.children(), link, scoped);
+        walk(node.children(), link, scoped, token);
       }
     }
   };
-  walk(inlines, undefined, []);
+  walk(children, undefined, [], undefined);
   return out;
 };
