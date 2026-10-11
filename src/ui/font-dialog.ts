@@ -1,5 +1,6 @@
 import { CSS_PX_PER_POINT } from '../units/index.js';
 import {
+  DIALOG_OVERLAY_Z,
   DIALOG_TOKENS,
   createDialog,
   dialogCheckbox,
@@ -30,12 +31,7 @@ export const SET_SUBSCRIPT = 'docier.command.format.subscript';
 
 const DIALOG_COALESCE_KEY = 'docier.dialog.font';
 
-const DEFAULT_TEXT_COLOUR = '000000';
-const DEFAULT_HIGHLIGHT = 'yellow';
 const HIGHLIGHT_NONE = 'none';
-
-const defaultColourFor = (kind: ColourKind): string =>
-  kind === 'highlight' ? DEFAULT_HIGHLIGHT : DEFAULT_TEXT_COLOUR;
 
 export interface ColourField {
   readonly id: string;
@@ -46,6 +42,7 @@ export interface ColourField {
   value(): string | undefined;
   setValue(value: string | undefined): void;
   setFromDocument(raw: string | undefined): void;
+  dispose(): void;
 }
 
 export const FONT_VALUE_COMMANDS: Readonly<Record<string, string>> = {
@@ -184,62 +181,101 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
   ): ColourField => {
     const lookup = (key: string, fallback: string): string => text(key, fallback);
     const sections = colourSections(kind, lookup);
+    const palette = sections.flatMap((section) => section.swatches);
 
     const swatch = document.createElement('span');
     const caption = document.createElement('span');
+    const chevron = document.createElement('span');
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'docier-control docier-dialog-colour-button';
     button.setAttribute('data-docier-dialog-colour', kind);
-    button.setAttribute('aria-haspopup', 'true');
+    button.setAttribute('aria-haspopup', 'dialog');
     button.setAttribute('aria-expanded', 'false');
     setDialogStyles(button, {
-      display: 'flex',
+      display: 'grid',
+      gridTemplateColumns: 'auto minmax(0, 1fr) auto',
       alignItems: 'center',
       gap: '8px',
-      justifyContent: 'flex-start',
       width: '100%',
-      minHeight: '26px',
-      padding: '2px 6px',
+      minHeight: '28px',
+      padding: '3px 6px',
       border: `1px solid ${DIALOG_TOKENS.border}`,
       borderRadius: DIALOG_TOKENS.radius,
       background: DIALOG_TOKENS.surface,
       color: DIALOG_TOKENS.text,
       font: 'inherit',
+      textAlign: 'start',
       cursor: 'pointer',
     });
     setDialogStyles(swatch, {
-      width: '18px',
-      height: '18px',
+      width: '20px',
+      height: '20px',
       flex: '0 0 auto',
-      borderRadius: '3px',
-      boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.22)',
+      borderRadius: '4px',
+      boxShadow: 'inset 0 0 0 1px rgba(0, 0, 0, 0.22)',
       background: '#ffffff',
     });
-    setDialogStyles(caption, { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+    setDialogStyles(caption, {
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    });
+    setDialogStyles(chevron, {
+      flex: '0 0 auto',
+      width: '10px',
+      height: '10px',
+      color: DIALOG_TOKENS.muted,
+      background: 'currentColor',
+      clipPath: 'polygon(50% 68%, 0 28%, 22% 6%, 50% 40%, 78% 6%, 100% 28%)',
+    });
+    chevron.setAttribute('aria-hidden', 'true');
     button.appendChild(swatch);
     button.appendChild(caption);
+    button.appendChild(chevron);
 
-    const grid = document.createElement('div');
-    grid.setAttribute('data-docier-dialog-colour-grid', kind);
-    grid.hidden = true;
-    setDialogStyles(grid, {
+    const popoverOwner = context.host.ownerDocument;
+    const popoverHost =
+      options.mount ?? popoverOwner.querySelector<HTMLElement>('[data-docier-portal]') ?? popoverOwner.body;
+    const popover = document.createElement('div');
+    popover.setAttribute('data-docier-dialog-colour-popover', kind);
+    popover.hidden = true;
+    setDialogStyles(popover, {
+      position: 'fixed',
+      zIndex: String(Number(DIALOG_OVERLAY_Z) + 1),
+      boxSizing: 'border-box',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
-      marginTop: '2px',
+      minWidth: '196px',
+      maxHeight: '60vh',
+      overflow: 'auto',
+      padding: '8px',
+      background: DIALOG_TOKENS.surface,
+      border: `1px solid ${DIALOG_TOKENS.border}`,
+      borderRadius: DIALOG_TOKENS.radius,
+      boxShadow: DIALOG_TOKENS.shadow,
+      color: DIALOG_TOKENS.text,
+      font: 'inherit',
     });
-
-    const none = dialogCheckbox(`docier-font-${kind}-none`, noneLabel, false);
     const cell = document.createElement('div');
     setDialogStyles(cell, { display: 'flex', flexDirection: 'column', gap: '6px' });
 
     let value: string | undefined = undefined;
+    const swatchCells: { readonly value: string; readonly element: HTMLElement }[] = [];
+    const marksCurrent = (): void => {
+      for (const item of swatchCells) {
+        const current = value !== undefined && item.value.toLowerCase() === value.toLowerCase();
+        item.element.setAttribute('aria-pressed', current ? 'true' : 'false');
+        item.element.setAttribute('data-docier-current', current ? 'true' : 'false');
+        item.element.style.boxShadow = current
+          ? `0 0 0 2px ${DIALOG_TOKENS.surface}, 0 0 0 3.5px var(--docier-accent, #185abd)`
+          : 'inset 0 0 0 1px rgba(0,0,0,0.22)';
+      }
+    };
 
     const paintSwatch = (): void => {
-      const found = sections
-        .flatMap((section) => section.swatches)
-        .find((entry) => entry.value.toLowerCase() === (value ?? '').toLowerCase());
+      const found = palette.find((entry) => entry.value.toLowerCase() === (value ?? '').toLowerCase());
       swatch.style.setProperty('background', value === undefined ? 'transparent' : found?.css ?? `#${value}`);
       if (value === undefined) {
         swatch.style.setProperty(
@@ -250,34 +286,38 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
         swatch.style.removeProperty('background-image');
       }
       caption.textContent = value === undefined ? noneLabel : found?.label ?? value;
+      marksCurrent();
+    };
+
+    const closePopover = (focusButton = false): void => {
+      if (popover.hidden) return;
+      popover.hidden = true;
+      popoverOwner.removeEventListener('pointerdown', onOutside, true);
+      popoverOwner.removeEventListener('keydown', onKey, true);
+      button.setAttribute('aria-expanded', 'false');
+      if (focusButton) button.focus();
     };
 
     const setValue = (next: string | undefined): void => {
       value = next;
-      none.input.checked = next === undefined;
       paintSwatch();
     };
 
-    const closeGrid = (): void => {
-      grid.hidden = true;
-      button.setAttribute('aria-expanded', 'false');
-    };
-
-    const buildGrid = (): void => {
-      if (grid.childElementCount > 0) return;
+    const buildPopover = (): void => {
+      if (popover.childElementCount > 0) return;
       for (const section of sections) {
         const block = document.createElement('div');
-        setDialogStyles(block, { display: 'flex', flexDirection: 'column', gap: '4px' });
+        setDialogStyles(block, { display: 'flex', flexDirection: 'column', gap: '5px' });
         const heading = document.createElement('div');
         heading.textContent = section.label;
         setDialogStyles(heading, {
           color: DIALOG_TOKENS.muted,
           fontSize: `calc(${DIALOG_TOKENS.fontSize} - 1px)`,
         });
-        const cells = document.createElement('div');
-        setDialogStyles(cells, {
+        const grid = document.createElement('div');
+        setDialogStyles(grid, {
           display: 'grid',
-          gridTemplateColumns: `repeat(${String(section.columns)}, 18px)`,
+          gridTemplateColumns: `repeat(${String(section.columns)}, 20px)`,
           gap: '3px',
         });
         for (const entry of section.swatches) {
@@ -286,13 +326,14 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
           cellButton.setAttribute('data-docier-dialog-swatch', entry.value);
           cellButton.setAttribute('data-docier-dialog-swatch-kind', kind);
           cellButton.setAttribute('aria-label', entry.label);
+          cellButton.setAttribute('aria-pressed', 'false');
           cellButton.title = entry.label;
           setDialogStyles(cellButton, {
-            width: '18px',
-            height: '18px',
+            width: '20px',
+            height: '20px',
             padding: '0',
             border: '0',
-            borderRadius: '3px',
+            borderRadius: '4px',
             cursor: 'pointer',
             background: entry.css,
             boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.22)',
@@ -300,46 +341,115 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
           cellButton.addEventListener('click', (event) => {
             event.preventDefault();
             setValue(entry.value);
-            closeGrid();
-            button.focus();
+            closePopover(true);
           });
-          cells.appendChild(cellButton);
+          grid.appendChild(cellButton);
+          swatchCells.push({ value: entry.value, element: cellButton });
         }
         block.appendChild(heading);
-        block.appendChild(cells);
-        grid.appendChild(block);
+        block.appendChild(grid);
+        popover.appendChild(block);
       }
       if (kind === 'text') {
-        grid.appendChild(
+        popover.appendChild(
           createCustomColourSection({
-            doc: document,
+            doc: popoverOwner,
             text,
             onPick: (picked) => {
               setValue(picked);
-              closeGrid();
-              button.focus();
+              closePopover(true);
             },
           }).element,
         );
+      }
+      const divider = document.createElement('div');
+      setDialogStyles(divider, { height: '1px', background: DIALOG_TOKENS.border });
+      const none = document.createElement('button');
+      none.type = 'button';
+      none.setAttribute('data-docier-dialog-colour-none', kind);
+      none.setAttribute('aria-label', noneLabel);
+      setDialogStyles(none, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        width: '100%',
+        padding: '4px 2px',
+        border: '0',
+        borderRadius: '4px',
+        background: 'transparent',
+        color: DIALOG_TOKENS.text,
+        font: 'inherit',
+        textAlign: 'start',
+        cursor: 'pointer',
+      });
+      const noneChip = document.createElement('span');
+      setDialogStyles(noneChip, {
+        width: '20px',
+        height: '20px',
+        flex: '0 0 auto',
+        borderRadius: '4px',
+        background: '#ffffff',
+        backgroundImage:
+          'linear-gradient(135deg, transparent 42%, #c0392b 42%, #c0392b 58%, transparent 58%)',
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.22)',
+      });
+      const noneCaption = document.createElement('span');
+      noneCaption.textContent = noneLabel;
+      none.appendChild(noneChip);
+      none.appendChild(noneCaption);
+      none.addEventListener('click', (event) => {
+        event.preventDefault();
+        setValue(undefined);
+        closePopover(true);
+      });
+      popover.appendChild(divider);
+      popover.appendChild(none);
+    };
+
+    const positionPopover = (): void => {
+      const rect = button.getBoundingClientRect();
+      const width = popover.offsetWidth;
+      const height = popover.offsetHeight;
+      const viewportWidth = popoverOwner.defaultView?.innerWidth ?? 0;
+      const viewportHeight = popoverOwner.defaultView?.innerHeight ?? 0;
+      const left = Math.min(rect.left, Math.max(8, viewportWidth - width - 8));
+      const below = rect.bottom + 4;
+      const top = below + height > viewportHeight - 8 ? Math.max(8, rect.top - height - 4) : below;
+      popover.style.left = `${String(Math.max(8, left))}px`;
+      popover.style.top = `${String(top)}px`;
+    };
+
+    const onOutside = (event: Event): void => {
+      const target = event.target as Node;
+      if (popover.contains(target) || button.contains(target)) return;
+      closePopover();
+    };
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closePopover(true);
       }
     };
 
     button.addEventListener('click', (event) => {
       event.preventDefault();
-      buildGrid();
-      const open = grid.hidden;
-      grid.hidden = !open;
-      button.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-
-    none.input.addEventListener('change', () => {
-      if (none.input.checked) setValue(undefined);
-      else setValue(defaultColourFor(kind));
+      buildPopover();
+      const open = popover.hidden;
+      if (open) {
+        popover.hidden = false;
+        popoverHost.appendChild(popover);
+        positionPopover();
+        popoverOwner.addEventListener('pointerdown', onOutside, true);
+        popoverOwner.addEventListener('keydown', onKey, true);
+        button.setAttribute('aria-expanded', 'true');
+        marksCurrent();
+      } else {
+        closePopover();
+      }
     });
 
     cell.appendChild(button);
-    cell.appendChild(none.element);
-    cell.appendChild(grid);
     paintSwatch();
 
     return {
@@ -357,8 +467,11 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
         } else {
           value = kind === 'highlight' ? normalised : normalised.replace('#', '').toUpperCase();
         }
-        none.input.checked = value === undefined;
         paintSwatch();
+      },
+      dispose: () => {
+        closePopover();
+        popover.remove();
       },
     };
   };
@@ -477,7 +590,7 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
   advancedPanel.appendChild(
     dialogGroup(
       text('ui.dialog.position', 'Position'),
-      [dialogRow(text('ui.dialog.position', 'Position'), positionSelect, positionSelect.id)],
+      [dialogColumn([positionSelect])],
       'position',
     ),
   );
@@ -625,7 +738,11 @@ export const createFontDialog = (options: FontDialogOptions): FontDialogHandle =
       refresh();
     },
     onApply: applyState,
-    onClose: options.onClose,
+    onClose: () => {
+      colour.dispose();
+      highlight.dispose();
+      options.onClose?.();
+    },
   });
 
   if (dialog.preview !== undefined) dialog.preview.appendChild(sampleLine);

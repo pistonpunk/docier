@@ -33,6 +33,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-chrome{display:grid;grid-template-areas:"menubar" "ribbon" "ruler" "canvas" "status";grid-template-rows:auto auto auto minmax(0,1fr) auto;position:relative;min-height:0;width:100%;height:100%;box-sizing:border-box;font-family:var(--docier-ui-font);font-size:var(--docier-ui-font-size);color:var(--docier-text);background:var(--docier-surface)}
 .docier-chrome *,.docier-chrome *::before,.docier-chrome *::after{box-sizing:border-box}
 .docier-chrome [hidden]{display:none}
+.docier-portal [hidden]{display:none}
 .docier-chrome-menubar{display:flex;grid-area:menubar;flex-direction:column;align-items:stretch;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
 .docier-titlebar{display:none}
 .docier-titlebar-title{flex:0 1 auto;max-width:34%;text-align:end;font-size:calc(var(--docier-ui-font-size) - 1px);color:var(--docier-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:6px}

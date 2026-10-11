@@ -638,6 +638,7 @@ export const createDialog = (context: ChromeContext, options: DialogOptions): Di
     for (const [key, panel] of panels) {
       if (tabs.length === 0) continue;
       panel.hidden = key !== id;
+      panel.style.setProperty('display', key === id ? 'flex' : 'none');
     }
     for (const [key, button] of tabButtons) {
       const selected = key === id;

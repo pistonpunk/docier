@@ -95,8 +95,9 @@ describe('the font dialog', () => {
     expect(dialog.element.querySelector('[data-docier-dialog-colour="text"]')).not.toBeNull();
     expect(dialog.element.querySelector('[data-docier-dialog-colour="highlight"]')).not.toBeNull();
     expect(dialog.element.querySelectorAll('input[type="color"]').length).toBe(0);
-    expect(field(dialog, 'docier-font-text-none').type).toBe('checkbox');
-    expect(field(dialog, 'docier-font-highlight-none').type).toBe('checkbox');
+    expect(
+      dialog.element.querySelector('[data-docier-dialog-colour-none="text"]'),
+    ).toBeNull();
 
     const tabs = [...dialog.element.querySelectorAll<HTMLElement>('[role="tab"]')];
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Font', 'Advanced']);
@@ -153,7 +154,9 @@ describe('the font dialog', () => {
     const dialog = openFont(chrome);
 
     click(dialog.element.querySelector<HTMLElement>('[data-docier-dialog-colour="text"]')!);
-    click(dialog.element.querySelector<HTMLElement>('[data-docier-dialog-swatch="FF0000"]')!);
+    const popover = document.querySelector<HTMLElement>('[data-docier-dialog-colour-popover="text"]');
+    expect(popover, 'colour popover').not.toBeNull();
+    click(popover!.querySelector<HTMLElement>('[data-docier-dialog-swatch="FF0000"]')!);
     dialog.setTab('advanced');
     field(dialog, 'docier-font-position').value = 'superscript';
     click(dialog.applyButton);
@@ -172,9 +175,12 @@ describe('the font dialog', () => {
     const second = openFont(chrome, (key) => (key === 'color' ? markOf(handle).color : undefined));
     second.setTab('advanced');
     field(second, 'docier-font-position').value = 'baseline';
-    const automatic = field(second, 'docier-font-text-none');
-    automatic.checked = true;
-    automatic.dispatchEvent(new Event('change', { bubbles: true }));
+    click(second.element.querySelector<HTMLElement>('[data-docier-dialog-colour="text"]')!);
+    const automatic = document.querySelector<HTMLElement>(
+      '[data-docier-dialog-colour-popover="text"] [data-docier-dialog-colour-none="text"]',
+    );
+    expect(automatic, 'automatic colour').not.toBeNull();
+    click(automatic!);
     click(second.applyButton);
     await handle.whenReady();
 
