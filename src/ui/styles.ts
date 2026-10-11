@@ -140,7 +140,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-backstage-groups{display:flex;flex-direction:column;gap:6px}
 .docier-backstage-group{display:flex;flex-direction:column;gap:1px;padding-block-end:6px;border-block-end:1px solid var(--docier-border-soft)}
 .docier-backstage-group:last-child{border-block-end:0;padding-block-end:0}
-.docier-backstage-item{appearance:none;border:0;background:transparent;color:var(--docier-text);font:inherit;text-align:start;cursor:pointer;min-height:32px;padding:0 10px;border-radius:6px}
+.docier-backstage-item{appearance:none;justify-content:flex-start;border:0;background:transparent;color:var(--docier-text);font:inherit;text-align:start;cursor:pointer;min-height:32px;padding:0 10px;border-radius:6px}
 .docier-backstage-item:hover:not([aria-disabled="true"]){background:var(--docier-state-hover);color:var(--docier-text)}
 .docier-backstage-item:focus-visible{outline:2px solid var(--docier-focus-ring);outline-offset:-2px}
 .docier-backstage-item[aria-disabled="true"]{color:var(--docier-text-disabled);cursor:default}
