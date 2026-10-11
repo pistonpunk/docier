@@ -85,6 +85,13 @@ export interface LoopSpec {
   };
 }
 
+export interface ConditionSpec {
+  readonly key: string;
+  readonly operator: 'isSet' | 'equals' | 'notEquals' | 'truthy';
+  readonly value?: unknown;
+  readonly negate?: boolean;
+}
+
 export interface TokenPermissions {
   readonly read?: boolean;
   readonly write?: boolean;
@@ -110,6 +117,7 @@ export interface TokenCatalogueEntry {
   readonly validation?: readonly ValidationRule[];
   readonly enumValues?: readonly EnumValue[];
   readonly loop?: LoopSpec;
+  readonly condition?: ConditionSpec;
   readonly permissions?: TokenPermissions;
   readonly deprecated?: TokenDeprecation;
   readonly [extra: string]: unknown;

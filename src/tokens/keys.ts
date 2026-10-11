@@ -90,6 +90,9 @@ export const markerTextOf = (kind: TokenKind, key: string, trigger: string): str
   return `${delimiters.open}${body}${close}`;
 };
 
+export const markerRunOf = (kind: TokenKind, key: string): string =>
+  `${kind === 'field' ? '' : `${kind}${TOKEN_TAG_SEPARATOR}`}${key}`;
+
 export interface MarkerScanOptions {
   readonly trigger?: string;
   readonly escaped?: readonly string[];

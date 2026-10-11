@@ -19,6 +19,7 @@ import type {
 } from './types.js';
 import { checkRules } from './validation.js';
 import { imageSourceOf, plainTextOf, runsOf, segmentsOf, stateOf, typeMismatchOf } from './values.js';
+import { expandRegions, scanRegions } from './regions.js';
 import { writeRichRuns, writeSegments } from './write.js';
 
 export interface DeferredImage {
@@ -69,7 +70,24 @@ export const fillDocument = (input: FillInput): FillOutcome => {
   let unresolved = 0;
   let failed = 0;
 
+  const regions = scanRegions(model);
+  const expanded =
+    regions.length === 0
+      ? undefined
+      : expandRegions({
+          model,
+          index,
+          data,
+          locale,
+          fallbackLocale,
+          trigger,
+          regions,
+        });
+  if (expanded !== undefined) issues.push(...expanded.issues);
+
   for (const token of tokens) {
+    if (token.ref.kind === 'loop' || token.ref.kind === 'if' || token.ref.kind === 'agg') continue;
+    if (token.element.parent === undefined) continue;
     const entry = index.entryOf(token.ref.key);
     const refs: readonly TokenInstanceRef[] = [token.ref];
 
@@ -184,7 +202,7 @@ export const fillDocument = (input: FillInput): FillOutcome => {
     filled,
     unresolved,
     failed,
-    loopsExpanded: 0,
+    loopsExpanded: expanded?.loopsExpanded ?? 0,
     issues,
     durationMs: Date.now() - started,
   };

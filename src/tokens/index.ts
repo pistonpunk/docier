@@ -20,6 +20,7 @@ export type {
   IssueSuggestion,
   LocaleCode,
   LocalizedString,
+  ConditionSpec,
   LoopSpec,
   PartName,
   PreviewOptions,
@@ -61,6 +62,7 @@ export {
   instanceIdOf,
   isTokenTag,
   isValidTokenKey,
+  markerRunOf,
   markerTextOf,
   parseMarkers,
   parseTokenTag,
@@ -159,8 +161,18 @@ export {
 export type { DeferredImage, FillInput, FillOutcome } from './fill.js';
 export { fillDocument } from './fill.js';
 
-export type { InsertRequest, InsertTarget } from './insert.js';
-export { collectSdtIds, insertToken, nextSdtId, retag, validateInsertRequest } from './insert.js';
+export type { InsertRequest, InsertTarget, RegionInsertRequest } from './insert.js';
+export {
+  collectSdtIds,
+  insertRegion,
+  insertToken,
+  nextSdtId,
+  retag,
+  validateInsertRequest,
+} from './insert.js';
+
+export type { ExpandInput, ExpandOutcome, Region, RegionKind } from './regions.js';
+export { conditionHolds, expandRegions, rowsFor, scanRegions } from './regions.js';
 
 export type { UnlinkResult } from './unlink.js';
 export { contentChildrenOf, unlinkTokens, unwrapControl } from './unlink.js';

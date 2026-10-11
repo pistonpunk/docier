@@ -135,6 +135,65 @@ export const insertToken = (request: InsertRequest): XmlElement | undefined => {
   return created;
 };
 
+export interface RegionInsertRequest {
+  readonly model: DocumentModel;
+  readonly paragraph: XmlElement;
+  readonly offset: number;
+  readonly key: string;
+  readonly kind: 'loop' | 'if';
+  readonly label: string;
+}
+
+export const insertRegion = (request: RegionInsertRequest): XmlElement | undefined => {
+  const sdtId = nextSdtId(request.model);
+  const runProperties = anchorRunProperties(request.model, request.paragraph);
+  let created: XmlElement | undefined;
+  const applied = insertContainerAt(
+    request.model,
+    request.paragraph,
+    request.offset,
+    'sdt',
+    (container) => {
+      container.selfClosing = false;
+      const properties = createWElement(container, 'sdtPr');
+      properties.parent = container;
+      if (runProperties !== undefined) {
+        const copy = cloneNode(runProperties) as XmlElement;
+        copy.parent = properties;
+        properties.children.push(copy);
+      }
+      const alias = createWElement(properties, 'alias');
+      setWAttr(alias, 'val', request.label);
+      const tag = createWElement(properties, 'tag');
+      setWAttr(tag, 'val', tokenTagOf(request.kind, request.key));
+      const id = createWElement(properties, 'id');
+      setWAttr(id, 'val', String(sdtId));
+      properties.children.push(alias, tag, id);
+      alias.parent = properties;
+      tag.parent = properties;
+      id.parent = properties;
+      const content = createWElement(container, 'sdtContent');
+      content.parent = container;
+      content.selfClosing = false;
+      const paragraph = createWElement(content, 'p');
+      paragraph.parent = content;
+      paragraph.selfClosing = false;
+      const run = createWElement(paragraph, 'r');
+      run.parent = paragraph;
+      run.selfClosing = false;
+      const text = createWElement(run, 't');
+      setElementText(text, `{{${request.key}}}`);
+      run.children.push(text);
+      paragraph.children.push(run);
+      content.children.push(paragraph);
+      container.children.push(properties, content);
+      created = container;
+    },
+  );
+  if (!applied) return undefined;
+  return created;
+};
+
 export const controlOfElement = (
   model: DocumentModel,
   element: XmlElement,
