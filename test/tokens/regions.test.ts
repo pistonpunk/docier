@@ -6,9 +6,9 @@ import { childElements, isWElement, textOfElement } from '../../src/model/index.
 import { scanTokens } from '../../src/tokens/binding.js';
 import { createCatalogueIndex } from '../../src/tokens/catalogue.js';
 import { fillDocument } from '../../src/tokens/fill.js';
-import { insertRegion, insertToken } from '../../src/tokens/insert.js';
-import type { TokenCatalogue, TokenData } from '../../src/tokens/types.js';
-import { bodyOf, catalogueOf, field, openModel, paragraphText, paragraphsOf, wrap } from './support.js';
+import type { TokenData } from '../../src/tokens/types.js';
+import { bodyOf, catalogueOf, field, openModel, paragraphText, wrap } from './support.js';
+import { cell, grid, row, table } from '../layout/table-support.js';
 
 const collect = (element: XmlElement, into: string[]): void => {
   for (const child of childElements(element)) {
@@ -93,5 +93,37 @@ describe('conditionals', () => {
     );
     const { texts } = await runFill(body, { hasBonus: false });
     expect(texts).toEqual(['End']);
+  });
+});
+
+const rosterTable = (): string =>
+  table(
+    '',
+    grid([4000, 4000]),
+    [
+      row('', [cell('', paragraphText('Name')), cell('', paragraphText('Role'))]),
+      `${regionTag('roster', 'loop')}${row('', [cell('', paragraphText('{{name}}')), cell('', paragraphText('{{role}}'))])}</w:sdtContent></w:sdt>`,
+    ],
+  );
+
+describe('iterable tables', () => {
+  it('grows a table row once per roster entry', async () => {
+    const body = bodyOf(rosterTable());
+    const { model, loops } = await runFill(body, {
+      roster: [
+        { name: 'Ana', role: 'Engineer' },
+        { name: 'Bogdan', role: 'Analyst' },
+      ],
+    });
+    expect(loops).toBe(1);
+    const texts = model.tables()[0]!.rows().map((element) => element.logicalText);
+    expect(texts).toEqual(['Name\nRole', 'Ana\nEngineer', 'Bogdan\nAnalyst']);
+  });
+
+  it('keeps only the header when the roster is empty', async () => {
+    const body = bodyOf(rosterTable());
+    const { model } = await runFill(body, { roster: [] });
+    const texts = model.tables()[0]!.rows().map((element) => element.logicalText);
+    expect(texts).toEqual(['Name\nRole']);
   });
 });

@@ -38,6 +38,26 @@ export interface GridReport {
   readonly isConsistent: boolean;
 }
 
+// A repeating section wraps each repeated row in its own content control, so a
+// row is not always a direct child of the table: it can sit inside the
+// sdtContent of a row-level sdt. Walk through those wrappers so a table that
+// grew from a loop still reads as a table with rows.
+export const tableRowsOf = (context: ModelContext, table: XmlElement): readonly XmlElement[] => {
+  const rows: XmlElement[] = [];
+  for (const child of childElements(table)) {
+    if (isWElement(child, 'tr')) {
+      rows.push(child);
+      continue;
+    }
+    if (isWElement(child, 'sdt')) {
+      const content = childElements(child).find((candidate) => isWElement(candidate, 'sdtContent'));
+      if (content !== undefined) rows.push(...tableRowsOf(context, content));
+    }
+  }
+  void context;
+  return rows;
+};
+
 export class TableCell extends BlockNode {
   readonly blockKind = 'tableCell' as const;
   private readonly context: ModelContext;
@@ -237,9 +257,9 @@ export class Table extends BlockNode {
   }
 
   rows(): readonly TableRow[] {
-    return childElements(this.element)
-      .filter((child) => isWElement(child, 'tr'))
-      .map((child) => this.context.view(child, (id, element) => new TableRow(id, element, this.context)));
+    return tableRowsOf(this.context, this.element).map((child) =>
+      this.context.view(child, (id, element) => new TableRow(id, element, this.context)),
+    );
   }
 
   get logicalText(): string {
