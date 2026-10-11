@@ -86,6 +86,17 @@ describe('conditionals', () => {
     expect(texts).toEqual(['Bonus applies.']);
   });
 
+  it('resolves an if-region whose key has no catalogue entry from the value itself', async () => {
+    const body = bodyOf(
+      `${regionTag('optionalClause', 'if')}${paragraphText('Present only when set.')}</w:sdtContent></w:sdt>`,
+      wrap('<w:r><w:t>End</w:t></w:r>'),
+    );
+    const withValue = await runFill(body, { optionalClause: 'yes' });
+    expect(withValue.texts).toEqual(['Present only when set.', 'End']);
+    const withoutValue = await runFill(body, {});
+    expect(withoutValue.texts).toEqual(['End']);
+  });
+
   it('removes the region when the condition does not hold', async () => {
     const body = bodyOf(
       `${regionTag('hasBonus', 'if')}${paragraphText('Bonus applies.')}</w:sdtContent></w:sdt>`,

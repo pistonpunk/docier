@@ -3,6 +3,10 @@ import { DocumentModel } from '../model/document.js';
 import type { LocaleCode, LocalizedString } from '../api/types.js';
 import { resolveLocalized } from '../api/localize.js';
 import { scanTokens } from './binding.js';
+import { childElements, isWElement } from '../model/index.js';
+import type { XmlElement } from '../ooxml/xml/index.js';
+import type { RegionKind } from './regions.js';
+import { parseTokenTag } from './keys.js';
 import type { CatalogueIndex } from './catalogue.js';
 import { createCatalogueIndex, labelOf } from './catalogue.js';
 import { fillDocument } from './fill.js';
@@ -45,10 +49,21 @@ export interface FillTemplateResult {
   readonly issues: readonly DataIssue[];
 }
 
+export interface ListedRegion {
+  readonly key: string;
+  readonly kind: RegionKind;
+}
+
 export interface ListedToken extends TokenInstanceRef {
   readonly label: string;
   readonly group: string | undefined;
   readonly known: boolean;
+  // A loop region carries the field keys its body expects, so a host can ask
+  // for the columns of a repeated table rather than for one opaque value.
+  readonly fields?: readonly string[];
+  // The innermost loop/if region a field sits inside, if any: a field inside a
+  // roster loop is one column of a row, not a top-level value.
+  readonly region?: ListedRegion;
 }
 
 const DEFAULT_MAX_IMAGE_WIDTH_PX = 320;
@@ -69,6 +84,25 @@ export const listTemplateTokens = async (
   const model = await openTemplate(template);
   const index = createCatalogueIndex(catalogue ?? null);
   const fallback: LocaleCode = index.catalogue?.defaultLocale ?? 'en-US';
+  const tagOfControl = (control: XmlElement): string | undefined => {
+    const properties = childElements(control).find((child) => isWElement(child, 'sdtPr'));
+    if (properties === undefined) return undefined;
+    const tag = childElements(properties).find((child) => isWElement(child, 'tag'));
+    return tag?.attributes?.find((attribute) => attribute.localName === 'val')?.value;
+  };
+  const enclosingRegion = (element: XmlElement): ListedRegion | undefined => {
+    let current: XmlElement | undefined = element.parent;
+    while (current !== undefined) {
+      if (isWElement(current, 'sdt')) {
+        const parsed = parseTokenTag(tagOfControl(current));
+        if (parsed !== undefined && (parsed.kind === 'loop' || parsed.kind === 'if')) {
+          return { key: parsed.key, kind: parsed.kind };
+        }
+      }
+      current = current.parent;
+    }
+    return undefined;
+  };
   return scanTokens(model).map((token) => {
     const entry = index.entryOf(token.ref.key);
     const label: string =
@@ -77,7 +111,17 @@ export const listTemplateTokens = async (
       entry?.group === undefined
         ? undefined
         : labelOf(entry.group, locale, fallback, '') || undefined;
-    return { ...token.ref, label, group, known: entry !== undefined };
+    const fields = token.ref.kind === 'loop' ? entry?.loop?.fields : undefined;
+    const region =
+      token.ref.kind === 'field' ? enclosingRegion(token.element) : undefined;
+    return {
+      ...token.ref,
+      label,
+      group,
+      known: entry !== undefined,
+      ...(fields === undefined ? {} : { fields }),
+      ...(region === undefined ? {} : { region }),
+    };
   });
 };
 

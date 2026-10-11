@@ -130,15 +130,24 @@ const isTruthy = (value: unknown): boolean =>
 export const conditionHolds = (
   spec: ConditionSpec | undefined,
   data: TokenData,
+  fallbackKey?: string,
 ): boolean | undefined => {
-  if (spec === undefined) return undefined;
-  const value = data[spec.key];
+  // A region can be authored before anyone writes a catalogue entry for it.
+  // With no spec the condition is "the region's own key is truthy", which is
+  // what an author who wrapped a block in {{if:key}} means; refusing to expand
+  // (returning undefined) would leave the marker text in the output.
+  const resolved: ConditionSpec =
+    spec ??
+    (fallbackKey === undefined
+      ? { key: '', operator: 'truthy' }
+      : { key: fallbackKey, operator: 'truthy' });
+  const value = data[resolved.key];
   let result: boolean;
-  if (spec.operator === 'truthy') result = isTruthy(value);
-  else if (spec.operator === 'isSet') result = value !== undefined && value !== null && value !== '';
-  else if (spec.operator === 'equals') result = String(value) === String(spec.value);
-  else result = String(value) !== String(spec.value);
-  return spec.negate === true ? !result : result;
+  if (resolved.operator === 'truthy') result = isTruthy(value);
+  else if (resolved.operator === 'isSet') result = value !== undefined && value !== null && value !== '';
+  else if (resolved.operator === 'equals') result = String(value) === String(resolved.value);
+  else result = String(value) !== String(resolved.value);
+  return resolved.negate === true ? !result : result;
 };
 
 const resolveText = (key: string, data: TokenData, ctx: FormatContext): string => {
@@ -272,7 +281,7 @@ const expandControl = (
     region.counter.loops += 1;
     return;
   }
-  const holds = conditionHolds(entry?.condition, data);
+  const holds = conditionHolds(entry?.condition, data, key);
   if (holds === undefined) {
     push({ code: 'condition-unresolved', key }, region.issues);
     return;

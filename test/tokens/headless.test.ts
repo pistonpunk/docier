@@ -163,6 +163,24 @@ describe('headless fill', () => {
     expect(unknown?.label).toBe('never.declared');
   });
 
+  it('reports the loop fields and the enclosing region of a nested token', async () => {
+    const sdt = (tag: string, id: number, inner: string): string =>
+      `<w:sdt><w:sdtPr><w:tag w:val="${tag}"/><w:id w:val="${id}"/></w:sdtPr><w:sdtContent>${inner}</w:sdtContent></w:sdt>`;
+    const fieldControl = sdt('docier:field:employee.surname', 78, paragraphText('Surname'));
+    const body = sdt('docier:loop:roster', 77, fieldControl);
+    const model = await openModel({ body });
+    const catalogue = catalogueOf([
+      field('employee.surname'),
+      { key: 'roster', kind: 'loop', type: 'rows', label: 'Roster', loop: { rowType: 'object', fields: ['employee.surname'] } },
+    ]);
+    const listed = await listTemplateTokens(await model.save(), catalogue, 'ro-RO');
+    const loop = listed.find((token) => token.key === 'roster');
+    expect(loop?.kind).toBe('loop');
+    expect(loop?.fields).toEqual(['employee.surname']);
+    const nested = listed.find((token) => token.key === 'employee.surname');
+    expect(nested?.region).toEqual({ key: 'roster', kind: 'loop' });
+  });
+
   it('lists nothing for a plain document with no tokens', async () => {
     const model = await openModel({ body: bodyOf(paragraphText('plain text')) });
     const listed = await listTemplateTokens(await model.save(), CATALOGUE, 'ro-RO');
