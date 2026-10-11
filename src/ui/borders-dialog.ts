@@ -119,17 +119,17 @@ export const createBordersDialog = (options: BordersDialogOptions): BordersDialo
       onPick: (picked) => {
         if (field instanceof HTMLInputElement) field.value = picked;
         swatch.style.setProperty('background', hexToCss(picked) ?? '#ffffff');
-        section.element.hidden = true;
+        section.setOpen(false);
         swatch.setAttribute('aria-expanded', 'false');
         field.dispatchEvent(new Event('input', { bubbles: true }));
       },
     });
-    section.element.hidden = true;
+    section.setOpen(false);
     swatch.setAttribute('aria-expanded', 'false');
     swatch.addEventListener('click', (event) => {
       event.preventDefault();
       const opening = section.element.hidden;
-      section.element.hidden = !opening;
+      section.setOpen(opening);
       swatch.setAttribute('aria-expanded', opening ? 'true' : 'false');
     });
     if (field instanceof HTMLInputElement) {

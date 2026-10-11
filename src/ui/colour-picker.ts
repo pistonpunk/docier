@@ -250,9 +250,11 @@ export const colourSections = (
 };
 
 const SWATCH_SHADOW = 'inset 0 0 0 1px rgba(0, 0, 0, 0.18)';
+
 export interface CustomColourSection {
   readonly element: HTMLElement;
   readonly refresh: (current: string | undefined) => void;
+  setOpen(open: boolean): void;
 }
 
 export interface CustomColourOptions {
@@ -448,8 +450,14 @@ export const createCustomColourSection = (options: CustomColourOptions): CustomC
   wrapper.appendChild(grid);
   paintRecent();
 
+  const setOpen = (open: boolean): void => {
+    wrapper.hidden = !open;
+    wrapper.style.setProperty('display', open ? 'flex' : 'none');
+  };
+
   return {
     element: wrapper,
+    setOpen,
     refresh: (current) => {
       const value = current === undefined ? undefined : normaliseHex(current);
       if (value !== undefined && hex.value.toLowerCase() !== `#${value.toLowerCase()}`) {
