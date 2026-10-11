@@ -306,8 +306,10 @@ describe('ribbon layout rules', () => {
     expect(css).toContain('.docier-ribbon .docier-menu-gallery .docier-control{min-height:22px');
   });
 
-  it('clears a ribbon too narrow for its content by wrapping the groups', () => {
-    expect(css).toContain('@container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}');
+  it('clears a ribbon too narrow for its content by scrolling it, not stacking it', () => {
+    expect(css).toContain('@container (max-width: 760px){.docier-ribbon-panel{flex-wrap:nowrap;overflow-x:auto');
+    expect(css).toContain('.docier-ribbon-panel>.docier-group{flex:0 0 auto}');
+    expect(css).toContain('.docier-group-controls{flex-wrap:nowrap}');
     expect(css).toContain('container-type:inline-size');
   });
 

@@ -56,7 +56,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-chrome .docier-ribbon{--docier-control-height:22px;--docier-gap:2px}
 .docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:2px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
-@container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}
+@container (max-width: 760px){.docier-ribbon-panel{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}.docier-ribbon-panel>.docier-group{flex:0 0 auto}.docier-group-controls{flex-wrap:nowrap}}
 .docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;min-height:var(--docier-ribbon-group-height);border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
 .docier-group:last-child{border-inline-end:0}
 .docier-group-controls{display:flex;align-items:center;flex-wrap:wrap;align-content:center;gap:2px;row-gap:1px;flex:1 1 auto;min-width:0}
