@@ -33,17 +33,19 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-chrome{display:grid;grid-template-areas:"menubar" "ribbon" "ruler" "canvas" "status";grid-template-rows:auto auto auto minmax(0,1fr) auto;position:relative;min-height:0;width:100%;height:100%;box-sizing:border-box;font-family:var(--docier-ui-font);font-size:var(--docier-ui-font-size);color:var(--docier-text);background:var(--docier-surface)}
 .docier-chrome *,.docier-chrome *::before,.docier-chrome *::after{box-sizing:border-box}
 .docier-chrome [hidden]{display:none}
-.docier-chrome-menubar{display:flex;grid-area:menubar;flex-direction:column;align-items:stretch;background:var(--docier-surface);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
-.docier-titlebar{display:flex;align-items:center;gap:8px;height:28px;padding-inline:8px;background:var(--docier-surface-raised);border-bottom:1px solid var(--docier-border)}
-.docier-titlebar-title{flex:1;text-align:center;font-size:12px;color:var(--docier-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.docier-quick-access{display:flex;align-items:center;gap:2px}
+.docier-chrome-menubar{display:flex;grid-area:menubar;flex-direction:column;align-items:stretch;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);position:relative;z-index:12}
+.docier-titlebar{display:none}
+.docier-titlebar-title{flex:0 1 auto;max-width:34%;text-align:end;font-size:calc(var(--docier-ui-font-size) - 1px);color:var(--docier-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:6px}
+.docier-quick-access{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.docier-tab-spacer{flex:1 1 auto;min-width:8px}
 .docier-quick-access .docier-control{min-width:22px;min-height:22px}
-.docier-tab-row{display:flex;align-items:stretch;flex-wrap:nowrap;min-width:0}
-.docier-tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:thin}
-.docier-tab{appearance:none;border:0;background:transparent;color:var(--docier-text);font:inherit;font-size:12px;height:var(--docier-tab-height);padding:0 calc(var(--docier-gap) * 2.5);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
-.docier-tab:hover{background:var(--docier-state-hover)}
-.docier-tab[aria-selected="true"]{background:var(--docier-surface-command);border-bottom-color:transparent;font-weight:400;color:var(--docier-text)}
+.docier-tab-row{display:flex;align-items:center;flex-wrap:nowrap;min-width:0;height:var(--docier-tab-height);padding-inline:6px;gap:1px}
+.docier-tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:thin;height:100%}
+.docier-tab{appearance:none;position:relative;border:0;background:transparent;color:var(--docier-text-muted);font:inherit;font-size:12px;height:100%;padding:0 10px;border-radius:var(--docier-radius);cursor:pointer;white-space:nowrap;transition:background 90ms ease,color 90ms ease}
+.docier-tab:hover{background:var(--docier-state-hover);color:var(--docier-text)}
+.docier-tab[aria-selected="true"]{background:var(--docier-accent-soft);color:var(--docier-accent);font-weight:600}
 .docier-tab[data-docier-contextual="true"]{color:var(--docier-accent)}
+.docier-backstage-button{font-weight:600}
 .docier-tab:focus-visible,.docier-control:focus-visible,.docier-menu-item:focus-visible,.docier-ruler-marker:focus-visible,.docier-status-item:focus-visible,.docier-tab:focus-visible{outline:2px solid var(--docier-focus-ring);outline-offset:-1px}
 .docier-ribbon{display:flex;position:relative;grid-area:ribbon;overflow:hidden;container-type:inline-size;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);min-height:var(--docier-ribbon-height)}
 .docier-ribbon[data-docier-collapsed="collapsed"]{position:absolute;top:0;inset-inline:0;z-index:11;box-shadow:var(--docier-shadow-2);border-bottom:1px solid var(--docier-border)}
@@ -51,7 +53,7 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ribbon-toggle{position:absolute;top:2px;inset-inline-end:4px;min-width:20px;min-height:20px;line-height:1;color:var(--docier-text-muted);z-index:2}
 .docier-ribbon[data-docier-collapsed="collapsed"] .docier-group-label{display:none}
 .docier-chrome .docier-ribbon{--docier-control-height:22px;--docier-gap:2px}
-.docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:3px 6px;width:100%}
+.docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:2px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
 @container (max-width: 760px){.docier-ribbon-panel{flex-wrap:wrap}}
 .docier-group{display:flex;flex:0 1 auto;flex-direction:column;justify-content:space-between;min-width:min-content;min-height:var(--docier-ribbon-group-height);border-inline-end:1px solid var(--docier-border-soft);padding-inline-end:calc(var(--docier-gap) * 2)}
@@ -130,13 +132,18 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-status-range{appearance:none;width:110px;height:var(--docier-status-height);background:transparent}
 .docier-floating{position:fixed;z-index:900;display:flex;align-items:center;gap:2px;background:var(--docier-surface-raised);border:1px solid var(--docier-border);border-radius:var(--docier-radius);box-shadow:var(--docier-shadow-2);padding:2px 4px}
 .docier-floating[hidden]{display:none}
-.docier-backstage{position:absolute;inset:0;z-index:30;display:grid;grid-template-columns:236px minmax(0,1fr);gap:0;background:var(--docier-surface);overflow:hidden}
-.docier-backstage-items{display:flex;flex-direction:column;gap:1px;padding:calc(var(--docier-gap) * 4) calc(var(--docier-gap) * 2);background:var(--docier-surface-sunken);border-inline-end:1px solid var(--docier-border);overflow-y:auto}
-.docier-backstage-item{appearance:none;border:0;background:transparent;color:var(--docier-text);font:inherit;text-align:start;cursor:pointer;min-height:34px;padding:0 calc(var(--docier-gap) * 3);border-radius:var(--docier-radius);border-inline-start:3px solid transparent}
-.docier-backstage-item:hover:not([aria-disabled="true"]){background:var(--docier-state-hover)}
+.docier-backstage{position:absolute;inset:0;z-index:30;display:grid;grid-template-columns:minmax(212px,240px) minmax(0,1fr);gap:0;background:var(--docier-surface);overflow:hidden}
+.docier-backstage-items{display:flex;flex-direction:column;padding:12px 10px;background:var(--docier-surface-sunken);border-inline-end:1px solid var(--docier-border);overflow-y:auto}
+.docier-backstage-head{display:flex;align-items:center;gap:8px;padding:4px 8px 14px;color:var(--docier-text);font-size:calc(var(--docier-ui-font-size) + 4px);font-weight:700;letter-spacing:-0.01em}
+.docier-backstage-mark{width:14px;height:14px;border-radius:4px;background:var(--docier-accent)}
+.docier-backstage-groups{display:flex;flex-direction:column;gap:6px}
+.docier-backstage-group{display:flex;flex-direction:column;gap:1px;padding-block-end:6px;border-block-end:1px solid var(--docier-border-soft)}
+.docier-backstage-group:last-child{border-block-end:0;padding-block-end:0}
+.docier-backstage-item{appearance:none;border:0;background:transparent;color:var(--docier-text);font:inherit;text-align:start;cursor:pointer;min-height:32px;padding:0 10px;border-radius:6px}
+.docier-backstage-item:hover:not([aria-disabled="true"]){background:var(--docier-state-hover);color:var(--docier-text)}
 .docier-backstage-item:focus-visible{outline:2px solid var(--docier-focus-ring);outline-offset:-2px}
 .docier-backstage-item[aria-disabled="true"]{color:var(--docier-text-disabled);cursor:default}
-.docier-backstage-body{display:flex;flex-direction:column;gap:calc(var(--docier-gap) * 4);padding:calc(var(--docier-gap) * 7) calc(var(--docier-gap) * 8);overflow-y:auto;max-width:720px}
+.docier-backstage-body{display:flex;flex-direction:column;gap:16px;padding:28px 32px;overflow-y:auto;max-width:760px}
 .docier-backstage-title{margin:0;font-size:calc(var(--docier-ui-font-size) + 8px);font-weight:600;color:var(--docier-text);letter-spacing:-0.01em}
 .docier-backstage-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:calc(var(--docier-gap) * 2) calc(var(--docier-gap) * 4);margin:0;padding:calc(var(--docier-gap) * 4);background:var(--docier-surface-raised);border:1px solid var(--docier-border);border-radius:var(--docier-radius);box-shadow:var(--docier-shadow-1)}
 .docier-backstage-term{margin:0;color:var(--docier-text-muted);font-size:calc(var(--docier-ui-font-size) - 1px)}

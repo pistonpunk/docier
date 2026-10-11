@@ -34,9 +34,9 @@ export const DEFAULT_THEME_TOKENS: Readonly<Record<string, string>> = {
   '--docier-control-height': '30px',
   '--docier-handle-size': '10px',
   '--docier-ruler-size': '20px',
-  '--docier-ribbon-group-height': '56px',
-  '--docier-ribbon-height': '88px',
-  '--docier-tab-height': '26px',
+  '--docier-ribbon-group-height': '50px',
+  '--docier-ribbon-height': '74px',
+  '--docier-tab-height': '32px',
   '--docier-status-height': '22px',
   '--docier-radius': '4px',
   '--docier-gap': '4px',
@@ -118,7 +118,7 @@ export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, st
     '--docier-handle-size': '9px',
     '--docier-gap': '3px',
     '--docier-menu-item-height': '20px',
-    '--docier-ribbon-height': '84px',
+    '--docier-ribbon-height': '70px',
   },
   comfortable: {
     '--docier-control-height': '32px',
@@ -132,7 +132,7 @@ export const DENSITY_TOKENS: Readonly<Record<Density, Readonly<Record<string, st
     '--docier-handle-size': '20px',
     '--docier-gap': '8px',
     '--docier-menu-item-height': '44px',
-    '--docier-ribbon-height': '116px',
+    '--docier-ribbon-height': '100px',
   },
 };
 

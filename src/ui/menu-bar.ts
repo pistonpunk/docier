@@ -3,7 +3,7 @@ import { applyResolved, applyValue, createControl, specOf } from './controls.js'
 import { createDisposableStore, markPart, markSlot, make, setText } from './dom.js';
 import { attachRoving, normaliseKeyTip } from './keyboard.js';
 import type { UiNode, UiTab } from './menu-model.js';
-import { ALL_RIBBON_TABS, BACKSTAGE_ITEMS, QUICK_ACCESS } from './menu-model.js';
+import { ALL_RIBBON_TABS, BACKSTAGE_ITEMS, QUICK_ACCESS, isSeparator } from './menu-model.js';
 import { visibleNodes, visibleTabs } from './menu-model.js';
 import { openMenu } from './menu.js';
 import type { MenuHandle } from './menu.js';
@@ -64,16 +64,13 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   markSlot(bar, 'menuBar');
   bar.setAttribute('role', 'none');
 
-  const titleBar = make('div', 'docier-titlebar');
-  markPart(titleBar, 'titlebar');
-  const titleText = make('span', 'docier-titlebar-title');
-  setText(titleText, context.i18n.text('ui.chrome.title'));
-  markPart(titleText, 'titlebar-title');
-  bar.appendChild(titleBar);
-
   const tabRow = make('div', 'docier-tab-row');
   markPart(tabRow, 'tab-row');
   bar.appendChild(tabRow);
+
+  const titleText = make('span', 'docier-titlebar-title');
+  setText(titleText, context.i18n.text('ui.chrome.title'));
+  markPart(titleText, 'titlebar-title');
 
   const backstageButton = make('button', 'docier-tab docier-backstage-button');
   backstageButton.setAttribute('type', 'button');
@@ -93,8 +90,10 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   quick.setAttribute('role', 'toolbar');
   quick.setAttribute('aria-label', context.i18n.text('ui.chrome.menuBar'));
   markPart(quick, 'quick-access');
-  titleBar.appendChild(quick);
-  titleBar.appendChild(titleText);
+  const titleSpacer = make('div', 'docier-tab-spacer');
+  tabRow.appendChild(titleSpacer);
+  tabRow.appendChild(titleText);
+  tabRow.appendChild(quick);
 
   const ribbon = make('div', 'docier-ribbon');
   ribbon.setAttribute('data-docier-collapsed', 'expanded');
@@ -316,12 +315,31 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   backstagePanel.setAttribute('role', 'dialog');
   backstagePanel.setAttribute('aria-label', context.i18n.text('ui.chrome.backstage'));
   const backstageItems = make('div', 'docier-backstage-items');
+  const backstageHead = make('div', 'docier-backstage-head');
+  const backstageMark = make('span', 'docier-backstage-mark');
+  backstageMark.setAttribute('aria-hidden', 'true');
+  const backstageBrand = make('span', 'docier-backstage-brand');
+  setText(backstageBrand, context.i18n.text('ui.chrome.backstage'));
+  backstageHead.appendChild(backstageMark);
+  backstageHead.appendChild(backstageBrand);
+  backstageItems.appendChild(backstageHead);
+  const backstageGroups = make('div', 'docier-backstage-groups');
+  let group: HTMLElement | null = null;
   for (const node of backstage) {
+    if (isSeparator(node)) {
+      group = null;
+      continue;
+    }
+    if (group === null) {
+      group = make('div', 'docier-backstage-group');
+      backstageGroups.appendChild(group);
+    }
     const element = createControl(context, node, { role: 'button', icon: false });
     element.classList.add('docier-backstage-item');
     bindNode(element, node, 'button');
-    backstageItems.appendChild(element);
+    group.appendChild(element);
   }
+  backstageItems.appendChild(backstageGroups);
   backstagePanel.appendChild(backstageItems);
 
   const backstageBody = make('div', 'docier-backstage-body');
