@@ -367,13 +367,16 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
     return value;
   };
 
-  const titleValue = fact(context.i18n.text('ui.backstage.name'));
   const pagesValue = fact(context.i18n.text('ui.backstage.pages'));
   const wordsValue = fact(context.i18n.text('ui.backstage.words'));
 
   const refreshBackstageInfo = (): void => {
     const stats = options.stats?.();
-    titleValue.textContent = stats === undefined ? context.i18n.text('ui.backstage.none') : stats.name;
+    /* The heading names the open document; the facts below it are its shape.
+       A blank heading left the body looking unfinished, so the name is the
+       title rather than a third row repeating what the heading already says. */
+    infoTitle.textContent =
+      stats === undefined ? context.i18n.text('ui.backstage.none') : stats.name;
     pagesValue.textContent = String(stats?.pages ?? 0);
     wordsValue.textContent = String(stats?.words ?? 0);
     infoNote.textContent = context.i18n.text('ui.backstage.hint');
