@@ -324,6 +324,7 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
   backstageHead.appendChild(backstageBrand);
   backstageItems.appendChild(backstageHead);
   const backstageGroups = make('div', 'docier-backstage-groups');
+  const backstageHint: Array<{ element: HTMLElement; spec: ControlSpec }> = [];
   let group: HTMLElement | null = null;
   for (const node of backstage) {
     if (isSeparator(node)) {
@@ -336,7 +337,13 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
     }
     const element = createControl(context, node, { role: 'button', icon: false });
     element.classList.add('docier-backstage-item');
+    /* The note promises every action here has a shortcut, so the row states
+       it rather than leaving the reader to guess which key runs Export. */
+    const hint = make('span', 'docier-backstage-shortcut');
+    hint.setAttribute('aria-hidden', 'true');
+    element.appendChild(hint);
     bindNode(element, node, 'button');
+    backstageHint.push({ element, spec: specOf(node) });
     group.appendChild(element);
   }
   backstageItems.appendChild(backstageGroups);
@@ -370,6 +377,13 @@ export const createMenuBar = (options: MenuBarOptions): MenuBarHandle => {
     pagesValue.textContent = String(stats?.pages ?? 0);
     wordsValue.textContent = String(stats?.words ?? 0);
     infoNote.textContent = context.i18n.text('ui.backstage.hint');
+    for (const entry of backstageHint) {
+      const shortcut = entry.element.querySelector<HTMLElement>('.docier-backstage-shortcut');
+      if (shortcut === null) continue;
+      const hint = context.describe(entry.spec).hint;
+      shortcut.textContent = hint ?? '';
+      shortcut.hidden = hint === undefined;
+    }
   };
 
   store.listen(backstageButton, 'click', (event) => {

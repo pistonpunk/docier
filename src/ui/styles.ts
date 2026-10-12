@@ -140,11 +140,12 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-backstage-groups{display:flex;flex-direction:column;gap:6px}
 .docier-backstage-group{display:flex;flex-direction:column;gap:1px;padding-block-end:6px;border-block-end:1px solid var(--docier-border-soft)}
 .docier-backstage-group:last-child{border-block-end:0;padding-block-end:0}
-.docier-backstage-item{appearance:none;justify-content:flex-start;border:0;background:transparent;color:var(--docier-text);font:inherit;text-align:start;cursor:pointer;min-height:32px;padding:0 10px;border-radius:6px}
+.docier-backstage-item{appearance:none;display:flex;align-items:center;gap:8px;width:100%;justify-content:flex-start;border:0;background:transparent;color:var(--docier-text);font:inherit;text-align:start;cursor:pointer;min-height:34px;padding:0 10px;border-radius:6px}
 .docier-backstage-item:hover:not([aria-disabled="true"]){background:var(--docier-state-hover);color:var(--docier-text)}
 .docier-backstage-item:focus-visible{outline:2px solid var(--docier-focus-ring);outline-offset:-2px}
 .docier-backstage-item[aria-disabled="true"]{color:var(--docier-text-disabled);cursor:default}
 .docier-backstage-body{display:flex;flex-direction:column;gap:16px;padding:28px 32px;overflow-y:auto;max-width:760px}
+.docier-backstage-shortcut{margin-inline-start:auto;padding-inline-start:12px;color:var(--docier-text-muted);font-size:calc(var(--docier-ui-font-size) - 2px);font-variant-numeric:tabular-nums}
 .docier-backstage-title{margin:0;font-size:calc(var(--docier-ui-font-size) + 8px);font-weight:600;color:var(--docier-text);letter-spacing:-0.01em}
 .docier-backstage-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:calc(var(--docier-gap) * 2) calc(var(--docier-gap) * 4);margin:0;padding:calc(var(--docier-gap) * 4);background:var(--docier-surface-raised);border:1px solid var(--docier-border);border-radius:var(--docier-radius);box-shadow:var(--docier-shadow-1)}
 .docier-backstage-term{margin:0;color:var(--docier-text-muted);font-size:calc(var(--docier-ui-font-size) - 1px)}
