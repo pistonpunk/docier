@@ -453,7 +453,7 @@ export interface PermissionsConfig {
 export interface TokenizationConfig {
   readonly enabled: boolean;
   readonly storage: 'sdt' | 'text';
-  readonly display: 'placeholder' | 'fieldCode' | 'resolved';
+  readonly display: 'placeholder' | 'marker' | 'fieldCode' | 'resolved';
   readonly trigger: string;
   readonly triggerEnabled: boolean;
 }
