@@ -124,6 +124,11 @@ and shown as a visible placeholder. A contract must never print a silently empty
 Filling runs headlessly: bytes in, bytes out, no DOM and no network, so a server can fill a template
 without a browser.
 
+While a template is being edited, `tokenization.display` decides what a token looks like on the page:
+`placeholder` (its catalogue label), `marker` (the literal `{{key}}`, which is what a template editor
+wants so the author sees the key that will be filled), `fieldCode` (the content-control tag) and
+`resolved` (the current data).
+
 ## What it handles
 
 - **DOCX fidelity.** Round-trips a real `.docx`, preserving markup it does not model as raw bytes rather

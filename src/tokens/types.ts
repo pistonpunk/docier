@@ -19,7 +19,7 @@ export type TokenValueType =
 
 export type TokenData = Readonly<Record<string, unknown>>;
 
-export type TokenDisplayMode = 'label' | 'code' | 'value';
+export type TokenDisplayMode = 'label' | 'code' | 'value' | 'key';
 
 export type FillMode = 'document' | 'template' | 'preview';
 

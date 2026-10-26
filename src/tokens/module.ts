@@ -175,6 +175,7 @@ const mutationOf = <T>(value: T, changed: boolean): MutationOutcomeLike<T> => ({
 const displayModeFromConfig = (value: string | undefined): TokenDisplayMode => {
   if (value === 'fieldCode' || value === 'code') return 'code';
   if (value === 'resolved' || value === 'value') return 'value';
+  if (value === 'marker' || value === 'key') return 'key';
   return 'label';
 };
 
@@ -759,7 +760,7 @@ export const createTokenAttachment = (
       refuse: () => NO_DOCUMENT,
       run: async (args, ctx) => {
         void args;
-        const order: readonly TokenDisplayMode[] = ['label', 'code', 'value'];
+        const order: readonly TokenDisplayMode[] = ['label', 'key', 'code', 'value'];
         const at = order.indexOf(engine.options().display);
         const next = order[(at + 1) % order.length] ?? 'label';
         const plan = planSetDisplay(next);

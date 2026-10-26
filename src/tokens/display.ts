@@ -13,12 +13,16 @@ import { writeRichRuns, writeSegments } from './write.js';
 export const displayModeOf = (value: string | undefined): TokenDisplayMode => {
   if (value === 'fieldCode' || value === 'code') return 'code';
   if (value === 'resolved' || value === 'value') return 'value';
+  if (value === 'marker' || value === 'key') return 'key';
   return 'label';
 };
 
-export const configValueOf = (mode: TokenDisplayMode): 'placeholder' | 'fieldCode' | 'resolved' => {
+export const configValueOf = (
+  mode: TokenDisplayMode,
+): 'placeholder' | 'fieldCode' | 'resolved' | 'marker' => {
   if (mode === 'code') return 'fieldCode';
   if (mode === 'value') return 'resolved';
+  if (mode === 'key') return 'marker';
   return 'placeholder';
 };
 
@@ -49,6 +53,10 @@ export const planDisplay = (input: ProjectionInput): DisplayPlan => {
   if (mode === 'code') {
     const text = token.ref.tag;
     return { mode, text, segments: segmentsOf(text), placeholder: false, resolved: true };
+  }
+  if (mode === 'key') {
+    const text = visibleMarkerOf(token.ref.key, input.trigger);
+    return { mode, text, segments: segmentsOf(text), placeholder: true, resolved: false };
   }
   if (mode === 'label') {
     const text =
