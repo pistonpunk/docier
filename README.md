@@ -220,6 +220,22 @@ to rendering ones already in a document; comments; footnotes; find and replace; 
 header or footer from the UI. See `agent_progress.md` for the current state and `docs/SPEC.md` for the
 full design.
 
+## Editing in HR Portal
+
+The HR Portal application does not use this package's editing surface any more. Templates are
+authored in **SuperDoc**, which owns caret, selection, tables, styles and the toolbar; this package
+is kept for the two jobs it does better than anything else in the field:
+
+- `docier-web/layout` + `docier-web/pdf` render the filled document to PDF from a computed layout,
+  so the preview and the printed page are the same object;
+- `docier-web/tokens` normalises legacy `{{key}}` markers into Word content controls and supplies
+  the catalogue types the token panel reads.
+
+The two engines share one contract, not one codebase: a placeholder is a Word content control whose
+`w:tag` is `docier:field:<key>` (or `image:`, `loop:`, `if:`). SuperDoc preserves those tags on
+round-trip and can create them at the caret; `pkg/docx` in the HR Portal backend fills them. That
+split is why replacing the editor did not touch the fill engine.
+
 ## Architecture
 
 For contributors, and for anyone who wants to know why the page you see is the page that prints.
