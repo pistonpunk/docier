@@ -144,8 +144,12 @@ wants so the author sees the key that will be filled), `fieldCode` (the content-
   semantics.
 - **Editing.** Caret and selection, Word's navigation keys, typing, splitting and joining, clipboard with
   a model-content buffer, undo and redo with one entry per gesture, and 112 commands.
-- **Chrome.** Ribbon with tabs and groups, context menus on every surface, a floating selection toolbar,
-  a ruler, a status bar, and theming through CSS custom properties.
+- **Chrome.** A full Word-style ribbon with tabs and groups, or a compact single-row toolbar
+  (`mountChrome(editor, { mode: 'compact' })`): one 40px row of icon controls with tooltips and menu
+  popovers, hairline dividers between groups, and every ribbon command still reachable from the same
+  menu model. Both modes share context menus on every surface, a floating selection toolbar, a ruler, a
+  status bar, and theming through CSS custom properties. The full ribbon stays selectable with
+  `{ mode: 'full' }`.
 
 ## Requirements
 
@@ -235,6 +239,23 @@ The two engines share one contract, not one codebase: a placeholder is a Word co
 `w:tag` is `docier:field:<key>` (or `image:`, `loop:`, `if:`). SuperDoc preserves those tags on
 round-trip and can create them at the caret; `pkg/docx` in the HR Portal backend fills them. That
 split is why replacing the editor did not touch the fill engine.
+
+The seam is part of this package rather than a pattern each application repeats. `docier-web/superdoc`
+mounts SuperDoc with its own chrome off and speaks the same token tags:
+
+```ts
+import { createSuperDocView } from 'docier-web/superdoc'
+
+const view = await createSuperDocView('#editor', { document: bytes, readOnly: false })
+await view.insertToken('employee.surname')
+const missing = await view.fill({ 'employee.surname': 'Popescu' })
+const saved = await view.bytes()
+view.destroy()
+```
+
+SuperDoc is an optional peer dependency: the entry point loads it with a dynamic `import()`, so an
+application that only renders PDFs or fills templates never pulls it in. `bytes()` exports without
+triggering a download, and `fill` returns the keys that had no content control.
 
 ## Architecture
 

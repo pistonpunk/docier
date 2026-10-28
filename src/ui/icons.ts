@@ -272,7 +272,20 @@ const GLYPHS: Readonly<Record<string, string>> = {
     '<rect x="1.5" y="3" width="9" height="9" rx="1"/><circle cx="4.4" cy="5.9" r=".9"/><path d="M1.8 10.6 4.4 8.2l2 1.9 1.3-1.2 1.8 1.7"/><path d="m10.4 10.4 3.2 3.2"/><path d="m13.6 10.4-3.2 3.2"/>',
   'token.toggleCodes':
     '<path d="M6 3.5H4.8A1.3 1.3 0 0 0 3.5 4.8v6.4a1.3 1.3 0 0 0 1.3 1.3H6"/><path d="M10 3.5h1.2a1.3 1.3 0 0 1 1.3 1.3v6.4a1.3 1.3 0 0 1-1.3 1.3H10"/><path d="M7 8h2"/>',
+  'docier.compact.more': '<path d="M3.5 8h.01"/><path d="M8 8h.01"/><path d="M12.5 8h.01"/>',
 };
+
+const GLYPH_ALIASES: Readonly<Record<string, string>> = {
+  'compact:style': 'style.apply',
+  'compact:fontFamily': 'format.setFontFamily',
+  'compact:fontSize': 'format.setFontSize',
+  'compact:align': 'format.alignLeft',
+  'compact:insert': 'insert.table',
+  'compact:zoom': 'zoomSet',
+  'compact:file': 'doc.save',
+};
+
+const glyphOf = (key: string): string | undefined => GLYPHS[key] ?? GLYPHS[GLYPH_ALIASES[key] ?? ''];
 
 const modeOf = (node: UiNode): string | undefined => {
   const mode = node.actionArgs?.['mode'];
@@ -289,8 +302,11 @@ const keyOf = (node: UiNode): string | undefined => {
 export const iconFor = (node: UiNode): string | undefined => {
   const key = keyOf(node);
   if (key === undefined) return undefined;
-  const glyph = GLYPHS[key];
+  const glyph = glyphOf(key);
   return glyph === undefined ? undefined : `${OPEN}${glyph}</svg>`;
 };
 
-export const iconKeys = (): readonly string[] => Object.keys(GLYPHS);
+export const iconKeys = (): readonly string[] => [
+  ...Object.keys(GLYPHS),
+  ...Object.keys(GLYPH_ALIASES),
+];

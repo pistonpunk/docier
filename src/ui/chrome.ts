@@ -9,6 +9,8 @@ import {
 import { toCssPx, mp } from '../units/index.js';
 import { createContextMenus } from './context-menu.js';
 import type { ContextMenuController } from './context-menu.js';
+import { createCompactBar } from './compact-bar.js';
+import type { CompactBarHandle } from './compact-bar.js';
 import { createResolver } from './controls.js';
 import { PICTURE_DIALOG, dialogNameFor, openEditorDialog } from './dialog.js';
 import { dialogLabelKeyFor } from './dialog-names.js';
@@ -111,6 +113,7 @@ export interface ChromeHandle extends Disposable {
   readonly context: ChromeContext;
   readonly store: ChromeStore;
   readonly menuBar: MenuBarHandle | undefined;
+  readonly compactBar: CompactBarHandle | undefined;
   readonly ruler: RulerHandle | undefined;
   readonly statusBar: StatusBarHandle | undefined;
   readonly floating: FloatingToolbarHandle | undefined;
@@ -123,6 +126,7 @@ export interface ChromeHandle extends Disposable {
 
 const MODE_SURFACES: Readonly<Record<ChromeMode, readonly ChromeSlot[]>> = {
   full: ['menuBar', 'ribbon', 'ruler', 'statusBar', 'floatingControls', 'contextMenu'],
+  compact: ['ribbon', 'ruler', 'statusBar', 'floatingControls', 'contextMenu'],
   minimal: ['menuBar', 'statusBar', 'floatingControls', 'contextMenu'],
   none: [],
 };
@@ -136,7 +140,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
       units: options?.units,
       density: options?.density,
       statusItems: options?.statusItems,
-      rulerVisible: mode === 'full',
+      rulerVisible: mode === 'full' || mode === 'compact',
       marks: handle.showMarks,
       collapse: mode === 'minimal' ? 'hidden' : 'expanded',
     }),
@@ -596,6 +600,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
   take('dialogs');
 
   let menuBar: MenuBarHandle | undefined;
+  let compactBar: CompactBarHandle | undefined;
   let ruler: RulerHandle | undefined;
   let verticalRuler: VerticalRulerHandle | undefined;
   const colourPickers = new Map<string, ColourPickerHandle>();
@@ -625,7 +630,15 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     const canvas = make('div', 'docier-canvas');
     markPart(canvas, 'canvas');
 
-    if (enabled('menuBar') || enabled('ribbon')) {
+    if (mode === 'compact' && enabled('ribbon')) {
+      compactBar = createCompactBar({
+        context,
+        tabs: options?.tabs,
+        mount: portal,
+      });
+      root.appendChild(mountInto('ribbon', compactBar.element));
+      styleStore.add(compactBar);
+    } else if (enabled('menuBar') || enabled('ribbon')) {
       menuBar = createMenuBar({
         context,
         tabs: options?.tabs,
@@ -796,6 +809,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
 
   function refreshControls(): void {
     menuBar?.refresh();
+    compactBar?.refresh();
     floating?.refresh();
   }
 
@@ -894,6 +908,7 @@ export const mountChrome = (handle: EditorHandle, options?: ChromeOptions): Chro
     context,
     store,
     menuBar,
+    compactBar,
     ruler,
     statusBar,
     floating,

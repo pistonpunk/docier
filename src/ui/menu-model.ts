@@ -1401,3 +1401,184 @@ export const visibleTabs = (tabs: readonly UiTab[]): readonly UiTab[] =>
   tabs
     .map((tab) => ({ ...tab, groups: visibleGroups(tab.groups) }))
     .filter((tab) => tab.groups.length > 0);
+
+export interface UiCompactGroup {
+  readonly id: string;
+  readonly labelKey: string;
+  readonly nodes: readonly UiNode[];
+}
+
+export interface UiCompactLayout {
+  readonly id: string;
+  readonly labelKey: string;
+  readonly groups: readonly UiCompactGroup[];
+}
+
+const MODEL_BY_ID = new Map<string, UiNode>();
+const MODEL_BY_LABEL = new Map<string, UiNode>();
+
+const indexNodes = (nodes: readonly UiNode[]): void => {
+  for (const entry of nodes) {
+    if (!MODEL_BY_ID.has(entry.id)) MODEL_BY_ID.set(entry.id, entry);
+    if (entry.labelKey !== '' && !MODEL_BY_LABEL.has(entry.labelKey)) {
+      MODEL_BY_LABEL.set(entry.labelKey, entry);
+    }
+  }
+};
+
+for (const tab of ALL_RIBBON_TABS) for (const group of tab.groups) indexNodes(group.nodes);
+indexNodes(QUICK_ACCESS);
+indexNodes(BACKSTAGE_ITEMS);
+indexNodes(FLOATING_CONTROLS);
+
+const modelNode = (key: string): UiNode => {
+  const found = MODEL_BY_ID.get(key) ?? MODEL_BY_LABEL.get(key);
+  if (found === undefined) {
+    throw new Error(`The compact chrome layout names a control the menu model does not define: ${key}`);
+  }
+  return found;
+};
+
+const COMPACT_STYLE_MENU: UiNode = node('menu', {
+  id: 'compact:style',
+  labelKey: 'ui.control.styles',
+  items: STYLE_GALLERY,
+});
+
+const COMPACT_FONT_FAMILY_MENU: UiNode = node('menu', {
+  id: 'compact:fontFamily',
+  labelKey: 'ui.control.fontFamily',
+  items: FONT_FAMILIES.map((option) =>
+    button({
+      id: `compact:family:${option.value}`,
+      labelKey: option.label ?? option.value,
+      command: command('format.setFontFamily'),
+      args: { fontFamily: option.value },
+    }),
+  ),
+});
+
+const COMPACT_FONT_SIZE_MENU: UiNode = node('menu', {
+  id: 'compact:fontSize',
+  labelKey: 'ui.control.fontSize',
+  items: FONT_SIZES.map((option) =>
+    button({
+      id: `compact:size:${option.value}`,
+      labelKey: option.value,
+      command: command('format.setFontSize'),
+      args: { sizeHalfPoints: Number(option.value) * 2 },
+    }),
+  ),
+});
+
+const COMPACT_ALIGN_MENU: UiNode = node('menu', {
+  id: 'compact:align',
+  labelKey: 'ui.compact.align',
+  items: [
+    modelNode('docier.command.format.alignLeft'),
+    modelNode('docier.command.format.alignCenter'),
+    modelNode('docier.command.format.alignRight'),
+    modelNode('docier.command.format.alignJustify'),
+  ],
+});
+
+const COMPACT_INSERT_MENU: UiNode = node('menu', {
+  id: 'compact:insert',
+  labelKey: 'ui.menu.insert',
+  items: [
+    modelNode('docier.command.edit.insertPageBreak'),
+    modelNode('docier.command.insert.table'),
+    modelNode('docier.command.object.insertImage'),
+    modelNode('docier.command.insert.link'),
+    separator('compact:insert:sep'),
+    modelNode('ui.control.insertField'),
+    modelNode('docier.command.insert.dateTime'),
+    modelNode('docier.command.insert.symbol'),
+  ],
+});
+
+const COMPACT_ZOOM_MENU: UiNode = node('menu', {
+  id: 'compact:zoom',
+  labelKey: 'ui.group.zoom',
+  items: [
+    modelNode('ui.control.zoomIn'),
+    modelNode('ui.control.zoomOut'),
+    modelNode('ui.control.zoom100'),
+    separator('compact:zoom:sep'),
+    modelNode('ui.control.zoomPageWidth'),
+    modelNode('ui.control.zoomWholePage'),
+  ],
+});
+
+const COMPACT_FILE_MENU: UiNode = node('menu', {
+  id: 'compact:file',
+  labelKey: 'ui.tab.file',
+  items: BACKSTAGE_ITEMS.filter((entry) => entry.id !== 'backstage:close'),
+});
+
+const COMPACT_CORE_GROUPS: readonly UiCompactGroup[] = [
+  {
+    id: 'history',
+    labelKey: 'ui.group.editing',
+    nodes: [modelNode('docier.command.history.undo'), modelNode('docier.command.history.redo')],
+  },
+  { id: 'style', labelKey: 'ui.group.styles', nodes: [COMPACT_STYLE_MENU] },
+  { id: 'font', labelKey: 'ui.group.font', nodes: [COMPACT_FONT_FAMILY_MENU, COMPACT_FONT_SIZE_MENU] },
+  {
+    id: 'format',
+    labelKey: 'ui.group.font',
+    nodes: [
+      modelNode('docier.command.format.bold'),
+      modelNode('docier.command.format.italic'),
+      modelNode('docier.command.format.underline'),
+      modelNode('docier.command.format.strike'),
+    ],
+  },
+  {
+    id: 'colour',
+    labelKey: 'ui.compact.colour',
+    nodes: [modelNode('docier.command.format.setColor'), modelNode('docier.command.format.setHighlight')],
+  },
+  { id: 'alignment', labelKey: 'ui.compact.align', nodes: [COMPACT_ALIGN_MENU] },
+  { id: 'lists', labelKey: 'ui.compact.lists', nodes: [modelNode('docier.command.numbering.bullets')] },
+  {
+    id: 'indent',
+    labelKey: 'ui.group.paragraph',
+    nodes: [
+      modelNode('docier.command.format.decreaseIndent'),
+      modelNode('docier.command.format.increaseIndent'),
+    ],
+  },
+  { id: 'insert', labelKey: 'ui.menu.insert', nodes: [COMPACT_INSERT_MENU] },
+  { id: 'zoom', labelKey: 'ui.group.zoom', nodes: [COMPACT_ZOOM_MENU] },
+  { id: 'file', labelKey: 'ui.tab.file', nodes: [COMPACT_FILE_MENU] },
+];
+
+export const compactOverflowMenu = (tabs: readonly UiTab[]): UiNode => {
+  const items: UiNode[] = [];
+  for (const tab of tabs) {
+    const nodes: UiNode[] = [];
+    for (const group of tab.groups) {
+      const visible = visibleNodes(group.nodes);
+      if (visible.length === 0) continue;
+      if (nodes.length > 0) nodes.push(separator(`compact:overflow:${tab.id}:${group.id}`));
+      nodes.push(...visible);
+    }
+    if (nodes.length === 0) continue;
+    items.push(
+      node('menu', {
+        id: `compact:overflow:${tab.id}`,
+        labelKey: tab.labelKey,
+        items: nodes,
+      }),
+    );
+  }
+  return node('menu', { id: 'docier.compact.more', labelKey: 'ui.compact.more', items });
+};
+
+export const compactGroupsFor = (tabs: readonly UiTab[]): readonly UiCompactGroup[] => [
+  ...COMPACT_CORE_GROUPS,
+  { id: 'more', labelKey: 'ui.compact.more', nodes: [compactOverflowMenu(tabs)] },
+];
+
+export const COMPACT_GROUPS: readonly UiCompactGroup[] = compactGroupsFor(ALL_RIBBON_TABS);

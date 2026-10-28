@@ -428,7 +428,7 @@ export interface DocierEventMap extends EventMap {
 
 export type InstanceState = 'created' | 'mounting' | 'ready' | 'reconfiguring' | 'destroyed';
 
-export type ChromeMode = 'full' | 'minimal' | 'none';
+export type ChromeMode = 'full' | 'compact' | 'minimal' | 'none';
 
 export interface EditingConfig {
   readonly coalesceWindowMs: number;

@@ -20,6 +20,11 @@ export const EN_MESSAGES: MessageCatalogue = {
   'ui.backstage.hint':
     'Open a .docx to replace this document, save it back, or export it. Every action here also has a keyboard shortcut.',
   'ui.chrome.floatingControls': 'Text formatting',
+  'ui.compact.bar': 'Formatting',
+  'ui.compact.align': 'Alignment',
+  'ui.compact.colour': 'Colour',
+  'ui.compact.lists': 'Lists',
+  'ui.compact.more': 'More',
   'ui.reason.unavailable': 'Unavailable here',
   'ui.reason.unknown': 'This command is not available in this build',
   'ui.tab.file': 'File',

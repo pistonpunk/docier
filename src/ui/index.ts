@@ -58,9 +58,10 @@ export type { RovingHandle } from './keyboard.js';
 export type { DescriptorIndex, ResolverOptions } from './controls.js';
 export { applyResolved, createControl, createResolver, specOf, tooltipFor } from './controls.js';
 
-export type { UiGroup, UiNode, UiNodeKind, UiTab } from './menu-model.js';
+export type { UiCompactGroup, UiCompactLayout, UiGroup, UiNode, UiNodeKind, UiTab } from './menu-model.js';
 export {
   BACKSTAGE_ITEMS,
+  COMPACT_GROUPS,
   CONTEXT_MENUS,
   FLOATING_CONTROLS,
   PICTURE_TAB,
@@ -69,7 +70,12 @@ export {
   STATUS_ITEM_MENU,
   STYLE_GALLERY,
   TABLE_TAB,
+  compactGroupsFor,
+  compactOverflowMenu,
 } from './menu-model.js';
+
+export type { CompactBarHandle, CompactBarOptions } from './compact-bar.js';
+export { createCompactBar } from './compact-bar.js';
 
 export type { MenuAnchor, MenuHandle, MenuOptions } from './menu.js';
 export { MENU_ITEM_SELECTOR, hasEnabledItem, menuHasItems, openMenu } from './menu.js';

@@ -172,7 +172,7 @@ try {
 
 let chrome: ui.ChromeHandle | undefined;
 try {
-  chrome = ui.mountChrome(handle, { mode: 'full', language: () => navigator.language });
+  chrome = ui.mountChrome(handle, { mode: 'compact', language: () => navigator.language });
 } catch (error) {
   panel.add({
     code: 'mountChrome.failed',

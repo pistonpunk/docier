@@ -54,6 +54,14 @@ export const renderStyles = (): string => `${themeStyles()}
 .docier-ribbon-toggle{position:absolute;top:2px;inset-inline-end:4px;min-width:20px;min-height:20px;line-height:1;color:var(--docier-text-muted);z-index:2}
 .docier-ribbon[data-docier-collapsed="collapsed"] .docier-group-label{display:none}
 .docier-chrome .docier-ribbon{--docier-control-height:22px;--docier-gap:2px}
+.docier-compact{display:flex;grid-area:ribbon;align-items:center;height:40px;min-height:40px;padding-inline:6px;background:var(--docier-surface-command);border-bottom:1px solid var(--docier-border);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.docier-compact-group{display:flex;align-items:center;gap:2px;height:100%;padding-inline:6px;border-inline-end:1px solid var(--docier-border-soft)}
+.docier-compact-group:first-child{padding-inline-start:0}
+.docier-compact-group:last-child{border-inline-end:0}
+.docier-compact .docier-control{min-width:28px;min-height:28px;padding:0 4px}
+.docier-compact .docier-control-label{display:none}
+.docier-compact .docier-control-has-icon{gap:0}
+.docier-compact .docier-control-icon,.docier-compact .docier-control-icon svg{width:18px;height:18px}
 .docier-ribbon-panel{display:flex;flex-wrap:nowrap;align-items:stretch;gap:calc(var(--docier-gap) * 2);padding:2px 6px;width:100%}
 .docier-ribbon-panel[hidden]{display:none}
 @container (max-width: 760px){.docier-ribbon-panel{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}.docier-ribbon-panel>.docier-group{flex:0 0 auto}.docier-group-controls{flex-wrap:nowrap}}

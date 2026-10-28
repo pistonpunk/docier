@@ -52,6 +52,10 @@
       "types": "./dist/tokens/index.d.ts",
       "import": "./dist/tokens/index.js"
     },
+    "./superdoc": {
+      "types": "./dist/superdoc/index.d.ts",
+      "import": "./dist/superdoc/index.js"
+    },
     "./style.css": "./dist/style.css"
   },
   "files": [
@@ -75,9 +79,18 @@
   "dependencies": {
     "fflate": "^0.8.3"
   },
+  "peerDependencies": {
+    "superdoc": "^2.27.0"
+  },
+  "peerDependenciesMeta": {
+    "superdoc": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.20.2",
     "jsdom": "^26.1.0",
+    "superdoc": "2.27.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
   }
